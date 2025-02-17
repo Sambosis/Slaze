@@ -9,7 +9,6 @@ icecream
 openai
 pandas
 playwright
-pyautogui
 pydantic
 pygments
 replicate

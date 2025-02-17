@@ -1,6 +1,6 @@
 # tools/windows_navigation.py
 
-import pyautogui
+# import pyautogui
 import time
 from typing import Literal, Optional, Dict, Any
 from pathlib import Path
@@ -149,13 +149,13 @@ class WindowsNavigationTool:
                 time.sleep(0.2)
 
             # Execute the key combination
-            pyautogui.hotkey(*keys)
+            # pyautogui.hotkey(*keys)
             time.sleep(0.1)  # Small delay for action to complete
 
             # Handle any follow-up input
             if target and self.shortcuts.get(action, {}).get("requires_target", False):
-                pyautogui.typewrite(target)
-                pyautogui.press('enter')
+                # pyautogui.typewrite(target)
+                # pyautogui.press('enter')
 
             success_msg = f"Successfully executed '{action}'"
             if target:

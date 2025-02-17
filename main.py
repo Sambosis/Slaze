@@ -24,7 +24,7 @@ from anthropic.types.beta import (
 )
 from dotenv import load_dotenv
 from icecream import ic, install
-from pyautogui import write
+# from pyautogui import write
 from rich import print as rr
 # from rich.prompt import Prompt, Confirm
 from tools import (
