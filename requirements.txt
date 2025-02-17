@@ -16,3 +16,4 @@ requests
 rich
 serpapi
 tenacity
+gunicorn 
