@@ -8,7 +8,8 @@ from icecream import ic
 from rich import print as rr
 import json
 from pydantic import BaseModel
-from config import get_constant, set_constant
+from config import * # get_constant, set_constant
+from utils.context_helpers import *
 
 class ProjectCommand(str, Enum):
     SETUP_PROJECT = "setup_project"
@@ -104,14 +105,14 @@ class ProjectSetupTool(BaseAnthropicTool):
         project_path.mkdir(parents=True, exist_ok=True)
         os.chdir(project_path)
         ic("Creating Python virtual environment...")
-        self.run_command("python -m venv .venv") 
+        self.run_command(f"cd {project_path} && python -m venv .venv") # Create a virtual environment
         # try:
         #     self.run_command("uv init --no-config")
         # except:
         #     pass
         ic("Installing Python packages...")
         for package in packages:
-            self.run_command(f"python -m pip install {package}")
+            self.run_command(f"cd {project_path} && python -m pip install {package}")
         return {
             "command": "setup_project",
             "status": "success",
@@ -120,16 +121,61 @@ class ProjectSetupTool(BaseAnthropicTool):
         }
 
     async def add_dependencies(self, project_path: Path, packages: List[str]) -> dict:
-        os.chdir(project_path)
-        ic("Installing additional Python packages...")
-        for package in packages:
-            self.run_command(f"python -m pip install {package}")
-        return {
-            "command": "add_additional_depends",
-            "status": "success",
-            "project_path": str(project_path),
-            "packages_installed": packages
-        }
+        try:
+            os.chdir(project_path)
+            ic(f"Installing {len(packages)} additional Python packages...")
+            self.display.add_message("user",f"Installing {len(packages)} additional Python packages...")
+            # Get path to venv's Python interpreter
+            if os.name == 'nt':  # Windows
+                python_path = project_path / ".venv" / "Scripts" / "python"
+            else:  # Unix-like
+                python_path = project_path / ".venv" / "bin" / "python"
+
+            installed_packages = []
+            
+            # Install packages with progress updates
+            for i, package in enumerate(packages, 1):
+                ic(f"Installing package {i}/{len(packages)}: {package}")
+                self.display.add_message("user",f"Installing package {i}/{len(packages)}: {package}")
+                process = subprocess.run(
+                    [str(python_path), "-m", "pip", "install", package],
+                    capture_output=True,
+                    text=True,
+                    check=False
+                )
+                
+                if process.returncode != 0:
+                    return {
+                        "command": "add_additional_depends",
+                        "status": "error",
+                        "error": f"Failed to install {package}: {process.stderr}",
+                        "project_path": str(project_path),
+                        "packages_installed": installed_packages,
+                        "packages_failed": packages[i-1:],
+                        "failed_at": package
+                    }
+                
+                installed_packages.append(package)
+                self.display.add_message("user",f"Successfully installed {package}")
+
+            self.display.add_message("user","All packages installed successfully")
+            
+            return {
+                "command": "add_additional_depends",
+                "status": "success",
+                "project_path": str(project_path),
+                "packages_installed": installed_packages
+            }
+            
+        except Exception as e:
+            return {
+                "command": "add_additional_depends",
+                "status": "error",
+                "error": str(e),
+                "project_path": str(project_path),
+                "packages_attempted": packages,
+                "packages_installed": installed_packages if 'installed_packages' in locals() else []
+            }
 
     async def run_app(self, project_path: Path, filename: str) -> dict:
         os.chdir(project_path)
@@ -138,6 +184,7 @@ class ProjectSetupTool(BaseAnthropicTool):
                 ["python", filename],
                 capture_output=True,
                 text=True,
+                cwd=project_path,
                 check=True
             )
             return {
@@ -160,10 +207,10 @@ class ProjectSetupTool(BaseAnthropicTool):
         project_path.mkdir(parents=True, exist_ok=True)
         os.chdir(project_path)
         ic("Initializing Node.js project...")
-        self.run_command("npm init -y")
+        self.run_command(f"cd {project_path} && npm init -y")
         ic("Installing Node.js packages...")
         for package in packages:
-            self.run_command(f"npm install {package}")
+            self.run_command(f"cd {project_path} && npm install {package}")
         return {
             "command": "setup_project",
             "status": "success",
@@ -175,7 +222,7 @@ class ProjectSetupTool(BaseAnthropicTool):
         os.chdir(project_path)
         ic("Installing additional Node.js packages...")
         for package in packages:
-            self.run_command(f"npm install {package}")
+            self.run_command(f"cd {project_path} && npm install {package}")
         return {
             "command": "add_additional_depends",
             "status": "success",
@@ -190,6 +237,7 @@ class ProjectSetupTool(BaseAnthropicTool):
                 ["node", filename],
                 capture_output=True,
                 text=True,
+                cwd=project_path,
                 check=True
             )
             return {

@@ -17,7 +17,8 @@ from .base import BaseAnthropicTool, ToolError, ToolResult
 from utils.agent_display_web_with_prompt import AgentDisplayWebWithPrompt  # Add this line
 from load_constants import  write_to_file, ICECREAM_OUTPUT_FILE
 from icecream import ic
-from config import BASH_PROMPT_FILE, get_constant
+from config import * # BASH_PROMPT_FILE, get_constant
+from utils.context_helpers import *
 
 ic.configureOutput(includeContext=True, outputFunction=write_to_file)
 
@@ -312,45 +313,34 @@ class BashTool(BaseAnthropicTool):
                 success = (result.returncode == 0)
 
             elif sys.platform == 'win32':
-                # Windows: Generate and execute scripts with LLM and fallback
+                # Windows: Generate and execute scripts via LLM with fallback
                 if self.display:
-                    self.display.add_message("user", f"Generating and executing scripts via LLM (Windows)...")
+                    self.display.add_message("user", "Generating and executing scripts via LLM (Windows)...")
 
                 prompt = read_prompt_from_file(BASH_PROMPT_FILE, command)
                 response = generate_script_with_llm(prompt)
                 await asyncio.sleep(0.2)
-                parsed_scripts = parse_llm_response(response) # Get list of parsed scripts
+                parsed_scripts = parse_llm_response(response)  # List of script blocks in LLM-provided order
 
-                for script_info in parsed_scripts: # Iterate through parsed scripts and execute them in order.
+                for script_info in parsed_scripts:
                     script_type = script_info['script_type']
                     script_code = script_info['script_code']
 
-                    if script_type == "PowerShell Script":
-                        powershell_result = execute_script(script_type, script_code, self.display)
-                        if powershell_result['success']: # If powershell succeeds, consider overall success and break.
-                            output += f"PowerShell output: {powershell_result['output']}\nPowerShell error: {powershell_result['error']}\n"
-                            success = True
-                            break # Stop after successful powershell execution
-                        else:
-                            output += f"PowerShell output: {powershell_result['output']}\nPowerShell error: {powershell_result['error']}\n" # Append powershell output even if failure for reporting.
-                            error += f"PowerShell script failed:\n{powershell_result['error']}\n" # Accumulate errors
-
-                    elif script_type == "Python Script":
-                        python_result = execute_script(script_type, script_code, self.display)
-                        if python_result['success']: # If python succeeds, consider overall success and break.
-                            output += f"Python output: {python_result['output']}\nPython error: {python_result['error']}\n"
-                            success = True
-                            break # Stop after successful python execution
-                        else:
-                            output += f"Python output: {python_result['output']}\nPython error: {python_result['error']}\n" # Append python output even if failure for reporting.
-                            error += f"Python script failed:\n{python_result['error']}\n" # Accumulate errors
-
-                    else: # Handle other script types or unknown if necessary
+                    if script_type not in ["Python Script", "PowerShell Script", "Bash Script"]:
                         error += f"Unsupported script type from LLM: {script_type}\n"
                         if self.display:
                             self.display.add_message("user", f"Error: Unsupported script type: {script_type}")
+                        continue
 
+                    result = execute_script(script_type, script_code, self.display)
+                    output += f"{script_type} output:\n{result['output']}\n{script_type} error:\n{result['error']}\n"
+                    if result['success']:
+                        success = True
+                        break  # Stop after successful execution
+                    else:
+                        error += f"{script_type} script failed:\n{result['error']}\n"
 
+ 
             else: # OS not detected as Linux or Windows
                 error = "Unsupported operating system. Bash tool only supports Linux and Windows."
                 if self.display:

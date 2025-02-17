@@ -376,39 +376,40 @@ class EditTool(BaseAnthropicTool):
         Returns:
             Normalized Path object within project directory
         """
-        try:
-            # Get project directory from config
-            project_dir = Path(get_constant('PROJECT_DIR'))
-            if not project_dir.exists():
-                project_dir.mkdir(parents=True, exist_ok=True)
+        return path
+        # try:
+        #     # Get project directory from config
+        #     project_dir = Path(get_constant('PROJECT_DIR'))
+        #     if not project_dir.exists():
+        #         project_dir.mkdir(parents=True, exist_ok=True)
             
-            # Convert input to Path object
-            input_path = Path(path)
+        #     # Convert input to Path object
+        #     input_path = Path(path)
             
-            # If absolute path, make relative to project dir
-            if input_path.is_absolute():
-                try:
-                    # Try to make relative to project dir
-                    relative_path = input_path.relative_to(project_dir)
-                    result_path = project_dir / relative_path
-                except ValueError:
-                    # If not under project dir, take the name only
-                    result_path = project_dir / input_path.name
-            else:
-                # For relative paths, prepend project dir
-                result_path = project_dir / input_path
+        #     # If absolute path, make relative to project dir
+        #     if input_path.is_absolute():
+        #         try:
+        #             # Try to make relative to project dir
+        #             relative_path = input_path.relative_to(project_dir)
+        #             result_path = project_dir / relative_path
+        #         except ValueError:
+        #             # If not under project dir, take the name only
+        #             result_path = project_dir / input_path.name
+        #     else:
+        #         # For relative paths, prepend project dir
+        #         result_path = project_dir / input_path
             
-            # Ensure result is within project directory
-            try:
-                result_path.relative_to(project_dir)
-            except ValueError:
-                raise ValueError(f"Path {result_path} must be within project directory {project_dir}")
+        #     # Ensure result is within project directory
+        #     try:
+        #         result_path.relative_to(project_dir)
+        #     except ValueError:
+        #         raise ValueError(f"Path {result_path} must be within project directory {project_dir}")
                 
-            return result_path
+        #     return result_path
 
-        except Exception as e:
-            ic(f"Path normalization error: {e}")
-            raise ValueError(f"Failed to normalize path '{path}': {str(e)}")
+        # except Exception as e:
+        #     ic(f"Path normalization error: {e}")
+        #     raise ValueError(f"Failed to normalize path '{path}': {str(e)}")
 
     def write_file(self, path: Path, file: str):
         """Write file content ensuring correct project directory"""

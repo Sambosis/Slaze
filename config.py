@@ -26,7 +26,7 @@ PROMPTS_DIR = TOP_LEVEL_DIR / 'prompts'
 ICECREAM_OUTPUT_FILE =  LOGS_DIR / "debug_log.md"
 LOGS_DIR.mkdir(parents=True, exist_ok=True)
 LOG_FILE = LOGS_DIR / 'file_creation_log.json'
-MESSAGES_FILE = LOGS_DIR / 'messages.json'
+MESSAGES_FILE = LOGS_DIR / 'messages.md'
 SUMMARY_MODEL = "claude-3-5-haiku-latest"
 MAIN_MODEL = "claude-3-5-sonnet-latest"
 COMPUTER_USE_BETA_FLAG = "computer-use-2024-10-22"
@@ -145,7 +145,7 @@ def write_to_file(s: str, file_path: str = ICECREAM_OUTPUT_FILE):
 
     
     output.append(f"# ENTRY {first_line}: ")
-    output.append(f"## Details: ")    
+    output.append(f"- Details: ")    
     # Join and clean multi-line strings
     current_line = ""
     for line in lines:
@@ -163,7 +163,7 @@ def write_to_file(s: str, file_path: str = ICECREAM_OUTPUT_FILE):
                     json_obj = json.loads(json_part)
                     output.append(f"tool_input: {json.dumps(json_obj, separators=(',', ':'))}")
                 else:
-                    output.append(f"> {cleaned_line}")
+                    output.append(f"{cleaned_line}")
             except (IndexError, json.JSONDecodeError):
                 output.append(f"{cleaned_line}")
         else:

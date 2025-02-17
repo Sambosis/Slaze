@@ -12,9 +12,10 @@ from pydantic import BaseModel
 import tempfile
 from load_constants import write_to_file, ICECREAM_OUTPUT_FILE
 from tenacity import retry, stop_after_attempt, wait_fixed
-from config import get_constant, set_constant, PROJECT_DIR, LOGS_DIR
-from openai import OpenAI
-from utils.file_logger import log_file_operation, get_all_current_code
+from config import *
+from openai import OpenAI, AsyncOpenAI
+from utils.file_logger import *
+from utils.context_helpers import *
 import time
 from system_prompt.code_prompts import code_prompt_research, code_prompt_generate
 from pygments import highlight
@@ -28,9 +29,6 @@ load_dotenv()
 
 
 ic.configureOutput(includeContext=True, outputFunction=write_to_file)
-class CodeCommand(str, Enum):
-    WRITE_CODE_TO_FILE = "write_code_to_file"
-    WRITE_AND_EXEC = "write_and_exec"
 
 def write_chat_completion_to_file(response, filepath):
     """Appends an OpenAI ChatCompletion object to a file in a human-readable format."""
@@ -74,15 +72,29 @@ def write_chat_completion_to_file(response, filepath):
         print(f"Error writing to file: {e}")
 
 
+class CodeCommand(str, Enum):
+    """
+    CodeCommand _summary_
+
+    _extended_summary_
+
+    Args:
+        str (_type_): _description_
+        Enum (_type_): _description_
+    """
+    WRITE_CODE_TO_FILE = "write_code_to_file"
+    WRITE_AND_EXEC = "write_and_exec"
+    WRITE_CODE_MULTIPLE_FILES = "write_code_multiple_files"  # Added new command
+    GET_ALL_CODE = "get_all_current_code"
+
 class WriteCodeTool(BaseAnthropicTool):
     """
-    A tool that sets up Python projects with virtual environments and manages script execution.
+    A tool that takes a description of code that needs to be written and provides the actual programming code in the specified language. It can either execute the code or write it to a file depending on the command.
     """
 
     name: Literal["write_code"] = "write_code"
     api_type: Literal["custom"] = "custom"
-    description: str = "A tool that takes a description of code that needs to be written and provides the actual programming code in the specified language. It can either execute the code or write it to a file depending on the command."
-
+    description: str = "A tool that takes a description of code that needs to be written and provides the actual programming code in the specified language. It can either execute the code or write it to a file depending on the command. It is also able to return all of the code written so far so you can view the contents of all files."
     def __init__(self, display=None):
         super().__init__(display)
 
@@ -97,22 +109,34 @@ class WriteCodeTool(BaseAnthropicTool):
                     "command": {
                         "type": "string",
                         "enum": [cmd.value for cmd in CodeCommand],
-                        "description": "Command of what to do with the code: write_code_to_file or write_and_exec"
+                        "description": "Command to perform. Options: write_code_to_file, write_and_exec, write_code_multiple_files, get_all_current_code"
                     },
                     "code_description": {
                         "type": "string",
-                        "description": "A detailed description of the code to be written. First speify the programming language that the code must be written in.  Then you must specify any additional imports, classes, functions, etc. that should be included in the code. If it needs to call functions from outside of the file requested, be specific and detailed about how they should be called. It also will need to know what files it may need to interact with, their paths and the directory structure. It should also give a brief description of the project as a whole, while being clear about the scope of the code that it needs to write. You need to give context about the domain that the code will be used in and any other relevant information that will help the code be written correctly.  The code writer will only have the context that you provide to it so be VERY detailed and specific"
+                        "description": "Description for single file code generation. This should be a very detailed description of the code to be created. Include any assumption and specific details including necessary imports and how to interact with other aspects of the code."
                     },
                     "project_path": {
                         "type": "string",
-                        "description": "Path to the project directory"
+                        "description": "Path to the project directory."
                     },
                     "python_filename": {
                         "type": "string",
-                        "description": "The filename of the file to write the code to.  This is only needed if the command is write_code_to_file, but if write_code_to_file is the command, this is required."
+                        "description": "Filename for write_code_to_file command."
+                    },
+                    "files": {  # Added for multiple file support
+                        "type": "array",
+                        "description": "List of objects with 'code_description' and 'file_path' for each file to write.",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "code_description": {"type": "string"},
+                                "file_path": {"type": "string"}
+                            },
+                            "required": ["code_description", "file_path"]
+                        }
                     }
                 },
-                "required": ["command", "code_description", "project_path"]
+                "required": ["command", "project_path"]
             }
         }
 
@@ -120,7 +144,7 @@ class WriteCodeTool(BaseAnthropicTool):
         self,
         *,
         command: CodeCommand,
-        code_description: str,
+        code_description: str = "",  # default empty for multi-file command
         project_path: str = PROJECT_DIR,
         python_filename: str = "you_need_to_name_me.py",
         **kwargs,
@@ -132,6 +156,8 @@ class WriteCodeTool(BaseAnthropicTool):
         try:
             if self.display is not None:
                 self.display.add_message("user", f"WriteCodeTool Instructions: {code_description}")
+                self.display.add_message("assistant", get_all_current_code())
+
                 await asyncio.sleep(0.2)
 
             # Convert path string to Path object
@@ -143,8 +169,21 @@ class WriteCodeTool(BaseAnthropicTool):
             elif command == CodeCommand.WRITE_AND_EXEC:
                 result_data = await self.write_and_exec(code_description, project_path)
                 ic(f"result_data: {result_data}")
+            elif command == CodeCommand.WRITE_CODE_MULTIPLE_FILES:
+                files = kwargs.get("files", [])
+                if not files:
+                    return ToolResult(error="No files provided for multiple file creation.")
+                result_data = await self.write_multiple_files(project_path, files)
+            elif command == CodeCommand.GET_ALL_CODE:
+                result_data = {
+                "command": "GET_ALL_CODE",
+                "status": "success",
+                "files_results ": get_all_current_code(),
+
+            }
 
             else:
+
                 ic(f"Unknown command: {command}")
                 return ToolResult(error=f"Unknown command: {command}")
 
@@ -198,11 +237,13 @@ class WriteCodeTool(BaseAnthropicTool):
     async def _call_llm_to_generate_code(self, code_description: str, research_string: str, file_path) -> str:
         """Call LLM to generate code based on the code description"""
         ic()
+        self.display.add_message("assistant", f"Generating code for: {file_path}")
+
         code_string="no code created"
         OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
         current_code_base = get_all_current_code()
 
-        client = OpenAI(
+        client = AsyncOpenAI(
             base_url="https://openrouter.ai/api/v1",
             api_key=OPENROUTER_API_KEY,
             )
@@ -212,7 +253,7 @@ class WriteCodeTool(BaseAnthropicTool):
         messages = code_prompt_generate(current_code_base, code_description, research_string)
         ic(messages)
         try:
-            completion = client.chat.completions.create(
+            completion = await client.chat.completions.create(
             # model="deepseek/deepseek-r1:nitro",
             max_tokens=28000,
             model=model,
@@ -244,10 +285,7 @@ class WriteCodeTool(BaseAnthropicTool):
             ic(CODE_FILE)
             with open(CODE_FILE, "a", encoding="utf-8") as f:
                 f.write(f"File Path: {str(file_path)}\n")
-                f.write("Research:\n")
                 f.write(f"Language detected: {detected_language}\n")
-                f.write(f"{research_string}\n")
-                f.write("Generated Code:\n")
                 f.write(f"{code_string}\n")
         except Exception as file_error:
             # Log failure but don't stop execution
@@ -281,18 +319,20 @@ class WriteCodeTool(BaseAnthropicTool):
 
     async def _call_llm_to_research_code(self, code_description: str, file_path) -> str:
         """Call LLM to generate code based on the code description"""
+    
         ic()
+        self.display.add_message("assistant", f"Researching code for: {file_path}")
         code_string = "no code created"
         OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
         current_code_base = get_all_current_code()
-        client2 = OpenAI()
+        client2 = AsyncOpenAI()
         model = "o3-mini"
         
         # Prepare messages
         messages = code_prompt_research(current_code_base, code_description)
         ic(messages)
         try:
-            completion = client2.chat.completions.create(
+            completion =  await client2.chat.completions.create(
                 model=model,
                 messages=messages)
         except Exception as e:
@@ -316,8 +356,8 @@ class WriteCodeTool(BaseAnthropicTool):
         ic(research_string)
         return research_string
 
-    def format_output(self, data: dict) -> str:
 
+    def format_output(self, data: dict) -> str:
         """Format the output data as a readable string"""
         output_lines = []
         
@@ -330,14 +370,14 @@ class WriteCodeTool(BaseAnthropicTool):
         # Add project path
         output_lines.append(f"Project Path: {data['project_path']}")
 
-        # Add filename if present
+        # Add filename if present (for single file operations)
         if 'filename' in data:
             output_lines.append(f"Filename: {data['filename']}")
+            output_lines.append(f"Code:\n{data.get('code_string', '')}")
 
-        # # Add code string if present
-        # if 'code_string' in data:
-        #     output_lines.append("Code:")
-        #     output_lines.append(data['code_string'])
+        # Add files_results (for multiple files, this is already formatted)
+        if 'files_results' in data:
+            output_lines.append(data['files_results'])
         
         # Add packages if present
         if 'packages_installed' in data:
@@ -363,15 +403,15 @@ class WriteCodeTool(BaseAnthropicTool):
         code_research_string = await self._call_llm_to_research_code(code_description, file_path)
         ic(code_research_string)
 
-        with open("codeResearch.txt","a", encoding='utf-8') as f:
-            f.write(code_research_string)
+        # Write research result (optional: can also be wrapped if needed)
+        await asyncio.to_thread(lambda: open("codeResearch.txt", "a", encoding='utf-8').write(code_research_string))
         ic(code_research_string)
         code_string = await self._call_llm_to_generate_code(code_description, code_research_string, file_path)
         ic(code_string)
         
         # Create the directory if it does not exist
         try:
-            os.makedirs(file_path.parent, exist_ok=True)
+            await asyncio.to_thread(os.makedirs, file_path.parent, exist_ok=True)
         except Exception as dir_error:
             return {
                 "command": "write_code_to_file",
@@ -381,10 +421,9 @@ class WriteCodeTool(BaseAnthropicTool):
                 "error": f"Failed to create directory: {str(dir_error)}"
             }
         
-        # Write the file
+        # Write the file asynchronously
         try:
-            with open(file_path, 'w', encoding='utf-8') as file:
-                file.write(code_string)
+            await asyncio.to_thread(file_path.write_text, code_string, encoding='utf-8')
         except Exception as write_error:
             return {
                 "command": "write_code_to_file",
@@ -396,14 +435,14 @@ class WriteCodeTool(BaseAnthropicTool):
         
         # Log the file creation
         try:
-            log_file_operation(file_path, "create")
+            await asyncio.to_thread(log_file_operation, file_path, "create")
         except Exception as log_error:
             if self.display is not None:
                 try:
                     self.display.add_message("user", f"Failed to log file operation: {str(log_error)}")
                 except Exception:
                     pass
-            
+        
         return {
             "command": "write_code_to_file",
             "status": "success",
@@ -445,3 +484,39 @@ class WriteCodeTool(BaseAnthropicTool):
                 "project_path": str(project_path),
                 "errors": f"Failed to run app: {str(e)}\nOutput: {e.stdout}\nError: {e.stderr}"
             }
+
+    async def write_multiple_files(self, project_path: Path, files: list) -> dict:
+        """Write multiple files concurrently.
+        Expects files as a list of dicts with 'code_description' and 'file_path' keys.
+        Returns a single string containing all filenames and file contents.
+        """
+        tasks = []
+        for file_info in files:
+            desc = file_info.get("code_description", "")
+            file_relative = file_info.get("file_path")
+            # Ensure file_relative is a Path object
+            file_path = Path(file_relative)
+            # If file_path is not absolute, combine it with project_path
+            if not file_path.is_absolute():
+                file_path = project_path / file_path
+            tasks.append(self.write_code_to_file(desc, project_path, file_path))
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        # Concatenate successful file creation results into a single string
+        output_string = ""
+        for result in results:
+            if isinstance(result, Exception):
+                output_string += f"Error writing file: {str(result)}\n"
+            elif result.get("status") == "success":
+                output_string += f"Filename: {result.get('filename')}\n"
+                output_string += f"Code:\n{result.get('code_string')}\n\n"
+            else:
+                output_string += f"Filename: {result.get('filename', 'Unknown')}\n"
+                output_string += f"Error: {result.get('error', 'Unknown error')}\n\n"
+
+        return {
+            "command": "write_code_multiple_files",
+            "status": "completed",
+            "project_path": str(project_path),
+            "files_results": output_string  # Return the concatenated string
+        }

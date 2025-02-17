@@ -114,7 +114,7 @@ class AgentDisplayWeb:
             self.tool_results.clear()
         self.broadcast_update()
 
-    def start_server(self, host='0.0.0.0', port=5000):
+    def start_server(self, host='0.0.0.0', port=5001):
         thread = threading.Thread(
             target=self.socketio.run,
             args=(self.app,),

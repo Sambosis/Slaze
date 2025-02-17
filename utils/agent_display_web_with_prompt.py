@@ -43,17 +43,17 @@ class AgentDisplayWebWithPrompt(AgentDisplayWeb):
                         # Instead of attempting to get a running loop here (which fails in this thread),
                         # return an error.
                         return "Error: Event loop not set", 500
-                    anthropic_client = Anthropic()
-                    # Set up the agent.
-                    messages = [
-                        {"role": "user", "content": f"Baased on this description, please provide or refine proper software specification, often called a Software Requirements Specification (SRS). Do not give timelines or unit testing. keep it relativly concise and leave room for implementation details to be developed by the programmers. \nDescription: {task}"},
-                        ]
-                    response  = anthropic_client.messages.create(
-                    max_tokens=MAX_SUMMARY_TOKENS,
-                    messages=messages,
-                    model=MAIN_MODEL,
-                    )
-                    task = response.content[0].text
+                    # anthropic_client = Anthropic()
+                    # # Set up the agent.
+                    # messages = [
+                    #     {"role": "user", "content": f"Baased on this description, please provide or refine proper software specification, often called a Software Requirements Specification (SRS). Do not give timelines or unit testing. keep it relativly concise and leave room for implementation details to be developed by the programmers. There is no need to implement security features at this point. The goal is just to create a basic working prototype.\nDescription: {task}"},
+                    #     ]
+                    # response  = anthropic_client.messages.create(
+                    # max_tokens=MAX_SUMMARY_TOKENS,
+                    # messages=messages,
+                    # model=MAIN_MODEL,
+                    # )
+                    # task = response.content[0].text
                     print(task)
                     # Schedule the sampling loop on the pre-set event loop.
                     asyncio.run_coroutine_threadsafe(run_sampling_loop(task, self), self.loop)
@@ -79,3 +79,7 @@ class AgentDisplayWebWithPrompt(AgentDisplayWeb):
                 return content
             except Exception as e:
                 return f"Error reading prompt: {e}", 500
+
+def create_app():
+    display = AgentDisplayWebWithPrompt()
+    return display.app
