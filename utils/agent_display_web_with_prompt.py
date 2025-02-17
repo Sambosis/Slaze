@@ -6,8 +6,6 @@ from utils.agent_display_web import AgentDisplayWeb
 from config import PROMPTS_DIR, MAIN_MODEL, MAX_SUMMARY_TOKENS
 from anthropic import Anthropic
 
-display = AgentDisplayWebWithPrompt() # Create instance of AgentDisplayWebWithPrompt
-app = display.app # Assign the Flask app instance to the module-level 'app' variable
 
 class AgentDisplayWebWithPrompt(AgentDisplayWeb):
     def __init__(self):
@@ -87,3 +85,5 @@ class AgentDisplayWebWithPrompt(AgentDisplayWeb):
     def create_app():
         display = AgentDisplayWebWithPrompt()
         return display.app
+display = AgentDisplayWebWithPrompt() # Create instance of AgentDisplayWebWithPrompt
+app = display.app # Assign the Flask app instance to the module-level 'app' variable
