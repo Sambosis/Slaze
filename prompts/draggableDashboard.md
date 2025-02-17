@@ -1,0 +1,1 @@
+Please create a website with a dashboard. The dashboard widgets much be able to be dragged and dropped with the mouse. They also must be able to be resized with the mouse. All other design and framework descisions are up to you. Please make it very visually appealing and open up the webpage when you are finished.

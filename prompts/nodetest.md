@@ -1,0 +1,1 @@
+create a dynamic website for a mock store that sells sweaters using node.
