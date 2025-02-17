@@ -153,7 +153,7 @@ class WindowsNavigationTool:
             time.sleep(0.1)  # Small delay for action to complete
 
             # Handle any follow-up input
-            if target and self.shortcuts.get(action, {}).get("requires_target", False):
+            # if target and self.shortcuts.get(action, {}).get("requires_target", False):
                 # pyautogui.typewrite(target)
                 # pyautogui.press('enter')
 
