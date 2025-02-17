@@ -1,1 +1,1 @@
-web: gunicorn main:app
+web: gunicorn agent_display_web_with_prompt:app

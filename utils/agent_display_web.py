@@ -114,11 +114,12 @@ class AgentDisplayWeb:
             self.tool_results.clear()
         self.broadcast_update()
 
-    def start_server(self, host='0.0.0.0', port=5001):
+
+    def start_server(self, host='0.0.0.0', port=None): # Remove default port here
+        if port is None: # Get port from environment or default to 5001 if not set (for local dev)
+            port = int(os.environ.get('PORT', 5001))
         thread = threading.Thread(
             target=self.socketio.run,
             args=(self.app,),
             kwargs={'host': host, 'port': port, 'use_reloader': False}
-        )
-        thread.daemon = True
-        thread.start()
+            )

@@ -5,6 +5,10 @@ from flask import render_template, request, redirect, url_for
 from utils.agent_display_web import AgentDisplayWeb
 from config import PROMPTS_DIR, MAIN_MODEL, MAX_SUMMARY_TOKENS
 from anthropic import Anthropic
+
+display = AgentDisplayWebWithPrompt() # Create instance of AgentDisplayWebWithPrompt
+app = display.app # Assign the Flask app instance to the module-level 'app' variable
+
 class AgentDisplayWebWithPrompt(AgentDisplayWeb):
     def __init__(self):
         super().__init__()
@@ -80,6 +84,6 @@ class AgentDisplayWebWithPrompt(AgentDisplayWeb):
             except Exception as e:
                 return f"Error reading prompt: {e}", 500
 
-def create_app():
-    display = AgentDisplayWebWithPrompt()
-    return display.app
+    def create_app():
+        display = AgentDisplayWebWithPrompt()
+        return display.app
