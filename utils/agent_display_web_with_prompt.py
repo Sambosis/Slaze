@@ -42,7 +42,7 @@ class AgentDisplayWebWithPrompt(AgentDisplayWeb):
                     )
 
                     # Use start_background_task, passing the FUNCTION
-                    self.socketio.start_background_task(run_sampling_loop, task, self)
+                    asyncio.run_coroutine_threadsafe(run_sampling_loop(task, self), self.loop)
                     return redirect(url_for('index'))
 
                 except Exception as e:
