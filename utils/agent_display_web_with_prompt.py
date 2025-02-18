@@ -1,16 +1,16 @@
+# agent_display_web_with_prompt.py (Corrected)
 import os
 import asyncio
 from flask import render_template, request, redirect, url_for
 from utils.agent_display_web import AgentDisplayWeb
-from config import PROMPTS_DIR, MAIN_MODEL, MAX_SUMMARY_TOKENS
-from anthropic import Anthropic
+from config import PROMPTS_DIR, MAIN_MODEL, MAX_SUMMARY_TOKENS  # Import constants
 
-# No need for a global 'display' or 'app' here
 
 class AgentDisplayWebWithPrompt(AgentDisplayWeb):
     def __init__(self):
         super().__init__()
         self.setup_prompt_routes()
+
 
     def setup_prompt_routes(self):
         @self.app.route('/select_prompt', methods=['GET', 'POST'])
@@ -32,18 +32,16 @@ class AgentDisplayWebWithPrompt(AgentDisplayWeb):
                             task = f.read()
 
                     # Set up project directory information.
-                    # Replace 'your_project_module' with the actual module name.
-                    from main import run_sampling_loop
-                    from config import set_project_dir,  set_constant
+                    from main import run_sampling_loop  # Import run_sampling_loop
+                    from config import set_project_dir, set_constant
                     project_dir = set_project_dir(filename)
                     set_constant("PROJECT_DIR", str(project_dir))
                     task += (
                         f"Your project directory is {project_dir}. "
                         "You need to make sure that all files you create and work you do is done in that directory.\n"
                     )
-                    # print(task)  # Debug print, remove later
 
-                    # Use start_background_task here!
+                    # Use start_background_task, passing the FUNCTION
                     self.socketio.start_background_task(run_sampling_loop, task, self)
                     return redirect(url_for('index'))
 
@@ -69,9 +67,6 @@ class AgentDisplayWebWithPrompt(AgentDisplayWeb):
                 return content
             except Exception as e:
                 return f"Error reading prompt: {e}", 500
-
-# Don't create a global 'display' or 'app' instance here.
-
-def create_app():  # Keep this function
+def create_app():
     display = AgentDisplayWebWithPrompt()
     return display.app
