@@ -217,7 +217,7 @@ async def sampling_loop(
     """Main loop for agentic sampling."""
     task = messages[0]['content']
     context_recently_refreshed = False
-    refresh_count = 8
+    refresh_count = 28
 
     interupt_counter = 0
     try:
