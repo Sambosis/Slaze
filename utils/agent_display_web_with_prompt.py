@@ -1,3 +1,4 @@
+# agent_display_web_with_prompt.py (Corrected)
 import os
 import asyncio
 from flask import render_template, request, redirect, url_for
@@ -9,6 +10,7 @@ class AgentDisplayWebWithPrompt(AgentDisplayWeb):
     def __init__(self):
         super().__init__()
         self.setup_prompt_routes()
+
 
     def setup_prompt_routes(self):
         @self.app.route('/select_prompt', methods=['GET', 'POST'])
@@ -39,8 +41,8 @@ class AgentDisplayWebWithPrompt(AgentDisplayWeb):
                         "You need to make sure that all files you create and work you do is done in that directory.\n"
                     )
 
-                    # Use start_background_task, passing the FUNCTION, and correct arguments!
-                    self.socketio.start_background_task(run_sampling_loop, task, self) #CORRECT
+                    # Use start_background_task, passing the FUNCTION
+                    asyncio.run_coroutine_threadsafe(run_sampling_loop(task, self), self.loop)
                     return redirect(url_for('index'))
 
                 except Exception as e:
@@ -65,9 +67,6 @@ class AgentDisplayWebWithPrompt(AgentDisplayWeb):
                 return content
             except Exception as e:
                 return f"Error reading prompt: {e}", 500
-
-
 def create_app():
     display = AgentDisplayWebWithPrompt()
     return display.app
-app = create_app()
