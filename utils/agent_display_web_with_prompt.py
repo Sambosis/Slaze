@@ -70,3 +70,4 @@ class AgentDisplayWebWithPrompt(AgentDisplayWeb):
 def create_app():
     display = AgentDisplayWebWithPrompt()
     return display.app
+app = create_app()
