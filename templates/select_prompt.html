@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Select Prompt</title>
   <style>
     :root {
@@ -176,6 +177,22 @@
     @keyframes fadeIn {
       from { opacity: 0; transform: translateY(-10px); }
       to { opacity: 1; transform: translateY(0); }
+    }
+
+    @media (max-width: 768px) {
+      .layout {
+        grid-template-columns: 1fr;
+      }
+      .prompt-grid {
+        grid-template-columns: 1fr;
+      }
+      .preview-panel {
+        position: static;
+        top: auto;
+      }
+      .preview-content {
+        max-height: none;
+      }
     }
   </style>
 </head>
