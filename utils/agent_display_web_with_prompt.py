@@ -1,10 +1,10 @@
 # agent_display_web_with_prompt.py (excerpt)
 
 import asyncio
-from flask import render_template, request, redirect, url_for
+from flask import render_template, request, redirect, url_for, send_from_directory
 
 from utils.agent_display_web import AgentDisplayWeb
-from config import PROMPTS_DIR
+from config import PROMPTS_DIR, LOGS_DIR
 
 def start_sampling_loop(task, display):
     """
@@ -74,6 +74,14 @@ class AgentDisplayWebWithPrompt(AgentDisplayWeb):
                 return content
             except Exception as e:
                 return f"Error reading prompt: {e}", 500
+
+        @self.app.route('/download/<filename>')
+        def download_file(filename):
+            try:
+                return send_from_directory(LOGS_DIR, filename, as_attachment=True)
+            except Exception as e:
+                return f"Error downloading file: {e}", 500
+
 def create_app():
     display = AgentDisplayWebWithPrompt()
     return display.app

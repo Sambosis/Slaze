@@ -111,6 +111,14 @@
         </div>
     </div>
 
+    <!-- Download Links Section -->
+    <div class="bg-white rounded-lg panel-shadow p-4 mb-4">
+        <div class="flex items-center mb-4 text-red-600">
+            <i class="fas fa-download mr-2"></i>
+            <h2 class="text-xl font-semibold">Download Links</h2>
+        </div>
+        <div id="download_links" class="messages-container h-[150px] overflow-y-auto space-y-3"></div>
+    </div>
 
     <script>
         var socket = io({ transports: ['polling'] });
@@ -151,6 +159,19 @@
                 });
                 containerDiv.scrollTop = containerDiv.scrollHeight;
             });
+
+            // Update download links
+            var downloadLinksDiv = document.getElementById('download_links');
+            downloadLinksDiv.innerHTML = '';
+            if (data.download_links) {
+                data.download_links.forEach(link => {
+                    var linkElement = document.createElement('a');
+                    linkElement.href = link.url;
+                    linkElement.textContent = link.name;
+                    linkElement.className = 'block text-blue-500 hover:underline';
+                    downloadLinksDiv.appendChild(linkElement);
+                });
+            }
         });
 
         document.getElementById('sendInput').addEventListener('click', function() {
