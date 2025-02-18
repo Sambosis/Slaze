@@ -1,16 +1,23 @@
-# agent_display_web_with_prompt.py (Corrected)
-import os
+# agent_display_web_with_prompt.py (excerpt)
+
 import asyncio
 from flask import render_template, request, redirect, url_for
-from utils.agent_display_web import AgentDisplayWeb
-from config import PROMPTS_DIR, MAIN_MODEL, MAX_SUMMARY_TOKENS  # Import constants
 
+from utils.agent_display_web import AgentDisplayWeb
+from config import PROMPTS_DIR
+
+def start_sampling_loop(task, display):
+    """
+    Simple wrapper function that spins up a fresh event loop
+    to run the async `run_sampling_loop`.
+    """
+    from main import run_sampling_loop
+    asyncio.run(run_sampling_loop(task, display))
 
 class AgentDisplayWebWithPrompt(AgentDisplayWeb):
     def __init__(self):
         super().__init__()
         self.setup_prompt_routes()
-
 
     def setup_prompt_routes(self):
         @self.app.route('/select_prompt', methods=['GET', 'POST'])
@@ -31,8 +38,6 @@ class AgentDisplayWebWithPrompt(AgentDisplayWeb):
                         with open(prompt_path, 'r', encoding='utf-8') as f:
                             task = f.read()
 
-                    # Set up project directory information.
-                    from main import run_sampling_loop  # Import run_sampling_loop
                     from config import set_project_dir, set_constant
                     project_dir = set_project_dir(filename)
                     set_constant("PROJECT_DIR", str(project_dir))
@@ -41,8 +46,10 @@ class AgentDisplayWebWithPrompt(AgentDisplayWeb):
                         "You need to make sure that all files you create and work you do is done in that directory.\n"
                     )
 
-                    # Use start_background_task, passing the FUNCTION
-                    asyncio.run_coroutine_threadsafe(run_sampling_loop(task, self), self.loop)
+                    # Schedule your async function in a background thread,
+                    # and let that thread call `asyncio.run(...)`.
+                    self.socketio.start_background_task(start_sampling_loop, task, self)
+
                     return redirect(url_for('index'))
 
                 except Exception as e:
