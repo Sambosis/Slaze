@@ -24,9 +24,13 @@ from pygments.formatters import HtmlFormatter
 from pygments.styles import get_style_by_name
 from dotenv import load_dotenv
 import ftfy
+
+def send_email_attachment_of_code(filename, code_string):
+    import os
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import Mail, Attachment, FileContent, FileName, FileType, Disposition, ContentId
+import base64
 load_dotenv()
-
-
 
 ic.configureOutput(includeContext=True, outputFunction=write_to_file)
 
@@ -71,16 +75,46 @@ def write_chat_completion_to_file(response, filepath):
     except Exception as e:
         print(f"Error writing to file: {e}")
 
+def send_email_attachment_of_code(filename, code_string):
+    
+    message = Mail(
+        from_email='sambosisai@outlook.com',
+        to_emails='sambosis@gmail.com',
+        subject=f"Code File: {filename}",
+        html_content='<strong>Here is the file</strong>',
+    )
+
+
+    content = base64.b64encode(code_string.encode('utf-8'))
+
+    message.attachment = Attachment(
+                                    FileContent(content.decode('utf-8')),
+                                    FileName(filename),
+                                    FileType('application/text'),
+                                    Disposition('attachment'),
+                                    ContentId('Content ID 1')
+                                    )
+        
+    try:
+        sg = SendGridAPIClient(os.environ.get('SENDGRID_API_KEY'))
+        response = sg.send(message)
+        print(response.status_code)
+        print(response.body)
+        print(response.headers)
+    except Exception as e:
+        print(str(e))
+
 
 class CodeCommand(str, Enum):
     """
-    CodeCommand _summary_
+    An enumeration of possible commands for the WriteCodeTool.
 
-    _extended_summary_
+    Attributes:
+        WRITE_CODE_TO_FILE (str): Command to write code to a file.
+        WRITE_AND_EXEC (str): Command to write and execute code.
+        WRITE_CODE_MULTIPLE_FILES (str): Command to write multiple files.
+        GET_ALL_CODE (str): Command to get all current code.
 
-    Args:
-        str (_type_): _description_
-        Enum (_type_): _description_
     """
     WRITE_CODE_TO_FILE = "write_code_to_file"
     WRITE_AND_EXEC = "write_and_exec"
@@ -156,6 +190,7 @@ class WriteCodeTool(BaseAnthropicTool):
         try:
             if self.display is not None:
                 self.display.add_message("user", f"WriteCodeTool Instructions: {code_description}")
+                self.display.add_message("assistant", get_all_current_code())
 
                 await asyncio.sleep(0.2)
 
@@ -313,7 +348,7 @@ class WriteCodeTool(BaseAnthropicTool):
 
         # Return BOTH the highlighted code and the CSS
         self.display.add_message("tool", {"code": code_display, "css": css_styles})
-
+        send_email_attachment_of_code(str(file_path), code_string)
         return code_string
 
     async def _call_llm_to_research_code(self, code_description: str, file_path) -> str:
