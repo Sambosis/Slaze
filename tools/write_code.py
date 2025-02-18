@@ -24,6 +24,7 @@ from pygments.formatters import HtmlFormatter
 from pygments.styles import get_style_by_name
 from dotenv import load_dotenv
 import ftfy
+from pygments.lexers import get_lexer_by_name, guess_lexer
 
 def send_email_attachment_of_code(filename, code_string):
     import os
@@ -114,12 +115,14 @@ class CodeCommand(str, Enum):
         WRITE_AND_EXEC (str): Command to write and execute code.
         WRITE_CODE_MULTIPLE_FILES (str): Command to write multiple files.
         GET_ALL_CODE (str): Command to get all current code.
+        GET_REVISED_VERSION (str): Command to get a revised version of an existing file.
 
     """
     WRITE_CODE_TO_FILE = "write_code_to_file"
     WRITE_AND_EXEC = "write_and_exec"
     WRITE_CODE_MULTIPLE_FILES = "write_code_multiple_files"  # Added new command
     GET_ALL_CODE = "get_all_current_code"
+    GET_REVISED_VERSION = "get_revised_version"  # Add new command
 
 class WriteCodeTool(BaseAnthropicTool):
     """
@@ -143,7 +146,7 @@ class WriteCodeTool(BaseAnthropicTool):
                     "command": {
                         "type": "string",
                         "enum": [cmd.value for cmd in CodeCommand],
-                        "description": "Command to perform. Options: write_code_to_file, write_and_exec, write_code_multiple_files, get_all_current_code"
+                        "description": "Command to perform. Options: write_code_to_file, write_and_exec, write_code_multiple_files, get_all_current_code, get_revised_version"
                     },
                     "code_description": {
                         "type": "string",
@@ -168,6 +171,14 @@ class WriteCodeTool(BaseAnthropicTool):
                             },
                             "required": ["code_description", "file_path"]
                         }
+                    },
+                    "revision_description": {
+                        "type": "string",
+                        "description": "Description of the changes to be made to an existing file"
+                    },
+                    "target_file": {
+                        "type": "string",
+                        "description": "Path to the file that needs to be revised"
                     }
                 },
                 "required": ["command", "project_path"]
@@ -186,11 +197,10 @@ class WriteCodeTool(BaseAnthropicTool):
         """
         Executes the specified command for project management.
         """
-        ic()
+        
         try:
             if self.display is not None:
                 self.display.add_message("user", f"WriteCodeTool Instructions: {code_description}")
-                self.display.add_message("assistant", get_all_current_code())
 
                 await asyncio.sleep(0.2)
 
@@ -215,7 +225,12 @@ class WriteCodeTool(BaseAnthropicTool):
                 "files_results ": get_all_current_code(),
 
             }
-
+            elif command == CodeCommand.GET_REVISED_VERSION:
+                target_file = kwargs.get("target_file")
+                revision_description = kwargs.get("revision_description")
+                if not target_file or not revision_description:
+                    return ToolResult(error="Both target_file and revision_description are required for revision")
+                result_data = await self.get_revised_version(project_path, target_file, revision_description)
             else:
 
                 ic(f"Unknown command: {command}")
@@ -225,16 +240,11 @@ class WriteCodeTool(BaseAnthropicTool):
             # Convert result_data to formatted string   
             formatted_output = self.format_output(result_data)
             ic(f"formatted_output: {formatted_output}")
-            if self.display is not None:
-                self.display.add_message("user", f"WriteCodeTool completed: {formatted_output}")
-                await asyncio.sleep(0.2)
+
             return ToolResult(output=formatted_output)
 
         except Exception as e:
-            await asyncio.sleep(0.2)
-            if self.display is not None:
-                self.display.add_message("user", f"WriteCodeTool error: {str(e)}")
-            await asyncio.sleep(0.2)
+
             error_msg = f"Failed to execute {command}: {str(e)}"
             
             return ToolResult(error=error_msg)
@@ -270,28 +280,33 @@ class WriteCodeTool(BaseAnthropicTool):
 
     async def _call_llm_to_generate_code(self, code_description: str, research_string: str, file_path) -> str:
         """Call LLM to generate code based on the code description"""
-        ic()
+        
         self.display.add_message("assistant", f"Generating code for: {file_path}")
 
         code_string="no code created"
-        OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-        current_code_base = get_all_current_code()
 
-        client = AsyncOpenAI(
-            base_url="https://openrouter.ai/api/v1",
-            api_key=OPENROUTER_API_KEY,
-            )
-        model = "google/gemini-2.0-flash-001"
+        current_code_base = get_all_current_code()
+        OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+        # client = AsyncOpenAI(
+        #     base_url="https://openrouter.ai/api/v1",
+        #     api_key=OPENROUTER_API_KEY,
+        #     )
+        # model = "google/gemini-2.0-flash-001"
+        client = AsyncOpenAI()
+        model = "o3-mini"
         ic(model)
         # Prepare messages
         messages = code_prompt_generate(current_code_base, code_description, research_string)
         ic(messages)
         try:
-            completion = await client.chat.completions.create(
-            # model="deepseek/deepseek-r1:nitro",
-            max_tokens=28000,
-            model=model,
-            messages=messages)
+            completion =  await client.chat.completions.create(
+                model=model,
+                messages=messages)
+            # completion = await client.chat.completions.create(
+            # # model="deepseek/deepseek-r1:nitro",
+            # max_tokens=28000,
+            # model=model,
+            # messages=messages)
         except Exception as e:
             ic(completion)
             ic(f"error: {e}")
@@ -302,7 +317,7 @@ class WriteCodeTool(BaseAnthropicTool):
         # Extract code using the new function
         try:
             code_string, detected_language = self.extract_code_block(code_string)
-            ic(f"Code String: {code_string}\nLanguage: {detected_language}")
+            # ic(f"Code String: {code_string}\nLanguage: {detected_language}")
         except Exception as parse_error:
             error_msg = f"Failed to parse code block: {str(parse_error)}"
             if self.display is not None:
@@ -316,7 +331,7 @@ class WriteCodeTool(BaseAnthropicTool):
         # Log the extraction
         try:
             CODE_FILE = Path(get_constant("CODE_FILE"))
-            ic(CODE_FILE)
+            # ic(CODE_FILE)
             with open(CODE_FILE, "a", encoding="utf-8") as f:
                 f.write(f"File Path: {str(file_path)}\n")
                 f.write(f"Language detected: {detected_language}\n")
@@ -329,22 +344,34 @@ class WriteCodeTool(BaseAnthropicTool):
                 except Exception:
                     pass
 
-        ### Highlight the code
-        #  Create a Python lexer
-        lexer = PythonLexer()
-        
-        # Create an HTML formatter with full=False
-        formatter = HtmlFormatter(style="monokai", full=False, linenos=True, wrap=True)        
+        if detected_language == "html":
+            # Send the HTML content directly to the display for rendering
+            self.display.add_message("tool", {"html": code_string})
+            code_display = "HTML rendered in display."
+            css_styles = ""
+        else:
+            ### Highlight the code
+            # Attempt to get a lexer based on the detected language, otherwise guess
+            try:
+                if detected_language and detected_language != 'code':
+                    lexer = get_lexer_by_name(detected_language, stripall=True)
+                else:
+                    lexer = guess_lexer(code_string)
+            except Exception:
+                lexer = PythonLexer()  # Fallback to Python lexer
+
+            # Create an HTML formatter with full=False
+            formatter = HtmlFormatter(style="monokai", full=False, linenos=True, wrap=True)        
     
 
-        code_temp=f"#{str(file_path)}\n{code_string}"
+            code_temp=f"#{str(file_path)}\n{code_string}"
 
 
-        # Highlight the code
-        code_display = highlight(code_temp, lexer, formatter)
+            # Highlight the code
+            code_display = highlight(code_temp, lexer, formatter)
 
-        # Get CSS styles
-        css_styles = formatter.get_style_defs(".highlight")
+            # Get CSS styles
+            css_styles = formatter.get_style_defs(".highlight")
 
         # Return BOTH the highlighted code and the CSS
         self.display.add_message("tool", {"code": code_display, "css": css_styles})
@@ -354,26 +381,42 @@ class WriteCodeTool(BaseAnthropicTool):
     async def _call_llm_to_research_code(self, code_description: str, file_path) -> str:
         """Call LLM to generate code based on the code description"""
     
-        ic()
+        
         self.display.add_message("assistant", f"Researching code for: {file_path}")
         code_string = "no code created"
         OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
         current_code_base = get_all_current_code()
-        client2 = AsyncOpenAI()
-        model = "o3-mini"
-        
+        client2 = AsyncOpenAI(
+            base_url="https://openrouter.ai/api/v1",
+            api_key=OPENROUTER_API_KEY,
+            )
+        model = "google/gemini-2.0-flash-001"
+        # client2 = AsyncOpenAI()
+        # model = "o3-mini"
+
         # Prepare messages
         messages = code_prompt_research(current_code_base, code_description)
-        ic(messages)
+        # ic(messages)
         try:
-            completion =  await client2.chat.completions.create(
+            # completion = await client.chat.completions.create(
+            # # model="deepseek/deepseek-r1:nitro",
+            # max_tokens=28000,
+            # model=model,
+            # messages=messages)
+            completion = await client2.chat.completions.create(
+                # model="deepseek/deepseek-r1:nitro",
+                max_tokens=28000,
                 model=model,
                 messages=messages)
+            
+            # completion =  await client2.chat.completions.create(
+            #     model=model,
+            #     messages=messages)
         except Exception as e:
             ic(completion)
             ic(f"error: {e}")
             return code_description   
-        ic(completion)
+        # ic(completion)
 
         # Handle both OpenRouter and standard OpenAI response formats
         try:
@@ -385,9 +428,9 @@ class WriteCodeTool(BaseAnthropicTool):
             ic(f"Error extracting content: {e}")
             return code_description
 
-        ic(research_string)
+        # ic(research_string)
         research_string = ftfy.fix_text(research_string)
-        ic(research_string)
+        # ic(research_string)
         return research_string
 
 
@@ -435,11 +478,11 @@ class WriteCodeTool(BaseAnthropicTool):
         """write code to a permanent file"""
         file_path = project_path / filename
         code_research_string = await self._call_llm_to_research_code(code_description, file_path)
-        ic(code_research_string)
+        # ic(code_research_string)
 
         # Write research result (optional: can also be wrapped if needed)
         await asyncio.to_thread(lambda: open("codeResearch.txt", "a", encoding='utf-8').write(code_research_string))
-        ic(code_research_string)
+        # ic(code_research_string)
         code_string = await self._call_llm_to_generate_code(code_description, code_research_string, file_path)
         ic(code_string)
         
@@ -554,3 +597,50 @@ class WriteCodeTool(BaseAnthropicTool):
             "project_path": str(project_path),
             "files_results": output_string  # Return the concatenated string
         }
+
+    async def get_revised_version(self, project_path: Path, target_file: str, revision_description: str) -> dict:
+        """Get a revised version of an existing file with specified changes."""
+        file_path = project_path / target_file
+        try:
+            # Read existing file content
+            with open(file_path, 'r', encoding='utf-8') as f:
+                existing_code = f.read()
+                
+            # Get revised version
+            research_string = await self._call_llm_to_research_code(
+                f"Revision needed: {revision_description}\nExisting code:\n{existing_code}", 
+                file_path
+            )
+            
+            revised_code = await self._call_llm_to_generate_code(
+                f"Revision needed: {revision_description}\nExisting code:\n{existing_code}",
+                research_string,
+                file_path
+            )
+            
+            return {
+                "command": "get_revised_version",
+                "status": "success",
+                "project_path": str(project_path),
+                "filename": target_file,
+                "original_code": existing_code,
+                "revised_code": revised_code
+            }
+            
+        except FileNotFoundError:
+            return {
+                "command": "get_revised_version",
+                "status": "error",
+                "project_path": str(project_path),
+                "filename": target_file,
+                "error": f"File not found: {target_file}"
+            }
+        except Exception as e:
+            return {
+                "command": "get_revised_version",
+                "status": "error",
+                "project_path": str(project_path),
+                "filename": target_file,
+                "error": f"Error during revision: {str(e)}"
+            }
+

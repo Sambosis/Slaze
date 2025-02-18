@@ -12,7 +12,10 @@ def start_sampling_loop(task, display):
     to run the async `run_sampling_loop`.
     """
     from main import run_sampling_loop
-    asyncio.run(run_sampling_loop(task, display))
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    display.loop = loop  # Set the loop for the display
+    loop.run_until_complete(run_sampling_loop(task, display))
 
 class AgentDisplayWebWithPrompt(AgentDisplayWeb):
     def __init__(self):
@@ -82,6 +85,9 @@ class AgentDisplayWebWithPrompt(AgentDisplayWeb):
             except Exception as e:
                 return f"Error downloading file: {e}", 500
 
-def create_app():
+def create_app(loop=None):
+    """Create and configure the application with an event loop"""
     display = AgentDisplayWebWithPrompt()
+    if loop:
+        display.loop = loop
     return display.app

@@ -51,6 +51,26 @@ def archive_file(file_path):
         return new_path
     except Exception as e:
         return f"Error archiving file: {str(e)}"
+# Global for quick summaries
+
+filename = ""
+ic.configureOutput(includeContext=True, outputFunction=write_to_file)
+# ──────────────────────────────────────────────────────────────────────────────
+
+archive_file(ICECREAM_OUTPUT_FILE)
+archive_file(LOG_FILE)
+archive_file(MESSAGES_FILE)
+archive_file(CODE_FILE)
+archive_file(USER_LOG_FILE)
+archive_file(ASSISTANT_LOG_FILE)
+archive_file(TOOL_LOG_FILE)
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Context Reduction Functions
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+# ──────────────────────────────────────────────────────────────────────────────
 
 def generate_download_link(file_path):
     """Generate a download link for a given file."""
@@ -197,7 +217,7 @@ async def sampling_loop(
     """Main loop for agentic sampling."""
     task = messages[0]['content']
     context_recently_refreshed = False
-    refresh_count = 40
+    refresh_count = 8
 
     interupt_counter = 0
     try:
@@ -345,8 +365,10 @@ async def sampling_loop(
                     if len(messages) > refresh_count:
                         last_3_messages = messages[-3:]
                         display.add_message("assistant", "Awaiting User Input JK!⌨️ (Type your response in the web interface)")
+                        user_input = await display.wait_for_user_input()
+                        
                         new_context = await refresh_context_async(task, last_3_messages, display)
-
+                        new_context = new_context + user_input
                         messages =[{"role": "user", "content": new_context}]
                         refresh_count += 5
                         context_recently_refreshed = True
@@ -393,17 +415,31 @@ async def run_sampling_loop(task: str, display: AgentDisplayWebWithPrompt) -> Li
     return messages
 
 async def main_async():
+    # Create event loop first
+    loop = asyncio.get_event_loop()
+    
+    # Create display with the loop
     display = AgentDisplayWebWithPrompt()
-    display.loop = asyncio.get_running_loop()
+    display.loop = loop
     display.start_server()
+    
+    # Open browser after server starts
     webbrowser.open("http://localhost:5001/select_prompt")
     print("Server started. Please use your browser to interact with the application.")
-    while True:
-        await asyncio.sleep(1)
+    
+    try:
+        while True:
+            await asyncio.sleep(1)
+    except KeyboardInterrupt:
+        print("Shutting down...")
 
 def main():
+    # Set the event loop policy for Windows if needed
+    if os.name == 'nt':
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+    
+    # Run the async main function
     asyncio.run(main_async())
-    # Removed display.socketio.stop() - not needed and could cause issues
 
 if __name__ == "__main__":
     main()

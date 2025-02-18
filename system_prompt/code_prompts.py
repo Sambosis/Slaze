@@ -1,4 +1,3 @@
-
 PROMPT_FOR_CODE="""I need you to break down a python file in a structured way that concisely describes how to interact with the code.  
     It should serve as a basic reference for someone who is unfamiliar with the codebase and needs to understand how to use the functions and classes defined in the file.
     It should largely be natural language based.
@@ -78,7 +77,8 @@ def code_prompt_generate(current_code_base, code_description, research_string):
         "content": [
             {
             "type": "text",
-            "text": "Your are an expert with software engineer and proud coder.  You are make carefully designed programs that work on the first try and take the whole scope of the program into consideration when creating a piece of code. You are well versed in many programming lanaguages"
+            "text": """Your are an expert with software engineer and proud coder. You are to make carefully designed programs that work on the first try and take the whole scope of the program into consideration when creating or modifying code. 
+            When revising existing code, you must maintain the exact same structure and only make the specifically requested changes. Do not refactor or improve other parts of the code unless explicitly asked."""
             },
             ],
         "role": "user",
@@ -110,5 +110,4 @@ def code_prompt_generate(current_code_base, code_description, research_string):
         ]
         }
     ]
-    return messages    
-    
+    return messages

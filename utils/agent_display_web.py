@@ -4,7 +4,7 @@ import threading
 import asyncio
 from queue import Queue
 from flask import Flask, render_template, jsonify
-from flask_socketio import SocketIO
+from flask_socketio import SocketIO, disconnect
 from config import USER_LOG_FILE, ASSISTANT_LOG_FILE, TOOL_LOG_FILE, LOGS_DIR
 
 def log_message(msg_type, message):
@@ -60,16 +60,42 @@ class AgentDisplayWeb:
             })
 
     def setup_socketio_events(self):
+        @self.socketio.on('connect')
+        def handle_connect():
+            print("[DEBUG] Client connected")
+            # Get event loop from the running event loop if not set
+            if self.loop is None:
+                try:
+                    self.loop = asyncio.get_event_loop()
+                except RuntimeError:
+                    print("[ERROR] No event loop available")
+
+        @self.socketio.on('disconnect')
+        def handle_disconnect():
+            print("[DEBUG] Client disconnected")
+
         @self.socketio.on('user_input')
         def handle_user_input(data):
             print("[DEBUG] Received user_input event with data:", data)
             user_input = data.get('input', '')
+            
+            # Get event loop from the running event loop if not set
+            if self.loop is None:
+                try:
+                    self.loop = asyncio.get_event_loop()
+                except RuntimeError:
+                    print("[ERROR] No event loop available")
+                    return None
+
             if self.loop is not None:
-                # Enqueue the input on the main event loop
-                self.loop.call_soon_threadsafe(self.input_queue.put_nowait, user_input)
-                print("[DEBUG] Enqueued user input:", user_input)
+                try:
+                    self.loop.call_soon_threadsafe(self.input_queue.put_nowait, user_input)
+                    print("[DEBUG] Enqueued user input:", user_input)
+                except Exception as e:
+                    print(f"[ERROR] Failed to enqueue user input: {e}")
+                    disconnect()
             else:
-                print("[DEBUG] No event loop set; cannot enqueue user input")
+                print("[ERROR] No event loop available for handling input")
             return None
 
     async def wait_for_user_input(self, user_input = None):
@@ -123,3 +149,4 @@ class AgentDisplayWeb:
             args=(self.app,),
             kwargs={'host': host, 'port': port, 'use_reloader': False}
             )
+        thread.start()

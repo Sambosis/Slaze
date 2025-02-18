@@ -143,6 +143,13 @@ def execute_script(script_type: str, script_code: str, display: AgentDisplayWebW
     error = ""
     success = False
 
+    # Get path to venv's Python interpreter
+    project_dir = Path(get_constant("PROJECT_DIR"))
+    if os.name == 'nt':  # Windows
+        python_path = project_dir / ".venv" / "Scripts" / "python"
+    else:  # Unix-like
+        python_path = project_dir / ".venv" / "bin" / "python"
+
     if script_type == "Python Script":
         if display:
             display.add_message("user", "Executing Python script...")
@@ -152,13 +159,6 @@ def execute_script(script_type: str, script_code: str, display: AgentDisplayWebW
         try:
             with open(script_file, "w", encoding="utf-8", errors='replace') as f:
                 f.write(script_code)
-
-            # Get path to venv's Python interpreter
-            project_dir = Path(get_constant("PROJECT_DIR"))
-            if os.name == 'nt':  # Windows
-                python_path = project_dir / ".venv" / "Scripts" / "python"
-            else:  # Unix-like
-                python_path = project_dir / ".venv" / "bin" / "python"
 
             # Use subprocess.Popen to start the process in the background
             process = subprocess.Popen(
