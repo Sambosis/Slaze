@@ -1,1 +1,1 @@
-web: gunicorn -w 2 -k gevent utils.agent_display_web_with_prompt:app --timeout 120
+web: gunicorn -w 2 -k gevent serve:app --bind=0.0.0.0:$PORT --timeout 120
