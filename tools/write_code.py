@@ -156,7 +156,6 @@ class WriteCodeTool(BaseAnthropicTool):
         try:
             if self.display is not None:
                 self.display.add_message("user", f"WriteCodeTool Instructions: {code_description}")
-                self.display.add_message("assistant", get_all_current_code())
 
                 await asyncio.sleep(0.2)
 
