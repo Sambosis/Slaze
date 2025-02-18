@@ -52,6 +52,15 @@ def archive_file(file_path):
     except Exception as e:
         return f"Error archiving file: {str(e)}"
 
+def generate_download_link(file_path):
+    """Generate a download link for a given file."""
+    try:
+        file_path = Path(file_path)
+        filename = file_path.name
+        return f"/download/{filename}"
+    except Exception as e:
+        return f"Error generating download link: {str(e)}"
+
 with open(SYSTEM_PROMPT_FILE, 'r', encoding="utf-8") as f:
     SYSTEM_PROMPT = f.read()
 
