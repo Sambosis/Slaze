@@ -134,7 +134,6 @@ class WriteCodeTool(BaseAnthropicTool):
     description: str = "A tool that takes a description of code that needs to be written and provides the actual programming code in the specified language. It can either execute the code or write it to a file depending on the command. It is also able to return all of the code written so far so you can view the contents of all files."
     def __init__(self, display=None):
         super().__init__(display)
-
     def to_params(self) -> dict:
         return {
             "name": self.name,
@@ -601,6 +600,8 @@ class WriteCodeTool(BaseAnthropicTool):
     async def get_revised_version(self, project_path: Path, target_file: str, revision_description: str) -> dict:
         """Get a revised version of an existing file with specified changes."""
         file_path = project_path / target_file
+        display.add_message("assistant", f"Revising file USING NEW TOOL {file_path}")
+        display.add_message("user", f"Revising file USING NEW TOOL {file_path}")
         try:
             # Read existing file content
             with open(file_path, 'r', encoding='utf-8') as f:
@@ -617,7 +618,18 @@ class WriteCodeTool(BaseAnthropicTool):
                 research_string,
                 file_path
             )
-            
+            # write the opdated version back to the file
+            file_path.write_text(revised_code, encoding='utf-8')
+            # Log the file creation
+            try:
+                await asyncio.to_thread(log_file_operation, file_path, "update")
+            except Exception as log_error:
+                if self.display is not None:
+                    try:
+                        self.display.add_message("user", f"Failed to log file operation: {str(log_error)}")
+                    except Exception:
+                        pass
+                    
             return {
                 "command": "get_revised_version",
                 "status": "success",
