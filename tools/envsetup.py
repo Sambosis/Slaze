@@ -180,21 +180,34 @@ class ProjectSetupTool(BaseAnthropicTool):
     async def run_app(self, project_path: Path, filename: str) -> dict:
         os.chdir(project_path)
         try:
-            result = subprocess.run(
-                ["python", filename],
-                capture_output=True,
-                text=True,
+            # Get path to venv's Python interpreter
+            if os.name == 'nt':  # Windows
+                python_path = project_path / ".venv" / "Scripts" / "python"
+            else:  # Unix-like
+                python_path = project_path / ".venv" / "bin" / "python"
+
+            # Use subprocess.Popen to start the process in the background
+            process = subprocess.Popen(
+                [str(python_path), filename],  # Use the venv's python
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
                 cwd=project_path,
-                check=True
+                text=True,
+                encoding='utf-8',
+                errors='replace'
             )
+
+            output = "Application started in the background. PID: " + str(process.pid)
+            success = True  # Assume success since the process started
+
             return {
                 "command": "run_app",
                 "status": "success",
                 "project_path": str(project_path),
-                "run_output": result.stdout,
-                "errors": result.stderr
+                "run_output": output,
+                "errors": ""
             }
-        except subprocess.CalledProcessError as e:
+        except Exception as e:
             return {
                 "command": "run_app",
                 "status": "error",

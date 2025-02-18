@@ -348,7 +348,7 @@ class WriteCodeTool(BaseAnthropicTool):
 
         # Return BOTH the highlighted code and the CSS
         self.display.add_message("tool", {"code": code_display, "css": css_styles})
-        send_email_attachment_of_code(str(file_path), code_string)
+        # send_email_attachment_of_code(str(file_path), code_string)
         return code_string
 
     async def _call_llm_to_research_code(self, code_description: str, file_path) -> str:

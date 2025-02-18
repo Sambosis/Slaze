@@ -153,23 +153,29 @@ def execute_script(script_type: str, script_code: str, display: AgentDisplayWebW
             with open(script_file, "w", encoding="utf-8", errors='replace') as f:
                 f.write(script_code)
 
-            result = subprocess.run(
-                ["python", str(script_file)],
-                capture_output=True,
+            # Get path to venv's Python interpreter
+            project_dir = Path(get_constant("PROJECT_DIR"))
+            if os.name == 'nt':  # Windows
+                python_path = project_dir / ".venv" / "Scripts" / "python"
+            else:  # Unix-like
+                python_path = project_dir / ".venv" / "bin" / "python"
+
+            # Use subprocess.Popen to start the process in the background
+            process = subprocess.Popen(
+                [str(python_path), str(script_file)],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                cwd=str(project_dir),
                 text=True,
                 encoding='utf-8',
-                errors='replace',
-                check=False
+                errors='replace'
             )
-            output = result.stdout
-            error = result.stderr
-            success = (result.returncode == 0)
+
+            output = "Process started in the background.  PID: " + str(process.pid)
+            success = True  # Assume success since the process started
 
             if display:
-                if output:
-                    display.add_message("user", f"Python Output:\n{output}")
-                if error:
-                    display.add_message("user", f"Python Error Message:\n{error}")
+                display.add_message("user", f"Python process started in background with PID {process.pid}")
 
         except Exception as e:
             output = ""
@@ -177,7 +183,6 @@ def execute_script(script_type: str, script_code: str, display: AgentDisplayWebW
             success = False
             if display:
                 display.add_message("user", f"Python Execution Error:\n{error}")
-
 
     elif script_type == "PowerShell Script":
         if display:
@@ -188,24 +193,22 @@ def execute_script(script_type: str, script_code: str, display: AgentDisplayWebW
             f.write(script_code)
 
         try:
-            result = subprocess.run(
+            # Use subprocess.Popen to start the process in the background
+            process = subprocess.Popen(
                 ["powershell.exe", "-File", str(script_file)],
-                capture_output=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                cwd=str(project_dir),
                 text=True,
-                check=False
+                encoding='utf-8',
+                errors='replace'
             )
-            output = result.stdout
-            error = result.stderr
-            success = (result.returncode == 0)
-            if len(output) > 12000:
-                output = f"{output[:5000]} ... (truncated) ... {output[-5000:]}"
-            if len(error) > 12000:
-                error = f"{error[:5000]} ... (truncated) ... {error[-5000:]}"
 
-            if display and output:
-                display.add_message("user", f"PowerShell Output:\n{output}")
-            if display and error:
-                display.add_message("user", f"PowerShell Errors:\n{error}")
+            output = "Process started in the background. PID: " + str(process.pid)
+            success = True  # Assume success since the process started
+
+            if display:
+                display.add_message("user", f"PowerShell process started in background with PID {process.pid}")
 
         except Exception as e:
             output = ""
@@ -214,8 +217,7 @@ def execute_script(script_type: str, script_code: str, display: AgentDisplayWebW
             if display:
                 display.add_message("user", f"PowerShell Unexpected Error:\n{error}")
 
-
-    elif script_type == "Bash Script": # Added bash script execution (if needed for linux and unknown types)
+    elif script_type == "Bash Script":
         if display:
             display.add_message("user", "Executing Bash script...")
 
@@ -224,19 +226,22 @@ def execute_script(script_type: str, script_code: str, display: AgentDisplayWebW
             f.write(script_code)
 
         try:
-            result = subprocess.run(
+            # Use subprocess.Popen to start the process in the background
+            process = subprocess.Popen(
                 ["bash", str(script_file)],
-                capture_output=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                cwd=str(project_dir),
                 text=True,
-                check=False
+                encoding='utf-8',
+                errors='replace'
             )
-            output = result.stdout
-            error = result.stderr
-            success = (result.returncode == 0)
-            if display and output:
-                display.add_message("user", f"Bash Output:\n{output}")
-            if display and error:
-                display.add_message("user", f"Bash Errors:\n{error}")
+
+            output = "Process started in the background. PID: " + str(process.pid)
+            success = True  # Assume success since the process started
+
+            if display:
+                display.add_message("user", f"Bash process started in background with PID {process.pid}")
 
         except Exception as e:
             output = ""
@@ -244,7 +249,6 @@ def execute_script(script_type: str, script_code: str, display: AgentDisplayWebW
             success = False
             if display:
                 display.add_message("user", f"Bash Unexpected Error:\n{error}")
-
 
     else:
         error_msg = f"Unsupported script type: {script_type}"
@@ -388,3 +392,4 @@ def save_successful_code(script_code: str) -> str:
         f.write(script_code)
 
     return str(file_path)
+ 
