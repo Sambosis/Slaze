@@ -1,5 +1,5 @@
 import asyncio
-import subprocess
+import uvicorn
 import webbrowser
 import time
 from utils.agent_display_web_with_prompt import create_app
@@ -12,7 +12,7 @@ asyncio.set_event_loop(loop)
 app = create_app(loop)
 
 # Start the server
-server_process = subprocess.Popen(["./.venv/Scripts/python", "serve.py"])
+server_process = asyncio.create_task(uvicorn.run(app, host="0.0.0.0", port=5001))
 
 # Wait a moment for the server to start
 time.sleep(2)
@@ -26,4 +26,4 @@ try:
         time.sleep(1)
 except KeyboardInterrupt:
     print("Shutting down...")
-    server_process.terminate()
+    server_process.cancel()
