@@ -180,39 +180,29 @@ class ProjectSetupTool(BaseAnthropicTool):
     async def run_app(self, project_path: Path, filename: str) -> dict:
         os.chdir(project_path)
         try:
-            # Get path to venv's Python interpreter
-            if os.name == 'nt':  # Windows
+            if os.name == 'nt':  # Windows: use venv's Python
                 python_path = project_path / ".venv" / "Scripts" / "python"
-            else:  # Unix-like
+            else:
                 python_path = project_path / ".venv" / "bin" / "python"
-
-            # Use subprocess.Popen to start the process in the background
-            process = subprocess.Popen(
-                [str(python_path), filename],  # Use the venv's python
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                cwd=project_path,
+            result = subprocess.run(
+                [str(python_path), filename],
+                capture_output=True,
                 text=True,
-                encoding='utf-8',
-                errors='replace'
+                check=False
             )
-
-            output = "Application started in the background. PID: " + str(process.pid)
-            success = True  # Assume success since the process started
-
             return {
                 "command": "run_app",
                 "status": "success",
                 "project_path": str(project_path),
-                "run_output": output,
-                "errors": ""
+                "run_output": result.stdout,
+                "errors": result.stderr
             }
         except Exception as e:
             return {
                 "command": "run_app",
                 "status": "error",
                 "project_path": str(project_path),
-                "errors": f"Failed to run app: {str(e)}\nOutput: {e.stdout}\nError: {e.stderr}"
+                "errors": f"Failed to run app: {str(e)}"
             }
 
     # === Node.js Environment Methods ===
@@ -275,23 +265,18 @@ class ProjectSetupTool(BaseAnthropicTool):
     async def run_app_node(self, project_path: Path, filename: str) -> dict:
         os.chdir(project_path)
         try:
-            # Start the process in the background (non-blocking)
-            process = subprocess.Popen(
+            result = subprocess.run(
                 ["node", filename],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                cwd=str(project_path),
+                capture_output=True,
                 text=True,
-                encoding='utf-8',
-                errors='replace'
+                check=False
             )
-            output = "Application started in the background. PID: " + str(process.pid)
             return {
                 "command": "run_app",
                 "status": "success",
                 "project_path": str(project_path),
-                "run_output": output,
-                "errors": ""
+                "run_output": result.stdout,
+                "errors": result.stderr
             }
         except Exception as e:
             return {

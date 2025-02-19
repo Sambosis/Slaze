@@ -221,7 +221,6 @@ async def reorganize_context(messages: List[BetaMessageParam], summary: str) -> 
     summary_prompt = f"""I need a 2 part response from you. The first part of the response is to list everything that has been done already. 
     You will be given a lot of context, mucch of which is repetitive, so you are only to list each thing done one time.
     For each thing done (or attempted) list if it worked or not, and if not, why it didn't work.
-    You will probably be able to infer from the section labeled <NARATIVE>  </NARATIVE> what has been done. 
     However you will need the info the section labeled <MESSAGES>   </MESSAGES> in order to figure out why it didn't work. 
     You are to response to this needs to be inclosed in XML style tags called <COMPLETED>   </COMPETED>
    
@@ -233,9 +232,7 @@ async def reorganize_context(messages: List[BetaMessageParam], summary: str) -> 
     Please make sure your steps are clear, concise, and in a logical order and actionable. 
     Number them 1 through 4 in the order they should be done.
     Here is the Narative part:
-    <NARATIVE>
-    {summary}
-    </NARATIVE>
+
     Here is the messages part:
     <MESSAGES>
     {conversation_text}
@@ -275,7 +272,7 @@ async def refresh_context_async(task: str, messages: List[Dict], display: AgentD
     and appending current file contents.
     """
     filtered = filter_messages(messages)
-    summary = get_all_summaries()
+    summary = ""#get_all_summaries()
     last4_messages = format_messages_to_string(messages[-4:])
     completed, steps = await reorganize_context(filtered, summary)
 

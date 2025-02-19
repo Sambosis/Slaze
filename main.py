@@ -268,7 +268,7 @@ async def sampling_loop(
                     for msg in messages
                 ]
                 # --- START ASYNC SUMMARY ---
-                summary_task = asyncio.create_task(summarize_recent_messages(messages[-4:], display))
+                # summary_task = asyncio.create_task(summarize_recent_messages(messages[-4:], display))
                 ic(f"NUMBER_OF_MESSAGES: {len(messages)}")
 
                 # --- MAIN LLM CALL ---
@@ -340,13 +340,12 @@ async def sampling_loop(
                             # --- NOW AWAIT AND DISPLAY SUMMARY ---
                 ic(f"NUNBER_OF_MESSAGES: {len(messages)}")
                 display.add_message("user", f"NUNBER_OF_MESSAGES: {len(messages)}")
-                quick_summary = await summary_task  # Now we wait for the summary to complete
-                add_summary(quick_summary)
+                # quick_summary = await summary_task  # Now we wait for the summary to complete
+                # add_summary(quick_summary)
 
                 await asyncio.sleep(0.1)
                 if (not tool_result_content):# and (not context_recently_refreshed):
                     display.add_message("assistant", "Awaiting User Input ⌨️ (Type your response in the web interface)")
-                    # interupt_counter += 1
                     user_input = await display.wait_for_user_input()
                     display.add_message("assistant",f"The user has said '{user_input}'")
                     if user_input.lower() in ["no", "n"]:# or interupt_counter > 4:
