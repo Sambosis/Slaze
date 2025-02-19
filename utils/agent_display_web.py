@@ -3,8 +3,11 @@ import os
 import threading
 import asyncio
 from queue import Queue
-from flask import Flask, render_template, jsonify
-from flask_socketio import SocketIO, disconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+from fastapi.middleware.cors import CORSMiddleware
 from config import USER_LOG_FILE, ASSISTANT_LOG_FILE, TOOL_LOG_FILE, LOGS_DIR
 
 def log_message(msg_type, message):
@@ -24,15 +27,21 @@ def log_message(msg_type, message):
 
 class AgentDisplayWeb:
     """
-    A class for managing and displaying messages on a web page using Flask and SocketIO.
+    A class for managing and displaying messages on a web page using FastAPI and WebSocket.
     """
     def __init__(self):
         # Assume that templates folder is at the project root.
         template_dir = os.path.join(os.getcwd(), "templates")
-        self.app = Flask(__name__, template_folder=template_dir)
-        self.app.config['SECRET_KEY'] = 'secret!'
-        self.app.debug = True  # Enable debug mode for detailed errors.
-        self.socketio = SocketIO(self.app, async_mode='threading')
+        self.app = FastAPI()
+        self.app.add_middleware(
+            CORSMiddleware,
+            allow_origins=["*"],
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
+        self.app.mount("/static", StaticFiles(directory="static"), name="static")
+        self.templates = Jinja2Templates(directory=template_dir)
         self.user_messages = []
         self.assistant_messages = []
         self.tool_results = []
@@ -41,66 +50,39 @@ class AgentDisplayWeb:
         self.input_queue = asyncio.Queue()
         self.loop = None  # This should be set by the main async function.
         self.setup_routes()
-        self.setup_socketio_events()
+        self.setup_websocket_events()
 
     def setup_routes(self):
-        @self.app.route('/')
-        def index():
+        @self.app.get('/')
+        async def index():
             try:
-                return render_template("index.html")
+                return self.templates.TemplateResponse("index.html", {"request": {}})
             except Exception as e:
-                return f"Error rendering index: {e}", 500
+                return HTMLResponse(f"Error rendering index: {e}", status_code=500)
 
-        @self.app.route('/messages')
-        def get_messages():
-            return jsonify({
+        @self.app.get('/messages')
+        async def get_messages():
+            return {
                 'user': self.user_messages,
                 'assistant': self.assistant_messages,
                 'tool': self.tool_results
-            })
+            }
 
-    def setup_socketio_events(self):
-        @self.socketio.on('connect')
-        def handle_connect():
-            print("[DEBUG] Client connected")
-            # Get event loop from the running event loop if not set
-            if self.loop is None:
-                try:
-                    self.loop = asyncio.get_event_loop()
-                except RuntimeError:
-                    print("[ERROR] No event loop available")
-
-        @self.socketio.on('disconnect')
-        def handle_disconnect():
-            print("[DEBUG] Client disconnected")
-
-        @self.socketio.on('user_input')
-        def handle_user_input(data):
-            print("[DEBUG] Received user_input event with data:", data)
-            user_input = data.get('input', '')
-            
-            # Get event loop from the running event loop if not set
-            if self.loop is None:
-                try:
-                    self.loop = asyncio.get_event_loop()
-                except RuntimeError:
-                    print("[ERROR] No event loop available")
-                    return None
-
-            if self.loop is not None:
-                try:
-                    self.loop.call_soon_threadsafe(self.input_queue.put_nowait, user_input)
-                    print("[DEBUG] Enqueued user input:", user_input)
-                except Exception as e:
-                    print(f"[ERROR] Failed to enqueue user input: {e}")
-                    disconnect()
-            else:
-                print("[ERROR] No event loop available for handling input")
-            return None
+    def setup_websocket_events(self):
+        @self.app.websocket("/ws")
+        async def websocket_endpoint(websocket: WebSocket):
+            await websocket.accept()
+            try:
+                while True:
+                    data = await websocket.receive_text()
+                    await self.input_queue.put(data)
+                    await self.broadcast_update()
+            except WebSocketDisconnect:
+                print("[DEBUG] Client disconnected")
 
     async def wait_for_user_input(self, user_input = None):
         """
-        Wait for user input sent from the client via SocketIO.
+        Wait for user input sent from the client via WebSocket.
         Returns:
             The user input as a string.
         """
@@ -113,13 +95,14 @@ class AgentDisplayWeb:
             print("[DEBUG] wait_for_user_input returning from index.html:", user_input)
         return user_input
 
-    def broadcast_update(self):
+    async def broadcast_update(self):
         # Emit an update event to all connected clients
-        self.socketio.emit('update', {
-            'user': self.user_messages,  # Only send the last eight messages
-            'assistant': self.assistant_messages, # Only send the last five messages
-            'tool': self.tool_results  # Simply pass the list directly
-        })
+        for connection in self.app.websocket_connections:
+            await connection.send_json({
+                'user': self.user_messages,  # Only send the last eight messages
+                'assistant': self.assistant_messages, # Only send the last five messages
+                'tool': self.tool_results  # Simply pass the list directly
+            })
 
     def add_message(self, msg_type, content):
         log_message(msg_type, content)
@@ -129,7 +112,7 @@ class AgentDisplayWeb:
             self.assistant_messages.append(content)
         elif msg_type == "tool":
             self.tool_results.append(content)
-        self.broadcast_update()
+        asyncio.create_task(self.broadcast_update())
 
     def clear_messages(self, panel):
         if panel in ("user", "all"):
@@ -138,15 +121,10 @@ class AgentDisplayWeb:
             self.assistant_messages.clear()
         if panel in ("tool", "all"):
             self.tool_results.clear()
-        self.broadcast_update()
-
+        asyncio.create_task(self.broadcast_update())
 
     def start_server(self, host='0.0.0.0', port=None): # Remove default port here
         if port is None: # Get port from environment or default to 5001 if not set (for local dev)
             port = int(os.environ.get('PORT', 5001))
-        thread = threading.Thread(
-            target=self.socketio.run,
-            args=(self.app,),
-            kwargs={'host': host, 'port': port, 'use_reloader': False}
-            )
-        thread.start()
+        import uvicorn
+        uvicorn.run(self.app, host=host, port=port)

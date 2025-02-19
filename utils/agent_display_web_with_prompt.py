@@ -1,7 +1,13 @@
 # agent_display_web_with_prompt.py (excerpt)
 
 import asyncio
-from flask import render_template, request, redirect, url_for, send_from_directory
+from fastapi import FastAPI, Request, Form, HTTPException
+from fastapi.responses import RedirectResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+from fastapi.middleware.cors import CORSMiddleware
+from starlette.websockets import WebSocket, WebSocketDisconnect
+from pathlib import Path
 
 from utils.agent_display_web import AgentDisplayWeb
 from config import PROMPTS_DIR, LOGS_DIR
@@ -23,67 +29,67 @@ class AgentDisplayWebWithPrompt(AgentDisplayWeb):
         self.setup_prompt_routes()
 
     def setup_prompt_routes(self):
-        @self.app.route('/select_prompt', methods=['GET', 'POST'])
-        def select_prompt():
-            if request.method == 'POST':
-                try:
-                    choice = request.form.get('choice')
-                    if choice == 'new':
-                        filename = request.form.get('filename')
-                        prompt_text = request.form.get('prompt_text')
-                        new_prompt_path = PROMPTS_DIR / f"{filename}.md"
-                        with open(new_prompt_path, 'w', encoding='utf-8') as f:
-                            f.write(prompt_text)
-                        task = prompt_text
-                    else:
-                        prompt_path = PROMPTS_DIR / choice
-                        filename = prompt_path.stem
-                        with open(prompt_path, 'r', encoding='utf-8') as f:
-                            task = f.read()
+        @self.app.get('/select_prompt')
+        async def select_prompt(request: Request):
+            try:
+                prompt_files = list(PROMPTS_DIR.glob("*.md"))
+                options = [file.name for file in prompt_files]
+                return self.templates.TemplateResponse('select_prompt.html', {'request': request, 'options': options})
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=f"Error rendering prompt selection: {e}")
 
-                    from config import set_project_dir, set_constant
-                    project_dir = set_project_dir(filename)
-                    set_constant("PROJECT_DIR", str(project_dir))
-                    task += (
-                        f"Your project directory is {project_dir}. "
-                        "You need to make sure that all files you create and work you do is done in that directory.\n"
-                    )
+        @self.app.post('/select_prompt')
+        async def select_prompt_post(request: Request, choice: str = Form(...), filename: str = Form(None), prompt_text: str = Form(None)):
+            try:
+                if choice == 'new':
+                    new_prompt_path = PROMPTS_DIR / f"{filename}.md"
+                    with open(new_prompt_path, 'w', encoding='utf-8') as f:
+                        f.write(prompt_text)
+                    task = prompt_text
+                else:
+                    prompt_path = PROMPTS_DIR / choice
+                    filename = prompt_path.stem
+                    with open(prompt_path, 'r', encoding='utf-8') as f:
+                        task = f.read()
 
-                    # Schedule your async function in a background thread,
-                    # and let that thread call `asyncio.run(...)`.
-                    self.socketio.start_background_task(start_sampling_loop, task, self)
+                from config import set_project_dir, set_constant
+                project_dir = set_project_dir(filename)
+                set_constant("PROJECT_DIR", str(project_dir))
+                task += (
+                    f"Your project directory is {project_dir}. "
+                    "You need to make sure that all files you create and work you do is done in that directory.\n"
+                )
 
-                    return redirect(url_for('index'))
+                # Schedule your async function in a background thread,
+                # and let that thread call `asyncio.run(...)`.
+                self.loop.run_in_executor(None, start_sampling_loop, task, self)
 
-                except Exception as e:
-                    return f"Error processing prompt selection: {e}", 500
-            else:
-                try:
-                    prompt_files = list(PROMPTS_DIR.glob("*.md"))
-                    options = [file.name for file in prompt_files]
-                    return render_template('select_prompt.html', options=options)
-                except Exception as e:
-                    return f"Error rendering prompt selection: {e}", 500
+                return RedirectResponse(url='/')
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=f"Error processing prompt selection: {e}")
 
-        @self.app.route('/api/prompts/<filename>')
-        def get_prompt_content(filename):
+        @self.app.get('/api/prompts/{filename}')
+        async def get_prompt_content(filename: str):
             try:
                 prompt_path = PROMPTS_DIR / filename
                 if not prompt_path.exists():
-                    return "Prompt file not found", 404
+                    raise HTTPException(status_code=404, detail="Prompt file not found")
 
                 with open(prompt_path, 'r', encoding='utf-8') as f:
                     content = f.read()
-                return content
+                return JSONResponse(content=content)
             except Exception as e:
-                return f"Error reading prompt: {e}", 500
+                raise HTTPException(status_code=500, detail=f"Error reading prompt: {e}")
 
-        @self.app.route('/download/<filename>')
-        def download_file(filename):
+        @self.app.get('/download/{filename}')
+        async def download_file(filename: str):
             try:
-                return send_from_directory(LOGS_DIR, filename, as_attachment=True)
+                file_path = LOGS_DIR / filename
+                if not file_path.exists():
+                    raise HTTPException(status_code=404, detail="File not found")
+                return FileResponse(file_path, filename=filename)
             except Exception as e:
-                return f"Error downloading file: {e}", 500
+                raise HTTPException(status_code=500, detail=f"Error downloading file: {e}")
 
 def create_app(loop=None):
     """Create and configure the application with an event loop"""
