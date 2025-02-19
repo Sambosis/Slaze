@@ -40,6 +40,7 @@ class AgentDisplayWeb:
         # We'll use an asyncio.Queue to deliver user input.
         self.input_queue = asyncio.Queue()
         self.loop = None  # This should be set by the main async function.
+        self.user_interupt = False  # Added for interrupt functionality
         self.setup_routes()
         self.setup_socketio_events()
 
@@ -97,6 +98,12 @@ class AgentDisplayWeb:
             else:
                 print("[ERROR] No event loop available for handling input")
             return None
+
+        # New interrupt event handler
+        @self.socketio.on('interrupt')
+        def handle_interrupt():
+            print("[DEBUG] Received interrupt event")
+            self.user_interupt = True
 
     async def wait_for_user_input(self, user_input = None):
         """

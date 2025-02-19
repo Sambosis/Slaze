@@ -33,20 +33,6 @@ PROMPT_FOR_CODE="""I need you to break down a python file in a structured way th
 def code_prompt_research(current_code_base, code_description):
     messages=[
             {
-            "role": "system",
-            "content": [
-                {
-                "type": "text",
-                "text": """Your are an expert with software engineer and proud researcher.  You review code projects for Programmers and try to help them by giving them insight into the best approaches to accomplish their task.
-                You try to anticipate common bugs, inefficiencies and suggest improvements to the origninal specs to add advanced performance and functionality.
-                You typically give 2 different approaches on how to accomplish their task and detail the benefits and limitations of each approach.
-                You make observations about how each approach will interact with the existing code base and how it will affect the overall performance of the program.
-                You are also to provide information about the context of the of the application and any domain specific knowledge that is needed to accomplish their task.
-                You take the whole scope of the program into consideration when reviewing their task description.
-                You do not tell them which of the approaches they need to take, just provide them with the information they need to make an informed decision.
-                """
-                },
-                ],
             "role": "user",
             "content": [
                 {
@@ -73,14 +59,6 @@ def code_prompt_research(current_code_base, code_description):
 def code_prompt_generate(current_code_base, code_description, research_string):
     messages = [
         {
-        "role": "system",
-        "content": [
-            {
-            "type": "text",
-            "text": """Your are an expert with software engineer and proud coder. You are to make carefully designed programs that work on the first try and take the whole scope of the program into consideration when creating or modifying code. 
-            When revising existing code, you must maintain the exact same structure and only make the specifically requested changes. Do not refactor or improve other parts of the code unless explicitly asked."""
-            },
-            ],
         "role": "user",
         "content": 
         [
@@ -99,6 +77,7 @@ def code_prompt_generate(current_code_base, code_description, research_string):
             // Your code goes here
             ```
             Here is all of the code that has been created for the project so far:
+            Code:
             {current_code_base}
             
             Here is the description of the code:

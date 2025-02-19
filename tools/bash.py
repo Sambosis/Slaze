@@ -138,12 +138,11 @@ def generate_temp_filename(script_type: str) -> Path:
     return temp_dir / f"temp_script_{timestamp}{extension}"
 
 def execute_script(script_type: str, script_code: str, display: AgentDisplayWebWithPrompt = None):
-    """Execute the extracted script and capture output and errors."""
+    """Execute the extracted script synchronously and capture output and errors."""
     output = ""
     error = ""
     success = False
 
-    # Get path to venv's Python interpreter
     project_dir = Path(get_constant("PROJECT_DIR"))
     if os.name == 'nt':  # Windows
         python_path = project_dir / ".venv" / "Scripts" / "python"
@@ -152,33 +151,29 @@ def execute_script(script_type: str, script_code: str, display: AgentDisplayWebW
 
     if script_type == "Python Script":
         if display:
-            display.add_message("user", "Executing Python script...")
-
+            display.add_message("user", "Executing Python script synchronously...")
         # Generate unique temp file path
         script_file = generate_temp_filename(script_type)
         try:
             with open(script_file, "w", encoding="utf-8", errors='replace') as f:
                 f.write(script_code)
-
-            # Use subprocess.Popen to start the process in the background
-            process = subprocess.Popen(
+            # Run the script synchronously and capture output and error
+            result = subprocess.run(
                 [str(python_path), str(script_file)],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 cwd=str(project_dir),
                 text=True,
                 encoding='utf-8',
-                errors='replace'
+                errors='replace',
+                check=False
             )
-
-            output = "Process started in the background.  PID: " + str(process.pid)
-            success = True  # Assume success since the process started
-
+            output = result.stdout
+            error = result.stderr
+            success = (result.returncode == 0)
             if display:
-                display.add_message("user", f"Python process started in background with PID {process.pid}")
-
+                display.add_message("user", f"Python script completed with return code {result.returncode}")
         except Exception as e:
-            output = ""
             error = f"Error: {str(e)}\n{traceback.format_exc()}"
             success = False
             if display:
@@ -186,70 +181,59 @@ def execute_script(script_type: str, script_code: str, display: AgentDisplayWebW
 
     elif script_type == "PowerShell Script":
         if display:
-            display.add_message("user", "Executing PowerShell script...")
-
+            display.add_message("user", "Executing PowerShell script synchronously...")
         script_file = generate_temp_filename(script_type)
         with open(script_file, "w", encoding="utf-8", errors='replace') as f:
             f.write(script_code)
-
         try:
-            # Use subprocess.Popen to start the process in the background
-            process = subprocess.Popen(
+            result = subprocess.run(
                 ["powershell.exe", "-File", str(script_file)],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 cwd=str(project_dir),
                 text=True,
                 encoding='utf-8',
-                errors='replace'
+                errors='replace',
+                check=False
             )
-
-            output = "Process started in the background. PID: " + str(process.pid)
-            success = True  # Assume success since the process started
-
+            output = result.stdout
+            error = result.stderr
+            success = (result.returncode == 0)
             if display:
-                display.add_message("user", f"PowerShell process started in background with PID {process.pid}")
-
+                display.add_message("user", f"PowerShell script completed with return code {result.returncode}")
         except Exception as e:
-            output = ""
             error = f"Unexpected error: {str(e)}\n{traceback.format_exc()}"
             success = False
             if display:
-                display.add_message("user", f"PowerShell Unexpected Error:\n{error}")
+                display.add_message("user", f"PowerShell Execution Error:\n{error}")
 
     elif script_type == "Bash Script":
         if display:
-            display.add_message("user", "Executing Bash script...")
-
+            display.add_message("user", "Executing Bash script synchronously...")
         script_file = generate_temp_filename(script_type)
         with open(script_file, "w", encoding="utf-8", errors='replace') as f:
             f.write(script_code)
-
         try:
-            # Use subprocess.Popen to start the process in the background
-            process = subprocess.Popen(
+            result = subprocess.run(
                 ["bash", str(script_file)],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 cwd=str(project_dir),
                 text=True,
                 encoding='utf-8',
-                errors='replace'
+                errors='replace',
+                check=False
             )
-
-            output = "Process started in the background. PID: " + str(process.pid)
-            success = True  # Assume success since the process started
-
+            output = result.stdout
+            error = result.stderr
+            success = (result.returncode == 0)
             if display:
-                display.add_message("user", f"Bash process started in background with PID {process.pid}")
-
+                display.add_message("user", f"Bash script completed with return code {result.returncode}")
         except Exception as e:
-            output = ""
             error = f"Unexpected error: {str(e)}\n{traceback.format_exc()}"
             success = False
             if display:
-                display.add_message("user", f"Bash Unexpected Error:\n{error}")
-
+                display.add_message("user", f"Bash Execution Error:\n{error}")
     else:
         error_msg = f"Unsupported script type: {script_type}"
         if display:

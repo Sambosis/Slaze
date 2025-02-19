@@ -217,13 +217,14 @@ class ProjectSetupTool(BaseAnthropicTool):
 
     # === Node.js Environment Methods ===
     async def setup_project_node(self, project_path: Path, packages: List[str]) -> dict:
+        # Create project directory and change to it
         project_path.mkdir(parents=True, exist_ok=True)
         os.chdir(project_path)
         ic("Initializing Node.js project...")
-        self.run_command(f"cd {project_path} && npm init -y")
+        self.run_command("npm init -y", cwd=str(project_path))
         ic("Installing Node.js packages...")
         for package in packages:
-            self.run_command(f"cd {project_path} && npm install {package}")
+            self.run_command(f"npm install {package}", cwd=str(project_path))
         return {
             "command": "setup_project",
             "status": "success",
@@ -234,38 +235,70 @@ class ProjectSetupTool(BaseAnthropicTool):
     async def add_dependencies_node(self, project_path: Path, packages: List[str]) -> dict:
         os.chdir(project_path)
         ic("Installing additional Node.js packages...")
-        for package in packages:
-            self.run_command(f"cd {project_path} && npm install {package}")
+        if self.display:
+            self.display.add_message("user", f"Installing {len(packages)} additional Node.js packages...")
+        installed_packages = []
+        for i, package in enumerate(packages, 1):
+            ic(f"Installing package {i}/{len(packages)}: {package}")
+            if self.display:
+                self.display.add_message("user", f"Installing package {i}/{len(packages)}: {package}")
+            process = subprocess.run(
+                f"npm install {package}",
+                shell=True,
+                cwd=str(project_path),
+                capture_output=True,
+                text=True,
+                check=False
+            )
+            if process.returncode != 0:
+                return {
+                    "command": "add_additional_depends",
+                    "status": "error",
+                    "error": f"Failed to install {package}: {process.stderr}",
+                    "project_path": str(project_path),
+                    "packages_installed": installed_packages,
+                    "packages_failed": packages[i-1:],
+                    "failed_at": package
+                }
+            installed_packages.append(package)
+            if self.display:
+                self.display.add_message("user", f"Successfully installed {package}")
+        if self.display:
+            self.display.add_message("user", "All Node.js packages installed successfully")
         return {
             "command": "add_additional_depends",
             "status": "success",
             "project_path": str(project_path),
-            "packages_installed": packages
+            "packages_installed": installed_packages
         }
 
     async def run_app_node(self, project_path: Path, filename: str) -> dict:
         os.chdir(project_path)
         try:
-            result = subprocess.run(
+            # Start the process in the background (non-blocking)
+            process = subprocess.Popen(
                 ["node", filename],
-                capture_output=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                cwd=str(project_path),
                 text=True,
-                cwd=project_path,
-                check=True
+                encoding='utf-8',
+                errors='replace'
             )
+            output = "Application started in the background. PID: " + str(process.pid)
             return {
                 "command": "run_app",
                 "status": "success",
                 "project_path": str(project_path),
-                "run_output": result.stdout,
-                "errors": result.stderr
+                "run_output": output,
+                "errors": ""
             }
-        except subprocess.CalledProcessError as e:
+        except Exception as e:
             return {
                 "command": "run_app",
                 "status": "error",
                 "project_path": str(project_path),
-                "errors": f"Failed to run app: {str(e)}\nOutput: {e.stdout}\nError: {e.stderr}"
+                "errors": f"Failed to run app: {str(e)}"
             }
 
     # === Ruby Environment Methods ===

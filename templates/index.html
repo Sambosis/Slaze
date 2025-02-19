@@ -108,16 +108,24 @@
                 <i class="fas fa-paper-plane mr-2"></i>
                 Send
             </button>
+            <!-- New Interrupt Button -->
+            <button id="interruptButton" 
+                    class="bg-red-500 text-white px-6 py-2 rounded-lg hover:bg-red-600 transition-colors duration-200 flex items-center">
+                <i class="fas fa-stop mr-2"></i>
+                Interrupt Agent
+            </button>
         </div>
-    </div>
 
     <!-- Download Links Section -->
     <div class="bg-white rounded-lg panel-shadow p-4 mb-4">
-        <div class="flex items-center mb-4 text-red-600">
-            <i class="fas fa-download mr-2"></i>
-            <h2 class="text-xl font-semibold">Download Links</h2>
-        </div>
         <div id="download_links" class="messages-container h-[150px] overflow-y-auto space-y-3"></div>
+        <!-- New button to download project zip -->
+        <div class="mt-4">
+            <a href="/download_project_zip" 
+               class="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-colors duration-200 inline-block">
+                <i class="fas fa-file-archive mr-2"></i> Download Project ZIP
+            </a>
+        </div>
     </div>
 
     <script>
@@ -127,15 +135,19 @@
             console.log("Connected to server");
         });
 
+        // Update createMessageElement to handle HTML content properly.
         function createMessageElement(message, type) {
             var msgElement = document.createElement('div');
             msgElement.className = `p-3 rounded-lg message-enter ${
-                type === 'assistant' ? 'bg-blue-50 border-l-4 border-blue-500 text-xl' : // Added text-lg for larger font
+                type === 'assistant' ? 'bg-blue-50 border-l-4 border-blue-500 text-xl' :
                 type === 'tool' ? 'bg-purple-50 border-l-4 border-purple-500' :
                 'bg-green-50 border-l-4 border-green-500'
             }`;
             
-            if (typeof message === 'object' && message.code && message.css) {
+            // Check for 'html' key and render that if present.
+            if (typeof message === 'object' && message.html) {
+                msgElement.innerHTML = message.html;
+            } else if (typeof message === 'object' && message.code && message.css) {
                 if (!document.getElementById('pygments-style')) {
                     var styleElement = document.createElement('style');
                     styleElement.id = 'pygments-style';
@@ -180,6 +192,12 @@
                 socket.emit('user_input', { input: input.value });
                 input.value = '';
             }
+        });
+
+        // New interrupt button event listener
+        document.getElementById('interruptButton').addEventListener('click', function() {
+            console.log("Interrupt button clicked.");
+            socket.emit('interrupt');
         });
 
         document.getElementById('userInput').addEventListener('keypress', function(e) {

@@ -85,7 +85,6 @@ with open(SYSTEM_PROMPT_FILE, 'r', encoding="utf-8") as f:
     SYSTEM_PROMPT = f.read()
 
 
-# Utility functions (simplified for brevity, ensure they are correct in your full code)
 def _make_api_tool_result(result: ToolResult, tool_use_id: str) -> Dict:
     """Create a tool result dictionary."""
     tool_result_content = []
@@ -204,8 +203,7 @@ def _maybe_filter_to_n_most_recent_images(messages: List[BetaMessageParam], imag
                 new_content.append(content)
             tool_result["content"] = new_content
 
-
-# ... (All your imports and other functions like archive_file, _make_api_tool_result, etc. remain unchanged) ...
+# ----------------  The main Agent Loop ----------------
 async def sampling_loop(
     *,
     model: str,
@@ -213,13 +211,11 @@ async def sampling_loop(
     api_key: str,
     max_tokens: int = 8000,
     display: AgentDisplayWebWithPrompt  # Keep this parameter
-) -> List[BetaMessageParam]:
+    ) -> List[BetaMessageParam]:
     """Main loop for agentic sampling."""
     task = messages[0]['content']
     context_recently_refreshed = False
-    refresh_count = 28
-
-    interupt_counter = 0
+    refresh_count = 5
     try:
         tool_collection = ToolCollection(
             WriteCodeTool(display=display),  # Use the passed-in display
@@ -350,7 +346,7 @@ async def sampling_loop(
                 await asyncio.sleep(0.1)
                 if (not tool_result_content):# and (not context_recently_refreshed):
                     display.add_message("assistant", "Awaiting User Input ⌨️ (Type your response in the web interface)")
-                    interupt_counter += 1
+                    # interupt_counter += 1
                     user_input = await display.wait_for_user_input()
                     display.add_message("assistant",f"The user has said '{user_input}'")
                     if user_input.lower() in ["no", "n"]:# or interupt_counter > 4:
@@ -362,17 +358,23 @@ async def sampling_loop(
 
                         messages =[{"role": "user", "content": new_context}]
                 else:
-                    if len(messages) > refresh_count:
+                    if (len(messages) > refresh_count):
+                        last_3_messages = messages[-3:]
+                        display.add_message("user", "refreshing")
+                        new_context = await refresh_context_async(task, last_3_messages, display)
+                        messages =[{"role": "user", "content": new_context}]
+                        refresh_count += 1
+
+                if display.user_interupt:
                         last_3_messages = messages[-3:]
                         display.add_message("assistant", "Awaiting User Input JK!⌨️ (Type your response in the web interface)")
                         user_input = await display.wait_for_user_input()
-                        
                         new_context = await refresh_context_async(task, last_3_messages, display)
                         new_context = new_context + user_input
                         messages =[{"role": "user", "content": new_context}]
-                        refresh_count += 5
-                        context_recently_refreshed = True
-
+                        refresh_count += 1
+                        display.user_interupt = False
+                    
                 with open(MESSAGES_FILE, 'w', encoding='utf-8') as f:
                     message_string = format_messages_to_string(messages)
                     f.write(message_string)
@@ -399,6 +401,7 @@ async def sampling_loop(
         display.add_message("user", ("Initialization Error", str(e)))
         ic(f"Error initializing sampling loop: {str(e)}")
         raise
+
 async def run_sampling_loop(task: str, display: AgentDisplayWebWithPrompt) -> List[BetaMessageParam]:
     """Run the sampling loop with clean output handling."""
     api_key = os.getenv("ANTHROPIC_API_KEY")

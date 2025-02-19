@@ -35,16 +35,13 @@ load_dotenv()
 
 ic.configureOutput(includeContext=True, outputFunction=write_to_file)
 
+
 def write_chat_completion_to_file(response, filepath):
     """Appends an OpenAI ChatCompletion object to a file in a human-readable format."""
-
     try:
         with open(filepath, 'a', encoding='utf-8') as f:
-
-
             f.write(f"Created: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(response.get('created', 0)))}\n")
             f.write(f"Model: {response.get('model', 'N/A')}\n")
-
             f.write("\nUsage:\n")
             usage = response.get("usage", {})
             for key, value in usage.items():
@@ -296,21 +293,16 @@ class WriteCodeTool(BaseAnthropicTool):
         ic(model)
         # Prepare messages
         messages = code_prompt_generate(current_code_base, code_description, research_string)
-        ic(messages)
+        ic(f"Here are the messages being sent to Generate the Code\n +++++ \n +++++ \n{messages}")
         try:
             completion =  await client.chat.completions.create(
                 model=model,
                 messages=messages)
-            # completion = await client.chat.completions.create(
-            # # model="deepseek/deepseek-r1:nitro",
-            # max_tokens=28000,
-            # model=model,
-            # messages=messages)
+
         except Exception as e:
             ic(completion)
             ic(f"error: {e}")
             return code_description
-        ic(completion)
         code_string = completion.choices[0].message.content
 
         # Extract code using the new function
@@ -385,32 +377,22 @@ class WriteCodeTool(BaseAnthropicTool):
         code_string = "no code created"
         OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
         current_code_base = get_all_current_code()
-        client2 = AsyncOpenAI(
-            base_url="https://openrouter.ai/api/v1",
-            api_key=OPENROUTER_API_KEY,
-            )
-        model = "google/gemini-2.0-flash-001"
-        # client2 = AsyncOpenAI()
-        # model = "o3-mini"
+        # client = AsyncOpenAI(
+        #     base_url="https://openrouter.ai/api/v1",
+        #     api_key=OPENROUTER_API_KEY,
+        #     )
+        # model = "google/gemini-2.0-flash-001"
+        client = AsyncOpenAI()
+        model = "o3-mini"
 
         # Prepare messages
         messages = code_prompt_research(current_code_base, code_description)
-        # ic(messages)
+        ic(f"Here are the messages being sent to Research the Code\n +++++ \n +++++ \n{messages}")
         try:
-            # completion = await client.chat.completions.create(
-            # # model="deepseek/deepseek-r1:nitro",
-            # max_tokens=28000,
-            # model=model,
-            # messages=messages)
-            completion = await client2.chat.completions.create(
-                # model="deepseek/deepseek-r1:nitro",
-                max_tokens=28000,
+            completion = await client.chat.completions.create(
                 model=model,
                 messages=messages)
-            
-            # completion =  await client2.chat.completions.create(
-            #     model=model,
-            #     messages=messages)
+
         except Exception as e:
             ic(completion)
             ic(f"error: {e}")

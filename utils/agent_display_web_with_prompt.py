@@ -2,10 +2,11 @@
 
 import asyncio
 from flask import render_template, request, redirect, url_for, send_from_directory
-
+from dotenv import load_dotenv
+load_dotenv()
 from utils.agent_display_web import AgentDisplayWeb
 from config import PROMPTS_DIR, LOGS_DIR
-
+from openai import OpenAI
 def start_sampling_loop(task, display):
     """
     Simple wrapper function that spins up a fresh event loop
@@ -40,12 +41,18 @@ class AgentDisplayWebWithPrompt(AgentDisplayWeb):
                         filename = prompt_path.stem
                         with open(prompt_path, 'r', encoding='utf-8') as f:
                             task = f.read()
-
+                    client = OpenAI()
+                    model = "o3-mini"
+                    messages = [{"role": "user", "content": f"Please create a simple step by step plan to accomplish the following task. It should be a very high level plan without too many steps.  Each step should be no more than 2 sentences long.  After your plan, provide a directory structure that should be used a list of every file that will need to be created to complete the project. Task:  {task}"}] 
+                    completion =  client.chat.completions.create(
+                        model=model,
+                        messages=messages)
+                    task = completion.choices[0].message.content
                     from config import set_project_dir, set_constant
                     project_dir = set_project_dir(filename)
                     set_constant("PROJECT_DIR", str(project_dir))
                     task += (
-                        f"Your project directory is {project_dir}. "
+                        f"Do not use Flask for this project. Start testing as soon as possible. DO NOT start making fixes or improvements until you have tested to see if it is working as is.  Your project directory is {project_dir}. "
                         "You need to make sure that all files you create and work you do is done in that directory.\n"
                     )
 
@@ -84,6 +91,32 @@ class AgentDisplayWebWithPrompt(AgentDisplayWeb):
                 return send_from_directory(LOGS_DIR, filename, as_attachment=True)
             except Exception as e:
                 return f"Error downloading file: {e}", 500
+
+        @self.app.route('/download_project_zip')
+        def download_project_zip():
+            try:
+                from flask import send_file
+                import tempfile
+                import zipfile
+                import os
+                from config import PROJECT_DIR  # Ensure PROJECT_DIR is defined in config.py
+                if not os.path.exists(PROJECT_DIR):
+                    return "Project directory not found", 404
+
+                # Create a temporary zip file
+                with tempfile.NamedTemporaryFile(delete=False, suffix='.zip') as tmp:
+                    zip_path = tmp.name
+
+                with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                    for root, dirs, files in os.walk(PROJECT_DIR):
+                        for file in files:
+                            file_path = os.path.join(root, file)
+                            arcname = os.path.relpath(file_path, PROJECT_DIR)
+                            zipf.write(file_path, arcname)
+
+                return send_file(zip_path, as_attachment=True, download_name='project_documents.zip')
+            except Exception as e:
+                return f"Error creating zip file: {e}", 500
 
 def create_app(loop=None):
     """Create and configure the application with an event loop"""
