@@ -215,7 +215,7 @@ async def sampling_loop(
     """Main loop for agentic sampling."""
     task = messages[0]['content']
     context_recently_refreshed = False
-    refresh_count = 5
+    refresh_count = 10
     try:
         tool_collection = ToolCollection(
             WriteCodeTool(display=display),  # Use the passed-in display
@@ -272,14 +272,24 @@ async def sampling_loop(
                 ic(f"NUMBER_OF_MESSAGES: {len(messages)}")
 
                 # --- MAIN LLM CALL ---
-                response = client.beta.messages.create(
-                    max_tokens=MAX_SUMMARY_TOKENS,
-                    messages=truncated_messages,
-                    model=MAIN_MODEL,
-                    system=system,
-                    tools=tool_collection.to_params(),
-                    betas=betas,
+                try:
+                    response = client.beta.messages.create(
+                        max_tokens=MAX_SUMMARY_TOKENS,
+                        messages=truncated_messages,
+                        model=MAIN_MODEL,
+                        system=system,
+                        tools=tool_collection.to_params(),
+                        betas=betas,
                     )
+                except Exception as llm_error:
+                    display.add_message("assistant", f"LLM call failed, refreshing context: {str(llm_error)}")
+                    # Get last few messages for context refresh
+                    last_3_messages = messages[-3:] if len(messages) >= 3 else messages
+                    new_context = await refresh_context_async(task, last_3_messages, display)
+                    messages = [{"role": "user", "content": new_context}]
+                    context_recently_refreshed = True
+                    continue  # Skip the rest of this iteration and try again with refreshed context
+
                 response_params = []
                 for block in response.content:
                     if hasattr(block, 'text'):
@@ -344,7 +354,7 @@ async def sampling_loop(
                 # add_summary(quick_summary)
 
                 await asyncio.sleep(0.1)
-                if (not tool_result_content):# and (not context_recently_refreshed):
+                if (not tool_result_content) and (not context_recently_refreshed):
                     display.add_message("assistant", "Awaiting User Input ⌨️ (Type your response in the web interface)")
                     user_input = await display.wait_for_user_input()
                     display.add_message("assistant",f"The user has said '{user_input}'")
@@ -354,15 +364,16 @@ async def sampling_loop(
                         messages.append({"role": "user", "content": user_input})
                         last_3_messages = messages[-4:]
                         new_context = await refresh_context_async(task, last_3_messages, display)
-
+                        context_recently_refreshed = True
                         messages =[{"role": "user", "content": new_context}]
                 else:
                     if (len(messages) > refresh_count):
                         last_3_messages = messages[-3:]
                         display.add_message("user", "refreshing")
                         new_context = await refresh_context_async(task, last_3_messages, display)
+                        context_recently_refreshed = True
                         messages =[{"role": "user", "content": new_context}]
-                        refresh_count += 1
+                        refresh_count += 2
 
                 if display.user_interupt:
                         last_3_messages = messages[-3:]
@@ -371,9 +382,11 @@ async def sampling_loop(
                         new_context = await refresh_context_async(task, last_3_messages, display)
                         new_context = new_context + user_input
                         messages =[{"role": "user", "content": new_context}]
-                        refresh_count += 1
+                        refresh_count += 2
+                        context_recently_refreshed = True
                         display.user_interupt = False
-                    
+                else:
+                    context_recently_refreshed = False
                 with open(MESSAGES_FILE, 'w', encoding='utf-8') as f:
                     message_string = format_messages_to_string(messages)
                     f.write(message_string)

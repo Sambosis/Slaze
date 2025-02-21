@@ -6,7 +6,8 @@ from dotenv import load_dotenv
 load_dotenv()
 from utils.agent_display_web import AgentDisplayWeb
 from config import PROMPTS_DIR, LOGS_DIR
-from openai import OpenAI
+from openai import OpenAI, AsyncOpenAI
+import os
 def start_sampling_loop(task, display):
     """
     Simple wrapper function that spins up a fresh event loop
@@ -41,8 +42,16 @@ class AgentDisplayWebWithPrompt(AgentDisplayWeb):
                         filename = prompt_path.stem
                         with open(prompt_path, 'r', encoding='utf-8') as f:
                             task = f.read()
-                    client = OpenAI()
-                    model = "o3-mini"
+                    # client = OpenAI()
+                    # model = "o3-mini"
+
+                                
+                    OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+                    client = OpenAI(
+                        base_url="https://openrouter.ai/api/v1",
+                        api_key=OPENROUTER_API_KEY,
+                        )
+                    model = "google/gemini-flash-1.5:nitro"
                     messages = [{"role": "user", "content": f"Please create a simple step by step plan to accomplish the following task. It should be a very high level plan without too many steps.  Each step should be no more than 2 sentences long.  After your plan, provide a directory structure that should be used a list of every file that will need to be created to complete the project. Task:  {task}"}] 
                     completion =  client.chat.completions.create(
                         model=model,

@@ -65,6 +65,46 @@
             height: auto;
         }
     }
+
+    .collapsible {
+        cursor: pointer;
+        padding: 8px;
+        width: 100%;
+        border: none;
+        text-align: left;
+        outline: none;
+        font-size: 1rem;
+        background-color: #f3f4f6;
+        border-radius: 4px 4px 0 0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .collapsible:hover {
+        background-color: #e5e7eb;
+    }
+
+    .collapsible:after {
+        content: '\002B';
+        font-weight: bold;
+        float: right;
+        margin-left: 5px;
+    }
+
+    .active:after {
+        content: "\2212";
+    }
+
+    .code-content {
+        max-height: 0;
+        overflow: hidden;
+        transition: max-height 0.2s ease-out;
+    }
+
+    .expanded {
+        max-height: none;
+    }
 </style>
 </head>
 <body class="bg-gray-100 min-h-screen">
@@ -119,6 +159,11 @@
     <!-- Download Links Section -->
     <div class="bg-white rounded-lg panel-shadow p-4 mb-4">
         <div id="download_links" class="messages-container h-[150px] overflow-y-auto space-y-3"></div>
+        <!-- Add timer display above the download button -->
+        <div class="mt-4 mb-2 text-center">
+            <span class="text-gray-600 font-semibold">Session Time: </span>
+            <span id="timer" class="text-blue-600 font-mono text-lg">00:00:00</span>
+        </div>
         <!-- New button to download project zip -->
         <div class="mt-4">
             <a href="/download_project_zip" 
@@ -135,7 +180,6 @@
             console.log("Connected to server");
         });
 
-        // Update createMessageElement to handle HTML content properly.
         function createMessageElement(message, type) {
             var msgElement = document.createElement('div');
             msgElement.className = `p-3 rounded-lg message-enter ${
@@ -144,7 +188,6 @@
                 'bg-green-50 border-l-4 border-green-500'
             }`;
             
-            // Check for 'html' key and render that if present.
             if (typeof message === 'object' && message.html) {
                 msgElement.innerHTML = message.html;
             } else if (typeof message === 'object' && message.code && message.css) {
@@ -154,7 +197,49 @@
                     styleElement.innerHTML = message.css;
                     document.head.appendChild(styleElement);
                 }
-                msgElement.innerHTML = message.code;
+                
+                // Create a temporary div to parse the HTML content
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = message.code;
+                
+                // Get all the content from the first row's second column
+                const firstRow = tempDiv.querySelector('.highlight table tr:first-child');
+                const firstLineSecondCol = firstRow ? firstRow.querySelector('td:nth-child(2)') : null;
+                const fullContent = firstLineSecondCol ? firstLineSecondCol.textContent : 'Unknown File';
+                
+                // Truncate to first 70 characters for the collapsed view
+                const truncatedContent = fullContent.substring(0, 70) + (fullContent.length > 70 ? '...' : '');
+                
+                // Create collapsible container with truncated content
+                const collapsibleBtn = document.createElement('button');
+                collapsibleBtn.className = 'collapsible';
+                collapsibleBtn.innerHTML = `<span>${truncatedContent}</span><span>+</span>`;
+                
+                // Create container for the code content
+                const codeContent = document.createElement('div');
+                codeContent.className = 'code-content';
+                codeContent.innerHTML = message.code;
+                
+                msgElement.appendChild(collapsibleBtn);
+                msgElement.appendChild(codeContent);
+                
+                // Add click event listener
+                collapsibleBtn.addEventListener('click', function() {
+                    this.classList.toggle('active');
+                    const content = this.nextElementSibling;
+                    
+                    if (content.classList.contains('expanded')) {
+                        content.classList.remove('expanded');
+                        content.style.maxHeight = '0';
+                    } else {
+                        content.classList.add('expanded');
+                        content.style.maxHeight = content.scrollHeight + 'px';
+                    }
+                });
+                
+                // Initial state - collapsed
+                codeContent.style.maxHeight = '0';
+                
             } else {
                 msgElement.innerHTML = message;
             }
@@ -205,6 +290,22 @@
                 document.getElementById('sendInput').click();
             }
         });
+
+        // Add timer functionality
+        const startTime = Date.now();
+        
+        function updateTimer() {
+            const elapsed = Date.now() - startTime;
+            const seconds = Math.floor((elapsed / 1000) % 60);
+            const minutes = Math.floor((elapsed / (1000 * 60)) % 60);
+            const hours = Math.floor(elapsed / (1000 * 60 * 60));
+            
+            const timeString = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            document.getElementById('timer').textContent = timeString;
+        }
+
+        // Update timer every second
+        setInterval(updateTimer, 1000);
     </script>
 </body>
 </html>

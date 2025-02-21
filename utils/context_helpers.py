@@ -7,7 +7,7 @@ from anthropic.types.beta import (
     BetaTextBlockParam,
     BetaToolResultBlockParam,
 )
-
+import os
 from utils.agent_display_web_with_prompt import AgentDisplayWebWithPrompt
 from load_constants import write_to_file, ICECREAM_OUTPUT_FILE
 from utils.file_logger import aggregate_file_states
@@ -81,8 +81,13 @@ def format_messages_to_string(messages):
 
 
 async def summarize_recent_messages(short_messages: List[BetaMessageParam], display: AgentDisplayWebWithPrompt) -> str:    # sum_client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
-    sum_client = OpenAI()
-    model = "o3-mini"
+    # sum_client = OpenAI()
+    # model = "o3-mini"
+    sum_client = OpenAI(
+        base_url="https://openrouter.ai/api/v1",
+        api_key=OPENROUTER_API_KEY,
+        )
+    model = "google/gemini-flash-1.5:nitro"
     conversation_text = ""
     for msg in short_messages:
         role = msg['role'].upper()
@@ -173,7 +178,7 @@ def extract_text_from_content(content: Any) -> str:
     return ""
 
 
-def truncate_message_content(content: Any, max_length: int = 900_000) -> Any:
+def truncate_message_content(content: Any, max_length: int = 200_000) -> Any:
     if isinstance(content, str):
         return content[:max_length]
     elif isinstance(content, list):

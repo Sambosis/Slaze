@@ -1,1 +1,1 @@
-create 3 pictures of dogs
+Create pictures for sprites that could be used in an 8 bit video game. Use a 16x16 grid for each sprite. The background should be transparent. The sprites should be simple and colorful. The character should be a Gorrila and you should have him posed in various postitions that would typically be used in a video game. For example, you could have him standing, jumping, running, etc. You could also have him holding a weapon or wearing a hat. Be creative!  

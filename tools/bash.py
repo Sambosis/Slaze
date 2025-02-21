@@ -10,7 +10,7 @@ import io
 import traceback
 from datetime import datetime
 from anthropic import Anthropic
-from openai import OpenAI
+from openai import AsyncOpenAI
 from dotenv import load_dotenv
 load_dotenv()
 from .base import BaseAnthropicTool, ToolError, ToolResult
@@ -80,17 +80,22 @@ def extract_code_block(text: str) -> tuple[str, str]:
         return [{'language': '', 'code': text.strip()}]
 
 
-def generate_script_with_llm(prompt: str) -> str:
+async def generate_script_with_llm(prompt: str) -> str:
     """Send a prompt to the LLM and return its response."""
 
     try:
         ic(prompt)
         # 1. Create a client with custom endpoint
-        client = OpenAI()
-
+        # client = OpenAI()
+        OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+        client = AsyncOpenAI(
+            base_url="https://openrouter.ai/api/v1",
+            api_key=OPENROUTER_API_KEY,
+            )
+        model = "mistralai/codestral-2501:nitro"
         # 2. Use it like normal OpenAI calls
-        response = client.chat.completions.create(
-            model="o3-mini",  # Use model name your endpoint expects
+        response = await client.chat.completions.create(
+            model=model,  # Use model name your endpoint expects
             messages=[
                 {"role": "user", "content": prompt}
             ]
@@ -306,7 +311,7 @@ class BashTool(BaseAnthropicTool):
                     self.display.add_message("user", "Generating and executing scripts via LLM (Windows)...")
 
                 prompt = read_prompt_from_file(BASH_PROMPT_FILE, command)
-                response = generate_script_with_llm(prompt)
+                response = await generate_script_with_llm(prompt)
                 await asyncio.sleep(0.2)
                 parsed_scripts = parse_llm_response(response)  # List of script blocks in LLM-provided order
 

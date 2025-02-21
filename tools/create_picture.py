@@ -8,7 +8,7 @@ from enum import Enum
 from dotenv import load_dotenv
 load_dotenv()
 import os
-import PIL
+from PIL import Image  # Changed import
 from utils.file_logger import log_file_operation
 
 class PictureCommand(str, Enum):
@@ -67,21 +67,18 @@ class PictureGenerationTool(BaseAnthropicTool):
 
             input_data = {
                 "prompt": prompt,
-                "prompt_upsampling": True
+                "aspect_ratio": "1:1",
+                "safety_filter_level": "block_only_high"
             }
-            
             # Get the image data from replicate
             client = replicate.Client()
-            output_iterator = client.run(
-                "black-forest-labs/flux-1.1-pro",
+            output = client.run(
+                "google/imagen-3-fast",  # Added missing comma
                 input=input_data
             )
             
-            # Collect all bytes from the iterator
-            image_data = b''
-            for chunk in output_iterator:
-                if isinstance(chunk, bytes):
-                    image_data += chunk
+            # Read all bytes from the FileOutput object
+            image_data = output.read()
             
             if not image_data:
                 raise Exception("No image data received from the model")
@@ -98,7 +95,7 @@ class PictureGenerationTool(BaseAnthropicTool):
 
             # Handle resizing if needed
             if width or height:
-                img = PIL.Image.open(output_path)
+                img = Image.open(output_path)  # Changed usage from PIL.Image.open to Image.open
                 if width and height:
                     new_size = (width, height)
                 elif width:
@@ -108,7 +105,7 @@ class PictureGenerationTool(BaseAnthropicTool):
                     ratio = height / img.height
                     new_size = (int(img.width * ratio), height)
                 
-                resized_img = img.resize(new_size, PIL.Image.LANCZOS)
+                resized_img = img.resize(new_size, Image.LANCZOS)  # Changed usage from PIL.Image.LANCZOS to Image.LANCZOS
                 resized_img.save(output_path)
 
             # Display message

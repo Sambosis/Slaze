@@ -287,7 +287,7 @@ class WriteCodeTool(BaseAnthropicTool):
         #     base_url="https://openrouter.ai/api/v1",
         #     api_key=OPENROUTER_API_KEY,
         #     )
-        # model = "google/gemini-2.0-flash-001"
+        # model = "microsoft/wizardlm-2-8x22b:nitro"
         client = AsyncOpenAI()
         model = "o3-mini"
         ic(model)
@@ -371,19 +371,17 @@ class WriteCodeTool(BaseAnthropicTool):
 
     async def _call_llm_to_research_code(self, code_description: str, file_path) -> str:
         """Call LLM to generate code based on the code description"""
-    
-        
         self.display.add_message("assistant", f"Researching code for: {file_path}")
         code_string = "no code created"
-        OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
         current_code_base = get_all_current_code()
-        # client = AsyncOpenAI(
-        #     base_url="https://openrouter.ai/api/v1",
-        #     api_key=OPENROUTER_API_KEY,
-        #     )
-        # model = "google/gemini-2.0-flash-001"
-        client = AsyncOpenAI()
-        model = "o3-mini"
+        OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+        client = AsyncOpenAI(
+            base_url="https://openrouter.ai/api/v1",
+            api_key=OPENROUTER_API_KEY,
+            )
+        model = "google/gemini-2.0-flash-001:nitro"
+        # client = AsyncOpenAI()
+        # model = "o3-mini"
 
         # Prepare messages
         messages = code_prompt_research(current_code_base, code_description)

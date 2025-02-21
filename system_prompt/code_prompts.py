@@ -42,7 +42,7 @@ def code_prompt_research(current_code_base, code_description):
                 you will review it and help them by giving them insight into ways to approaches their task.
                 You try to anticipate common bugs, inefficiencies and suggest improvements to the origninal specs to add advanced performance and functionality.
                 You need to give 2 different approaches on how to accomplish this task and detail the benefits and limitations of each approach.  If useful, you can provide small code snippets to illustrate your points, however you are not to write the code for them.
-                Make observations about how each approach will interact with the existing code base and how it will affect the overall performance of the program.
+                Make observations about how each approach will interact with the existing code base and how it will affect the overall performance of the program. Make certain notes about the file structure and how the new code will fit in.  Try to guide them in using proper import statements and how to structure their code in a way that is easy to read and maintain.
                 You take the whole scope of the program into consideration when reviewing their task description.
                 Do not tell them which of the approaches they need to take, just provide them with the information they need to make an informed decision and insights to common pitfalls and   best practices of each approach.
                 Here is all of the code that has been created for the project so far:
@@ -65,7 +65,8 @@ def code_prompt_generate(current_code_base, code_description, research_string):
             {
             "type": "text",
             "text": f"""At the bottom is a detailed description of code that you need to write. Flollow up by an expert review that gives some valuable suggestions. 
-            Make sure you provide your response in the requested programming lanaguage. Your response should include everything needed in order to run the file including imports that will be needed.
+            Make sure you provide your response in the requested programming lanaguage. Your response should include the code for the entire file including proper imports lines, but do not actually include the code from other files.
+            You may be occasionally asked to provide non-typical file responses, such as Markdown, Readme, ipynb, txt   etc.  Please provide the file in the requested format instead of providing code that would generate the file.
 
             All of the code that you provide needs to be enclosed in a single markdown style code block with the language specified.
             Here is an example of what your response should look like:
