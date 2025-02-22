@@ -1,0 +1,1 @@
+Create a game that is a mixture of a classic video game and a classic board game. Make it in pygame and make it look pretty.

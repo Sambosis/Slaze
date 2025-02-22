@@ -66,6 +66,9 @@ def code_prompt_generate(current_code_base, code_description, research_string):
             "type": "text",
             "text": f"""At the bottom is a detailed description of code that you need to write. Flollow up by an expert review that gives some valuable suggestions. 
             Make sure you provide your response in the requested programming lanaguage. Your response should include the code for the entire file including proper imports lines, but do not actually include the code from other files.
+            If you are requested to make changes to an existing file, please provide the full file with the correction made as your response. Please keep your changes limited to what was requested and keep the rest of the code unchanged.
+            If you see possible errors that are outside of the scope of the request, please make a note of them using inline comments in the code. Provide addtional explanation as needed in comments. 
+            If you see additional improvements that could be made to the code, please make a note of them at the bottom of the code in the comments, but do not make the changes.
             You may be occasionally asked to provide non-typical file responses, such as Markdown, Readme, ipynb, txt   etc.  Please provide the file in the requested format instead of providing code that would generate the file.
 
             All of the code that you provide needs to be enclosed in a single markdown style code block with the language specified.

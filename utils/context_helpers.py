@@ -82,7 +82,8 @@ def format_messages_to_string(messages):
 
 async def summarize_recent_messages(short_messages: List[BetaMessageParam], display: AgentDisplayWebWithPrompt) -> str:    # sum_client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
     # sum_client = OpenAI()
-    # model = "o3-mini"
+    # model = "o3-mini"\
+    OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
     sum_client = OpenAI(
         base_url="https://openrouter.ai/api/v1",
         api_key=OPENROUTER_API_KEY,
@@ -104,9 +105,9 @@ async def summarize_recent_messages(short_messages: List[BetaMessageParam], disp
             conversation_text += f"\n{role}: {msg['content']}"
 
     summary_prompt = f"""Please provide a concise casual natural language summary of the messages. 
-        They are the actual LLM messages log of interaction and you will provide between 3 and 5 conversational style sentences informing someone what was done. 
+        They are the actual LLM messages log of the interaction and you will provide several brief statements informing someone what was done. 
         Focus on the actions taken and provide the names of any files, functions, directories, or paths mentioned and a basic idea of what was done and why. 
-        Your response should be in HTML format that would make it easy for the reader to understand and view the summary.
+        If known, provide the outcome of the action and whether it was successful or not.
         Messages to summarize:
         {conversation_text}"""
     messages_prompt = [
@@ -126,14 +127,14 @@ async def summarize_recent_messages(short_messages: List[BetaMessageParam], disp
                 model=model,
                 messages=messages_prompt)
     ic(completion)
-    # response = sum_client.messages.create(
-    #     model=SUMMARY_MODEL,
-    #     max_tokens=MAX_SUMMARY_TOKENS,
-    #     messages=[{
-    #         "role": "user",
-    #         "content": summary_prompt
-    #     }]
-    # )
+    response = sum_client.chat.completions.create(
+        model=model,
+        max_completion_tokens=3000,
+        messages=[{
+            "role": "user",
+            "content": summary_prompt
+        }]
+    )
     summary = completion.choices[0].message.content
     return summary
 
@@ -236,8 +237,8 @@ async def reorganize_context(messages: List[BetaMessageParam], summary: str) -> 
     Your response to this needs to be enclosed in XML style tags called <STEPS>   </STEPS>
     Please make sure your steps are clear, concise, and in a logical order and actionable. 
     Number them 1 through 4 in the order they should be done.
-    Here is the Narative part:
-
+    Here is the Summary part:
+    {summary}
     Here is the messages part:
     <MESSAGES>
     {conversation_text}
@@ -277,7 +278,7 @@ async def refresh_context_async(task: str, messages: List[Dict], display: AgentD
     and appending current file contents.
     """
     filtered = filter_messages(messages)
-    summary = ""#get_all_summaries()
+    summary = get_all_summaries()
     last4_messages = format_messages_to_string(messages[-4:])
     completed, steps = await reorganize_context(filtered, summary)
 

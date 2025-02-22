@@ -9,7 +9,31 @@ def aggregate_file_states() -> str:
     """
     Aggregate file states. Here we reuse extract_files_content.
     """
-    return extract_files_content()
+    code_contents = extract_files_content()
+    images_created = list_images_created()
+    output = f"Code Contents:\n{code_contents}\n\nImages Created:\n{images_created}"
+    return output
+
+def list_images_created() -> str:
+    """ List all image files from the log """
+    LOG_FILE = Path(get_constant('LOG_FILE'))
+    if not LOG_FILE.exists():
+        return "No images created yet"
+    
+    # Initialize output
+    image_paths = []
+    image_suffixes = ['.png', '.jpg', '.jpeg', '.gif', '.bmp']
+    
+    # Read log file and check each line for image paths
+    with open(LOG_FILE, 'r', encoding='utf-8') as f:
+        for line in f:
+            if any(suffix in line.lower() for suffix in image_suffixes):
+                # Extract the path between quotes if present
+                if '"' in line:
+                    path = line.split('"')[1]  # Get text between first pair of quotes
+                    image_paths.append(path)
+    
+    return "\n".join(image_paths) if image_paths else "No images found"
 
 def extract_files_content() -> str:
     """ Returns the complete contents of all files with special handling for images """

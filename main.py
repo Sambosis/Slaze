@@ -52,7 +52,7 @@ def archive_file(file_path):
     except Exception as e:
         return f"Error archiving file: {str(e)}"
 # Global for quick summaries
-
+quick_summary= []
 filename = ""
 ic.configureOutput(includeContext=True, outputFunction=write_to_file)
 # ──────────────────────────────────────────────────────────────────────────────
@@ -268,7 +268,7 @@ async def sampling_loop(
                     for msg in messages
                 ]
                 # --- START ASYNC SUMMARY ---
-                # summary_task = asyncio.create_task(summarize_recent_messages(messages[-4:], display))
+                summary_task = asyncio.create_task(summarize_recent_messages(messages[-4:], display))
                 ic(f"NUMBER_OF_MESSAGES: {len(messages)}")
 
                 # --- MAIN LLM CALL ---
@@ -277,6 +277,7 @@ async def sampling_loop(
                         max_tokens=MAX_SUMMARY_TOKENS,
                         messages=truncated_messages,
                         model=MAIN_MODEL,
+                        tool_choice={"type": "any"},
                         system=system,
                         tools=tool_collection.to_params(),
                         betas=betas,
@@ -350,8 +351,9 @@ async def sampling_loop(
                             # --- NOW AWAIT AND DISPLAY SUMMARY ---
                 ic(f"NUNBER_OF_MESSAGES: {len(messages)}")
                 display.add_message("user", f"NUNBER_OF_MESSAGES: {len(messages)}")
-                # quick_summary = await summary_task  # Now we wait for the summary to complete
-                # add_summary(quick_summary)
+                quick_summary = await summary_task  # Now we wait for the summary to complete
+                add_summary(quick_summary)
+                display.add_message("assistant", quick_summary)
 
                 await asyncio.sleep(0.1)
                 if (not tool_result_content) and (not context_recently_refreshed):
