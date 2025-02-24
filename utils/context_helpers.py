@@ -98,19 +98,19 @@ async def summarize_recent_messages(short_messages: List[BetaMessageParam], disp
                     if block.get('type') == 'text':
                         content = block.get('text', '')
                         if len(content) > 200000:
-                            content = content[:100000] + " ... [TRUNCATED] ... " + content[-100000:]
+                            content = content[:70000] + " ... [TRUNCATED] ... " + content[-70000:]
                         conversation_text += f"\n{role}: {content}"
                     elif block.get('type') == 'tool_result':
                         for item in block.get('content', []):
                             if item.get('type') == 'text':
                                 content = item.get('text', '')
                                 if len(content) > 200000:
-                                    content = content[:100000] + " ... [TRUNCATED] ... " + content[-100000:]
+                                    content = content[:70000] + " ... [TRUNCATED] ... " + content[-70000:]
                                 conversation_text += f"\n{role} (Tool Result): {content}"
         else:
             content = msg['content']
             if len(content) > 200000:
-                content = content[:100000] + " ... [TRUNCATED] ... " + content[-100000:]
+                content = content[:70000] + " ... [TRUNCATED] ... " + content[-70000:]
             conversation_text += f"\n{role}: {content}"
 
     summary_prompt = f"""Please provide a concise casual natural language summary of the messages. 
@@ -189,10 +189,10 @@ def extract_text_from_content(content: Any) -> str:
     return ""
 
 
-def truncate_message_content(content: Any, max_length: int = 200_000) -> Any:
+def truncate_message_content(content: Any, max_length: int = 150_000) -> Any:
     if isinstance(content, str):
         if len(content) > max_length:
-            return content[:100000] + " ... [TRUNCATED] ... " + content[-100000:]
+            return content[:70000] + " ... [TRUNCATED] ... " + content[-70000:]
         return content
     elif isinstance(content, list):
         return [truncate_message_content(item, max_length) for item in content]
@@ -293,12 +293,12 @@ async def refresh_context_async(task: str, messages: List[Dict], display: AgentD
     summary = get_all_summaries()
     last4_messages = format_messages_to_string(filtered[-4:])
     if len(last4_messages) > 200000:
-        last4_messages = last4_messages[:100000] + " ... [TRUNCATED] ... " + last4_messages[-100000:]
+        last4_messages = last4_messages[:70000] + " ... [TRUNCATED] ... " + last4_messages[-70000:]
     completed, steps = await reorganize_context(filtered, summary)
 
     file_contents = aggregate_file_states()
     if len(file_contents) > 200000:
-        file_contents = file_contents[:100000] + " ... [TRUNCATED] ... " + file_contents[-100000:]
+        file_contents = file_contents[:70000] + " ... [TRUNCATED] ... " + file_contents[-70000:]
     combined_content = f"""Original request: {task}
     Current Completed Project Files:
     {file_contents}

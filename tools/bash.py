@@ -264,7 +264,7 @@ class BashTool(BaseAnthropicTool):
         """
 
     name: ClassVar[Literal["bash"]] = "bash"
-    api_type: ClassVar[Literal["bash_20241022"]] = "bash_20241022"
+    api_type: ClassVar[Literal["bash_20250124"]] = "bash_20250124"
 
     async def __call__(self, command: str | None = None, **kwargs):
         if command is not None:

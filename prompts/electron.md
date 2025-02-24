@@ -1,1 +1,0 @@
-Create a simple electron app that I can run on windows.  Just a simple working prototype.  try to get it running in as few steps as possible.  There is no need to double check if a file is correct before attempting to run the app.  

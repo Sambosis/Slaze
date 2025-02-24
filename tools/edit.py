@@ -44,7 +44,7 @@ class EditTool(BaseAnthropicTool):
     The tool parameters are defined by Anthropic and are not editable.
     """
 
-    api_type: Literal["text_editor_20241022"] = "text_editor_20241022"
+    api_type: Literal["text_editor_20250124"] = "text_editor_20250124"
     name: Literal["str_replace_editor"] = "str_replace_editor"
     LOG_FILE = Path(get_constant('LOG_FILE'))
     _file_history: dict[Path, list[str]]

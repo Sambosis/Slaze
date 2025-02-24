@@ -17,6 +17,7 @@ from tools import (
     ProjectSetupTool,
     WriteCodeTool,
     PictureGenerationTool,
+    EditTool,
     ToolCollection,
     ToolResult
 )
@@ -31,12 +32,13 @@ class Agent:
         self.task = task
         self.display = display
         self.context_recently_refreshed = False
-        self.refresh_count = 30
+        self.refresh_count = 8
         self.tool_collection = ToolCollection(
             WriteCodeTool(display=self.display),
             ProjectSetupTool(display=self.display),
             BashTool(display=self.display),
             PictureGenerationTool(display=self.display),
+            # EditTool(display=self.display),
             display=self.display
         )
         self.output_manager = OutputManager(self.display)
@@ -162,6 +164,16 @@ class Agent:
                     new_content.append(content)
                 tool_result["content"] = new_content
 
+    def _sanitize_tool_name(self, name: str) -> str:
+        """Sanitize tool name to match pattern '^[a-zA-Z0-9_-]{1,64}$'"""
+        import re
+        # Keep only alphanumeric chars, underscores and hyphens
+        sanitized = re.sub(r'[^a-zA-Z0-9_-]', '_', name)
+        # Truncate to 64 chars if needed
+        if len(sanitized) > 64:
+            sanitized = sanitized[:64]
+        return sanitized
+
     async def step(self):
         messages = self.messages
         task = self.task
@@ -181,14 +193,13 @@ class Agent:
                 {"role": msg["role"], "content": truncate_message_content(msg["content"])}
                 for msg in messages
             ]
-            # --- START ASYNC SUMMARY ---
             summary_task = asyncio.create_task(summarize_recent_messages(messages[-4:], self.display))
             ic(f"NUMBER_OF_MESSAGES: {len(messages)}")
 
             # --- MAIN LLM CALL ---
+            response = None  # Initialize response to avoid UnboundLocalError
             try:
                 ic(self.tool_collection.to_params())
-                response = None # ADD THIS LINE
                 response = self.client.beta.messages.create(
                     max_tokens=MAX_SUMMARY_TOKENS,
                     messages=truncated_messages,
@@ -199,31 +210,30 @@ class Agent:
                     betas=self.betas,
                 )
             except Exception as llm_error:
-                self.display.add_message("assistant", f"Calling LLM with tool params: {self.tool_collection.to_params()}")
-
-                self.display.add_message("assistant", f"LLM call failed, refreshing context: {str(llm_error)}")
-                # Get last few messages for context refresh
+                self.display.add_message("assistant", f"LLM call failed: {str(llm_error)}")
                 last_3_messages = messages[-3:] if len(messages) >= 3 else messages
                 new_context = await refresh_context_async(task, last_3_messages, self.display)
                 self.messages = [{"role": "user", "content": new_context}]
                 self.context_recently_refreshed = True
 
             response_params = []
-            if response is not None: # ADD THIS CHECK
+            if response is not None:
                 for block in response.content:
                     if hasattr(block, 'text'):
                         response_params.append({"type": "text", "text": block.text})
                         self.display.add_message("assistant", block.text)
                     elif getattr(block, 'type', None) == "tool_use":
+                        sanitized_name = self._sanitize_tool_name(block.name)
                         response_params.append({
                             "type": "tool_use",
-                            "name": block.name,
+                            "name": sanitized_name,
                             "id": block.id,
                             "input": block.input
                         })
-            else: # ADD THIS ELSE BLOCK
+            else:
                 self.display.add_message("assistant", "LLM response was None.")
-                response_params = [] # Assign an empty list to avoid further errors
+                response_params = []
+
             self.messages.append({"role": "assistant", "content": response_params})
             ic(f"NUNBER_OF_MESSAGES: {len(messages)}")
 
@@ -239,7 +249,7 @@ class Agent:
                     tool_result_content.append(tool_result)
 
             ic(f"NUNBER_OF_MESSAGES: {len(messages)}")
-            self.display.add_message("user", f"NUNBER_OF_MESSAGES: {len(messages)}")
+            self.display.add_message("user", f"Refreshing context in {self.refresh_count - len(messages)} currently {len(messages)} of {self.refresh_count}messages")
             quick_summary = await summary_task  # Now we wait for the summary to complete
             add_summary(quick_summary)
             self.display.add_message("assistant", quick_summary)
@@ -264,7 +274,7 @@ class Agent:
                     new_context = await refresh_context_async(task, last_3_messages, self.display)
                     self.context_recently_refreshed = True
                     self.messages =[{"role": "user", "content": new_context}]
-                    self.refresh_count += 2
+                    self.refresh_count += 9
 
             if self.display.user_interupt:
                 last_3_messages = messages[-3:]
@@ -273,7 +283,7 @@ class Agent:
                 new_context = await refresh_context_async(task, last_3_messages, self.display)
                 new_context = new_context + user_input
                 self.messages =[{"role": "user", "content": new_context}]
-                self.refresh_count += 2
+                self.refresh_count += 9
                 self.context_recently_refreshed = True
                 self.display.user_interupt = False
             else:
@@ -281,8 +291,12 @@ class Agent:
             with open(MESSAGES_FILE, 'w', encoding='utf-8') as f:
                 message_string = format_messages_to_string(messages)
                 f.write(message_string)
-            self.token_tracker.update(response)
-            self.token_tracker.display(self.display)
+            # Only update token tracker if response is not None
+            if response is not None and hasattr(response, 'usage'):
+                self.token_tracker.update(response)
+                self.token_tracker.display(self.display)
+            else:
+                self.display.add_message("assistant", "No valid LLM response for token usage update.")
             return True
 
         except Exception as e:

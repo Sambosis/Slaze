@@ -28,7 +28,7 @@ LOGS_DIR.mkdir(parents=True, exist_ok=True)
 LOG_FILE = LOGS_DIR / 'file_creation_log.json'
 MESSAGES_FILE = LOGS_DIR / 'messages.md'
 SUMMARY_MODEL = "claude-3-5-haiku-latest"
-MAIN_MODEL = "claude-3-5-sonnet-latest"
+MAIN_MODEL = "claude-3-7-sonnet-20250219"
 COMPUTER_USE_BETA_FLAG = "computer-use-2024-10-22"
 PROMPT_CACHING_BETA_FLAG = "prompt-caching-2024-07-31"
 CODE_FILE = LOGS_DIR / "code_messages.py"
@@ -83,12 +83,16 @@ def get_constants():
 
 # function to load the constants from a file
 def load_constants():
+    const_file = CACHE_DIR / 'constants.json'
     try:
-        with open(CACHE_DIR / 'constants.json', 'r') as f:
+        # If file is empty, return an empty dict
+        if const_file.stat().st_size == 0:
+            return {}
+        with open(const_file, 'r') as f:
             constants = json.load(f)
         return constants
     except FileNotFoundError:
-        return None
+        return {}
 
 # get a constant by name
 def get_constant(name):
@@ -106,18 +110,15 @@ def get_constant(name):
 
 # function to set a constant
 def set_constant(name, value):
-    constants = load_constants()
-    if constants:
-        # Convert Path objects to strings for JSON serialization
-        if isinstance(value, Path):
-            constants[name] = str(value)
-        else:
-            constants[name] = value
-        with open(CACHE_DIR / 'constants.json', 'w') as f:
-            json.dump(constants, f, indent=4)
-            return True
+    constants = load_constants() or {}
+    # Convert Path objects to strings for JSON serialization
+    if isinstance(value, Path):
+        constants[name] = str(value)
     else:
-        return False
+        constants[name] = value
+    with open(CACHE_DIR / 'constants.json', 'w') as f:
+        json.dump(constants, f, indent=4)
+    return True
 
 # function to set the project directory
 def set_project_dir(new_dir):

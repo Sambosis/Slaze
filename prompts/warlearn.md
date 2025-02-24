@@ -1,2 +1,1 @@
-Most of the work si donefor the following project.  please look at the files in the project folder and complete and improve it. Check to make sure each episode has a way to end.
-train a war game model using RL. Use a high level helper library for model training. Use Pydantic where possible. use pygame to display full gameplay occasionally during training.
+Create a reinforcement learning model for a Strategy Based War Game where 2 agents control their respective armies. The model should learn by playing itself. Use a high level helper framework for model training. Use Pydantic where possible. Be Mindeful of how you structure your imports. Use pygame to display full gameplay occasionally during training.

@@ -21,6 +21,7 @@ from tools import (
     BashTool,
     ProjectSetupTool,
     WriteCodeTool,
+    EditTool,
     PictureGenerationTool,
     ToolCollection,
     ToolResult
@@ -235,7 +236,7 @@ async def run_sampling_loop(task: str, display: AgentDisplayWebWithPrompt) -> Li
     agent.messages.append({"role": "user", "content": task})
     messages = await sampling_loop(
         agent=agent,
-        max_tokens=8000,
+        max_tokens=28000,
     )
     return messages
 
@@ -244,6 +245,7 @@ async def main_async():
     loop = asyncio.get_event_loop()
     
     # Create display with the loop
+    app, socketio = AgentDisplayWebWithPrompt.create_app(loop=loop) # MODIFY THIS LINE
     display = AgentDisplayWebWithPrompt()
     display.loop = loop
     display.start_server()

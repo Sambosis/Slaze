@@ -287,7 +287,7 @@ class WriteCodeTool(BaseAnthropicTool):
         #     base_url="https://openrouter.ai/api/v1",
         #     api_key=OPENROUTER_API_KEY,
         #     )
-        # model = "microsoft/wizardlm-2-8x22b:nitro"
+        # model = "google/gemini-2.0-flash-001:nitro"
         client = AsyncOpenAI()
         model = "o3-mini"
         ic(model)
@@ -297,7 +297,9 @@ class WriteCodeTool(BaseAnthropicTool):
         try:
             completion =  await client.chat.completions.create(
                 model=model,
-                messages=messages)
+                messages=messages,
+                reasoning_effort="high"
+            )
 
         except Exception as e:
             ic(completion)
@@ -375,22 +377,23 @@ class WriteCodeTool(BaseAnthropicTool):
         code_string = "no code created"
         current_code_base = get_all_current_code()
         OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-        client = AsyncOpenAI(
-            base_url="https://openrouter.ai/api/v1",
-            api_key=OPENROUTER_API_KEY,
-            )
-        model = "google/gemini-2.0-flash-001:nitro"
-        # client = AsyncOpenAI()
-        # model = "o3-mini"
+        # client = AsyncOpenAI(
+        #     base_url="https://openrouter.ai/api/v1",
+        #     api_key=OPENROUTER_API_KEY,
+        #     )
+        # model = "google/gemini-2.0-flash-001:nitro"
+        client = AsyncOpenAI()
+        model = "o3-mini"
 
         # Prepare messages
         messages = code_prompt_research(current_code_base, code_description)
         ic(f"Here are the messages being sent to Research the Code\n +++++ \n +++++ \n{messages}")
         try:
-            completion = await client.chat.completions.create(
+            completion =  await client.chat.completions.create(
                 model=model,
-                messages=messages)
-
+                messages=messages,
+                reasoning_effort="high"
+            )
         except Exception as e:
             ic(completion)
             ic(f"error: {e}")
@@ -430,15 +433,15 @@ class WriteCodeTool(BaseAnthropicTool):
         if 'filename' in data:
             output_lines.append(f"Filename: {data['filename']}")
             code_string = data.get('code_string', '')
-            if len(code_string) > 200000:
-                code_string = code_string[:100000] + " ... [TRUNCATED] ... " + code_string[-100000:]
+            if len(code_string) > 150000:
+                code_string = code_string[:75000] + " ... [TRUNCATED] ... " + code_string[-75000:]
             output_lines.append(f"Code:\n{code_string}")
 
         # Add files_results (for multiple files, this is already formatted)
         if 'files_results' in data:
             files_results = data['files_results']
-            if len(files_results) > 200000:
-                files_results = files_results[:100000] + " ... [TRUNCATED] ... " + files_results[-100000:]
+            if len(files_results) > 150000:
+                files_results = files_results[:75000] + " ... [TRUNCATED] ... " + files_results[-75000:]
             output_lines.append(files_results)
         
         # Add packages if present
@@ -450,15 +453,15 @@ class WriteCodeTool(BaseAnthropicTool):
         # Add run output if present
         if 'run_output' in data and data['run_output']:
             run_output = data['run_output']
-            if len(run_output) > 200000:
-                run_output = run_output[:100000] + " ... [TRUNCATED] ... " + run_output[-100000:]
+            if len(run_output) > 150000:
+                run_output = run_output[:75000] + " ... [TRUNCATED] ... " + run_output[-75000:]
             output_lines.append("\nApplication Output:")
             output_lines.append(run_output)
         
         if 'errors' in data and data['errors']:
             errors = data['errors']
-            if len(errors) > 200000:
-                errors = errors[:100000] + " ... [TRUNCATED] ... " + errors[-100000:]
+            if len(errors) > 150000:
+                errors = errors[:75000] + " ... [TRUNCATED] ... " + errors[-75000:]
             output_lines.append("\nErrors:")
             output_lines.append(errors)
         
