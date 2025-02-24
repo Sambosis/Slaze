@@ -93,11 +93,17 @@ class ProjectSetupTool(BaseAnthropicTool):
             for package in data['packages_installed']:
                 output_lines.append(f"  - {package}")
         if 'run_output' in data and data['run_output']:
+            run_output = data['run_output']
+            if len(run_output) > 200000:
+                run_output = run_output[:100000] + " ... [TRUNCATED] ... " + run_output[-100000:]
             output_lines.append("\nApplication Output:")
-            output_lines.append(data['run_output'])
+            output_lines.append(run_output)
         if 'errors' in data and data['errors']:
+            errors = data['errors']
+            if len(errors) > 200000:
+                errors = errors[:100000] + " ... [TRUNCATED] ... " + errors[-100000:]
             output_lines.append("\nErrors:")
-            output_lines.append(data['errors'])
+            output_lines.append(errors)
         return "\n".join(output_lines)
 
     # === Python Environment Methods ===

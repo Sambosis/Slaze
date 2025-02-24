@@ -341,8 +341,16 @@ class BashTool(BaseAnthropicTool):
 
 
             if success:
+                if len(output) > 200000:
+                    output = output[:100000] + " ... [TRUNCATED] ... " + output[-100000:]
+                if len(error) > 200000:
+                    error = error[:100000] + " ... [TRUNCATED] ... " + error[-100000:]
                 return ToolResult(output=f"command: {command}\nsuccess: true\noutput: {output}\nerror: {error}")
             else:
+                if len(output) > 200000:
+                    output = output[:100000] + " ... [TRUNCATED] ... " + output[-100000:]
+                if len(error) > 200000:
+                    error = error[:100000] + " ... [TRUNCATED] ... " + error[-100000:]
                 return ToolResult(output=f"command: {command}\nsuccess: false\noutput: {output}\nerror: {error}")
 
 
@@ -381,4 +389,4 @@ def save_successful_code(script_code: str) -> str:
         f.write(script_code)
 
     return str(file_path)
- 
+

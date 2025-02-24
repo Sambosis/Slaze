@@ -181,4 +181,7 @@ def write_to_file(s: str, file_path: str = ICECREAM_OUTPUT_FILE):
     with open(file_path, 'a', encoding="utf-8") as f:
         f.write('\n'.join(output) + '\n')
 
+with open(SYSTEM_PROMPT_DIR / "system_prompt.md", 'r', encoding="utf-8") as f:
+    SYSTEM_PROMPT = f.read()
+
 ic.configureOutput(includeContext=True, outputFunction=write_to_file)

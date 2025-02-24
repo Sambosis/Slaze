@@ -1,0 +1,2 @@
+Most of the work si donefor the following project.  please look at the files in the project folder and complete and improve it. Check to make sure each episode has a way to end.
+train a war game model using RL. Use a high level helper library for model training. Use Pydantic where possible. use pygame to display full gameplay occasionally during training.

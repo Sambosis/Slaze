@@ -1,1 +1,1 @@
-design a strategy based war game where a user plays against the computer.  make it look pretty. use pygame.
+design a strategy based war game where a computer plays against another computer.  make it look pretty. use pygame.

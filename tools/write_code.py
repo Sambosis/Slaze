@@ -429,11 +429,17 @@ class WriteCodeTool(BaseAnthropicTool):
         # Add filename if present (for single file operations)
         if 'filename' in data:
             output_lines.append(f"Filename: {data['filename']}")
-            output_lines.append(f"Code:\n{data.get('code_string', '')}")
+            code_string = data.get('code_string', '')
+            if len(code_string) > 200000:
+                code_string = code_string[:100000] + " ... [TRUNCATED] ... " + code_string[-100000:]
+            output_lines.append(f"Code:\n{code_string}")
 
         # Add files_results (for multiple files, this is already formatted)
         if 'files_results' in data:
-            output_lines.append(data['files_results'])
+            files_results = data['files_results']
+            if len(files_results) > 200000:
+                files_results = files_results[:100000] + " ... [TRUNCATED] ... " + files_results[-100000:]
+            output_lines.append(files_results)
         
         # Add packages if present
         if 'packages_installed' in data:
@@ -443,12 +449,18 @@ class WriteCodeTool(BaseAnthropicTool):
         
         # Add run output if present
         if 'run_output' in data and data['run_output']:
+            run_output = data['run_output']
+            if len(run_output) > 200000:
+                run_output = run_output[:100000] + " ... [TRUNCATED] ... " + run_output[-100000:]
             output_lines.append("\nApplication Output:")
-            output_lines.append(data['run_output'])
+            output_lines.append(run_output)
         
         if 'errors' in data and data['errors']:
+            errors = data['errors']
+            if len(errors) > 200000:
+                errors = errors[:100000] + " ... [TRUNCATED] ... " + errors[-100000:]
             output_lines.append("\nErrors:")
-            output_lines.append(data['errors'])
+            output_lines.append(errors)
         
         # Join all lines with newlines
         return "\n".join(output_lines)

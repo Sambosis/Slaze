@@ -31,6 +31,7 @@ from utils.file_logger import *
 from utils.context_helpers import *
 from utils.output_manager import *
 from config import *  # Make sure config.py defines the constants
+from agent import Agent
 
 write_constants_to_file()
 load_dotenv()
@@ -80,9 +81,6 @@ def generate_download_link(file_path):
         return f"/download/{filename}"
     except Exception as e:
         return f"Error generating download link: {str(e)}"
-
-with open(SYSTEM_PROMPT_FILE, 'r', encoding="utf-8") as f:
-    SYSTEM_PROMPT = f.read()
 
 
 def _make_api_tool_result(result: ToolResult, tool_use_id: str) -> Dict:
@@ -206,228 +204,38 @@ def _maybe_filter_to_n_most_recent_images(messages: List[BetaMessageParam], imag
 # ----------------  The main Agent Loop ----------------
 async def sampling_loop(
     *,
-    model: str,
-    messages: List[BetaMessageParam],
-    api_key: str,
-    max_tokens: int = 8000,
-    display: AgentDisplayWebWithPrompt  # Keep this parameter
+    agent: Agent,
+    max_tokens: int = 28000,
     ) -> List[BetaMessageParam]:
     """Main loop for agentic sampling."""
-    task = messages[0]['content']
-    context_recently_refreshed = False
-    refresh_count = 10
-    try:
-        tool_collection = ToolCollection(
-            WriteCodeTool(display=display),  # Use the passed-in display
-            ProjectSetupTool(display=display), # Use the passed-in display
-            BashTool(display=display),        # Use the passed-in display
-            PictureGenerationTool(display=display), #Use the passed-in display
-            display=display                   # Use the passed-in display
-        )
-        with open(LOG_FILE, 'w', encoding='utf-8') as f:
-            f.write("")
-
-        display.add_message("user", tool_collection.get_tool_names_as_string())
-        await asyncio.sleep(0.1)
-
-        system = BetaTextBlockParam(type="text", text=SYSTEM_PROMPT_FILE)
-        output_manager = OutputManager(display) # and here.
-        client = Anthropic(api_key=api_key)
-        i = 0
-        running = True
-        token_tracker = TokenTracker(display) # Use passed in Display
-        enable_prompt_caching = True
-        betas = [COMPUTER_USE_BETA_FLAG, PROMPT_CACHING_BETA_FLAG]
-        image_truncation_threshold = 1
-        only_n_most_recent_images = 2
-        while running:
-            i += 1
-            with open(SYSTEM_PROMPT_FILE, 'r', encoding="utf-8") as f:
-                SYSTEM_PROMPT = f.read()
-            if enable_prompt_caching:
-                _inject_prompt_caching(messages)
-                image_truncation_threshold = 1
-                system = [{
-                    "type": "text",
-                    "text": SYSTEM_PROMPT,
-                    "cache_control": {"type": "ephemeral"}
-                }]
-
-            if only_n_most_recent_images:
-                _maybe_filter_to_n_most_recent_images(
-                    messages,
-                    only_n_most_recent_images,
-                    min_removal_threshold=image_truncation_threshold,
-                )
-
-            try:
-                tool_collection.to_params()
-
-                truncated_messages = [
-                    {"role": msg["role"], "content": truncate_message_content(msg["content"])}
-                    for msg in messages
-                ]
-                # --- START ASYNC SUMMARY ---
-                summary_task = asyncio.create_task(summarize_recent_messages(messages[-4:], display))
-                ic(f"NUMBER_OF_MESSAGES: {len(messages)}")
-
-                # --- MAIN LLM CALL ---
-                try:
-                    response = client.beta.messages.create(
-                        max_tokens=MAX_SUMMARY_TOKENS,
-                        messages=truncated_messages,
-                        model=MAIN_MODEL,
-                        tool_choice={"type": "any"},
-                        system=system,
-                        tools=tool_collection.to_params(),
-                        betas=betas,
-                    )
-                except Exception as llm_error:
-                    display.add_message("assistant", f"LLM call failed, refreshing context: {str(llm_error)}")
-                    # Get last few messages for context refresh
-                    last_3_messages = messages[-3:] if len(messages) >= 3 else messages
-                    new_context = await refresh_context_async(task, last_3_messages, display)
-                    messages = [{"role": "user", "content": new_context}]
-                    context_recently_refreshed = True
-                    continue  # Skip the rest of this iteration and try again with refreshed context
-
-                response_params = []
-                for block in response.content:
-                    if hasattr(block, 'text'):
-                        response_params.append({"type": "text", "text": block.text})
-                        display.add_message("assistant", block.text)  # Use passed-in display
-                    elif getattr(block, 'type', None) == "tool_use":
-                        response_params.append({
-                            "type": "tool_use",
-                            "name": block.name,
-                            "id": block.id,
-                            "input": block.input
-                        })
-                messages.append({"role": "assistant", "content": response_params})
-                ic(f"NUNBER_OF_MESSAGES: {len(messages)}")
-
-                with open(MESSAGES_FILE, 'w', encoding='utf-8') as f:
-                    message_string = format_messages_to_string(messages)
-                    f.write(message_string)
-
-                tool_result_content: List[BetaToolResultBlockParam] = []
-                for content_block in response_params:
-                    output_manager.format_content_block(content_block)
-                    if content_block["type"] == "tool_use":
-                        result = ToolResult(output="Tool execution not started")
-                        try:
-                            ic(content_block['name'])
-                            ic(content_block["input"])
-                            result = await tool_collection.run(
-                                name=content_block["name"],
-                                tool_input=content_block["input"],
-                            )
-                            if result is None:
-                                result = ToolResult(output="Tool execution failed with no result")
-                        except Exception as e:
-                            result = ToolResult(output=f"Tool execution failed: {str(e)}")
-                        finally:
-                            tool_result = _make_api_tool_result(result, content_block["id"])
-                            ic(tool_result)
-                            tool_result_content.append(tool_result)
-                            tool_output = result.output if hasattr(result, 'output') else str(result)
-                            combined_content = [{
-                                "type": "tool_result",
-                                "content": tool_result["content"],
-                                "tool_use_id": tool_result["tool_use_id"],
-                                "is_error": tool_result["is_error"]
-                            }]
-                            combined_content.append({
-                                "type": "text",
-                                "text": f"Tool '{content_block['name']}' was called with input: {json.dumps(content_block['input'])}.\nResult: {extract_text_from_content(tool_output)}"
-                            })
-                            messages.append({
-                                "role": "user",
-                                "content": combined_content
-                            })
-
-                            await asyncio.sleep(0.2)
-
-                            # --- NOW AWAIT AND DISPLAY SUMMARY ---
-                ic(f"NUNBER_OF_MESSAGES: {len(messages)}")
-                display.add_message("user", f"NUNBER_OF_MESSAGES: {len(messages)}")
-                quick_summary = await summary_task  # Now we wait for the summary to complete
-                add_summary(quick_summary)
-                display.add_message("assistant", quick_summary)
-
-                await asyncio.sleep(0.1)
-                if (not tool_result_content) and (not context_recently_refreshed):
-                    display.add_message("assistant", "Awaiting User Input ⌨️ (Type your response in the web interface)")
-                    user_input = await display.wait_for_user_input()
-                    display.add_message("assistant",f"The user has said '{user_input}'")
-                    if user_input.lower() in ["no", "n"]:# or interupt_counter > 4:
-                        running = False
-                    else:
-                        messages.append({"role": "user", "content": user_input})
-                        last_3_messages = messages[-4:]
-                        new_context = await refresh_context_async(task, last_3_messages, display)
-                        context_recently_refreshed = True
-                        messages =[{"role": "user", "content": new_context}]
-                else:
-                    if (len(messages) > refresh_count):
-                        last_3_messages = messages[-3:]
-                        display.add_message("user", "refreshing")
-                        new_context = await refresh_context_async(task, last_3_messages, display)
-                        context_recently_refreshed = True
-                        messages =[{"role": "user", "content": new_context}]
-                        refresh_count += 2
-
-                if display.user_interupt:
-                        last_3_messages = messages[-3:]
-                        display.add_message("assistant", "Awaiting User Input JK!⌨️ (Type your response in the web interface)")
-                        user_input = await display.wait_for_user_input()
-                        new_context = await refresh_context_async(task, last_3_messages, display)
-                        new_context = new_context + user_input
-                        messages =[{"role": "user", "content": new_context}]
-                        refresh_count += 2
-                        context_recently_refreshed = True
-                        display.user_interupt = False
-                else:
-                    context_recently_refreshed = False
-                with open(MESSAGES_FILE, 'w', encoding='utf-8') as f:
-                    message_string = format_messages_to_string(messages)
-                    f.write(message_string)
-                token_tracker.update(response)
-                token_tracker.display(display) #pass in display
-            except UnicodeEncodeError as ue:
-                ic(f"UnicodeEncodeError: {ue}")
-                rr(f"Unicode encoding error: {ue}")
-                rr(f"ascii: {ue.args[1].encode('ascii', errors='replace').decode('ascii')}")
-                break
-            except Exception as e:
-                ic(f"Error in sampling loop: {str(e).encode('ascii', errors='replace').decode('ascii')}")
-                ic(f"The error occurred at the following message: {messages[-1]} and line: {e.__traceback__.tb_lineno}")
-                ic(e.__traceback__.tb_frame.f_locals)
-                display.add_message("user", ("Error", str(e)))
-                raise
-        return messages
-
-    except Exception as e:
-        ic(e.__traceback__.tb_lineno)
-        ic(e.__traceback__.tb_lasti)
-        ic(e.__traceback__.tb_frame.f_code.co_filename)
-        ic(e.__traceback__.tb_frame)
-        display.add_message("user", ("Initialization Error", str(e)))
-        ic(f"Error initializing sampling loop: {str(e)}")
-        raise
+    running = True
+    while running:
+        try:
+            running = await agent.step()
+        except UnicodeEncodeError as ue:
+            ic(f"UnicodeEncodeError: {ue}")
+            rr(f"Unicode encoding error: {ue}")
+            rr(f"ascii: {ue.args[1].encode('ascii', errors='replace').decode('ascii')}")
+            break
+        except Exception as e:
+            ic(f"Error in sampling loop: {str(e).encode('ascii', errors='replace').decode('ascii')}")
+            ic(f"The error occurred at the following message: {agent.messages[-1]} and line: {e.__traceback__.tb_lineno}")
+            ic(e.__traceback__.tb_frame.f_locals)
+            agent.display.add_message("user", ("Error", str(e)))
+            raise
+    return agent.messages
 
 async def run_sampling_loop(task: str, display: AgentDisplayWebWithPrompt) -> List[BetaMessageParam]:
     """Run the sampling loop with clean output handling."""
     api_key = os.getenv("ANTHROPIC_API_KEY")
-    messages = []
     if not api_key:
         raise ValueError("API key not found. Please set the ANTHROPIC_API_KEY environment variable.")
-    messages.append({"role": "user", "content": task})
+    
+    agent = Agent(task=task, display=display)
+    agent.messages.append({"role": "user", "content": task})
     messages = await sampling_loop(
-        model=MAIN_MODEL,
-        messages=messages,
-        api_key=api_key,
-        display=display  # Pass the display instance
+        agent=agent,
+        max_tokens=8000,
     )
     return messages
 

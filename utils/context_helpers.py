@@ -96,20 +96,30 @@ async def summarize_recent_messages(short_messages: List[BetaMessageParam], disp
             for block in msg['content']:
                 if isinstance(block, dict):
                     if block.get('type') == 'text':
-                        conversation_text += f"\n{role}: {block.get('text', '')}"
+                        content = block.get('text', '')
+                        if len(content) > 200000:
+                            content = content[:100000] + " ... [TRUNCATED] ... " + content[-100000:]
+                        conversation_text += f"\n{role}: {content}"
                     elif block.get('type') == 'tool_result':
                         for item in block.get('content', []):
                             if item.get('type') == 'text':
-                                conversation_text += f"\n{role} (Tool Result): {item.get('text', '')}"
+                                content = item.get('text', '')
+                                if len(content) > 200000:
+                                    content = content[:100000] + " ... [TRUNCATED] ... " + content[-100000:]
+                                conversation_text += f"\n{role} (Tool Result): {content}"
         else:
-            conversation_text += f"\n{role}: {msg['content']}"
+            content = msg['content']
+            if len(content) > 200000:
+                content = content[:100000] + " ... [TRUNCATED] ... " + content[-100000:]
+            conversation_text += f"\n{role}: {content}"
 
     summary_prompt = f"""Please provide a concise casual natural language summary of the messages. 
         They are the actual LLM messages log of the interaction and you will provide several brief statements informing someone what was done. 
         Focus on the actions taken and provide the names of any files, functions, directories, or paths mentioned and a basic idea of what was done and why. 
         If known, provide the outcome of the action and whether it was successful or not.
         Messages to summarize:
-        {conversation_text}"""
+
+        {conversation_text[:10000]}""" # ADD TRUNCATION HERE
     messages_prompt = [
     {
           "role": "user",
@@ -129,7 +139,7 @@ async def summarize_recent_messages(short_messages: List[BetaMessageParam], disp
     ic(completion)
     response = sum_client.chat.completions.create(
         model=model,
-        max_completion_tokens=3000,
+        max_completion_tokens=20000,
         messages=[{
             "role": "user",
             "content": summary_prompt
@@ -181,7 +191,9 @@ def extract_text_from_content(content: Any) -> str:
 
 def truncate_message_content(content: Any, max_length: int = 200_000) -> Any:
     if isinstance(content, str):
-        return content[:max_length]
+        if len(content) > max_length:
+            return content[:100000] + " ... [TRUNCATED] ... " + content[-100000:]
+        return content
     elif isinstance(content, list):
         return [truncate_message_content(item, max_length) for item in content]
     elif isinstance(content, dict):
@@ -223,7 +235,7 @@ async def reorganize_context(messages: List[BetaMessageParam], summary: str) -> 
                                 conversation_text += f"\n{role} (Tool Result): {item.get('text', '')}"
         else:
             conversation_text += f"\n{role}: {msg['content']}"
-        
+
     summary_prompt = f"""I need a 2 part response from you. The first part of the response is to list everything that has been done already. 
     You will be given a lot of context, mucch of which is repetitive, so you are only to list each thing done one time.
     For each thing done (or attempted) list if it worked or not, and if not, why it didn't work.
@@ -279,10 +291,14 @@ async def refresh_context_async(task: str, messages: List[Dict], display: AgentD
     """
     filtered = filter_messages(messages)
     summary = get_all_summaries()
-    last4_messages = format_messages_to_string(messages[-4:])
+    last4_messages = format_messages_to_string(filtered[-4:])
+    if len(last4_messages) > 200000:
+        last4_messages = last4_messages[:100000] + " ... [TRUNCATED] ... " + last4_messages[-100000:]
     completed, steps = await reorganize_context(filtered, summary)
 
     file_contents = aggregate_file_states()
+    if len(file_contents) > 200000:
+        file_contents = file_contents[:100000] + " ... [TRUNCATED] ... " + file_contents[-100000:]
     combined_content = f"""Original request: {task}
     Current Completed Project Files:
     {file_contents}
