@@ -204,7 +204,7 @@ class Agent:
                     max_tokens=MAX_SUMMARY_TOKENS,
                     messages=truncated_messages,
                     model=MAIN_MODEL,
-                    tool_choice={"type": "any"},
+                    tool_choice={"type": "auto"},
                     system=system,
                     tools=self.tool_collection.to_params(),
                     betas=self.betas,

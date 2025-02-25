@@ -283,13 +283,13 @@ class WriteCodeTool(BaseAnthropicTool):
 
         current_code_base = get_all_current_code()
         OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-        # client = AsyncOpenAI(
-        #     base_url="https://openrouter.ai/api/v1",
-        #     api_key=OPENROUTER_API_KEY,
-        #     )
-        # model = "google/gemini-2.0-flash-001:nitro"
-        client = AsyncOpenAI()
-        model = "o3-mini"
+        client = AsyncOpenAI(
+            base_url="https://openrouter.ai/api/v1",
+            api_key=OPENROUTER_API_KEY,
+            )
+        model = "google/gemini-2.0-pro-exp-02-05:free"
+        # client = AsyncOpenAI()
+        # model = "o3-mini"
         ic(model)
         # Prepare messages
         messages = code_prompt_generate(current_code_base, code_description, research_string)
@@ -298,7 +298,7 @@ class WriteCodeTool(BaseAnthropicTool):
             completion =  await client.chat.completions.create(
                 model=model,
                 messages=messages,
-                reasoning_effort="high"
+                # reasoning_effort="high"
             )
 
         except Exception as e:
@@ -377,13 +377,13 @@ class WriteCodeTool(BaseAnthropicTool):
         code_string = "no code created"
         current_code_base = get_all_current_code()
         OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-        # client = AsyncOpenAI(
-        #     base_url="https://openrouter.ai/api/v1",
-        #     api_key=OPENROUTER_API_KEY,
-        #     )
-        # model = "google/gemini-2.0-flash-001:nitro"
-        client = AsyncOpenAI()
-        model = "o3-mini"
+        client = AsyncOpenAI(
+            base_url="https://openrouter.ai/api/v1",
+            api_key=OPENROUTER_API_KEY,
+            )
+        model = "google/gemini-2.0-pro-exp-02-05:free"
+        # client = AsyncOpenAI()
+        # model = "o3-mini"
 
         # Prepare messages
         messages = code_prompt_research(current_code_base, code_description)
@@ -392,7 +392,7 @@ class WriteCodeTool(BaseAnthropicTool):
             completion =  await client.chat.completions.create(
                 model=model,
                 messages=messages,
-                reasoning_effort="high"
+                # reasoning_effort="high"
             )
         except Exception as e:
             ic(completion)
