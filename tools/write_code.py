@@ -247,10 +247,17 @@ class WriteCodeTool(BaseAnthropicTool):
 
     def extract_code_block(self, text: str) -> tuple[str, str]:
         """
-        Extracts the first code block in the text with its language.
-        If no code block is found, returns the full text and language "code".
-        If text is empty, returns "No Code Found" and language "Unknown".
+        Extracts code based on file type. Special handling for Markdown files.
+        Returns tuple of (content, language).
         """
+        # Get file extension from the context if available
+        is_markdown = hasattr(self, 'current_file') and str(self.current_file).lower().endswith(('.md', '.markdown'))
+        
+        if is_markdown:
+            # For Markdown files, return the entire text as-is
+            return text, "markdown"
+            
+        # Original code block extraction logic for other files
         if not text.strip():
             return "No Code Found", "Unknown"
         
@@ -471,56 +478,62 @@ class WriteCodeTool(BaseAnthropicTool):
     async def write_code_to_file(self, code_description: str,  project_path: Path, filename) -> dict:
         """write code to a permanent file"""
         file_path = project_path / filename
-        code_research_string = await self._call_llm_to_research_code(code_description, file_path)
-        # ic(code_research_string)
+        # Store current file path for context in extract_code_block
+        self.current_file = file_path
+        
+        try:
+            code_research_string = await self._call_llm_to_research_code(code_description, file_path)
+            # ic(code_research_string)
 
-        # Write research result (optional: can also be wrapped if needed)
-        await asyncio.to_thread(lambda: open("codeResearch.txt", "a", encoding='utf-8').write(code_research_string))
-        # ic(code_research_string)
-        code_string = await self._call_llm_to_generate_code(code_description, code_research_string, file_path)
-        ic(code_string)
-        
-        # Create the directory if it does not exist
-        try:
-            await asyncio.to_thread(os.makedirs, file_path.parent, exist_ok=True)
-        except Exception as dir_error:
+            # Write research result (optional: can also be wrapped if needed)
+            # await asyncio.to_thread(lambda: open("codeResearch.txt", "a", encoding='utf-8').write(code_research_string))
+
+            code_string = await self._call_llm_to_generate_code(code_description, code_research_string, file_path)
+            
+            # Create the directory if it does not exist
+            try:
+                await asyncio.to_thread(os.makedirs, file_path.parent, exist_ok=True)
+            except Exception as dir_error:
+                return {
+                    "command": "write_code_to_file",
+                    "status": "error",
+                    "project_path": str(project_path),
+                    "filename": filename,
+                    "error": f"Failed to create directory: {str(dir_error)}"
+                }
+            
+            # Write the file asynchronously
+            try:
+                await asyncio.to_thread(file_path.write_text, code_string, encoding='utf-8')
+            except Exception as write_error:
+                return {
+                    "command": "write_code_to_file",
+                    "status": "error",
+                    "project_path": str(project_path),
+                    "filename": filename,
+                    "error": f"Failed to write file: {str(write_error)}"
+                }
+            
+            # Log the file creation
+            try:
+                await asyncio.to_thread(log_file_operation, file_path, "create")
+            except Exception as log_error:
+                if self.display is not None:
+                    try:
+                        self.display.add_message("user", f"Failed to log file operation: {str(log_error)}")
+                    except Exception:
+                        pass
+            
             return {
                 "command": "write_code_to_file",
-                "status": "error",
+                "status": "success",
                 "project_path": str(project_path),
                 "filename": filename,
-                "error": f"Failed to create directory: {str(dir_error)}"
+                "code_string": code_string
             }
-        
-        # Write the file asynchronously
-        try:
-            await asyncio.to_thread(file_path.write_text, code_string, encoding='utf-8')
-        except Exception as write_error:
-            return {
-                "command": "write_code_to_file",
-                "status": "error",
-                "project_path": str(project_path),
-                "filename": filename,
-                "error": f"Failed to write file: {str(write_error)}"
-            }
-        
-        # Log the file creation
-        try:
-            await asyncio.to_thread(log_file_operation, file_path, "create")
-        except Exception as log_error:
-            if self.display is not None:
-                try:
-                    self.display.add_message("user", f"Failed to log file operation: {str(log_error)}")
-                except Exception:
-                    pass
-        
-        return {
-            "command": "write_code_to_file",
-            "status": "success",
-            "project_path": str(project_path),
-            "filename": filename,
-            "code_string": code_string
-        }
+        finally:
+            # Clean up the temporary attribute
+            delattr(self, 'current_file')
            
     async def write_and_exec(self, code_description: str,  project_path: Path) -> dict:
         """Write code to a temp file and execute it"""

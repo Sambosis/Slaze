@@ -112,10 +112,7 @@ class ProjectSetupTool(BaseAnthropicTool):
         os.chdir(project_path)
         ic("Creating Python virtual environment...")
         self.run_command(f"cd {project_path} && python -m venv .venv") # Create a virtual environment
-        # try:
-        #     self.run_command("uv init --no-config")
-        # except:
-        #     pass
+
         ic("Installing Python packages...")
         for package in packages:
             self.run_command(f"cd {project_path} && python -m pip install {package}")
