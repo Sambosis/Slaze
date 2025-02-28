@@ -1,11 +1,11 @@
-# agent_display_web_with_prompt.py (excerpt)
-
+# utils/agent_display_web_with_prompt.py
 import asyncio
 from flask import render_template, request, redirect, url_for, send_from_directory
 from dotenv import load_dotenv
 load_dotenv()
 from utils.agent_display_web import AgentDisplayWeb
-from config import PROMPTS_DIR, LOGS_DIR
+from config import PROMPTS_DIR, LOGS_DIR, get_project_dir, get_docker_project_dir, set_project_dir
+from pathlib import Path
 from openai import OpenAI, AsyncOpenAI
 import os
 def start_sampling_loop(task, display):
@@ -34,36 +34,37 @@ class AgentDisplayWebWithPrompt(AgentDisplayWeb):
                         filename = request.form.get('filename')
                         prompt_text = request.form.get('prompt_text')
                         new_prompt_path = PROMPTS_DIR / f"{filename}.md"
+                        print(new_prompt_path)
                         with open(new_prompt_path, 'w', encoding='utf-8') as f:
                             f.write(prompt_text)
                         task = prompt_text
                     else:
                         prompt_path = PROMPTS_DIR / choice
+                        print(prompt_path)
                         filename = prompt_path.stem
                         with open(prompt_path, 'r', encoding='utf-8') as f:
                             task = f.read()
                     # client = OpenAI()
                     # model = "o3-mini"
 
-                                
                     OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
                     client = OpenAI(
                         base_url="https://openrouter.ai/api/v1",
                         api_key=OPENROUTER_API_KEY,
                         )
-                    model = "google/gemini-flash-1.5:nitro"
+                    model = "google/gemini-2.0-flash-lite-001"
                     messages = [{"role": "user", "content": f"Please create a simple step by step plan to accomplish the following task. It should be a very high level plan without too many steps.  Each step should be no more than 2 sentences long.  After your plan, provide a directory structure that should be used a list of every file that will need to be created to complete the project. Task:  {task}"}] 
                     completion =  client.chat.completions.create(
                         model=model,
                         messages=messages)
+                    print(completion)
                     task = completion.choices[0].message.content
                     from config import set_project_dir, set_constant
-                    # Remove .md extension if present when setting project dir
-                    project_name = filename.replace('.md', '')
-                    project_dir = set_project_dir(project_name)
+                    project_dir = set_project_dir(filename)
                     set_constant("PROJECT_DIR", str(project_dir))
+                    docker_project_dir = get_docker_project_dir()
                     task += (
-                        f"Do not use Flask for this project. Start testing as soon as possible. DO NOT start making fixes or improvements until you have tested to see if it is working as is.  Your project directory is {project_dir}. "
+                        f"Do not use Flask for this project. Start testing as soon as possible. DO NOT start making fixes or improvements until you have tested to see if it is working as is.  Your project directory is {docker_project_dir}. "
                         "You need to make sure that all files you create and work you do is done in that directory.\n"
                     )
 

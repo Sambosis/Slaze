@@ -16,6 +16,7 @@ from icecream import ic, install
 ic.configureOutput(includeContext=True, outputFunction=write_to_file)
 
 QUICK_SUMMARIES = []
+    
 def format_messages_to_restart(messages):
     """
     Format a list of messages into a formatted string.
@@ -45,7 +46,6 @@ def format_messages_to_restart(messages):
         return "".join(output_pieces)
     except Exception as e:
         return f"Error during formatting: {str(e)}"
-
 
 def format_messages_to_string(messages):
     """
@@ -79,16 +79,18 @@ def format_messages_to_string(messages):
     except Exception as e:
         return f"Error during formatting: {str(e)}"
 
-
-async def summarize_recent_messages(short_messages: List[BetaMessageParam], display: AgentDisplayWebWithPrompt) -> str:    # sum_client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
-    # sum_client = OpenAI()
-    # model = "o3-mini"\
+async def summarize_recent_messages(short_messages: List[BetaMessageParam], display: AgentDisplayWebWithPrompt) -> str:   
+    """ 
+        Summarize the most recent messages. 
+    """
     OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
     sum_client = OpenAI(
         base_url="https://openrouter.ai/api/v1",
         api_key=OPENROUTER_API_KEY,
         )
-    model = "google/gemini-flash-1.5:nitro"
+    model = "google/gemini-2.0-flash-lite-001"
+    # sum_client = OpenAI()
+    # model = "o3-mini"
     conversation_text = ""
     for msg in short_messages:
         role = msg['role'].upper()
@@ -97,62 +99,60 @@ async def summarize_recent_messages(short_messages: List[BetaMessageParam], disp
                 if isinstance(block, dict):
                     if block.get('type') == 'text':
                         content = block.get('text', '')
-                        if len(content) > 200000:
+                        if len(content) > 150000:
                             content = content[:70000] + " ... [TRUNCATED] ... " + content[-70000:]
                         conversation_text += f"\n{role}: {content}"
                     elif block.get('type') == 'tool_result':
                         for item in block.get('content', []):
                             if item.get('type') == 'text':
                                 content = item.get('text', '')
-                                if len(content) > 200000:
+                                if len(content) > 150000:
                                     content = content[:70000] + " ... [TRUNCATED] ... " + content[-70000:]
                                 conversation_text += f"\n{role} (Tool Result): {content}"
         else:
             content = msg['content']
-            if len(content) > 200000:
+            if len(content) > 150000:
                 content = content[:70000] + " ... [TRUNCATED] ... " + content[-70000:]
             conversation_text += f"\n{role}: {content}"
-
     summary_prompt = f"""Please provide a concise casual natural language summary of the messages. 
         They are the actual LLM messages log of the interaction and you will provide several brief statements informing someone what was done. 
         Focus on the actions taken and provide the names of any files, functions, directories, or paths mentioned and a basic idea of what was done and why. 
         If known, provide the outcome of the action and whether it was successful or not.
         Messages to summarize:
-
-        {conversation_text[:10000]}""" # ADD TRUNCATION HERE
+        {conversation_text}"""
     messages_prompt = [
-    {
-          "role": "user",
-          "content": [
+        {
+            "role": "user",
+            "content": 
+                [
                     {
-                        
-                    "type": "text",
-                    "text": summary_prompt
+                        "type": "text",
+                        "text": summary_prompt
                     },
                 ]
-                }
+        }
             ]
     ic(messages_prompt)
-    completion = sum_client.chat.completions.create(
-                model=model,
-                messages=messages_prompt)
-    ic(completion)
+    # completion = sum_client.chat.completions.create(
+    #             model=model,
+    #             messages=messages_prompt)
+    # ic(completion)
     response = sum_client.chat.completions.create(
         model=model,
-        max_completion_tokens=20000,
-        messages=[{
-            "role": "user",
-            "content": summary_prompt
-        }]
+        messages=[
+            {
+                "role": "user",
+                "content": summary_prompt
+            }
+        ]
     )
-    summary = completion.choices[0].message.content
+    summary = response.choices[0].message.content
     return summary
 
-
 def filter_messages(messages: List[Dict]) -> List[Dict]:
-    """
-    Keep only messages with role 'user' or 'assistant'.
-    Also keep any tool_result messages that contain errors.
+    """    
+        Keep only messages with role 'user' or 'assistant'.
+        Also keep any tool_result messages that contain errors.
     """
     keep_roles = {"user", "assistant"}
     filtered = []
@@ -188,7 +188,6 @@ def extract_text_from_content(content: Any) -> str:
         return " ".join(text_parts)
     return ""
 
-
 def truncate_message_content(content: Any, max_length: int = 150_000) -> Any:
     if isinstance(content, str):
         if len(content) > max_length:
@@ -201,11 +200,9 @@ def truncate_message_content(content: Any, max_length: int = 150_000) -> Any:
                 for k, v in content.items()}
     return content
 
-
 def add_summary(summary: str) -> None:
     """Add a new summary to the global list with timestamp."""
     QUICK_SUMMARIES.append(summary.strip())
-
 
 def get_all_summaries() -> str:
     """Combine all summaries into a chronological narrative."""
@@ -216,8 +213,6 @@ def get_all_summaries() -> str:
     for entry in QUICK_SUMMARIES:
         combined += f"{entry}\n"
     return combined
-
-
 
 async def reorganize_context(messages: List[BetaMessageParam], summary: str) -> str:
     """ Reorganize the context by filtering and summarizing messages. """
@@ -258,8 +253,12 @@ async def reorganize_context(messages: List[BetaMessageParam], summary: str) -> 
 
     Remeber to the formats request and to enclose your responses in <COMPLETED>  </COMPLETED> and <STEPS>  </STEPS> tags respectively.
     """
-    sum_client = OpenAI()
-    model = "o3-mini"
+    OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+    sum_client = OpenAI(
+        base_url="https://openrouter.ai/api/v1",
+        api_key=OPENROUTER_API_KEY,
+        )
+    model = "google/gemini-2.0-flash-lite-001"
     response = sum_client.chat.completions.create(
         model=model,
         max_completion_tokens=30000,
@@ -282,7 +281,6 @@ async def reorganize_context(messages: List[BetaMessageParam], summary: str) -> 
     else:
         steps = "No steps found."
     return completed_items, steps
-
 
 async def refresh_context_async(task: str, messages: List[Dict], display: AgentDisplayWebWithPrompt) -> str:
     """
@@ -310,4 +308,3 @@ async def refresh_context_async(task: str, messages: List[Dict], display: AgentD
     {steps}
     """
     return combined_content
-

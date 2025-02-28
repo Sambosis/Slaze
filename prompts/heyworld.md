@@ -1,0 +1,1 @@
+create a basic hello world gui app in python and open it up.  make it simple, no documentation is necessary.

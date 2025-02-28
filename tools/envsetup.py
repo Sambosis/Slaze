@@ -8,7 +8,7 @@ from icecream import ic
 from rich import print as rr
 import json
 from pydantic import BaseModel
-from config import * # get_constant, set_constant
+from config import get_constant, set_constant
 from utils.context_helpers import *
 
 class ProjectCommand(str, Enum):
@@ -19,16 +19,71 @@ class ProjectCommand(str, Enum):
 class ProjectSetupTool(BaseAnthropicTool):
     """
     A tool that sets up various project environments and manages script execution.
+    Uses Docker for all project types to ensure consistent Linux environment.
     """
 
     name: Literal["project_setup"] = "project_setup"
     api_type: Literal["custom"] = "custom"
     description: str = ("A tool for project management: setup projects, add dependencies, and run applications. "
-                        "Supports Python, Node.js, and Ruby environments.")
+                        "Supports Python (in Docker) and Node.js environments.")
+    
+    # Docker container name
+    container_name = "python-dev-container"
 
     def __init__(self, display=None):
         super().__init__(display)
+        # Check Docker availability at initialization
+        self._docker_available = self._check_docker()
+    
+    def _check_docker(self):
+        """Check if Docker is available and the container exists"""
+        try:
+            # Check if Docker is running
+            result = subprocess.run(
+                ["docker", "ps"],
+                capture_output=True,
+                check=False
+            )
+            return result.returncode == 0
+        except Exception:
+            return False
 
+    def docker_exec(self, cmd: str, capture_output=True) -> subprocess.CompletedProcess:
+        """Execute a command in the Docker container"""
+        # Properly escape the command for passing to bash -c
+        # escaped_cmd = cmd.replace('"', '\\"')
+        docker_cmd = f'docker exec -e DISPLAY=host.docker.internal:0 {self.container_name} bash -c "{cmd}"'
+        ic(f"Running Docker command: {docker_cmd}")
+        try:
+            result = subprocess.run(
+                docker_cmd,
+                shell=True,
+                check=True,
+                capture_output=capture_output,
+                text=True
+            )
+            return result
+        except subprocess.CalledProcessError as e:
+            ic(f"Error executing Docker command: {docker_cmd}")
+            ic(f"Error details: {e}")
+            raise
+
+    def to_docker_path(self, path) -> str:
+        """Convert path to Docker container path with proper Linux formatting"""
+        if isinstance(path, str):
+            path = Path(path)
+            
+        # Get the project name from the path
+        project_name = path.name
+        
+        # Use defined constant or fallback to standard Docker path
+        docker_project_dir = get_constant("DOCKER_PROJECT_DIR") or f"/home/myuser/apps/{project_name}"
+        
+        # Make sure we're using Linux format
+        docker_project_dir = str(docker_project_dir).replace("\\", "/")
+        
+        return docker_project_dir
+    
     def to_params(self) -> dict:
         return {
             "name": self.name,
@@ -44,7 +99,7 @@ class ProjectSetupTool(BaseAnthropicTool):
                     },
                     "environment": {
                         "type": "string",
-                        "enum": ["python", "node", "ruby"],
+                        "enum": ["python", "node"],
                         "description": "Type of project environment to setup"
                     },
                     "packages": {
@@ -65,29 +120,14 @@ class ProjectSetupTool(BaseAnthropicTool):
             }
         }
 
-    def run_command(self, cmd: str, cwd=None, capture_output=True) -> subprocess.CompletedProcess:
-        """Helper method to run shell commands safely"""
-        try:
-            result = subprocess.run(
-                cmd,
-                shell=True,
-                check=True,
-                cwd=cwd,
-                capture_output=capture_output,
-                text=True
-            )
-            return result
-        except subprocess.CalledProcessError as e:
-            ic(f"Error executing command: {cmd}")
-            ic(f"Error details: {e}")
-            raise
-
     def format_output(self, data: dict) -> str:
         """Format the output data as a readable string"""
         output_lines = []
         output_lines.append(f"Command: {data['command']}")
         output_lines.append(f"Status: {data['status']}")
         output_lines.append(f"Project Path: {data['project_path']}")
+        if 'docker_path' in data:
+            output_lines.append(f"Docker Path: {data['docker_path']}")
         if 'packages_installed' in data:
             output_lines.append("Packages Installed:")
             for package in data['packages_installed']:
@@ -106,67 +146,107 @@ class ProjectSetupTool(BaseAnthropicTool):
             output_lines.append(errors)
         return "\n".join(output_lines)
 
-    # === Python Environment Methods ===
+    # === Python Environment Methods (Docker-enabled) ===
     async def setup_project(self, project_path: Path, packages: List[str]) -> dict:
+        """Sets up a Python project inside the Docker container"""
+        if not self._docker_available:
+            return {
+                "command": "setup_project",
+                "status": "error",
+                "error": "Docker is not available or not running",
+                "project_path": str(project_path)
+            }
+            
+        # Make sure local directory exists (will be mounted to Docker)
         project_path.mkdir(parents=True, exist_ok=True)
-        os.chdir(project_path)
-        ic("Creating Python virtual environment...")
-        self.run_command(f"cd {project_path} && python -m venv .venv") # Create a virtual environment
-
-        ic("Installing Python packages...")
-        for package in packages:
-            self.run_command(f"cd {project_path} && python -m pip install {package}")
-        return {
-            "command": "setup_project",
-            "status": "success",
-            "project_path": str(project_path),
-            "packages_installed": packages
-        }
+        
+        # Use proper Docker paths for Linux
+        docker_path = self.to_docker_path(project_path)
+        
+        try:
+            # Create the project directory in Docker
+            ic(f"Creating directory in Docker: {docker_path}")
+            self.docker_exec(f"mkdir -p {docker_path}")
+            
+            # Create virtual environment in Docker
+            ic("Creating Python virtual environment in Docker...")
+            self.docker_exec(f"cd {docker_path} && python3 -m venv .venv")
+            
+            # Install packages in Docker
+            ic("Installing Python packages in Docker...")
+            for package in packages:
+                ic(f"Installing package: {package}")
+                self.docker_exec(f"cd {docker_path} && .venv/bin/pip install --upgrade pip && .venv/bin/pip install {package}")
+            
+            return {
+                "command": "setup_project",
+                "status": "success",
+                "project_path": str(project_path),
+                "docker_path": docker_path,
+                "packages_installed": packages
+            }
+        except Exception as e:
+            return {
+                "command": "setup_project",
+                "status": "error",
+                "error": f"Failed to set up project in Docker: {str(e)}",
+                "project_path": str(project_path),
+                "docker_path": docker_path
+            }
 
     async def add_dependencies(self, project_path: Path, packages: List[str]) -> dict:
+        """Adds Python dependencies inside the Docker container"""
+        if not self._docker_available:
+            return {
+                "command": "add_additional_depends",
+                "status": "error",
+                "error": "Docker is not available or not running",
+                "project_path": str(project_path)
+            }
+        
+        # Use proper Docker paths for Linux
+        docker_path = self.to_docker_path(project_path)
+        
         try:
-            os.chdir(project_path)
-            ic(f"Installing {len(packages)} additional Python packages...")
-            self.display.add_message("user",f"Installing {len(packages)} additional Python packages...")
-            # Get path to venv's Python interpreter
-            if os.name == 'nt':  # Windows
-                python_path = project_path / ".venv" / "Scripts" / "python"
-            else:  # Unix-like
-                python_path = project_path / ".venv" / "bin" / "python"
-
+            ic(f"Installing {len(packages)} additional Python packages in Docker...")
+            if self.display:
+                self.display.add_message("user", f"Installing {len(packages)} additional Python packages in Docker...")
+            
             installed_packages = []
             
             # Install packages with progress updates
             for i, package in enumerate(packages, 1):
                 ic(f"Installing package {i}/{len(packages)}: {package}")
-                self.display.add_message("user",f"Installing package {i}/{len(packages)}: {package}")
-                process = subprocess.run(
-                    [str(python_path), "-m", "pip", "install", package],
-                    capture_output=True,
-                    text=True,
-                    check=False
-                )
+                if self.display:
+                    self.display.add_message("user", f"Installing package {i}/{len(packages)}: {package}")
                 
-                if process.returncode != 0:
+                try:
+                    result = self.docker_exec(
+                        f"cd {docker_path} && .venv/bin/pip install {package}"
+                    )
+                    installed_packages.append(package)
+                    if self.display:
+                        self.display.add_message("user", f"Successfully installed {package}")
+                except subprocess.CalledProcessError as e:
                     return {
                         "command": "add_additional_depends",
                         "status": "error",
-                        "error": f"Failed to install {package}: {process.stderr}",
+                        "error": f"Failed to install {package}: {str(e)}",
                         "project_path": str(project_path),
+                        "docker_path": docker_path,
                         "packages_installed": installed_packages,
                         "packages_failed": packages[i-1:],
                         "failed_at": package
                     }
-                
-                installed_packages.append(package)
-                self.display.add_message("user",f"Successfully installed {package}")
-
-            self.display.add_message("user","All packages installed successfully")
+            
+            if self.display:
+                self.display.add_message("user", "All packages installed successfully in Docker")
             
             return {
                 "command": "add_additional_depends",
                 "status": "success",
                 "project_path": str(project_path),
+                "docker_path": docker_path,
                 "packages_installed": installed_packages
             }
             
@@ -174,166 +254,38 @@ class ProjectSetupTool(BaseAnthropicTool):
             return {
                 "command": "add_additional_depends",
                 "status": "error",
-                "error": str(e),
+                "error": f"Docker error: {str(e)}",
                 "project_path": str(project_path),
+                "docker_path": docker_path,
                 "packages_attempted": packages,
                 "packages_installed": installed_packages if 'installed_packages' in locals() else []
             }
 
     async def run_app(self, project_path: Path, filename: str) -> dict:
-        os.chdir(project_path)
-        try:
-            if os.name == 'nt':  # Windows: use venv's Python
-                python_path = project_path / ".venv" / "Scripts" / "python"
-            else:
-                python_path = project_path / ".venv" / "bin" / "python"
-            result = subprocess.run(
-                [str(python_path), filename],
-                capture_output=True,
-                text=True,
-                check=False
-            )
-            return {
-                "command": "run_app",
-                "status": "success",
-                "project_path": str(project_path),
-                "run_output": result.stdout,
-                "errors": result.stderr
-            }
-        except Exception as e:
+        """Runs a Python application inside the Docker container with X11 forwarding"""
+        if not self._docker_available:
             return {
                 "command": "run_app",
                 "status": "error",
-                "project_path": str(project_path),
-                "errors": f"Failed to run app: {str(e)}"
+                "error": "Docker is not available or not running",
+                "project_path": str(project_path)
             }
-
-    # === Node.js Environment Methods ===
-    async def setup_project_node(self, project_path: Path, packages: List[str]) -> dict:
-        # Create project directory and change to it
-        project_path.mkdir(parents=True, exist_ok=True)
-        os.chdir(project_path)
-        ic("Initializing Node.js project...")
-        self.run_command("npm init -y", cwd=str(project_path))
-        ic("Installing Node.js packages...")
-        for package in packages:
-            self.run_command(f"npm install {package}", cwd=str(project_path))
-        return {
-            "command": "setup_project",
-            "status": "success",
-            "project_path": str(project_path),
-            "packages_installed": packages
-        }
-
-    async def add_dependencies_node(self, project_path: Path, packages: List[str]) -> dict:
-        os.chdir(project_path)
-        ic("Installing additional Node.js packages...")
-        if self.display:
-            self.display.add_message("user", f"Installing {len(packages)} additional Node.js packages...")
-        installed_packages = []
-        for i, package in enumerate(packages, 1):
-            ic(f"Installing package {i}/{len(packages)}: {package}")
-            if self.display:
-                self.display.add_message("user", f"Installing package {i}/{len(packages)}: {package}")
-            process = subprocess.run(
-                f"npm install {package}",
-                shell=True,
-                cwd=str(project_path),
-                capture_output=True,
-                text=True,
-                check=False
-            )
-            if process.returncode != 0:
-                return {
-                    "command": "add_additional_depends",
-                    "status": "error",
-                    "error": f"Failed to install {package}: {process.stderr}",
-                    "project_path": str(project_path),
-                    "packages_installed": installed_packages,
-                    "packages_failed": packages[i-1:],
-                    "failed_at": package
-                }
-            installed_packages.append(package)
-            if self.display:
-                self.display.add_message("user", f"Successfully installed {package}")
-        if self.display:
-            self.display.add_message("user", "All Node.js packages installed successfully")
-        return {
-            "command": "add_additional_depends",
-            "status": "success",
-            "project_path": str(project_path),
-            "packages_installed": installed_packages
-        }
-
-    async def run_app_node(self, project_path: Path, filename: str) -> dict:
-        os.chdir(project_path)
+        
+        # Use proper Docker paths for Linux
+        docker_path = self.to_docker_path(project_path)
+        
         try:
-            result = subprocess.run(
-                ["node", filename],
-                capture_output=True,
-                text=True,
-                check=False
+            # Run Python script with DISPLAY environment variable set
+            ic(f"Running {filename} in Docker container")
+            result = self.docker_exec(
+                f"cd {docker_path} && .venv/bin/python {filename}"
             )
+            
             return {
                 "command": "run_app",
                 "status": "success",
                 "project_path": str(project_path),
-                "run_output": result.stdout,
-                "errors": result.stderr
-            }
-        except Exception as e:
-            return {
-                "command": "run_app",
-                "status": "error",
-                "project_path": str(project_path),
-                "errors": f"Failed to run app: {str(e)}"
-            }
-
-    # === Ruby Environment Methods ===
-    async def setup_project_ruby(self, project_path: Path, packages: List[str]) -> dict:
-        project_path.mkdir(parents=True, exist_ok=True)
-        os.chdir(project_path)
-        ic("Setting up Ruby project...")
-        # Create a basic Gemfile
-        gemfile_content = "source 'https://rubygems.org'\n"
-        for package in packages:
-            gemfile_content += f"gem '{package}'\n"
-        gemfile_path = project_path / "Gemfile"
-        with open(gemfile_path, "w") as f:
-            f.write(gemfile_content)
-        self.run_command("bundle install")
-        return {
-            "command": "setup_project",
-            "status": "success",
-            "project_path": str(project_path),
-            "packages_installed": packages
-        }
-
-    async def add_dependencies_ruby(self, project_path: Path, packages: List[str]) -> dict:
-        os.chdir(project_path)
-        ic("Adding additional Ruby gems...")
-        for package in packages:
-            self.run_command(f"bundle add {package}")
-        return {
-            "command": "add_additional_depends",
-            "status": "success",
-            "project_path": str(project_path),
-            "packages_installed": packages
-        }
-
-    async def run_app_ruby(self, project_path: Path, filename: str) -> dict:
-        os.chdir(project_path)
-        try:
-            result = subprocess.run(
-                ["ruby", filename],
-                capture_output=True,
-                text=True,
-                check=True
-            )
-            return {
-                "command": "run_app",
-                "status": "success",
-                "project_path": str(project_path),
+                "docker_path": docker_path,
                 "run_output": result.stdout,
                 "errors": result.stderr
             }
@@ -342,7 +294,176 @@ class ProjectSetupTool(BaseAnthropicTool):
                 "command": "run_app",
                 "status": "error",
                 "project_path": str(project_path),
-                "errors": f"Failed to run app: {str(e)}\nOutput: {e.stdout}\nError: {e.stderr}"
+                "docker_path": docker_path,
+                "errors": f"Failed to run app in Docker: {str(e)}\nStderr: {e.stderr if hasattr(e, 'stderr') else 'No error output'}"
+            }
+        except Exception as e:
+            return {
+                "command": "run_app",
+                "status": "error",
+                "project_path": str(project_path),
+                "docker_path": docker_path,
+                "errors": f"Failed to run app: {str(e)}"
+            }
+
+    # === Node.js Environment Methods (now Docker-based) ===
+    async def setup_project_node(self, project_path: Path, packages: List[str]) -> dict:
+        """Sets up a Node.js project inside the Docker container"""
+        if not self._docker_available:
+            return {
+                "command": "setup_project",
+                "status": "error",
+                "error": "Docker is not available or not running",
+                "project_path": str(project_path)
+            }
+            
+        # Make sure local directory exists (will be mounted to Docker)
+        project_path.mkdir(parents=True, exist_ok=True)
+        
+        # Use proper Docker paths for Linux
+        docker_path = self.to_docker_path(project_path)
+        
+        try:
+            # Create the project directory in Docker
+            ic(f"Creating directory in Docker: {docker_path}")
+            self.docker_exec(f"mkdir -p {docker_path}")
+            
+            # Initialize Node.js project in Docker
+            ic("Initializing Node.js project in Docker...")
+            self.docker_exec(f"cd {docker_path} && npm init -y")
+            
+            # Install packages in Docker
+            ic("Installing Node.js packages in Docker...")
+            for package in packages:
+                ic(f"Installing package: {package}")
+                self.docker_exec(f"cd {docker_path} && npm install {package}")
+            
+            return {
+                "command": "setup_project",
+                "status": "success",
+                "project_path": str(project_path),
+                "docker_path": docker_path,
+                "packages_installed": packages
+            }
+        except Exception as e:
+            return {
+                "command": "setup_project",
+                "status": "error",
+                "error": f"Failed to set up Node.js project in Docker: {str(e)}",
+                "project_path": str(project_path),
+                "docker_path": docker_path
+            }
+
+    async def add_dependencies_node(self, project_path: Path, packages: List[str]) -> dict:
+        """Adds Node.js dependencies inside the Docker container"""
+        if not self._docker_available:
+            return {
+                "command": "add_additional_depends",
+                "status": "error",
+                "error": "Docker is not available or not running",
+                "project_path": str(project_path)
+            }
+        
+        # Use proper Docker paths for Linux
+        docker_path = self.to_docker_path(project_path)
+        
+        try:
+            ic(f"Installing {len(packages)} additional Node.js packages in Docker...")
+            if self.display:
+                self.display.add_message("user", f"Installing {len(packages)} additional Node.js packages in Docker...")
+            
+            installed_packages = []
+            
+            # Install packages with progress updates
+            for i, package in enumerate(packages, 1):
+                ic(f"Installing package {i}/{len(packages)}: {package}")
+                if self.display:
+                    self.display.add_message("user", f"Installing package {i}/{len(packages)}: {package}")
+                
+                try:
+                    result = self.docker_exec(
+                        f"cd {docker_path} && npm install {package}"
+                    )
+                    installed_packages.append(package)
+                    if self.display:
+                        self.display.add_message("user", f"Successfully installed {package}")
+                except subprocess.CalledProcessError as e:
+                    return {
+                        "command": "add_additional_depends",
+                        "status": "error",
+                        "error": f"Failed to install {package}: {str(e)}",
+                        "project_path": str(project_path),
+                        "docker_path": docker_path,
+                        "packages_installed": installed_packages,
+                        "packages_failed": packages[i-1:],
+                        "failed_at": package
+                    }
+            
+            if self.display:
+                self.display.add_message("user", "All Node.js packages installed successfully in Docker")
+            
+            return {
+                "command": "add_additional_depends",
+                "status": "success",
+                "project_path": str(project_path),
+                "docker_path": docker_path,
+                "packages_installed": installed_packages
+            }
+            
+        except Exception as e:
+            return {
+                "command": "add_additional_depends",
+                "status": "error",
+                "error": f"Docker error: {str(e)}",
+                "project_path": str(project_path),
+                "docker_path": docker_path,
+                "packages_attempted": packages,
+                "packages_installed": installed_packages if 'installed_packages' in locals() else []
+            }
+
+    async def run_app_node(self, project_path: Path, filename: str) -> dict:
+        """Runs a Node.js application inside the Docker container"""
+        if not self._docker_available:
+            return {
+                "command": "run_app",
+                "status": "error",
+                "error": "Docker is not available or not running",
+                "project_path": str(project_path)
+            }
+        
+        # Use proper Docker paths for Linux
+        docker_path = self.to_docker_path(project_path)
+        
+        try:
+            # Run Node.js script
+            ic(f"Running {filename} in Docker container")
+            result = self.docker_exec(
+                f"cd {docker_path} && node {filename}"
+            )
+            
+            return {
+                "command": "run_app",
+                "status": "success",
+                "project_path": str(project_path),
+                "docker_path": docker_path,
+                "run_output": result.stdout,
+                "errors": result.stderr
+            }
+        except subprocess.CalledProcessError as e:
+            return {
+                "command": "run_app",
+                "status": "error",
+                "project_path": str(project_path),
+                "docker_path": docker_path,
+                "errors": f"Failed to run app in Docker: {str(e)}\nStderr: {e.stderr if hasattr(e, 'stderr') else 'No error output'}"
+            }
+        except Exception as e:
+            return {
+                "command": "run_app",
+                "status": "error",
+                "project_path": str(project_path),
+                "docker_path": docker_path,
+                "errors": f"Failed to run app: {str(e)}"
             }
 
     async def __call__(
@@ -356,44 +477,36 @@ class ProjectSetupTool(BaseAnthropicTool):
         **kwargs,
     ) -> ToolResult:
         """
-        Executes the specified command for project management depending on the environment.
+        Executes the specified command for project management in the Docker container.
+        Both Python and Node.js projects run in Docker for consistent Linux environment.
         """
         if packages is None:
             packages = []
 
         try:
             if self.display:
-                self.display.add_message("user", f"ProjectSetupTool executing command: {command} in {environment} environment")
+                self.display.add_message("user", f"ProjectSetupTool executing command: {command} in {environment} environment (Docker)")
             
-            # Convert project_path string to Path object (using constant if needed)
-            project_path = Path(get_constant("PROJECT_DIR")) if get_constant("PROJECT_DIR") else Path(project_path)
+            # Convert project_path string to Path object
+            project_path_obj = Path(project_path)
             
             # Dispatch based on environment and command
             if environment == "python":
                 if command == ProjectCommand.SETUP_PROJECT:
-                    result_data = await self.setup_project(project_path, packages)
+                    result_data = await self.setup_project(project_path_obj, packages)
                 elif command == ProjectCommand.ADD_DEPENDENCIES:
-                    result_data = await self.add_dependencies(project_path, packages)
+                    result_data = await self.add_dependencies(project_path_obj, packages)
                 elif command == ProjectCommand.RUN_APP:
-                    result_data = await self.run_app(project_path, entry_filename)
+                    result_data = await self.run_app(project_path_obj, entry_filename)
                 else:
                     return ToolResult(error=f"Unknown command: {command}")
             elif environment == "node":
                 if command == ProjectCommand.SETUP_PROJECT:
-                    result_data = await self.setup_project_node(project_path, packages)
+                    result_data = await self.setup_project_node(project_path_obj, packages)
                 elif command == ProjectCommand.ADD_DEPENDENCIES:
-                    result_data = await self.add_dependencies_node(project_path, packages)
+                    result_data = await self.add_dependencies_node(project_path_obj, packages)
                 elif command == ProjectCommand.RUN_APP:
-                    result_data = await self.run_app_node(project_path, entry_filename)
-                else:
-                    return ToolResult(error=f"Unknown command: {command}")
-            elif environment == "ruby":
-                if command == ProjectCommand.SETUP_PROJECT:
-                    result_data = await self.setup_project_ruby(project_path, packages)
-                elif command == ProjectCommand.ADD_DEPENDENCIES:
-                    result_data = await self.add_dependencies_ruby(project_path, packages)
-                elif command == ProjectCommand.RUN_APP:
-                    result_data = await self.run_app_ruby(project_path, entry_filename)
+                    result_data = await self.run_app_node(project_path_obj, entry_filename)
                 else:
                     return ToolResult(error=f"Unknown command: {command}")
             else:

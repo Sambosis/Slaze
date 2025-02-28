@@ -1,3 +1,5 @@
+# serve.py is the entry point for the web server. It creates a new event loop and runs the web server on it.
+# The server is started using the Waitress WSGI server, which is a production-quality server that can handle multiple requests concurrently.
 import asyncio
 from utils.agent_display_web_with_prompt import create_app
 

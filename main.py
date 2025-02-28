@@ -1,4 +1,5 @@
-# main.py 
+# main.py is the entry point for the application. It starts the server and opens the browser to the correct page.
+
 import asyncio
 import base64
 import os

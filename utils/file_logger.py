@@ -9,7 +9,7 @@ def aggregate_file_states() -> str:
     """
     Aggregate file states. Here we reuse extract_files_content.
     """
-    code_contents = extract_files_content()
+    code_contents = get_all_current_code()
     images_created = list_images_created()
     output = f"Code Contents:\n{code_contents}\n\nImages Created:\n{images_created}"
     return output

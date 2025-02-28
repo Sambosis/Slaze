@@ -193,7 +193,7 @@ class WriteCodeTool(BaseAnthropicTool):
         """
         Executes the specified command for project management.
         """
-        
+
         try:
             if self.display is not None:
                 self.display.add_message("user", f"WriteCodeTool Instructions: {code_description}")
@@ -232,8 +232,7 @@ class WriteCodeTool(BaseAnthropicTool):
                 ic(f"Unknown command: {command}")
                 return ToolResult(error=f"Unknown command: {command}")
 
-
-            # Convert result_data to formatted string   
+            # Convert result_data to formatted string
             formatted_output = self.format_output(result_data)
             ic(f"formatted_output: {formatted_output}")
 
@@ -242,29 +241,26 @@ class WriteCodeTool(BaseAnthropicTool):
         except Exception as e:
 
             error_msg = f"Failed to execute {command}: {str(e)}"
-            
+
             return ToolResult(error=error_msg)
 
-    def extract_code_block(self, text: str) -> tuple[str, str]:
+    def extract_code_block(self, text: str, file_path: Optional[Path] = None) -> tuple[str, str]:
         """
         Extracts code based on file type. Special handling for Markdown files.
         Returns tuple of (content, language).
         """
-        # Get file extension from the context if available
-        is_markdown = hasattr(self, 'current_file') and str(self.current_file).lower().endswith(('.md', '.markdown'))
-        
-        if is_markdown:
-            # For Markdown files, return the entire text as-is
+        # If a file_path is provided and it's a Markdown file, return text as-is.
+        if file_path is not None and str(file_path).lower().endswith(('.md', '.markdown')):
             return text, "markdown"
-            
+
         # Original code block extraction logic for other files
         if not text.strip():
             return "No Code Found", "Unknown"
-        
+
         start_marker = text.find("```")
         if start_marker == -1:
             return text, "code"
-        
+
         # Determine language (text immediately after opening delimiter)
         language_line_end = text.find("\n", start_marker)
         if language_line_end == -1:
@@ -272,18 +268,18 @@ class WriteCodeTool(BaseAnthropicTool):
         language = text[start_marker+3:language_line_end].strip()
         if not language:
             language = "code"
-        
+
         end_marker = text.find("```", language_line_end)
         if end_marker == -1:
             code_block = text[language_line_end:].strip()
         else:
             code_block = text[language_line_end:end_marker].strip()
-        
+
         return code_block if code_block else "No Code Found", language
 
     async def _call_llm_to_generate_code(self, code_description: str, research_string: str, file_path) -> str:
         """Call LLM to generate code based on the code description"""
-        
+
         self.display.add_message("assistant", f"Generating code for: {file_path}")
 
         code_string="no code created"
@@ -294,7 +290,7 @@ class WriteCodeTool(BaseAnthropicTool):
             base_url="https://openrouter.ai/api/v1",
             api_key=OPENROUTER_API_KEY,
             )
-        model = "google/gemini-2.0-pro-exp-02-05:free"
+        model = "google/gemini-2.0-flash-lite-001"
         # client = AsyncOpenAI()
         # model = "o3-mini"
         ic(model)
@@ -316,7 +312,7 @@ class WriteCodeTool(BaseAnthropicTool):
 
         # Extract code using the new function
         try:
-            code_string, detected_language = self.extract_code_block(code_string)
+            code_string, detected_language = self.extract_code_block(code_string, file_path)
             # ic(f"Code String: {code_string}\nLanguage: {detected_language}")
         except Exception as parse_error:
             error_msg = f"Failed to parse code block: {str(parse_error)}"
@@ -327,7 +323,7 @@ class WriteCodeTool(BaseAnthropicTool):
                     return ToolResult(error=f"{error_msg}\nFailed to display error: {str(display_error)}")
 
             raise ToolResult(code_string)
-        
+
         # Log the extraction
         try:
             CODE_FILE = Path(get_constant("CODE_FILE"))
@@ -362,10 +358,8 @@ class WriteCodeTool(BaseAnthropicTool):
 
             # Create an HTML formatter with full=False
             formatter = HtmlFormatter(style="monokai", full=False, linenos=True, wrap=True)        
-    
 
             code_temp=f"#{str(file_path)}\n{code_string}"
-
 
             # Highlight the code
             code_display = highlight(code_temp, lexer, formatter)
@@ -388,7 +382,7 @@ class WriteCodeTool(BaseAnthropicTool):
             base_url="https://openrouter.ai/api/v1",
             api_key=OPENROUTER_API_KEY,
             )
-        model = "google/gemini-2.0-pro-exp-02-05:free"
+        model = "qwen/qwen-2.5-72b-instruct:nitro"
         # client = AsyncOpenAI()
         # model = "o3-mini"
 
@@ -422,17 +416,16 @@ class WriteCodeTool(BaseAnthropicTool):
         # ic(research_string)
         return research_string
 
-
     def format_output(self, data: dict) -> str:
         """Format the output data as a readable string"""
         output_lines = []
-        
+
         # Add command type
         output_lines.append(f"Command: {data['command']}")
-        
+
         # Add status
         output_lines.append(f"Status: {data['status']}")
-        
+
         # Add project path
         output_lines.append(f"Project Path: {data['project_path']}")
 
@@ -450,13 +443,13 @@ class WriteCodeTool(BaseAnthropicTool):
             if len(files_results) > 150000:
                 files_results = files_results[:75000] + " ... [TRUNCATED] ... " + files_results[-75000:]
             output_lines.append(files_results)
-        
+
         # Add packages if present
         if 'packages_installed' in data:
             output_lines.append("Packages Installed:")
             for package in data['packages_installed']:
                 output_lines.append(f"  - {package}")
-        
+
         # Add run output if present
         if 'run_output' in data and data['run_output']:
             run_output = data['run_output']
@@ -464,23 +457,21 @@ class WriteCodeTool(BaseAnthropicTool):
                 run_output = run_output[:75000] + " ... [TRUNCATED] ... " + run_output[-75000:]
             output_lines.append("\nApplication Output:")
             output_lines.append(run_output)
-        
+
         if 'errors' in data and data['errors']:
             errors = data['errors']
             if len(errors) > 150000:
                 errors = errors[:75000] + " ... [TRUNCATED] ... " + errors[-75000:]
             output_lines.append("\nErrors:")
             output_lines.append(errors)
-        
+
         # Join all lines with newlines
         return "\n".join(output_lines)
 
     async def write_code_to_file(self, code_description: str,  project_path: Path, filename) -> dict:
         """write code to a permanent file"""
         file_path = project_path / filename
-        # Store current file path for context in extract_code_block
-        self.current_file = file_path
-        
+
         try:
             code_research_string = await self._call_llm_to_research_code(code_description, file_path)
             # ic(code_research_string)
@@ -489,7 +480,7 @@ class WriteCodeTool(BaseAnthropicTool):
             # await asyncio.to_thread(lambda: open("codeResearch.txt", "a", encoding='utf-8').write(code_research_string))
 
             code_string = await self._call_llm_to_generate_code(code_description, code_research_string, file_path)
-            
+
             # Create the directory if it does not exist
             try:
                 await asyncio.to_thread(os.makedirs, file_path.parent, exist_ok=True)
@@ -501,7 +492,7 @@ class WriteCodeTool(BaseAnthropicTool):
                     "filename": filename,
                     "error": f"Failed to create directory: {str(dir_error)}"
                 }
-            
+
             # Write the file asynchronously
             try:
                 await asyncio.to_thread(file_path.write_text, code_string, encoding='utf-8')
@@ -513,7 +504,7 @@ class WriteCodeTool(BaseAnthropicTool):
                     "filename": filename,
                     "error": f"Failed to write file: {str(write_error)}"
                 }
-            
+
             # Log the file creation
             try:
                 await asyncio.to_thread(log_file_operation, file_path, "create")
@@ -523,7 +514,7 @@ class WriteCodeTool(BaseAnthropicTool):
                         self.display.add_message("user", f"Failed to log file operation: {str(log_error)}")
                     except Exception:
                         pass
-            
+
             return {
                 "command": "write_code_to_file",
                 "status": "success",
@@ -531,18 +522,21 @@ class WriteCodeTool(BaseAnthropicTool):
                 "filename": filename,
                 "code_string": code_string
             }
-        finally:
-            # Clean up the temporary attribute
-            delattr(self, 'current_file')
-           
+        except Exception as e:
+            return {
+                "command": "write_code_to_file",
+                "status": "error",
+                "project_path": str(project_path),
+                "filename": filename,
+                "error": f"Error writing file: {str(e)}"
+            }
+
     async def write_and_exec(self, code_description: str,  project_path: Path) -> dict:
         """Write code to a temp file and execute it"""
         os.chdir(project_path)    
 
         code_string = await self._call_llm_to_generate_code(code_description)
-        
 
-        
         # Create temp file with .py extension
         with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as temp_file:
             temp_file.write(code_string)
@@ -614,13 +608,13 @@ class WriteCodeTool(BaseAnthropicTool):
             # Read existing file content
             with open(file_path, 'r', encoding='utf-8') as f:
                 existing_code = f.read()
-                
+
             # Get revised version
             research_string = await self._call_llm_to_research_code(
                 f"Revision needed: {revision_description}\nExisting code:\n{existing_code}", 
                 file_path
             )
-            
+
             revised_code = await self._call_llm_to_generate_code(
                 f"Revision needed: {revision_description}\nExisting code:\n{existing_code}",
                 research_string,
@@ -637,7 +631,7 @@ class WriteCodeTool(BaseAnthropicTool):
                         self.display.add_message("user", f"Failed to log file operation: {str(log_error)}")
                     except Exception:
                         pass
-                    
+
             return {
                 "command": "get_revised_version",
                 "status": "success",
@@ -646,7 +640,7 @@ class WriteCodeTool(BaseAnthropicTool):
                 "original_code": existing_code,
                 "revised_code": revised_code
             }
-            
+
         except FileNotFoundError:
             return {
                 "command": "get_revised_version",
@@ -663,4 +657,3 @@ class WriteCodeTool(BaseAnthropicTool):
                 "filename": target_file,
                 "error": f"Error during revision: {str(e)}"
             }
-
