@@ -43,6 +43,7 @@ CODE_FILE = LOGS_DIR / "code_messages.py"
 USER_LOG_FILE = LOGS_DIR / "user_messages.log"
 ASSISTANT_LOG_FILE = LOGS_DIR / "assistant_messages.log"
 TOOL_LOG_FILE = LOGS_DIR / "tool_messages.log"
+TOOL_RESULTS_DIR = LOGS_DIR / "tool_results"  # New constant for tool results directory
 
 MAX_SUMMARY_MESSAGES = 40
 MAX_SUMMARY_TOKENS = 8000
@@ -111,6 +112,7 @@ def write_constants_to_file():
         "MESSAGES_FILE": str(MESSAGES_FILE),
         "ICECREAM_OUTPUT_FILE": str(ICECREAM_OUTPUT_FILE),
         "CODE_FILE": str(CODE_FILE),
+        "TOOL_RESULTS_DIR": str(TOOL_RESULTS_DIR),  # Include the new constant
     }
     with open(CACHE_DIR / "constants.json", "w") as f:
         json.dump(constants, f, indent=4)

@@ -28,6 +28,7 @@ from utils.context_helpers import *
 from utils.output_manager import *
 from config import *
 from token_tracker import TokenTracker
+from utils.file_logger import save_tool_result, retrieve_tool_results
 
 class Agent:
     def __init__(self, task: str, display: AgentDisplayWebWithPrompt):
@@ -87,6 +88,7 @@ class Agent:
                 "content": combined_content
             })
             await asyncio.sleep(0.2)
+            save_tool_result(tool_result)  # Save tool result to file
             return tool_result
 
     def _make_api_tool_result(self, result: ToolResult, tool_use_id: str) -> Dict:

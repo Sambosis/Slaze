@@ -10,7 +10,7 @@ from anthropic.types.beta import (
 import os
 from utils.agent_display_web_with_prompt import AgentDisplayWebWithPrompt
 from load_constants import write_to_file, ICECREAM_OUTPUT_FILE
-from utils.file_logger import aggregate_file_states
+from utils.file_logger import aggregate_file_states, retrieve_tool_results
 from openai import OpenAI
 from icecream import ic, install
 ic.configureOutput(includeContext=True, outputFunction=write_to_file)
@@ -297,6 +297,13 @@ async def refresh_context_async(task: str, messages: List[Dict], display: AgentD
     file_contents = aggregate_file_states()
     if len(file_contents) > 200000:
         file_contents = file_contents[:70000] + " ... [TRUNCATED] ... " + file_contents[-70000:]
+    
+    # Retrieve saved tool results and include them in the context
+    saved_tool_results = retrieve_tool_results()
+    tool_results_text = "\n".join([str(result) for result in saved_tool_results])
+    if len(tool_results_text) > 200000:
+        tool_results_text = tool_results_text[:70000] + " ... [TRUNCATED] ... " + tool_results_text[-70000:]
+
     combined_content = f"""Original request: {task}
     Current Completed Project Files:
     {file_contents}
@@ -306,5 +313,11 @@ async def refresh_context_async(task: str, messages: List[Dict], display: AgentD
     {completed}
     ToDo List of tasks in order to complete the task:
     {steps}
+    Saved Tool Results:
+    {tool_results_text}
     """
     return combined_content
+
+def get_saved_tool_results() -> List[dict]:
+    """Retrieve saved tool results and include them in the context."""
+    return retrieve_tool_results()
