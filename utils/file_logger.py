@@ -82,7 +82,7 @@ def extract_files_content() -> str:
             continue
     
     # Combine all content
-    return "\n".join(output)
+    return "\n.join(output)
 
 
 def log_file_operation(path: Path, operation: str) -> None:
@@ -169,7 +169,7 @@ def get_all_current_code() -> str:
                     content = path.read_text(encoding='utf-8')
                     output.append(content)
                 
-                output.append("\n" + "=" * 80 + "\n")  # Separator between files
+                output.append("\n" + "=" + 80 + "\n")  # Separator between files
                 
             except Exception as e:
                 print(f"Error processing {filepath}: {str(e)}")
@@ -180,3 +180,36 @@ def get_all_current_code() -> str:
         
     except Exception as e:
         return f"Error reading log file: {str(e)}"
+
+def save_tool_result(tool_result: dict) -> None:
+    """Save tool result to a file."""
+    TOOL_RESULTS_DIR = Path(get_constant('TOOL_RESULTS_DIR'))
+    TOOL_RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+    
+    tool_use_id = tool_result.get("tool_use_id")
+    if not tool_use_id:
+        ic("Tool result does not have a tool_use_id.")
+        return
+    
+    result_file = TOOL_RESULTS_DIR / f"{tool_use_id}.json"
+    with open(result_file, 'w', encoding='utf-8') as f:
+        json.dump(tool_result, f, indent=2)
+    ic(f"Tool result saved to {result_file}")
+
+def retrieve_tool_results() -> List[dict]:
+    """Retrieve all saved tool results from files."""
+    TOOL_RESULTS_DIR = Path(get_constant('TOOL_RESULTS_DIR'))
+    if not TOOL_RESULTS_DIR.exists():
+        ic("Tool results directory does not exist.")
+        return []
+    
+    tool_results = []
+    for result_file in TOOL_RESULTS_DIR.glob("*.json"):
+        try:
+            with open(result_file, 'r', encoding='utf-8') as f:
+                tool_result = json.load(f)
+                tool_results.append(tool_result)
+        except Exception as e:
+            ic(f"Failed to read tool result from {result_file}: {str(e)}")
+    
+    return tool_results
