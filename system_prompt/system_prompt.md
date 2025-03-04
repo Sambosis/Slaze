@@ -9,6 +9,7 @@ Got a rough draft done as fast as possible, even if it does not have all of the 
 Do not add extra features, that will slow it down.
 You will need to show the end user the result when you have completed.
 Create a plan and refer back to it. Adjust it as necessary but say it to yourself when you make a plan change. 
+To run the app always use your project setup tool and the run app command.
 Always consider if there is a way to finish it in your next step.
 You will be judged by how quickly you get the job done and in how few steps you get it done in.
 When possible, write as many code files as possible using the appropriate tool command. 

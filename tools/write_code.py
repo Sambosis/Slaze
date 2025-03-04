@@ -290,7 +290,7 @@ class WriteCodeTool(BaseAnthropicTool):
             base_url="https://openrouter.ai/api/v1",
             api_key=OPENROUTER_API_KEY,
             )
-        model = "google/gemini-2.0-flash-lite-001"
+        model = "anthropic/claude-3.7-sonnet:beta"
         # client = AsyncOpenAI()
         # model = "o3-mini"
         ic(model)
@@ -382,7 +382,7 @@ class WriteCodeTool(BaseAnthropicTool):
             base_url="https://openrouter.ai/api/v1",
             api_key=OPENROUTER_API_KEY,
             )
-        model = "qwen/qwen-2.5-72b-instruct:nitro"
+        model = "google/gemini-2.0-flash-001"
         # client = AsyncOpenAI()
         # model = "o3-mini"
 

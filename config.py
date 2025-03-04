@@ -71,16 +71,18 @@ def to_docker_path(windows_path):
     """Convert a local Windows path to a Docker container path"""
     if isinstance(windows_path, str):
         windows_path = Path(windows_path)
+
     if not PROJECT_DIR:
         return None
+
     try:
         # Get the path relative to the project directory
         rel_path = windows_path.relative_to(PROJECT_DIR)
         # Convert to Docker path
-        return Path(f"/home/myuser/apps/{rel_path}")
+        return Path(f"/home/myuser/app/{rel_path}")
     except ValueError:
         # If not under project dir, just return the filename
-        return Path(f"/home/myuser/apps/{windows_path.name}")
+        return Path(f"/home/myuser/app/{windows_path.name}")
 
 
 # Function to write the constants to a file
@@ -168,25 +170,18 @@ def set_constant(name, value):
     return True
 
 
-# Function to set the project directory
-def set_project_dir(new_dir):
+    # Function to set the project directory
+def set_project_dir(project_name: str) -> Path:
+    """Set up project directories for both local and Docker"""
     global PROJECT_DIR, DOCKER_PROJECT_DIR, LLM_GEN_CODE_DIR
-    PROJECT_DIR = REPO_DIR / new_dir
-    PROJECT_DIR.mkdir(parents=True, exist_ok=True)
-
-    
+    PROJECT_DIR = REPO_DIR / project_name
     LLM_GEN_CODE_DIR = TOP_LEVEL_DIR / "llm_gen_code"
 
-    # Set up Docker project directory
-    if check_docker_available():
-        DOCKER_PROJECT_DIR = Path(f"/home/myuser/apps/{new_dir}")
-    else:
-        DOCKER_PROJECT_DIR = None
+    # Set up Docker project directory - just use the project name, not the full path
+    DOCKER_PROJECT_DIR = Path(f"/home/myuser/apps/{project_name}")
 
     set_constant("PROJECT_DIR", str(PROJECT_DIR))
-    set_constant(
-        "DOCKER_PROJECT_DIR", str(DOCKER_PROJECT_DIR) if DOCKER_PROJECT_DIR else ""
-    )
+    set_constant("DOCKER_PROJECT_DIR", str(DOCKER_PROJECT_DIR))
     set_constant("LLM_GEN_CODE_DIR", str(LLM_GEN_CODE_DIR))
     return PROJECT_DIR
 

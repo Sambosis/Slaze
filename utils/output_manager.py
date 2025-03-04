@@ -61,7 +61,7 @@ class OutputManager:
         if hasattr(response.content[0], 'text'):
             text = self._truncate_string(response.content[0].text)
             # self.display.add_message("assistant", f"{text}")
-# 
+
     def format_content_block(self, block: BetaContentBlock) -> None:
         """Format and display content block."""
         if getattr(block, 'type', None) == "tool_use":

@@ -1,0 +1,1 @@
+train a diffusion based language model using public datasets. show live results in a python gui window as you train. 
