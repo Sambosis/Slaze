@@ -30,30 +30,40 @@ class AgentDisplayWebWithPrompt(AgentDisplayWeb):
             if request.method == 'POST':
                 try:
                     choice = request.form.get('choice')
+                    filename = request.form.get('filename')
+                    prompt_text = request.form.get('prompt_text')
+
                     if choice == 'new':
-                        filename = request.form.get('filename')
-                        prompt_text = request.form.get('prompt_text')
                         new_prompt_path = PROMPTS_DIR / f"{filename}.md"
-                        print(new_prompt_path)
+                        print(f"Creating new prompt at {new_prompt_path}")
                         with open(new_prompt_path, 'w', encoding='utf-8') as f:
                             f.write(prompt_text)
                         task = prompt_text
                     else:
+                        # Handle editing existing prompt
                         prompt_path = PROMPTS_DIR / choice
-                        print(prompt_path)
-                        filename = prompt_path.stem
+                        print(f"Using/updating prompt at {prompt_path}")
+                        # If we have prompt text, it means the user edited the prompt
+                        if prompt_text:
+                            with open(prompt_path, 'w', encoding='utf-8') as f:
+                                f.write(prompt_text)
+
+                        # Read the prompt content (possibly updated)
                         with open(prompt_path, 'r', encoding='utf-8') as f:
                             task = f.read()
-                    # client = OpenAI()
-                    # model = "o3-mini"
+                        filename = prompt_path.stem
 
+                    # Get assistant to analyze the task
                     OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
                     client = OpenAI(
                         base_url="https://openrouter.ai/api/v1",
                         api_key=OPENROUTER_API_KEY,
                         )
-                    model = "google/gemini-2.0-flash-lite-001"
-                    messages = [{"role": "user", "content": f"Please create a simple step by step plan to accomplish the following task. It should be a very high level plan without too many steps.  Each step should be no more than 2 sentences long.  After your plan, provide a directory structure that should be used a list of every file that will need to be created to complete the project. Task:  {task}"}] 
+                    model = "anthropic/claude-3.7-sonnet:beta"
+                    prompt = f"""First, restate the problem in more detail.  At this stage if there are any decisons that were left for the developer, you should make the choices needed and include them in your restated description of the promlem. 
+                    After you have restated the expanded description. You will provide a file tree for the program.  Use src file format to structure the project files. You will use absolute imports.  Do not create any non code files such as pyproject, gitignore, readme, etc.. You will need to attempt to list every file that will be needed and be thorough. This is all code files that will need to be created,  all asset files etc. For each file, in additon to the path and filename, you should give a brief statement about the purpose of the file and explicitly give the correct way to import the file using absolut imports. Do not actually create any of the code for the project. Just the expanded description and the file tree with the extra info included. 
+                    Task:  {task}"""
+                    messages = [{"role": "user", "content": prompt}] 
                     completion =  client.chat.completions.create(
                         model=model,
                         messages=messages)
@@ -64,12 +74,10 @@ class AgentDisplayWebWithPrompt(AgentDisplayWeb):
                     set_constant("PROJECT_DIR", str(project_dir))
                     docker_project_dir = get_docker_project_dir()
                     task += (
-                        f"Do not use Flask for this project. Start testing as soon as possible. DO NOT start making fixes or improvements until you have tested to see if it is working as is.  Your project directory is {docker_project_dir}. "
+                        f"Start testing as soon as possible. DO NOT start making fixes or improvements until you have tested to see if it is working as is.  Your project directory is {docker_project_dir}. "
                         "You need to make sure that all files you create and work you do is done in that directory.\n"
                     )
 
-                    # Schedule your async function in a background thread,
-                    # and let that thread call `asyncio.run(...)`.
                     self.socketio.start_background_task(start_sampling_loop, task, self)
 
                     return redirect(url_for('index'))

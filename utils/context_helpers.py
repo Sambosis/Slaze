@@ -16,7 +16,7 @@ from icecream import ic, install
 ic.configureOutput(includeContext=True, outputFunction=write_to_file)
 
 QUICK_SUMMARIES = []
-    
+
 def format_messages_to_restart(messages):
     """
     Format a list of messages into a formatted string.
@@ -132,11 +132,9 @@ async def summarize_recent_messages(short_messages: List[BetaMessageParam], disp
                 ]
         }
             ]
-    ic(messages_prompt)
     # completion = sum_client.chat.completions.create(
     #             model=model,
     #             messages=messages_prompt)
-    # ic(completion)
     response = sum_client.chat.completions.create(
         model=model,
         messages=[
@@ -258,10 +256,9 @@ async def reorganize_context(messages: List[BetaMessageParam], summary: str) -> 
         base_url="https://openrouter.ai/api/v1",
         api_key=OPENROUTER_API_KEY,
         )
-    model = "google/gemini-2.0-flash-lite-001"
+    model = "google/gemini-2.0-flash-001"
     response = sum_client.chat.completions.create(
         model=model,
-        max_completion_tokens=30000,
         messages=[{
             "role": "user",
             "content": summary_prompt

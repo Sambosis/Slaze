@@ -208,7 +208,7 @@ def write_to_file(s: str, file_path: str = ICECREAM_OUTPUT_FILE):
     lines = lines[1:]
 
     output.append(f"# ENTRY {first_line}: ")
-    output.append(f"- Details: ")
+    output.append(f"Details: ")
     # Join and clean multi-line strings
     current_line = ""
     for line in lines:

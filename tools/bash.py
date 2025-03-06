@@ -67,13 +67,12 @@ class BashTool(BaseAnthropicTool):
         try:
             if self.display:
                 self.display.add_message("user", f"Executing command: {command}")
-                await asyncio.sleep(0.2)
 
             if not self._docker_available:
                 error = "Docker is not available or the container is not running."
                 if self.display:
                     self.display.add_message("user", f"Error: {error}")
-                return ToolError(error)
+                return ToolResult(error=error, tool_name=self.name)
 
             docker_project_dir = get_constant("DOCKER_PROJECT_DIR") or "/home/myuser/apps"
             # Use proper Linux path format
@@ -93,15 +92,19 @@ class BashTool(BaseAnthropicTool):
             if len(error) > 200000:
                 error = error[:100000] + " ... [TRUNCATED] ... " + error[-100000:]
                 
+            formatted_output = f"command: {command}\nsuccess: {str(success).lower()}\noutput: {output}\nerror: {error}"
+            # Create a new ToolResult instead of modifying an existing one
             return ToolResult(
-                output=f"command: {command}\nsuccess: {str(success).lower()}\noutput: {output}\nerror: {error}"
+                output=formatted_output, 
+                tool_name=self.name,
+                command=command
             )
 
         except Exception as e:
             error = str(e)
             if self.display:
                 self.display.add_message("user", f"Error: {error}")
-            return ToolError(error)
+            return ToolResult(error=error, tool_name=self.name, command=command)
 
     def to_params(self) -> BetaToolBash20241022Param:
         return {

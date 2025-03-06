@@ -3,6 +3,7 @@
 import asyncio
 import base64
 import os
+import shutil
 from datetime import datetime
 from pathlib import Path
 from typing import List
@@ -40,33 +41,51 @@ load_dotenv()
 install()
 ic.configureOutput(includeContext=True, outputFunction=write_to_file)
 
-def archive_file(file_path):
-    """Archive a file by moving it to an archive folder with a timestamp."""
+def archive_logs():
+    """Archive all log files in LOGS_DIR by moving them to an archive folder with a timestamp."""
     try:
-        file_path = Path(file_path)
-        filename = file_path.stem
-        extension = file_path.suffix
-        archive_dir = Path(LOGS_DIR, "archive")
-        archive_dir.mkdir(parents=True, exist_ok=True)
+        # Create timestamp for the archive folder
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        new_path = Path(archive_dir, f"{filename}_{timestamp}{extension}")
-        file_path.rename(new_path)
-        return new_path
+        archive_dir = Path(LOGS_DIR, "archive", timestamp)
+        archive_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Get all files in LOGS_DIR
+        log_path = Path(LOGS_DIR)
+        log_files = [f for f in log_path.iterdir() if f.is_file()]
+        
+        # Skip archiving if there are no files
+        if not log_files:
+            return "No log files to archive"
+        
+        # Move each file to the archive directory
+        for file_path in log_files:
+            # Skip archive directory itself
+            if "archive" in str(file_path):
+                continue
+                
+            # Create destination path
+            dest_path = Path(archive_dir, file_path.name)
+            
+            # Copy the file if it exists (some might be created later)
+            if file_path.exists():
+                shutil.copy2(file_path, dest_path)
+                
+                # Clear the original file but keep it
+                with open(file_path, 'w') as f:
+                    f.write('')
+        
+        return f"Archived {len(log_files)} log files to {archive_dir}"
     except Exception as e:
-        return f"Error archiving file: {str(e)}"
+        return f"Error archiving files: {str(e)}"
+
 # Global for quick summaries
 quick_summary= []
 filename = ""
 ic.configureOutput(includeContext=True, outputFunction=write_to_file)
 # ──────────────────────────────────────────────────────────────────────────────
 
-archive_file(ICECREAM_OUTPUT_FILE)
-archive_file(LOG_FILE)
-archive_file(MESSAGES_FILE)
-archive_file(CODE_FILE)
-archive_file(USER_LOG_FILE)
-archive_file(ASSISTANT_LOG_FILE)
-archive_file(TOOL_LOG_FILE)
+# Archive all existing logs
+archive_logs()
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Context Reduction Functions

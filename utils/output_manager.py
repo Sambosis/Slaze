@@ -73,8 +73,6 @@ class OutputManager:
         # elif hasattr(block, 'text'):
         #     self.display.add_message("assistant", block.text)
 
-
-
     def format_recent_conversation(self, messages: List[BetaMessageParam], num_recent: int = 10):
         """Format and display recent conversation."""
         # recent_messages = messages[:num_recent] if len(messages) > num_recent else messages

@@ -48,7 +48,7 @@ class ProjectSetupTool(BaseAnthropicTool):
                     "command": {
                         "type": "string",
                         "enum": [cmd.value for cmd in ProjectCommand],
-                        "description": "Command to execute: setup_project, add_additional_depends, or run_app",
+                        "description": "Command to execute: The options are setup_project( which will create the project direct and set up the project virtual environment), add_additional_depends which will install a list of dependicies passed to it, or run_app which will run the application. These are the prefered methods to do these operations.",
                     },
                     "environment": {
                         "type": "string",
@@ -58,7 +58,7 @@ class ProjectSetupTool(BaseAnthropicTool):
                     "packages": {
                         "type": "array",
                         "items": {"type": "string"},
-                        "description": "List of packages to install",
+                        "description": "List of packages to install. This should be a list of strings contained inside of []",
                     },
                     "project_path": {
                         "type": "string",
@@ -190,9 +190,10 @@ class ProjectSetupTool(BaseAnthropicTool):
 
             # Create virtual environment in Docker
             ic("Creating Python virtual environment in Docker...")
-            self.display.add_message(
-                "user", "Creating Python virtual environment in Docker..."
-            )
+            if self.display:  # Check if display exists before using it
+                self.display.add_message(
+                    "user", "Creating Python virtual environment in Docker..."
+                )
             venv_result = self.docker.execute_command(
                 f"cd {docker_path} && python3 -m venv .venv"
             )
@@ -632,6 +633,8 @@ class ProjectSetupTool(BaseAnthropicTool):
                 project_path_obj = project_dir
 
             # Dispatch based on environment and command
+            command_str = command.value if hasattr(command, 'value') else str(command)
+            
             if environment == "python":
                 if command == ProjectCommand.SETUP_PROJECT:
                     result_data = await self.setup_project(project_path_obj, packages)
@@ -642,7 +645,7 @@ class ProjectSetupTool(BaseAnthropicTool):
                 elif command == ProjectCommand.RUN_APP:
                     result_data = await self.run_app(project_path_obj, entry_filename)
                 else:
-                    return ToolResult(error=f"Unknown command: {command}")
+                    return ToolResult(error=f"Unknown command: {command}", tool_name=self.name, command=command_str)
             elif environment == "node":
                 if command == ProjectCommand.SETUP_PROJECT:
                     result_data = await self.setup_project_node(
@@ -657,19 +660,22 @@ class ProjectSetupTool(BaseAnthropicTool):
                         project_path_obj, entry_filename
                     )
                 else:
-                    return ToolResult(error=f"Unknown command: {command}")
+                    return ToolResult(error=f"Unknown command: {command}", tool_name=self.name, command=command_str)
             else:
-                return ToolResult(error=f"Unsupported environment: {environment}")
+                return ToolResult(error=f"Unsupported environment: {environment}", tool_name=self.name, command=command_str)
 
             formatted_output = self.format_output(result_data)
             if self.display:
                 self.display.add_message(
                     "user", f"ProjectSetupTool completed: {formatted_output}"
                 )
-            return ToolResult(output=formatted_output)
+                
+            # Create a new ToolResult instead of modifying an existing one
+            return ToolResult(output=formatted_output, tool_name=self.name, command=command_str)
 
         except Exception as e:
             if self.display:
                 self.display.add_message("user", f"ProjectSetupTool error: {str(e)}")
             error_msg = f"Failed to execute {command}: {str(e)}"
-            return ToolResult(error=error_msg)
+            command_str = command.value if hasattr(command, 'value') else str(command)
+            return ToolResult(error=error_msg, tool_name=self.name, command=command_str)

@@ -56,20 +56,75 @@ def code_prompt_research(current_code_base, code_description):
         ]
     return messages
 
-def code_prompt_generate(current_code_base, code_description, research_string):
+
+def code_skeleton_prompt(code_description, existing_structure=None):
+    """
+    Creates a prompt that asks the LLM to generate code skeleton/structure
+    based on a description.
+
+    Args:
+        code_description (str): Detailed description of what code to generate
+        existing_structure (str, optional): Existing code structure to build upon
+
+    Returns:
+        list: Formatted messages for the LLM prompt
+    """
     messages = [
         {
-        "role": "user",
-        "content": 
-        [
-            {
-            "type": "text",
-            "text": f"""At the bottom is a detailed description of code that you need to write. Flollow up by an expert review that gives some valuable suggestions. 
-            Make sure you provide your response in the requested programming lanaguage. Your response should include the code for the entire file including proper imports lines, but do not actually include the code from other files.
+            "role": "user",
+            "content": f"""You are an expert software architect who creates clean, well-structured code skeletons.
+            Your task is to create a comprehensive code structure with proper imports, class definitions, method signatures, 
+            and detailed docstrings - but WITHOUT implementation details.
+            
+            Provide a complete scaffold that a developer can fill in with implementation code later.
+            Follow these principles:
+            1. Include ALL necessary imports at the top
+            2. Define ALL classes with proper inheritance and attributes
+            3. Include ALL methods with proper signatures (parameters with type hints)
+            4. Write DETAILED docstrings for everything (classes, methods, functions)
+            5. Use proper typing annotations throughout
+            6. Include constructor methods and initialization where needed
+            7. Include abstract methods where appropriate
+            8. Add placeholder comments for complex logic sections
+            9. Follow PEP standards for Python code
+            
+            The output should be properly structured, syntactically valid code that could be directly
+            placed into a file and run (though it would only contain structure, not implementation).
+            Please create a complete code skeleton based on the following description.
+            Include all necessary imports, class/method signatures, and detailed docstrings.
+            
+            {'' if existing_structure is None else f'Build upon or integrate with this existing structure:\n\n{existing_structure}\n\n'}
+            
+            Code description:
+            {code_description}
+            
+            Please provide ONLY the code skeleton with detailed docstrings and proper type hints, 
+            but with minimal implementation details (use `pass` or simple placeholder comments for method bodies).
+            """,
+        },
+    ]
+
+    return messages
+
+
+def code_prompt_generate(current_code_base, code_description, code_skeleton):
+    messages = [
+        {
+            "role": "user",
+            "content": [
+                {
+                    "type": "text",
+                    "text": f"""At the bottom is a detailed description of code that you need to write, followed by a code skeleton that provides the structure.
+            
+            Your task is to implement the full code based on the description and skeleton. Make sure you provide your response in the requested programming language. Your response should include the code for the entire file including proper imports lines, but do not actually include the code from other files.
+            
             If you are requested to make changes to an existing file, please provide the full file with the correction made as your response. Please keep your changes limited to what was requested and keep the rest of the code unchanged.
-            If you see possible errors that are outside of the scope of the request, please make a note of them using inline comments in the code. Provide addtional explanation as needed in comments. 
+            
+            If you see possible errors that are outside of the scope of the request, please make a note of them using inline comments in the code. Provide additional explanation as needed in comments.
+            
             If you see additional improvements that could be made to the code, please make a note of them at the bottom of the code in the comments, but do not make the changes.
-            You may be occasionally asked to provide non-typical file responses, such as Markdown, Readme, ipynb, txt   etc.  Please provide the file in the requested format instead of providing code that would generate the file.
+            
+            You may be occasionally asked to provide non-typical file responses, such as Markdown, Readme, ipynb, txt, etc. Please provide the file in the requested format instead of providing code that would generate the file.
 
             All of the code that you provide needs to be enclosed in a single markdown style code block with the language specified.
             Here is an example of what your response should look like:
@@ -80,17 +135,19 @@ def code_prompt_generate(current_code_base, code_description, research_string):
             ```javascript
             // Your code goes here
             ```
+            
             Here is all of the code that has been created for the project so far:
             Code:
             {current_code_base}
             
             Here is the description of the code:
             {code_description}
-            Here is the research that was done:
-            {research_string}
-            """
-            },
-        ]
+            
+            Here is the code skeleton to implement:
+            {code_skeleton}
+            """,
+                },
+            ],
         }
     ]
     return messages

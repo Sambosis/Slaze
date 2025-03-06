@@ -1,0 +1,1 @@
+create a simple pong game using pygame. it should have 1 computer playing another computer, no user input.

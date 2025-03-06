@@ -34,7 +34,7 @@ class Agent:
         self.task = task
         self.display = display
         self.context_recently_refreshed = False
-        self.refresh_count = 8
+        self.refresh_count = 24
         self.tool_collection = ToolCollection(
             WriteCodeTool(display=self.display),
             ProjectSetupTool(display=self.display),
@@ -53,7 +53,7 @@ class Agent:
         self.only_n_most_recent_images = 2
 
     async def run_tool(self, content_block):
-        result = ToolResult(output="Tool execution not started")
+        result = ToolResult(output="Tool execution not started", tool_name=content_block["name"])
         try:
             ic(content_block['name'])
             ic(content_block["input"])
@@ -62,13 +62,13 @@ class Agent:
                 tool_input=content_block["input"],
             )
             if result is None:
-                result = ToolResult(output="Tool execution failed with no result")
+                result = ToolResult(output="Tool execution failed with no result", tool_name=content_block["name"])
         except Exception as e:
-            result = ToolResult(output=f"Tool execution failed: {str(e)}")
+            result = ToolResult(output=f"Tool execution failed: {str(e)}", tool_name=content_block["name"], error=str(e))
         finally:
             tool_result = self._make_api_tool_result(result, content_block["id"])
             ic(tool_result)
-            tool_output = result.output if hasattr(result, 'output') else str(result)
+            tool_output = result.output if hasattr(result, 'output') and result.output else str(result)
             tool_name = content_block['name']
             if len(tool_name) > 64:
                 tool_name = tool_name[:61] + "..."  # Truncate to 61 and add ellipsis
@@ -86,30 +86,43 @@ class Agent:
                 "role": "user",
                 "content": combined_content
             })
-            await asyncio.sleep(0.2)
+            with open("./logs/tool.txt", 'a', encoding='utf-8') as f:
+                for content in combined_content:
+                    for key, value in content.items():
+                        f.write(f"{key}: {value}\n")
             return tool_result
 
     def _make_api_tool_result(self, result: ToolResult, tool_use_id: str) -> Dict:
         """Create a tool result dictionary."""
         tool_result_content = []
         is_error = False
+        
         if result is None:
             is_error = True
             tool_result_content.append({"type": "text", "text": "Tool execution resulted in None"})
         elif isinstance(result, str):
             is_error = True
             tool_result_content.append({"type": "text", "text": result})
-        elif hasattr(result, 'output') and result.output:
-            tool_result_content.append({"type": "text", "text": result.output})
+        else:
+            # Check if there's an error attribute and it has a value
+            if hasattr(result, 'error') and result.error:
+                is_error = True
+                tool_result_content.append({"type": "text", "text": result.error})
+            
+            # Add output if it exists
+            if hasattr(result, 'output') and result.output:
+                tool_result_content.append({"type": "text", "text": result.output})
+            
+            # Add image if it exists
             if hasattr(result, 'base64_image') and result.base64_image:
-                 tool_result_content.append({
+                tool_result_content.append({
                     "type": "image",
-                     "source": {
-                         "type": "base64",
-                         "media_type": "image/png",
-                         "data": result.base64_image,
-                     }
-                 })
+                    "source": {
+                        "type": "base64",
+                        "media_type": "image/png",
+                        "data": result.base64_image,
+                    }
+                })
 
         return {
             "type": "tool_result",
@@ -194,14 +207,13 @@ class Agent:
             truncated_messages = [
                 {"role": msg["role"], "content": truncate_message_content(msg["content"])}
                 for msg in messages
-            ]
+                ]   
             summary_task = asyncio.create_task(summarize_recent_messages(messages[-4:], self.display))
             ic(f"NUMBER_OF_MESSAGES: {len(messages)}")
 
             # --- MAIN LLM CALL ---
             response = None  # Initialize response to avoid UnboundLocalError
             try:
-                ic(self.tool_collection.to_params())
                 response = self.client.beta.messages.create(
                     max_tokens=MAX_SUMMARY_TOKENS,
                     messages=truncated_messages,
@@ -250,13 +262,11 @@ class Agent:
                     tool_result = await self.run_tool(content_block)
                     tool_result_content.append(tool_result)
 
-            ic(f"NUNBER_OF_MESSAGES: {len(messages)}")
-            self.display.add_message("user", f"Refreshing context in {self.refresh_count - len(messages)} currently {len(messages)} of {self.refresh_count}messages")
+            self.display.add_message("user", f"{self.refresh_count+2 - len(messages)} More Messages Until Context Refresh: Currently {len(messages)} of {self.refresh_count}")
             quick_summary = await summary_task  # Now we wait for the summary to complete
             add_summary(quick_summary)
             self.display.add_message("assistant", quick_summary)
 
-            await asyncio.sleep(0.1)
             if (not tool_result_content) and (not self.context_recently_refreshed):
                 self.display.add_message("assistant", "Awaiting User Input ⌨️ (Type your response in the web interface)")
                 user_input = await self.display.wait_for_user_input()
@@ -271,32 +281,30 @@ class Agent:
                     self.messages =[{"role": "user", "content": new_context}]
             else:
                 if (len(messages) > self.refresh_count):
-                    last_3_messages = messages[-3:]
+                    last_3_messages = messages[-4:]
                     self.display.add_message("user", "refreshing")
                     new_context = await refresh_context_async(task, last_3_messages, self.display)
                     self.context_recently_refreshed = True
                     self.messages =[{"role": "user", "content": new_context}]
-                    self.refresh_count += 9
+                    self.refresh_count += 2
 
             if self.display.user_interupt:
-                last_3_messages = messages[-3:]
+                last_3_messages = messages[-4:]
                 self.display.add_message("assistant", "Awaiting User Input JK!⌨️ (Type your response in the web interface)")
                 user_input = await self.display.wait_for_user_input()
-                new_context = await refresh_context_async(task, last_3_messages, self.display)
+                new_context = await refresh_context_async(task, last_3_messages)
                 new_context = new_context + user_input
                 self.messages =[{"role": "user", "content": new_context}]
-                self.refresh_count += 9
+                self.refresh_count += 2
                 self.context_recently_refreshed = True
                 self.display.user_interupt = False
             else:
                 self.context_recently_refreshed = False
-            with open(MESSAGES_FILE, 'w', encoding='utf-8') as f:
-                message_string = format_messages_to_string(messages)
-                f.write(message_string)
+
             # Only update token tracker if response is not None
             if response is not None and hasattr(response, 'usage'):
                 self.token_tracker.update(response)
-                self.token_tracker.display(self.display)
+                # self.token_tracker.display(self.display)
             else:
                 self.display.add_message("assistant", "No valid LLM response for token usage update.")
             return True

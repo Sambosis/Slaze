@@ -58,10 +58,10 @@
         .col-span-3 {
             grid-column: span 1 / span 1;
         }
-        .h-[500px] {
+        .h-[250px] {
             height: auto;
         }
-        .h-[150px] {
+        .h-[75px] {
             height: auto;
         }
     }
@@ -105,6 +105,43 @@
     .expanded {
         max-height: none;
     }
+
+    /* New compact styles for download section */
+    .download-section {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 16px;
+        background-color: white;
+        border-radius: 8px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    .timer-badge {
+        background-color: #f0f4f8;
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-family: monospace;
+        white-space: nowrap;
+        font-weight: 500;
+        margin-right: 15px;
+    }
+
+    .downloads-container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+        max-width: 75%;
+    }
+
+    .download-link {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 200px;
+        display: inline-block;
+    }
 </style>
 </head>
 <body class="bg-gray-100 min-h-screen">
@@ -116,7 +153,7 @@
                     <i class="fas fa-robot mr-2"></i>
                     <h2 class="text-xl font-semibold">Assistant Messages</h2>
                 </div>
-                        <div id="assistant_messages" class="messages-container h-[500px] overflow-y-auto space-y-3"></div>
+                        <div id="assistant_messages" class="messages-container h-[350px] overflow-y-auto space-y-3"></div>
                     </div>
 
                     <!-- Tool Results Panel -->
@@ -125,7 +162,7 @@
                             <i class="fas fa-tools mr-2"></i>
                             <h2 class="text-xl font-semibold">Tool Results</h2>
                         </div>
-                        <div id="tool_messages" class="messages-container h-[500px] overflow-y-auto space-y-3"></div>
+                        <div id="tool_messages" class="messages-container h-[350px] overflow-y-auto space-y-3"></div>
                     </div>
                 </div>
 
@@ -135,7 +172,7 @@
                         <i class="fas fa-user mr-2"></i>
                         <h2 class="text-xl font-semibold">User Messages</h2>
                     </div>
-                    <div id="user_messages" class="messages-container h-[150px] overflow-y-auto space-y-3"></div>
+                    <div id="user_messages" class="messages-container h-[200px] overflow-y-auto space-y-3"></div>
                 </div>
 
         <!-- Input Form -->
@@ -156,20 +193,18 @@
             </button>
         </div>
 
-    <!-- Download Links Section -->
-    <div class="bg-white rounded-lg panel-shadow p-4 mb-4">
-        <div id="download_links" class="messages-container h-[150px] overflow-y-auto space-y-3"></div>
-        <!-- Add timer display above the download button -->
-        <div class="mt-4 mb-2 text-center">
-            <span class="text-gray-600 font-semibold">Session Time: </span>
-            <span id="timer" class="text-blue-600 font-mono text-lg">00:00:00</span>
-        </div>
-        <!-- New button to download project zip -->
-        <div class="mt-4">
-            <a href="/download_project_zip" 
-               class="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-colors duration-200 inline-block">
-                <i class="fas fa-file-archive mr-2"></i> Download Project ZIP
-            </a>
+        <!-- Compact Download Links Section -->
+        <div class="download-section mt-4">
+            <div class="flex items-center">
+                <i class="fas fa-clock text-blue-500 mr-2"></i>
+                <span class="timer-badge">
+                    <span id="timer">00:00:00</span>
+                </span>
+                <a href="/download_project_zip" class="bg-green-500 text-white px-3 py-1 rounded-lg hover:bg-green-600 transition-colors duration-200 inline-flex items-center">
+                    <i class="fas fa-file-archive mr-1"></i> Download ZIP
+                </a>
+            </div>
+            <div class="downloads-container" id="download_links"></div>
         </div>
     </div>
 
@@ -265,7 +300,7 @@
                     var linkElement = document.createElement('a');
                     linkElement.href = link.url;
                     linkElement.textContent = link.name;
-                    linkElement.className = 'block text-blue-500 hover:underline';
+                    linkElement.className = 'download-link text-blue-500 hover:underline';
                     downloadLinksDiv.appendChild(linkElement);
                 });
             }

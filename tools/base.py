@@ -1,13 +1,73 @@
 ## base.py
 from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass, fields, replace
-
 from typing import Any, Optional, Dict
+
 from utils.agent_display_web_with_prompt import AgentDisplayWebWithPrompt
 
+@dataclass(kw_only=True, frozen=True)
+class ToolResult:
+    """
+    Result from executing a tool.
+    
+    Attributes:
+        output: The output of the tool execution
+        error: Optional error message if the tool execution failed
+        base64_image: Optional base64-encoded image data
+        system: Optional system message
+        message: Optional message
+        tool_name: Name of the tool that was executed
+        command: Command that was executed
+    """
+    output: Optional[str] = None
+    error: Optional[str] = None
+    base64_image: Optional[str] = None
+    system: Optional[str] = None
+    message: Optional[str] = None
+    tool_name: Optional[str] = None
+    command: Optional[str] = None
+    
+    def __bool__(self):
+        """Returns True if the tool execution was successful."""
+        return any(getattr(self, field.name) for field in fields(self))
+
+    def __add__(self, other: "ToolResult"):
+        def combine_fields(field: str | None, other_field: str | None, concatenate: bool = True):
+            if field and other_field:
+                if concatenate:
+                    return field + other_field
+                raise ValueError("Cannot combine tool results")
+            return field or other_field
+
+        return ToolResult(
+            output=combine_fields(self.output, other.output),
+            error=combine_fields(self.error, other.error),
+            base64_image=combine_fields(self.base64_image, other.base64_image, False),
+            system=combine_fields(self.system, other.system),
+            tool_name=self.tool_name or other.tool_name,
+            command=self.command or other.command,
+        )
+
+    def replace(self, **kwargs):
+        """Returns a new ToolResult with the given fields replaced.""" 
+        return replace(self, **kwargs)
+
+class ToolError(Exception):
+    """Exception raised when a tool fails to execute."""
+    
+    def __init__(self, message: str):
+        self.message = message
+        super().__init__(message)
+        
+    def __str__(self):
+        return self.message
 
 class BaseAnthropicTool(metaclass=ABCMeta):
     """Base class for all tools."""
+    
+    name: str = "base_tool"
+    api_type: str = "custom"
+    description: str = "Base tool implementation"
 
     def __init__(self, input_schema: Optional[Dict[str, Any]] = None, display: Optional[AgentDisplayWebWithPrompt] = None):
         self.input_schema = input_schema or {
@@ -49,60 +109,10 @@ class BaseAnthropicTool(metaclass=ABCMeta):
             }
         }
 
-
-@dataclass(kw_only=True, frozen=True)
-class ToolResult:
-    """Represents the result of a tool execution."""
-
-    output: Optional[str] = None
-    error: Optional[str] = None
-    base64_image: Optional[str] = None
-    system: Optional[str] = None
-    message: Optional[str] = None
-    def __bool__(self):
-        return any(getattr(self, field.name) for field in fields(self))
-
-    def __add__(self, other: "ToolResult"):
-        def _fields(
-            field: str | None, other_field: str | None, concatenate: bool = True
-        ):
-            if field and other_field:
-                if concatenate:
-                    return field + other_field
-                raise ValueError("Cannot combine tool results")
-            return field or other_field
-
-        return ToolResult(
-            output=combine_fields(self.output, other.output),
-            error=combine_fields(self.error, other.error),
-            base64_image=combine_fields(self.base64_image, other.base64_image, False),
-            system=combine_fields(self.system, other.system),
-        )
-
-    def replace(self, **kwargs):
-        """Returns a new ToolResult with the given fields replaced."""
-        return replace(self, **kwargs)
-
-
 class CLIResult(ToolResult):
     """A ToolResult that can be rendered as a CLI output."""
     pass
 
-
 class ToolFailure(ToolResult):
     """A ToolResult that represents a failure."""
     pass
-
-
-@dataclass(kw_only=True, frozen=True)
-class ToolError(Exception):
-    """Raised when a tool encounters an error."""
-    message: str
-    output: Optional[str] = None
-
-    def __init__(self, message: str):
-        object.__setattr__(self, 'message', message)
-        super().__init__(message)
-
-    def __str__(self):
-        return self.message

@@ -143,8 +143,7 @@ class DockerService:
 
         # Build the full Docker command
         docker_command = f'docker exec {self._container_name} bash -c "{env_string}{escaped_command}"'
-        ic(docker_command)
-        print(f"DEBUG: {docker_command}")
+        # ic(docker_command)
         logger.info(f"Executing Docker command: {docker_command}")
 
         try:
