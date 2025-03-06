@@ -40,7 +40,7 @@ class Agent:
             ProjectSetupTool(display=self.display),
             BashTool(display=self.display),
             PictureGenerationTool(display=self.display),
-            # EditTool(display=self.display),
+            EditTool(display=self.display),  # Uncommented and enabled
             display=self.display
         )
         self.output_manager = OutputManager(self.display)

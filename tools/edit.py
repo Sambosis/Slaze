@@ -14,17 +14,14 @@ import ftfy
 from rich import print as rr
 import datetime
 import json
-from load_constants import  write_to_file, ICECREAM_OUTPUT_FILE
-from config import get_constant, set_constant, REPO_DIR, PROJECT_DIR, LOGS_DIR  # Updated import
+from load_constants import write_to_file, ICECREAM_OUTPUT_FILE
+from config import get_constant, set_constant, REPO_DIR, PROJECT_DIR, LOGS_DIR
 from utils.file_logger import log_file_operation
+from utils.docker_service import DockerService
 
-# Reconfigure stdout to use UTF-8 encoding
-# sys.stdout.reconfigure(encoding='utf-8')
-# include the context for the icecream debugger
-# ic.configureOutput(includeContext=True)
+# Configure icecream for debugging
 ic.configureOutput(includeContext=True, outputFunction=write_to_file)
 
-# Reconfigure stdout to use UTF-8 encoding
 Command = Literal[
     "view",
     "create",
@@ -33,11 +30,7 @@ Command = Literal[
     "undo_edit",
 ]
 SNIPPET_LINES: int = 4
-PROJECT_DIR = Path(get_constant('PROJECT_DIR'))
-PROJECT_DIR = Path.cwd() / PROJECT_DIR
 
-
-# set_constant('LOG_FILE', str(LOG_FILE))  # Ensure LOG_FILE is a string path
 class EditTool(BaseAnthropicTool):
     description="""
     A cross-platform filesystem editor tool that allows the agent to view, create, and edit files.
@@ -52,6 +45,9 @@ class EditTool(BaseAnthropicTool):
     def __init__(self, display=None):
         super().__init__(display)
         self._file_history = defaultdict(list)
+        # Initialize Docker service
+        self.docker = DockerService()
+        self._docker_available = self.docker.is_available()
         
 
     def to_params(self) -> BetaToolTextEditor20241022Param:
@@ -66,7 +62,8 @@ class EditTool(BaseAnthropicTool):
         
         # Add command type
         output_lines.append(f"Command: {data['command']}")
-        self.display.add_message("user", f"EditTool Command: {data['command']}")
+        if self.display:
+            self.display.add_message("user", f"EditTool Command: {data['command']}")
         # Add status
         output_lines.append(f"Status: {data['status']}")
         
@@ -87,6 +84,9 @@ class EditTool(BaseAnthropicTool):
     async def __call__(
         self,
         *,
+        command: Command,
+        path: str,
+        file_text: str | None = None,
         command: Command,
         path: str,
         file_text: str | None = None,
