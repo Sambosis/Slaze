@@ -87,9 +87,6 @@ class EditTool(BaseAnthropicTool):
         command: Command,
         path: str,
         file_text: str | None = None,
-        command: Command,
-        path: str,
-        file_text: str | None = None,
         view_range: list[int] | None = None,
         old_str: str | None = None,
         new_str: str | None = None,
@@ -111,41 +108,44 @@ class EditTool(BaseAnthropicTool):
                 self.write_file(_path, file_text)
                 self._file_history[_path].append(file_text)
                 log_file_operation(_path, "create")  
-                self.display.add_message("user", f"EditTool Command: {command}  successfully created file {_path} !")
-                self.display.add_message("tool", file_text)
+                if self.display:
+                    self.display.add_message("user", f"EditTool Command: {command} successfully created file {_path} !")
+                    self.display.add_message("tool", file_text)
                 output_data = {
                     "command": "create",
                     "status": "success",
                     "file_path": str(_path),
                     "operation_details": "File created successfully"
                 }
-                return ToolResult(output=self.format_output(output_data))
+                return ToolResult(output=self.format_output(output_data), tool_name=self.name, command="create")
 
             elif command == "view":
                 result = await self.view(_path, view_range)
-                self.display.add_message("user", f"EditTool Command: {command}  successfully viewed file\n {str(result.output[:100])} !")
+                if self.display:
+                    self.display.add_message("user", f"EditTool Command: {command} successfully viewed file\n {str(result.output[:100])} !")
                 output_data = {
                     "command": "view",
                     "status": "success",
                     "file_path": str(_path),
                     "operation_details": result.output if result.output else "No content to display"
                 }
-                return ToolResult(output=self.format_output(output_data))
+                return ToolResult(output=self.format_output(output_data), tool_name=self.name, command="view")
 
             elif command == "str_replace":
                 if not old_str:
                     raise ToolError("Parameter `old_str` is required for command: str_replace")
                 result = self.str_replace(_path, old_str, new_str)
-                self.display.add_message("user", f"EditTool Command: {command}  successfully replaced text in file{str(_path)} !")
-                self.display.add_message("user", f"End of Old Text: {old_str[-200:]}")
-                self.display.add_message("user", f"End of New Text: {new_str[-200:]}")
+                if self.display:
+                    self.display.add_message("user", f"EditTool Command: {command} successfully replaced text in file {str(_path)} !")
+                    self.display.add_message("user", f"End of Old Text: {old_str[-200:] if len(old_str) > 200 else old_str}")
+                    self.display.add_message("user", f"End of New Text: {new_str[-200:] if new_str and len(new_str) > 200 else new_str}")
                 output_data = {
                     "command": "str_replace",
                     "status": "success",
                     "file_path": str(_path),
-                    "operation_details": f"Replaced '{old_str}' with '{new_str}'"
+                    "operation_details": f"Replaced text in file"
                 }
-                return ToolResult(output=self.format_output(output_data))
+                return ToolResult(output=self.format_output(output_data), tool_name=self.name, command="str_replace")
 
             elif command == "insert":
                 if insert_line is None:
@@ -159,7 +159,7 @@ class EditTool(BaseAnthropicTool):
                     "file_path": str(_path),
                     "operation_details": f"Inserted text at line {insert_line}"
                 }
-                return ToolResult(output=self.format_output(output_data))
+                return ToolResult(output=self.format_output(output_data), tool_name=self.name, command="insert")
 
             elif command == "undo_edit":
                 result = self.undo_edit(_path)
@@ -169,16 +169,12 @@ class EditTool(BaseAnthropicTool):
                     "file_path": str(_path),
                     "operation_details": "Last edit undone successfully"
                 }
-                return ToolResult(output=self.format_output(output_data))
+                return ToolResult(output=self.format_output(output_data), tool_name=self.name, command="undo_edit")
 
             else:
                 raise ToolError(
                     f'Unrecognized command {command}. The allowed commands are: {", ".join(get_args(Command))}'
                 )
-
-            if self.display:
-                self.display.add_message("user", f"EditTool completed {command}")
-            return ToolResult(output=self.format_output(output_data))
 
         except Exception as e:
             if self.display:
@@ -189,7 +185,12 @@ class EditTool(BaseAnthropicTool):
                 "file_path": str(_path) if '_path' in locals() else path,
                 "operation_details": f"Error: {str(e)}"
             }
-            return ToolResult(output=self.format_output(error_data))
+            return ToolResult(
+                output=self.format_output(error_data), 
+                error=str(e),
+                tool_name=self.name, 
+                command=str(command)
+            )
 
     async def view(self, path: Path, view_range: Optional[List[int]] = None) -> ToolResult:
         """Implement the view command using cross-platform methods."""
@@ -247,6 +248,7 @@ class EditTool(BaseAnthropicTool):
             else:
                 file_content = "\n".join(file_lines[init_line - 1 : final_line])
         return ToolResult(output=self._make_output(file_content, str(path), init_line=init_line), error=None, base64_image=None)
+
     def str_replace(self, path: Path, old_str: str, new_str: Optional[str]) -> ToolResult:
         """Implement the str_replace command, which replaces old_str with new_str in the file content."""
         try:
@@ -296,6 +298,7 @@ class EditTool(BaseAnthropicTool):
 
         except Exception as e:
             return ToolResult(output=None, error=str(e), base64_image=None)
+
     def insert(self, path: Path, insert_line: int, new_str: str) -> ToolResult:
         """Implement the insert command, which inserts new_str at the specified line in the file content."""
         path = self.normalize_path(path)
@@ -335,19 +338,7 @@ class EditTool(BaseAnthropicTool):
         )
         success_msg += "Review the changes and make sure they are as expected (correct indentation, no duplicate lines, etc). Edit the file again if necessary."
         return ToolResult(output=success_msg)
-    # def ensure_valid_repo_path(filename: str) -> str:
-    #     ### Need to Try this out ###
-    #     base_path = PROJECT_DIR
-        
-    #     # Normalize path separators for cross-platform compatibility
-    #     filename = filename.replace("\\", "/")
-        
-    #     # Check if the filename already starts with the base path
-    #     if not filename.startswith(base_path):
-    #         # Prepend the base path if it's not present
-    #         filename = os.path.join(base_path, filename.lstrip("/"))
 
-        return os.path.normpath(filename)
     def undo_edit(self, path: Path) -> ToolResult:
         """Implement the undo_edit command."""
         path = self.normalize_path(path)
@@ -376,40 +367,40 @@ class EditTool(BaseAnthropicTool):
         Returns:
             Normalized Path object within project directory
         """
-        return path
-        # try:
-        #     # Get project directory from config
-        #     project_dir = Path(get_constant('PROJECT_DIR'))
-        #     if not project_dir.exists():
-        #         project_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            # Get project directory from config
+            project_dir = Path(get_constant('PROJECT_DIR'))
+            if not project_dir.exists():
+                project_dir.mkdir(parents=True, exist_ok=True)
             
-        #     # Convert input to Path object
-        #     input_path = Path(path)
+            # Convert input to Path object
+            input_path = Path(path)
             
-        #     # If absolute path, make relative to project dir
-        #     if input_path.is_absolute():
-        #         try:
-        #             # Try to make relative to project dir
-        #             relative_path = input_path.relative_to(project_dir)
-        #             result_path = project_dir / relative_path
-        #         except ValueError:
-        #             # If not under project dir, take the name only
-        #             result_path = project_dir / input_path.name
-        #     else:
-        #         # For relative paths, prepend project dir
-        #         result_path = project_dir / input_path
+            # If absolute path, check if it's within project dir
+            if input_path.is_absolute():
+                try:
+                    # Check if within project dir
+                    relative_path = input_path.relative_to(project_dir)
+                    result_path = project_dir / relative_path
+                except ValueError:
+                    # Not under project dir, use it directly if allowed, otherwise put in project dir
+                    if '/c:/Users/Machine81/Slazy' in str(input_path):
+                        result_path = input_path
+                    else:
+                        result_path = project_dir / input_path.name
+            else:
+                # For relative paths, prepend project dir
+                result_path = project_dir / input_path
             
-        #     # Ensure result is within project directory
-        #     try:
-        #         result_path.relative_to(project_dir)
-        #     except ValueError:
-        #         raise ValueError(f"Path {result_path} must be within project directory {project_dir}")
+            # Create parent directories if needed
+            result_path.parent.mkdir(parents=True, exist_ok=True)
                 
-        #     return result_path
+            return result_path
 
-        # except Exception as e:
-        #     ic(f"Path normalization error: {e}")
-        #     raise ValueError(f"Failed to normalize path '{path}': {str(e)}")
+        except Exception as e:
+            ic(f"Path normalization error: {e}")
+            # If anything fails, return the original path
+            return Path(path)
 
     def write_file(self, path: Path, file: str):
         """Write file content ensuring correct project directory"""
@@ -425,6 +416,37 @@ class EditTool(BaseAnthropicTool):
             full_path.write_text(file, encoding="utf-8")
             # Log the file operation
             log_file_operation(full_path, "modify")
+            
+            # Try to also write to Docker if available
+            if self._docker_available:
+                try:
+                    docker_path = self.docker.to_docker_path(full_path)
+                    docker_path_str = str(docker_path).replace('\\', '/')
+                    
+                    # Create parent directory in Docker
+                    parent_dir = str(Path(docker_path_str).parent).replace('\\', '/')
+                    self.docker.execute_command(f"mkdir -p {parent_dir}")
+                    
+                    # Create a temporary file and use docker cp to copy it
+                    import tempfile
+                    fd, temp_path = tempfile.mkstemp(text=True)
+                    try:
+                        with os.fdopen(fd, 'w', encoding='utf-8') as temp_file:
+                            temp_file.write(file)
+                            
+                        # Copy to Docker
+                        import subprocess
+                        subprocess.run(
+                            f'docker cp "{temp_path}" {self.docker._container_name}:"{docker_path_str}"',
+                            shell=True, check=True
+                        )
+                    finally:
+                        os.unlink(temp_path)
+                        
+                except Exception as docker_e:
+                    ic(f"Docker write failed (continuing anyway): {docker_e}")
+                    # Do not raise, just log the error
+                    
         except Exception as e:
             raise ToolError(f"Error writing to {path}: {str(e)}")
 

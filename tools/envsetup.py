@@ -262,6 +262,9 @@ class ProjectSetupTool(BaseAnthropicTool):
         # Get Docker path with correct format
         docker_path = self.get_docker_path(project_path)
 
+        # Ensure proper Linux path format with forward slashes
+        docker_path = str(docker_path).replace("\\", "/")
+
         try:
             ic(f"Installing {len(packages)} additional Python packages in Docker...")
             if self.display:
