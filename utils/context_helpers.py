@@ -81,7 +81,7 @@ def format_messages_to_string(messages):
 
 async def summarize_recent_messages(short_messages: List[BetaMessageParam], display: AgentDisplayWebWithPrompt) -> str:   
     """ 
-        Summarize the most recent messages. 
+    Summarize the most recent messages. 
     """
     OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
     sum_client = OpenAI(
@@ -114,6 +114,7 @@ async def summarize_recent_messages(short_messages: List[BetaMessageParam], disp
             if len(content) > 150000:
                 content = content[:70000] + " ... [TRUNCATED] ... " + content[-70000:]
             conversation_text += f"\n{role}: {content}"
+    ic(f"conversation_text: {conversation_text}")
     summary_prompt = f"""Please provide a concise casual natural language summary of the messages. 
         They are the actual LLM messages log of the interaction and you will provide several brief statements informing someone what was done. 
         Focus on the actions taken and provide the names of any files, functions, directories, or paths mentioned and a basic idea of what was done and why. 
@@ -144,7 +145,9 @@ async def summarize_recent_messages(short_messages: List[BetaMessageParam], disp
             }
         ]
     )
+    ic(f"response: {response}")
     summary = response.choices[0].message.content
+    ic(f"summary: {summary}")
     return summary
 
 def filter_messages(messages: List[Dict]) -> List[Dict]:
@@ -215,6 +218,10 @@ def get_all_summaries() -> str:
 async def reorganize_context(messages: List[BetaMessageParam], summary: str) -> str:
     """ Reorganize the context by filtering and summarizing messages. """
     conversation_text = ""
+    
+    # Look for tool results related to image generation
+    image_generation_results = []
+    
     for msg in messages:
         role = msg['role'].upper()
         if isinstance(msg['content'], list):
@@ -223,61 +230,106 @@ async def reorganize_context(messages: List[BetaMessageParam], summary: str) -> 
                     if block.get('type') == 'text':
                         conversation_text += f"\n{role}: {block.get('text', '')}"
                     elif block.get('type') == 'tool_result':
+                        # Track image generation results
+                        if any("picture_generation" in str(item) for item in block.get('content', [])):
+                            for item in block.get('content', []):
+                                if item.get('type') == 'text' and 'Generated image' in item.get('text', ''):
+                                    image_generation_results.append(item.get('text', ''))
+                        
                         for item in block.get('content', []):
                             if item.get('type') == 'text':
                                 conversation_text += f"\n{role} (Tool Result): {item.get('text', '')}"
         else:
             conversation_text += f"\n{role}: {msg['content']}"
 
-    summary_prompt = f"""I need a 2 part response from you. The first part of the response is to list everything that has been done already. 
-    You will be given a lot of context, mucch of which is repetitive, so you are only to list each thing done one time.
-    For each thing done (or attempted) list if it worked or not, and if not, why it didn't work.
-    However you will need the info the section labeled <MESSAGES>   </MESSAGES> in order to figure out why it didn't work. 
-    You are to response to this needs to be inclosed in XML style tags called <COMPLETED>   </COMPETED>
-   
-    The second part of the response is to list the steps that need to be taken to complete the task.
-    You will need to take the whole context into account in order to    figure out what needs to be done.
-    You must list between 0 (you have deemed the task complete) and 4 steps that need to be taken to complete the task.
-    You should try to devise a plan that uses the least possible steps to compete the task, while insuring that you complete thetask
-    Your response to this needs to be enclosed in XML style tags called <STEPS>   </STEPS>
-    Please make sure your steps are clear, concise, and in a logical order and actionable. 
-    Number them 1 through 4 in the order they should be done.
+    # Add special section for image generation if we found any
+    if image_generation_results:
+        conversation_text += "\n\nIMAGE GENERATION RESULTS:\n" + "\n".join(image_generation_results)
+    ic(f"conversation_text: {conversation_text}")
+    summary_prompt = f"""I need a summary of completed steps and next steps for a project that is ALREADY IN PROGRESS. 
+    This is NOT a new project - you are continuing work on an existing codebase.
+
+    VERY IMPORTANT INSTRUCTIONS:
+    1. ALL FILES mentioned as completed or created ARE ALREADY CREATED AND FULLY FUNCTIONAL.
+       - Do NOT suggest recreating these files.
+       - Do NOT suggest checking if these files exist.
+       - Assume all files mentioned in completed steps exist exactly where they are described.
+    
+    2. ALL STEPS listed as completed HAVE ALREADY BEEN SUCCESSFULLY DONE.
+       - Do NOT suggest redoing any completed steps.
+    
+    3. Your summary should be in TWO clearly separated parts:
+       a. COMPLETED: List all tasks/steps that have been completed so far
+       b. NEXT STEPS: List 1-4 specific, actionable steps that should be taken next to complete the project
+    
+    4. List each completed item and next step ONLY ONCE, even if it appears multiple times in the context.
+    
+    5. If any images were generated, mention each image, its purpose, and its location in the COMPLETED section.
+    
+    Please format your response with:
+    <COMPLETED>
+    [List of ALL completed steps and created files - these are DONE and exist]
+    </COMPLETED>
+
+    <NEXT_STEPS>
+    [Numbered list of 1-4 next steps to complete the project]
+    </NEXT_STEPS>
+
     Here is the Summary part:
     {summary}
+    
     Here is the messages part:
     <MESSAGES>
     {conversation_text}
     </MESSAGES>
-
-    Remeber to the formats request and to enclose your responses in <COMPLETED>  </COMPLETED> and <STEPS>  </STEPS> tags respectively.
     """
-    OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-    sum_client = OpenAI(
-        base_url="https://openrouter.ai/api/v1",
-        api_key=OPENROUTER_API_KEY,
+    
+    try:
+        OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+        if not OPENROUTER_API_KEY:
+            raise ValueError("OPENROUTER_API_KEY environment variable is not set")
+            
+        sum_client = OpenAI(
+            base_url="https://openrouter.ai/api/v1",
+            api_key=OPENROUTER_API_KEY,
         )
-    model = "google/gemini-2.0-flash-001"
-    response = sum_client.chat.completions.create(
-        model=model,
-        messages=[{
-            "role": "user",
-            "content": summary_prompt
-        }]
-    )
-    summary = response.choices[0].message.content
-    start_tag = "<COMPLETED>"
-    end_tag = "</COMPLETED>"
-    if start_tag in summary and end_tag in summary:
-        completed_items = summary[summary.find(start_tag)+len(start_tag):summary.find(end_tag)]
-    else:
-        completed_items = "No completed items found."
-    start_tag = "<STEPS>"
-    end_tag = "</STEPS>"
-    if start_tag in summary and end_tag in summary:
-        steps = summary[summary.find(start_tag)+len(start_tag):summary.find(end_tag)]
-    else:
-        steps = "No steps found."
-    return completed_items, steps
+        model = "google/gemini-2.0-flash-001"
+        response = sum_client.chat.completions.create(
+            model=model,
+            messages=[{
+                "role": "user",
+                "content": summary_prompt
+            }]
+        )
+        ic(f"response: {response}")
+        if not response or not response.choices:
+            raise ValueError("No response received from OpenRouter API")
+            
+        summary = response.choices[0].message.content
+        ic(f"summary: {summary}")
+        if not summary:
+            raise ValueError("Empty response content from OpenRouter API")
+            
+        start_tag = "<COMPLETED>"
+        end_tag = "</COMPLETED>"
+        if start_tag in summary and end_tag in summary:
+            completed_items = summary[summary.find(start_tag)+len(start_tag):summary.find(end_tag)]
+        else:
+            completed_items = "No completed items found."
+            
+        start_tag = "<NEXT_STEPS>"
+        end_tag = "</NEXT_STEPS>"
+        if start_tag in summary and end_tag in summary:
+            steps = summary[summary.find(start_tag)+len(start_tag):summary.find(end_tag)]
+        else:
+            steps = "No steps found."
+            
+        return completed_items, steps
+        
+    except Exception as e:
+        ic(f"Error in reorganize_context: {str(e)}")
+        # Return default values in case of error
+        return "Error processing context. Please try again.", "Error processing steps. Please try again."
 
 async def refresh_context_async(task: str, messages: List[Dict], display: AgentDisplayWebWithPrompt) -> str:
     """
@@ -286,22 +338,37 @@ async def refresh_context_async(task: str, messages: List[Dict], display: AgentD
     """
     filtered = filter_messages(messages)
     summary = get_all_summaries()
-    last4_messages = format_messages_to_string(filtered[-4:])
-    if len(last4_messages) > 200000:
-        last4_messages = last4_messages[:70000] + " ... [TRUNCATED] ... " + last4_messages[-70000:]
-    completed, steps = await reorganize_context(filtered, summary)
+    completed, next_steps = await reorganize_context(filtered, summary)
 
     file_contents = aggregate_file_states()
     if len(file_contents) > 200000:
         file_contents = file_contents[:70000] + " ... [TRUNCATED] ... " + file_contents[-70000:]
+    
+    # Extract information about images generated
+    images_info = ""
+    if "## Generated Images:" in file_contents:
+        images_section = file_contents.split("## Generated Images:")[1]
+        if "##" in images_section:
+            images_section = images_section.split("##")[0]
+        images_info = "## Generated Images:\n" + images_section.strip()
+    
     combined_content = f"""Original request: {task}
-    Current Completed Project Files:
-    {file_contents}
-    Most Recent activity:
-    {last4_messages}
-    List if things we've done and what has worked or not:
-    {completed}
-    ToDo List of tasks in order to complete the task:
-    {steps}
-    """
+
+IMPORTANT: This is a CONTINUING PROJECT. All files listed below ALREADY EXIST and are FULLY FUNCTIONAL.
+DO NOT recreate any existing files or redo completed steps. Continue the work from where it left off.
+
+Current Project Files and Assets:
+{file_contents}
+
+COMPLETED STEPS (These have ALL been successfully completed - DO NOT redo these):
+{completed}
+
+NEXT STEPS (Continue the project by completing these):
+{next_steps}
+
+NOTES: 
+- All files mentioned in completed steps ALREADY EXIST in the locations specified.
+- All completed steps have ALREADY BEEN DONE successfully.
+- Continue the project by implementing the next steps, building on the existing work.
+"""
     return combined_content

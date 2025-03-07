@@ -4,6 +4,7 @@ from dataclasses import dataclass, fields, replace
 from typing import Any, Optional, Dict
 
 from utils.agent_display_web_with_prompt import AgentDisplayWebWithPrompt
+from icecream import ic
 
 @dataclass(kw_only=True, frozen=True)
 class ToolResult:
@@ -100,7 +101,8 @@ class BaseAnthropicTool(metaclass=ABCMeta):
 
     def to_params(self) -> Dict[str, Any]:
         """Convert the tool to xAI API parameters."""
-        return {
+        ic(f"BaseAnthropicTool.to_params called for {self.name}")
+        params = {
             "type": "function",
             "function": {
                 "name": self.name,
@@ -108,6 +110,8 @@ class BaseAnthropicTool(metaclass=ABCMeta):
                 "parameters": self.input_schema
             }
         }
+        ic(f"BaseAnthropicTool params for {self.name}: {params}")
+        return params
 
 class CLIResult(ToolResult):
     """A ToolResult that can be rendered as a CLI output."""

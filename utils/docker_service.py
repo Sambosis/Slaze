@@ -11,7 +11,10 @@ from config import get_constant, set_constant
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("DockerService")
 # set the logger level to DEBUG
-logger.setLevel(logging.DEBUG)
+# logger.setLevel(logging.DEBUG)
+# set the logger level to INFO
+logger.setLevel(logging.INFO)
+
 @dataclass
 class DockerResult:
     """Structured result from Docker command execution"""
@@ -47,7 +50,8 @@ class DockerService:
         self._path_cache = {}  # Cache for path translations
 
         # Get Docker project directory from config
-        self._docker_project_dir = get_constant("DOCKER_PROJECT_DIR")
+        raw_docker_dir = get_constant("DOCKER_PROJECT_DIR")
+        self._docker_project_dir = self._format_docker_path(raw_docker_dir) if raw_docker_dir else None
         self._project_dir = get_constant("PROJECT_DIR")
 
         # Default display settings
@@ -55,6 +59,7 @@ class DockerService:
 
         if self._docker_available:
             logger.info(f"Docker service initialized with container: {self._container_name}")
+            logger.info(f"Docker project directory: {self._docker_project_dir}")
         else:
             logger.warning("Docker not available. Operations will fail.")
 
@@ -77,6 +82,33 @@ class DockerService:
         self._docker_available = self._check_docker_available()
         return self._docker_available
 
+    def _format_docker_path(self, path: Union[str, Path]) -> str:
+        """Format a path for use in Docker commands to ensure proper slashes."""
+        if path is None:
+            return None
+            
+        # Convert to string if it's a Path
+        docker_path = str(path)
+        
+        # Replace backslashes with forward slashes
+        docker_path = docker_path.replace('\\', '/')
+        
+        # Ensure there are no double slashes
+        while '//' in docker_path:
+            docker_path = docker_path.replace('//', '/')
+            
+        # Ensure it starts with /
+        if not docker_path.startswith('/'):
+            docker_path = '/' + docker_path
+            
+        # Split the path and filter out empty parts
+        parts = docker_path.split('/')
+        parts = [part for part in parts if part]
+        
+        # Reconstruct the path with proper slashes
+        docker_path = '/' + '/'.join(parts)
+        
+        return docker_path
 
     def to_docker_path(self, host_path: Union[str, Path]) -> Path:
         """Convert a host path to a Docker container path"""
@@ -242,8 +274,14 @@ class DockerService:
 
     def create_virtual_env(self, packages: Optional[List[str]] = None) -> DockerResult:
         """Create a Python virtual environment in the Docker container"""
+        # Ensure docker_project_dir is properly formatted with slashes
+        docker_dir = self._format_docker_path(self._docker_project_dir)
+        
+        # Log the directory we're using
+        logger.info(f"Creating virtual environment in directory: {docker_dir}")
+        
         commands = [
-            f"cd {self._docker_project_dir}",
+            f"cd {docker_dir}",
             "python3 -m venv .venv",
             ".venv/bin/pip install --upgrade pip"
         ]
@@ -260,18 +298,25 @@ class DockerService:
         if not packages:
             return DockerResult(True, "No packages to install", "", 0, "")
 
+        # Ensure docker_project_dir is properly formatted with slashes
+        docker_dir = self._format_docker_path(self._docker_project_dir)
+        
+        # Log the directory we're using
+        logger.info(f"Installing packages in directory: {docker_dir}")
+
         venv_check = self.execute_command(
-            f"[ -d {self._docker_project_dir}/.venv ] && echo 'exists' || echo 'not exists'"
+            f"[ -d {docker_dir}/.venv ] && echo 'exists' || echo 'not exists'"
         )
 
         if not (venv_check.success and "exists" in venv_check.stdout):
-            # Create virtual environment first
+            # Create virtual environment if it doesn't exist
             venv_result = self.create_virtual_env()
             if not venv_result.success:
                 return venv_result
 
+        # Install packages
         pkg_list = " ".join(packages)
-        command = f"cd {self._docker_project_dir} && .venv/bin/pip install {pkg_list}"
+        command = f"cd {docker_dir} && .venv/bin/pip install {pkg_list}"
         return self.execute_command(command)
 
     def start_container(self) -> bool:

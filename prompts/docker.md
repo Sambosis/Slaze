@@ -1,1 +1,0 @@
-create a docker that has a linux gui and opens a python hello world app

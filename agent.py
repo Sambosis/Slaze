@@ -34,7 +34,8 @@ class Agent:
         self.task = task
         self.display = display
         self.context_recently_refreshed = False
-        self.refresh_count = 24
+        self.refresh_count = 28
+        self.refresh_increment = 6 # the number to increase the refresh count by
         self.tool_collection = ToolCollection(
             WriteCodeTool(display=self.display),
             ProjectSetupTool(display=self.display),
@@ -51,6 +52,37 @@ class Agent:
         self.betas = [COMPUTER_USE_BETA_FLAG, PROMPT_CACHING_BETA_FLAG]
         self.image_truncation_threshold = 1
         self.only_n_most_recent_images = 2
+
+    def log_tool_results(self, combined_content, tool_name, tool_input):
+        """
+        Log tool results to a file in a human-readable format.
+        
+        Args:
+            combined_content: The content to log
+            tool_name: The name of the tool that was executed
+            tool_input: The input provided to the tool
+        """
+        with open("./logs/tool.txt", 'a', encoding='utf-8') as f:
+            f.write("\n" + "="*80 + "\n")
+            f.write(f"TOOL EXECUTION: {tool_name}\n")
+            f.write(f"INPUT: {json.dumps(tool_input, indent=2)}\n")
+            f.write("-"*80 + "\n")
+            
+            for item in combined_content:
+                f.write(f"CONTENT TYPE: {item['type']}\n")
+                if item['type'] == 'tool_result':
+                    f.write(f"TOOL USE ID: {item['tool_use_id']}\n")
+                    f.write(f"ERROR: {item['is_error']}\n")
+                    if isinstance(item['content'], list):
+                        f.write("CONTENT:\n")
+                        for content_item in item['content']:
+                            f.write(f"  - {content_item['type']}: {content_item.get('text', '[non-text content]')}\n")
+                    else:
+                        f.write(f"CONTENT: {item['content']}\n")
+                elif item['type'] == 'text':
+                    f.write(f"TEXT:\n{item['text']}\n")
+                f.write("-"*50 + "\n")
+            f.write("="*80 + "\n\n")
 
     async def run_tool(self, content_block):
         result = ToolResult(output="Tool execution not started", tool_name=content_block["name"])
@@ -86,10 +118,10 @@ class Agent:
                 "role": "user",
                 "content": combined_content
             })
-            with open("./logs/tool.txt", 'a', encoding='utf-8') as f:
-                for content in combined_content:
-                    for key, value in content.items():
-                        f.write(f"{key}: {value}\n")
+            
+            # Use the dedicated logging function instead of inline logging
+            self.log_tool_results(combined_content, tool_name, content_block['input'])
+            
             return tool_result
 
     def _make_api_tool_result(self, result: ToolResult, tool_use_id: str) -> Dict:
@@ -203,27 +235,44 @@ class Agent:
         if self.only_n_most_recent_images:
             self._maybe_filter_to_n_most_recent_images()
         try:
-            self.tool_collection.to_params()
+            # Add detailed logging of tool params
+            tool_params = self.tool_collection.to_params()
+            ic("---- TOOL PARAMS SENT TO LLM ----")
+            ic(tool_params)
+            ic("---- END TOOL PARAMS ----")
+            
             truncated_messages = [
                 {"role": msg["role"], "content": truncate_message_content(msg["content"])}
                 for msg in messages
                 ]   
-            summary_task = asyncio.create_task(summarize_recent_messages(messages[-4:], self.display))
+            summary_task = asyncio.create_task(summarize_recent_messages(messages[-4:] if len(messages) >= 4 else messages, self.display))
             ic(f"NUMBER_OF_MESSAGES: {len(messages)}")
 
             # --- MAIN LLM CALL ---
             response = None  # Initialize response to avoid UnboundLocalError
             try:
+                ic("---- SENDING LLM REQUEST ----")
+                ic({
+                    "max_tokens": MAX_SUMMARY_TOKENS,
+                    "model": MAIN_MODEL,
+                    "tool_choice": {"type": "auto"},
+                    "tools_count": len(tool_params),
+                    "betas": self.betas,
+                })
                 response = self.client.beta.messages.create(
                     max_tokens=MAX_SUMMARY_TOKENS,
                     messages=truncated_messages,
                     model=MAIN_MODEL,
                     tool_choice={"type": "auto"},
                     system=system,
-                    tools=self.tool_collection.to_params(),
+                    tools=tool_params,
                     betas=self.betas,
                 )
+                ic("---- LLM RESPONSE SUCCESS ----")
             except Exception as llm_error:
+                ic("---- LLM REQUEST ERROR ----")
+                ic(llm_error)
+                ic("---- END LLM ERROR ----")
                 self.display.add_message("assistant", f"LLM call failed: {str(llm_error)}")
                 last_3_messages = messages[-3:] if len(messages) >= 3 else messages
                 new_context = await refresh_context_async(task, last_3_messages, self.display)
@@ -232,41 +281,56 @@ class Agent:
 
             response_params = []
             if response is not None:
-                for block in response.content:
-                    if hasattr(block, 'text'):
-                        response_params.append({"type": "text", "text": block.text})
-                        self.display.add_message("assistant", block.text)
-                    elif getattr(block, 'type', None) == "tool_use":
-                        sanitized_name = self._sanitize_tool_name(block.name)
-                        response_params.append({
-                            "type": "tool_use",
-                            "name": sanitized_name,
-                            "id": block.id,
-                            "input": block.input
-                        })
+                # Ensure response.content exists before iterating over it
+                if hasattr(response, 'content') and response.content is not None:
+                    for block in response.content:
+                        if hasattr(block, 'text'):
+                            response_params.append({"type": "text", "text": block.text})
+                            self.display.add_message("assistant", block.text)
+                        elif getattr(block, 'type', None) == "tool_use":
+                            sanitized_name = self._sanitize_tool_name(block.name)
+                            response_params.append({
+                                "type": "tool_use",
+                                "name": sanitized_name,
+                                "id": block.id,
+                                "input": block.input
+                            })
+                else:
+                    self.display.add_message("assistant", "LLM response content was empty or missing.")
             else:
                 self.display.add_message("assistant", "LLM response was None.")
-                response_params = []
 
             self.messages.append({"role": "assistant", "content": response_params})
-            ic(f"NUNBER_OF_MESSAGES: {len(messages)}")
+            ic(f"NUMBER_OF_MESSAGES: {len(messages)}")
 
             with open(MESSAGES_FILE, 'w', encoding='utf-8') as f:
                 message_string = format_messages_to_string(messages)
                 f.write(message_string)
 
-            tool_result_content: List[BetaToolResultBlockParam] = []
-            for content_block in response_params:
-                self.output_manager.format_content_block(content_block)
-                if content_block["type"] == "tool_use":
-                    tool_result = await self.run_tool(content_block)
-                    tool_result_content.append(tool_result)
+            tool_result_content = []  # Initialize as empty list
+            
+            # Only process tool use blocks if there are response parameters
+            if response_params:
+                for content_block in response_params:
+                    self.output_manager.format_content_block(content_block)
+                    if content_block.get("type") == "tool_use":
+                        tool_result = await self.run_tool(content_block)
+                        if tool_result:  # Ensure tool_result is not None
+                            tool_result_content.append(tool_result)
+
+            # Wait for summary task to complete
+            try:
+                quick_summary = await summary_task
+                if quick_summary:
+                    add_summary(quick_summary)
+                    self.display.add_message("assistant", quick_summary)
+            except Exception as summary_error:
+                self.display.add_message("assistant", f"Error generating summary: {str(summary_error)}")
+                quick_summary = "Summary generation failed."
 
             self.display.add_message("user", f"{self.refresh_count+2 - len(messages)} More Messages Until Context Refresh: Currently {len(messages)} of {self.refresh_count}")
-            quick_summary = await summary_task  # Now we wait for the summary to complete
-            add_summary(quick_summary)
-            self.display.add_message("assistant", quick_summary)
 
+            # Rest of the method remains the same
             if (not tool_result_content) and (not self.context_recently_refreshed):
                 self.display.add_message("assistant", "Awaiting User Input ⌨️ (Type your response in the web interface)")
                 user_input = await self.display.wait_for_user_input()
@@ -286,32 +350,41 @@ class Agent:
                     new_context = await refresh_context_async(task, last_3_messages, self.display)
                     self.context_recently_refreshed = True
                     self.messages =[{"role": "user", "content": new_context}]
-                    self.refresh_count += 2
+                    self.refresh_count += self.refresh_increment
 
             if self.display.user_interupt:
-                last_3_messages = messages[-4:]
+                # last_3_messages = messages[-4:]
                 self.display.add_message("assistant", "Awaiting User Input JK!⌨️ (Type your response in the web interface)")
                 user_input = await self.display.wait_for_user_input()
-                new_context = await refresh_context_async(task, last_3_messages)
-                new_context = new_context + user_input
-                self.messages =[{"role": "user", "content": new_context}]
-                self.refresh_count += 2
+                # new_context = await refresh_context_async(task, last_3_messages)
+                self.messages.append({"role": "user", "content": user_input})
+
+                self.refresh_count += self.refresh_increment
                 self.context_recently_refreshed = True
                 self.display.user_interupt = False
             else:
                 self.context_recently_refreshed = False
 
-            # Only update token tracker if response is not None
+            # Only update token tracker if response is not None and has usage information
             if response is not None and hasattr(response, 'usage'):
                 self.token_tracker.update(response)
-                # self.token_tracker.display(self.display)
             else:
                 self.display.add_message("assistant", "No valid LLM response for token usage update.")
             return True
 
         except Exception as e:
             ic(f"Error in sampling loop: {str(e).encode('ascii', errors='replace').decode('ascii')}")
-            ic(f"The error occurred at the following message: {messages[-1]} and line: {e.__traceback__.tb_lineno}")
+            ic(f"The error occurred at the following message: {messages[-1] if messages else 'No messages'} and line: {e.__traceback__.tb_lineno}")
             ic(e.__traceback__.tb_frame.f_locals)
             self.display.add_message("user", ("Error", str(e)))
-            raise
+            # Try to recover by refreshing context
+            try:
+                last_messages = messages[-3:] if len(messages) >= 3 else messages
+                new_context = await refresh_context_async(task, last_messages, self.display)
+                self.messages = [{"role": "user", "content": new_context}]
+                self.context_recently_refreshed = True
+                self.display.add_message("assistant", "Attempting recovery by refreshing context.")
+                return True  # Continue execution
+            except Exception as recovery_error:
+                self.display.add_message("assistant", f"Recovery attempt failed: {str(recovery_error)}")
+                raise

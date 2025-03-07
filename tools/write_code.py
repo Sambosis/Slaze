@@ -32,6 +32,36 @@ from dotenv import load_dotenv
 import ftfy
 from pygments.lexers import get_lexer_by_name, guess_lexer
 
+def html_format_code(code, extension):
+    """Format code with syntax highlighting for HTML display."""
+    try:
+        # Try to get a lexer based on the file extension
+        try:
+            lexer = get_lexer_by_name(extension.lower().lstrip('.'))
+        except:
+            # If that fails, try to guess the lexer from the code content
+            lexer = guess_lexer(code)
+            
+        # Use a nice style for the highlighting
+        formatter = HtmlFormatter(style='monokai', linenos=True, cssclass="source")
+        
+        # Highlight the code
+        highlighted = highlight(code, lexer, formatter)
+        
+        # Add some CSS for better display
+        css = formatter.get_style_defs('.source')
+        html = f"""
+        <style>
+        {css}
+        .source {{ background-color: #272822; padding: 10px; border-radius: 5px; }}
+        </style>
+        {highlighted}
+        """
+        return html
+    except Exception as e:
+        # If highlighting fails, return plain code in a pre tag
+        return f"<pre>{code}</pre>"
+
 def send_email_attachment_of_code(filename, code_string):
     import os
 from sendgrid import SendGridAPIClient
@@ -136,7 +166,8 @@ class WriteCodeTool(BaseAnthropicTool):
     api_type: Literal["custom"] = "custom"
     description: str = "A tool that takes a description of code that needs to be written and provides the actual programming code in the specified language. It can either execute the code or write it to a file depending on the command. It is also able to return all of the code written so far so you can view the contents of all files."
     def __init__(self, display=None):
-        super().__init__(display)
+        super().__init__(input_schema=None, display=display)
+        self.display = display  # Explicitly set self.display
         # Initialize Docker service
         self.docker = DockerService()
         self._docker_available = self.docker.is_available()
@@ -144,7 +175,9 @@ class WriteCodeTool(BaseAnthropicTool):
         ic(f"Docker available: {self._docker_available}")
 
     def to_params(self) -> dict:
-        return {
+        ic(f"WriteCodeTool.to_params called with api_type: {self.api_type}")
+        # Use the format that has worked in the past
+        params = {
             "name": self.name,
             "description": self.description,
             "type": self.api_type,
@@ -167,31 +200,13 @@ class WriteCodeTool(BaseAnthropicTool):
                     "python_filename": {
                         "type": "string",
                         "description": "Filename for write_code_to_file command."
-                    },
-                    "files": {  # Added for multiple file support
-                        "type": "array",
-                        "description": "List of objects with 'code_description' and 'file_path' for each file to write.",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "code_description": {"type": "string"},
-                                "file_path": {"type": "string"}
-                            },
-                            "required": ["code_description", "file_path"]
-                        }
-                    },
-                    "revision_description": {
-                        "type": "string",
-                        "description": "Description of the changes to be made to an existing file"
-                    },
-                    "target_file": {
-                        "type": "string",
-                        "description": "Path to the file that needs to be revised"
                     }
                 },
-                "required": ["command", "project_path"]
+                "required": ["command"]
             }
         }
+        ic(f"WriteCodeTool params: {params}")
+        return params
 
     async def __call__(
         self,
@@ -203,63 +218,115 @@ class WriteCodeTool(BaseAnthropicTool):
         **kwargs,
         ) -> ToolResult:
         """
-        Executes the specified command for project management.
+        Execute the tool with the given command and parameters.
+        
+        Args:
+            command: The command to execute
+            code_description: Description of the code to write
+            project_path: Path to the project directory
+            python_filename: Name of the file to write
+            **kwargs: Additional parameters
+            
+        Returns:
+            A ToolResult object with the result of the operation
         """
-
+        import traceback
+        
         try:
-            if self.display is not None:
-                self.display.add_message("user", f"WriteCodeTool Instructions: {code_description}")
-
-            # Convert path string to Path object
-            project_path = Path(get_constant("PROJECT_DIR"))
-            ic(f"Project path: {project_path}")
+            # Convert project_path to Path object if it's a string
+            if isinstance(project_path, str):
+                from pathlib import Path
+                project_path = Path(project_path)
             
-            # Get command value as string for the ToolResult
-            command_str = command.value if hasattr(command, 'value') else str(command)
+            # Ensure the project directory exists
+            project_path.mkdir(parents=True, exist_ok=True)
             
-            # Execute the appropriate command
+            # Handle different commands
             if command == CodeCommand.WRITE_CODE_TO_FILE:
-                result_data = await self.write_code_to_file(code_description, project_path, python_filename)
-            elif command == CodeCommand.WRITE_AND_EXEC:
-                result_data = await self.write_and_exec(code_description, project_path)
+                result = await self.write_code_to_file(
+                    code_description, project_path, python_filename
+                )
+                
+                # Check if we have an error in the result
+                if "error" in result and result["error"]:
+                    return ToolResult(
+                        error=result["error"],
+                        output=result.get("output", "Failed to write code"),
+                        tool_name=self.name,
+                        command=command
+                    )
+                
+                return ToolResult(
+                    output=self.format_output(result),
+                    tool_name=self.name,
+                    command=command
+                )
+                
             elif command == CodeCommand.WRITE_CODE_MULTIPLE_FILES:
                 files = kwargs.get("files", [])
                 if not files:
-                    return ToolResult(error="No files provided for multiple file creation.", tool_name=self.name, command=command_str)
-                result_data = await self.write_multiple_files(project_path, files)
+                    return ToolResult(
+                        error="No files specified for write_code_multiple_files command",
+                        tool_name=self.name,
+                        command=command
+                    )
+                    
+                result = await self.write_multiple_files(project_path, files)
+                
+                # Check if we have an error in the result
+                if "error" in result and result["error"]:
+                    return ToolResult(
+                        error=result["error"],
+                        output=result.get("output", "Failed to write multiple files"),
+                        tool_name=self.name,
+                        command=command
+                    )
+                
+                return ToolResult(
+                    output=self.format_output(result),
+                    tool_name=self.name,
+                    command=command
+                )
+                
             elif command == CodeCommand.GET_ALL_CODE:
-                result_data = {
-                    "command": "GET_ALL_CODE",
-                    "status": "success",
-                    "project_path": str(project_path),
-                    "files_results": get_all_current_code(),
-                }
+                from utils.file_logger import get_all_current_code
+                return ToolResult(
+                    output=get_all_current_code(),
+                    tool_name=self.name,
+                    command=command
+                )
+                
             elif command == CodeCommand.GET_REVISED_VERSION:
-                target_file = kwargs.get("target_file")
-                revision_description = kwargs.get("revision_description")
-                if not target_file or not revision_description:
-                    return ToolResult(error="Both target_file and revision_description are required for revision", 
-                                     tool_name=self.name, command=command_str)
-                result_data = await self.get_revised_version(project_path, target_file, revision_description)
+                file_path = kwargs.get("file_path", "")
+                if not file_path:
+                    return ToolResult(
+                        error="No file_path specified for get_revised_version command",
+                        tool_name=self.name,
+                        command=command
+                    )
+                    
+                # TODO: Implement get_revised_version
+                return ToolResult(
+                    error="get_revised_version command not implemented yet",
+                    tool_name=self.name,
+                    command=command
+                )
+                
             else:
-                ic(f"Unknown command: {command}")
-                return ToolResult(error=f"Unknown command: {command}", tool_name=self.name, command=command_str)
-
-            # Add tool name and command to the result data
-            result_data["tool_name"] = self.name
-            if "command" not in result_data:
-                result_data["command"] = command_str
-
-            # Convert result_data to formatted string
-            formatted_output = self.format_output(result_data)
-            ic(f"formatted_output: {formatted_output}")
-
-            return ToolResult(output=formatted_output, tool_name=self.name, command=command_str)
-
+                return ToolResult(
+                    error=f"Unknown command: {command}",
+                    tool_name=self.name,
+                    command=command
+                )
+                
         except Exception as e:
-            error_msg = f"Failed to execute {command}: {str(e)}"
-            command_str = command.value if hasattr(command, 'value') else str(command)
-            return ToolResult(error=error_msg, tool_name=self.name, command=command_str)
+            error_message = f"Error in WriteCodeTool: {str(e)}\n{traceback.format_exc()}"
+            print(error_message)  # Print to console for debugging
+            return ToolResult(
+                error=error_message,
+                tool_name=self.name,
+                command=command
+            )
 
     def extract_code_block(self, text: str, file_path: Optional[Path] = None) -> tuple[str, str]:
         """
@@ -476,250 +543,256 @@ class WriteCodeTool(BaseAnthropicTool):
         return skeleton_string
 
     def format_output(self, data: dict) -> str:
-        """Format the output data as a readable string"""
-        output_lines = []
-
-        # Add tool name 
-        output_lines.append(f"Tool: {data.get('tool_name', self.name)}")
-
-        # Add command type
-        output_lines.append(f"Command: {data['command']}")
-
-        # Add status
-        output_lines.append(f"Status: {data['status']}")
-
-        # Add project path
-        output_lines.append(f"Project Path: {data['project_path']}")
-
-        # Add filename if present (for single file operations)
-        if 'filename' in data:
-            output_lines.append(f"Filename: {data['filename']}")
-            code_string = data.get('code_string', '')
-            if len(code_string) > 150000:
-                code_string = code_string[:75000] + " ... [TRUNCATED] ... " + code_string[-75000:]
-            output_lines.append(f"Code:\n{code_string}")
-
-        # Add files_results (for multiple files, this is already formatted)
-        if 'files_results' in data:
-            files_results = data['files_results']
-            if len(files_results) > 150000:
-                files_results = files_results[:75000] + " ... [TRUNCATED] ... " + files_results[-75000:]
-            output_lines.append(files_results)
-
-        # Add packages if present
-        if 'packages_installed' in data:
-            output_lines.append("Packages Installed:")
-            for package in data['packages_installed']:
-                output_lines.append(f"  - {package}")
-
-        # Add run output if present
-        if 'run_output' in data and data['run_output']:
-            run_output = data['run_output']
-            if len(run_output) > 150000:
-                run_output = run_output[:75000] + " ... [TRUNCATED] ... " + run_output[-75000:]
-            output_lines.append("\nApplication Output:")
-            output_lines.append(run_output)
-
-        if 'errors' in data and data['errors']:
-            errors = data['errors']
-            if len(errors) > 150000:
-                errors = errors[:75000] + " ... [TRUNCATED] ... " + errors[-75000:]
-            output_lines.append("\nErrors:")
-            output_lines.append(errors)
-
-        # Join all lines with newlines
-        return "\n".join(output_lines)
-
-    async def write_code_to_file(self, code_description: str, project_path: Path, filename) -> dict:
         """
-        Write code to a file in the Docker container.
-        
-        Generates code based on description and writes it directly to the Docker container
-        rather than the local file system.
-        """
-        local_file_path = project_path / filename
-        ic(f"Writing code to file: {local_file_path}")
-        try:
-            # Initialize Docker service
-            docker = DockerService()
-            if not docker.is_available():
-                return {
-                    "command": "write_code_to_file",
-                    "status": "error",
-                    "project_path": str(project_path),
-                    "filename": filename,
-                    "error": "Docker service not available"
-                }
-
-            # Get the Docker path with normalized Linux forward slashes
-            docker_project_dir = docker.to_docker_path(project_path)
-            docker_project_dir_str = str(docker_project_dir).replace('\\', '/')
-
-            # Ensure we have a correct Linux-style path with forward slashes
-            docker_file_path = f"{docker_project_dir_str}/{filename}".replace('\\', '/')
-            ic(f"Docker file path: {docker_file_path}")
-
-            # Generate code skeleton
-            code_research_string = await self._call_llm_for_code_skeleton(
-                code_description, local_file_path
-            )
-
-            # Generate full code implementation
-            code_string = await self._call_llm_to_generate_code(
-                code_description, code_research_string, local_file_path
-            )
-
-            # Debug log the generated code length
-            ic(f"Generated code length: {len(code_string)} chars")
-
-            # Create parent directories in Docker
-            parent_dir = str(Path(docker_file_path).parent).replace('\\', '/')
-            mkdir_result = docker.execute_command(f"mkdir -p {parent_dir}")
-
-            if not mkdir_result.success:
-                return {
-                    "command": "write_code_to_file",
-                    "status": "error",
-                    "project_path": str(project_path),
-                    "filename": filename,
-                    "error": f"Failed to create directory in Docker: {mkdir_result.stderr}"
-                }
-
-            # Write file directly using a temporary file and docker cp
-            # Create a temporary file
-            fd, temp_path = tempfile.mkstemp(suffix='.py', text=True)
-            try:
-                with os.fdopen(fd, 'w', encoding='utf-8') as temp_file:
-                    temp_file.write(code_string)
-
-                # Ensure temp file has content
-                temp_size = os.path.getsize(temp_path)
-                ic(f"Temporary file created at {temp_path} with size: {temp_size} bytes")
-
-                if temp_size == 0:
-                    return {
-                        "command": "write_code_to_file",
-                        "status": "error", 
-                        "project_path": str(project_path),
-                        "filename": filename,
-                        "error": "Generated content is empty"
-                    }
-
-                # Copy the file to Docker using docker cp with escaped paths
-                docker_cp_command = f'docker cp "{temp_path}" {docker._container_name}:"{docker_file_path}"'
-                ic(f"Docker copy command: {docker_cp_command}")
-
-                cp_result = subprocess.run(
-                    docker_cp_command,
-                    shell=True,
-                    capture_output=True,
-                    text=True,
-                    check=False
-                )
-
-                if cp_result.returncode != 0:
-                    ic(f"Docker cp failed: {cp_result.stderr}")
-                    return {
-                        "command": "write_code_to_file",
-                        "status": "error",
-                        "project_path": str(project_path),
-                        "filename": filename,
-                        "error": f"Failed to copy file to Docker: {cp_result.stderr}"
-                    }
-
-                # Verify the file was created successfully
-                check_cmd = f"[ -f {docker_file_path} ] && wc -c {docker_file_path} || echo 'File not found'"
-                verify_result = docker.execute_command(check_cmd)
-
-                ic(f"File verification result: {verify_result.stdout}")
-
-                # Also write to local filesystem for logging
-                await asyncio.to_thread(os.makedirs, local_file_path.parent, exist_ok=True)
-                await asyncio.to_thread(local_file_path.write_text, code_string, encoding='utf-8')
-
-                # Log the file creation
-                await asyncio.to_thread(log_file_operation, local_file_path, "create")
-
-            finally:
-                # Clean up temp file
-                try:
-                    os.unlink(temp_path)
-                except Exception as e:
-                    ic(f"Failed to delete temp file: {e}")
-
-            return {
-                "command": "write_code_to_file",
-                "status": "success",
-                "project_path": str(project_path),
-                "filename": filename,
-                "docker_path": docker_file_path,
-                "code_string": code_string
-            }
-
-        except Exception as e:
-            import traceback
-            ic(f"Error in write_code_to_file: {str(e)}")
-            ic(traceback.format_exc())
-            return {
-                "command": "write_code_to_file",
-                "status": "error",
-                "project_path": str(project_path),
-                "filename": filename,
-                "error": f"Error writing file to Docker: {str(e)}"
-            }
-
-    async def write_multiple_files(self, project_path: Path, files: List[dict]) -> dict:
-        """
-        Write multiple files based on descriptions.
+        Format the output of the tool for display.
         
         Args:
-            project_path: Base project path
-            files: List of dictionaries with 'code_description' and 'file_path' keys
+            data: The data returned by the tool
             
         Returns:
-            Dictionary with command, status, project_path, and files_results
+            A formatted string for display
         """
-        results = []
-        status = "success"
-        errors = []
+        if "error" in data:
+            return f"Error: {data['error']}"
+            
+        if "output" in data:
+            return data["output"]
+            
+        # Handle different commands
+        command = data.get("command", "")
         
-        # Process each file in the list
-        for file_entry in files:
-            file_path = file_entry.get("file_path", "")
-            code_description = file_entry.get("code_description", "")
+        if command == "write_code_to_file":
+            if data.get("status") == "success":
+                return f"Successfully wrote code to {data.get('file_path', 'unknown file')}"
+            else:
+                return f"Failed to write code: {data.get('error', 'Unknown error')}"
+                
+        elif command == "write_code_multiple_files":
+            if data.get("status") in ["success", "partial_success"]:
+                return f"Wrote {data.get('files_processed', 0)} files to {data.get('project_path', 'unknown path')}\n{data.get('files_results', '')}"
+            else:
+                return f"Failed to write files: {data.get('errors', 'Unknown error')}"
+                
+        elif command == "get_all_current_skeleton":
+            from utils.file_logger import get_all_current_skeleton
+            return get_all_current_skeleton()
             
-            if not file_path or not code_description:
-                errors.append(f"Invalid file entry: Missing required fields: {file_entry}")
-                continue
+        elif command == "get_revised_version":
+            if data.get("status") == "success":
+                return f"Successfully revised {data.get('file_path', 'unknown file')}"
+            else:
+                return f"Failed to revise file: {data.get('error', 'Unknown error')}"
+                
+        # Default case
+        return str(data)
+
+    async def write_code_to_file(self, code_description: str, project_path: Path, filename) -> dict:
+        """Generate and write code to a file based on description."""
+        try:
+            if not isinstance(project_path, Path):
+                project_path = Path(project_path)
+                
+            # Ensure project_path exists
+            project_path.mkdir(parents=True, exist_ok=True)
             
+            # Determine file path
+            if os.path.isabs(filename):
+                file_path = Path(filename)
+            else:
+                file_path = project_path / filename
+                
+            # Create parent directories if needed
+            file_path.parent.mkdir(parents=True, exist_ok=True)
+
+            # Research and generate code
+            if self.display is not None:
+                self.display.add_message("assistant", f"Generating code for: {file_path}")
+            code = await self._research_and_generate_code(code_description, file_path)
+            
+            # Skip if no code was generated
+            if not code:
+                return {
+                    "status": "error", 
+                    "message": f"No code was generated for {file_path}",
+                    "file_path": str(file_path),
+                    "code": ""
+                }
+                
+            # Determine operation type
+            operation = "update" if file_path.exists() else "create"
+                
+            # Write code to file
             try:
-                # Use the existing write_code_to_file method to handle each file
-                result = await self.write_code_to_file(code_description, project_path, file_path)
-                if result.get("status") == "error":
-                    status = "partial_success"  # At least one file had an error
-                    errors.append(f"Error writing {file_path}: {result.get('error', 'Unknown error')}")
+                with open(file_path, "w", encoding="utf-8") as f:
+                    f.write(code)
+                    
+                # Log file operation
+                try:
+                    log_file_operation(
+                        file_path=file_path,
+                        operation_type=operation,
+                        content=code,
+                        code_description=code_description,
+                        language=get_language_from_extension(file_path.suffix),
+                    )
+                except Exception as file_error:
+                    if self.display is not None:
+                        self.display.add_message("user", f"Failed to log code: {str(file_error)}")
+                        
+                # Generate a nice HTML output with highlighted code
+                try:
+                    code_string = html_format_code(code, str(file_path).split('.')[-1])
+                    if self.display is not None:
+                        self.display.add_message("tool", {"html": code_string})
+                except Exception as format_error:
+                    if self.display is not None:
+                        self.display.add_message("user", f"Note: Code highlighting failed: {str(format_error)}")
+                        # Still display the code in a simple format
+                        self.display.add_message("tool", {"text": f"```\n{code}\n```"})
+                    
+                # Return the result with file path and code
+                return {
+                    "status": "success", 
+                    "operation": operation,
+                    "message": f"Successfully wrote code to {file_path}",
+                    "file_path": str(file_path),
+                    "code": code
+                }
+                    
+            except PermissionError:
+                return {
+                    "status": "error", 
+                    "message": f"Permission denied when writing to {file_path}",
+                    "file_path": str(file_path),
+                    "code": code
+                }
                 
-                results.append({
-                    "file_path": file_path,
-                    "status": result.get("status", "unknown"),
-                    "code_length": len(result.get("code_string", "")) if "code_string" in result else 0
-                })
+            except OSError as os_error:
+                return {
+                    "status": "error", 
+                    "message": f"OS error when writing to {file_path}: {str(os_error)}",
+                    "file_path": str(file_path),
+                    "code": code
+                }
                 
-            except Exception as e:
-                status = "partial_success"
-                errors.append(f"Exception while processing {file_path}: {str(e)}")
-        
-        # If all files failed, mark status as error
-        if status == "success" and not results:
-            status = "error"
-        elif errors and len(errors) == len(files):
-            status = "error"
-        
-        return {
-            "command": "write_code_multiple_files",
-            "status": status,
-            "project_path": str(project_path),
-            "files_processed": len(results),
-            "files_results": "\n".join([f"- {r['file_path']}: {r['status']} ({r['code_length']} bytes)" for r in results]),
-            "errors": "\n".join(errors) if errors else None
-        }
+        except Exception as e:
+            return {
+                "status": "error", 
+                "message": f"Error generating code: {str(e)}",
+                "file_path": str(filename),
+                "code": ""
+            }
+
+    async def _research_and_generate_code(self, code_description: str, file_path: Path) -> str:
+        """Research and generate code based on description."""
+        try:
+            if self.display is not None:
+                self.display.add_message("assistant", f"Researching code for: {file_path}")
+                
+            # Generate code using the LLM
+            code = await self._call_llm_to_generate_code(
+                code_description,
+                await self._call_llm_to_research_code(code_description, file_path),
+                file_path
+            )
+            
+            # Extract only the code block if the LLM returned extra text
+            if code:
+                code, _ = self.extract_code_block(code, file_path)
+                
+            return code
+        except Exception as e:
+            print(f"Error in code research: {str(e)}")
+            return ""
+
+    async def write_multiple_files(self, project_path: Path, files: list) -> dict:
+        """Write multiple files concurrently.
+        Expects files as a list of dicts with 'code_description' and 'file_path' keys.
+        Returns a structured result with information about all created files.
+        """
+        try:
+            # Convert project_path to Path if it's a string
+            if not isinstance(project_path, Path):
+                project_path = Path(project_path)
+                
+            # Ensure project directory exists
+            project_path.mkdir(parents=True, exist_ok=True)
+            
+            # Set up tasks for concurrent execution
+            tasks = []
+            for file_info in files:
+                desc = file_info.get("code_description", "")
+                file_relative = file_info.get("file_path")
+                
+                # Ensure file_relative is a Path object
+                file_path = Path(file_relative)
+                
+                # If file_path is not absolute, combine it with project_path
+                if not file_path.is_absolute():
+                    file_path = project_path / file_path
+                    
+                tasks.append(self.write_code_to_file(desc, project_path, file_path))
+                
+            # Execute all file creation tasks concurrently
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            
+            # Process results
+            successful_files = []
+            errors = []
+            output_string = ""
+            
+            for result in results:
+                if isinstance(result, Exception):
+                    error_message = f"Error writing file: {str(result)}"
+                    errors.append({"message": error_message})
+                    output_string += f"{error_message}\n"
+                elif result.get("status") == "success":
+                    successful_files.append(result)
+                    file_path = result.get("file_path", "Unknown")
+                    code = result.get("code", "")
+                    output_string += f"Filename: {file_path}\n"
+                    output_string += f"Code:\n{code}\n\n"
+                    
+                    # Try to display code with syntax highlighting
+                    if self.display is not None:
+                        try:
+                            extension = str(file_path).split('.')[-1]
+                            code_string = html_format_code(code, extension)
+                            self.display.add_message("tool", {
+                                "html": f"<h3>{file_path}</h3>{code_string}"
+                            })
+                        except Exception as format_error:
+                            self.display.add_message("user", f"Note: Code highlighting failed for {file_path}: {str(format_error)}")
+                            # Still display the code in a simple format
+                            self.display.add_message("tool", {"text": f"# {file_path}\n```\n{code}\n```"})
+                else:
+                    error_message = f"Filename: {result.get('file_path', 'Unknown')}\nError: {result.get('message', 'Unknown error')}"
+                    errors.append(result)
+                    output_string += f"{error_message}\n\n"
+            
+            # Create the response in the format expected by the caller
+            return {
+                "command": "write_code_multiple_files",
+                "status": "completed" if not errors else "partial_success",
+                "project_path": str(project_path),
+                "files_results": output_string,
+                "files": successful_files,
+                "errors": errors,
+                "message": f"Successfully wrote {len(successful_files)} files" + 
+                          (f", with {len(errors)} errors" if errors else "")
+            }
+            
+        except Exception as e:
+            error_message = f"Error in write_multiple_files: {str(e)}"
+            if self.display is not None:
+                self.display.add_message("user", error_message)
+                
+            return {
+                "command": "write_code_multiple_files",
+                "status": "error",
+                "message": error_message,
+                "project_path": str(project_path),
+                "files_results": error_message,
+                "files": [],
+                "errors": [{"message": str(e)}]
+            }

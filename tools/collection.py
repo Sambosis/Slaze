@@ -44,7 +44,22 @@ class ToolCollection:
         Returns:
             List[Dict[str, Any]]: List of tool parameters
         """
-        return [tool.to_params() for tool in self.tools.values()]
+        ic("---- COLLECTING TOOL PARAMS ----")
+        tool_params = []
+        
+        for tool_name, tool in self.tools.items():
+            ic(f"Tool: {tool_name}")
+            try:
+                params = tool.to_params()
+                ic(f"Tool params for {tool_name}:")
+                ic(params)
+                tool_params.append(params)
+            except Exception as e:
+                ic(f"Error getting params for tool {tool_name}: {str(e)}")
+        
+        ic(f"Total tools collected: {len(tool_params)}")
+        ic("---- END COLLECTING TOOL PARAMS ----")
+        return tool_params
     
     async def run(self, name: str, tool_input: Dict[str, Any]) -> ToolResult:
         """

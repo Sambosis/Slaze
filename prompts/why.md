@@ -1,1 +1,0 @@
-create a simple gui python scientific calculator

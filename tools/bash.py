@@ -43,7 +43,7 @@ class BashTool(BaseAnthropicTool):
     def __init__(self, display: AgentDisplayWebWithPrompt = None):
         self.display = display
         self._docker_available = check_docker_available()
-        super().__init__()
+        super().__init__(input_schema=None, display=display)
 
     description = """
         A tool that allows the agent to run bash commands in a Docker container.
@@ -65,12 +65,12 @@ class BashTool(BaseAnthropicTool):
         success = False
 
         try:
-            if self.display:
+            if self.display is not None:
                 self.display.add_message("user", f"Executing command: {command}")
 
             if not self._docker_available:
                 error = "Docker is not available or the container is not running."
-                if self.display:
+                if self.display is not None:
                     self.display.add_message("user", f"Error: {error}")
                 return ToolResult(error=error, tool_name=self.name)
 
@@ -102,12 +102,16 @@ class BashTool(BaseAnthropicTool):
 
         except Exception as e:
             error = str(e)
-            if self.display:
+            if self.display is not None:
                 self.display.add_message("user", f"Error: {error}")
             return ToolResult(error=error, tool_name=self.name, command=command)
 
     def to_params(self) -> BetaToolBash20241022Param:
-        return {
+        ic(f"BashTool.to_params called with api_type: {self.api_type}")
+        # For specialized tools, use 'type' not 'api_type'
+        params = {
             "type": self.api_type,
             "name": self.name,
         }
+        ic(f"BashTool params: {params}")
+        return params

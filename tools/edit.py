@@ -43,7 +43,8 @@ class EditTool(BaseAnthropicTool):
     _file_history: dict[Path, list[str]]
 
     def __init__(self, display=None):
-        super().__init__(display)
+        super().__init__(input_schema=None, display=display)
+        self.display = display  # Explicitly set self.display
         self._file_history = defaultdict(list)
         # Initialize Docker service
         self.docker = DockerService()
@@ -51,10 +52,14 @@ class EditTool(BaseAnthropicTool):
         
 
     def to_params(self) -> BetaToolTextEditor20241022Param:
-        return {
+        ic(f"EditTool.to_params called with api_type: {self.api_type}")
+        # For specialized tools, use 'type' not 'api_type'
+        params = {
             "name": self.name,
             "type": self.api_type,
         }
+        ic(f"EditTool params: {params}")
+        return params
 
     def format_output(self, data: Dict) -> str:
         """Format the output data similar to ProjectSetupTool style"""
@@ -62,7 +67,7 @@ class EditTool(BaseAnthropicTool):
         
         # Add command type
         output_lines.append(f"Command: {data['command']}")
-        if self.display:
+        if self.display is not None:
             self.display.add_message("user", f"EditTool Command: {data['command']}")
         # Add status
         output_lines.append(f"Status: {data['status']}")
@@ -96,7 +101,7 @@ class EditTool(BaseAnthropicTool):
         """Execute the specified command with proper error handling and formatted output."""
         try:
             # Add display messages
-            if self.display:
+            if self.display is not None:
                 self.display.add_message("user", f"EditTool Executing Command: {command} on path: {path}")
 
             # Normalize the path first
@@ -108,7 +113,7 @@ class EditTool(BaseAnthropicTool):
                 self.write_file(_path, file_text)
                 self._file_history[_path].append(file_text)
                 log_file_operation(_path, "create")  
-                if self.display:
+                if self.display is not None:
                     self.display.add_message("user", f"EditTool Command: {command} successfully created file {_path} !")
                     self.display.add_message("tool", file_text)
                 output_data = {
@@ -121,7 +126,7 @@ class EditTool(BaseAnthropicTool):
 
             elif command == "view":
                 result = await self.view(_path, view_range)
-                if self.display:
+                if self.display is not None:
                     self.display.add_message("user", f"EditTool Command: {command} successfully viewed file\n {str(result.output[:100])} !")
                 output_data = {
                     "command": "view",
@@ -135,7 +140,7 @@ class EditTool(BaseAnthropicTool):
                 if not old_str:
                     raise ToolError("Parameter `old_str` is required for command: str_replace")
                 result = self.str_replace(_path, old_str, new_str)
-                if self.display:
+                if self.display is not None:
                     self.display.add_message("user", f"EditTool Command: {command} successfully replaced text in file {str(_path)} !")
                     self.display.add_message("user", f"End of Old Text: {old_str[-200:] if len(old_str) > 200 else old_str}")
                     self.display.add_message("user", f"End of New Text: {new_str[-200:] if new_str and len(new_str) > 200 else new_str}")
@@ -177,7 +182,7 @@ class EditTool(BaseAnthropicTool):
                 )
 
         except Exception as e:
-            if self.display:
+            if self.display is not None:
                 self.display.add_message("user", f"EditTool error: {str(e)}")
             error_data = {
                 "command": command,

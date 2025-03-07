@@ -170,12 +170,29 @@ def set_constant(name, value):
     return True
 
 
-    # Function to set the project directory
 def set_project_dir(project_name: str) -> Path:
-    """Set up project directories for both local and Docker"""
+    """
+    Set up project directories for both local and Docker.
+    This function also creates the project directory if it doesn't already exist.
+    
+    Args:
+        project_name: The name of the project
+        
+    Returns:
+        The Path to the project directory
+    """
     global PROJECT_DIR, DOCKER_PROJECT_DIR, LLM_GEN_CODE_DIR
     PROJECT_DIR = REPO_DIR / project_name
     LLM_GEN_CODE_DIR = TOP_LEVEL_DIR / "llm_gen_code"
+
+    # Create repo directory if it doesn't exist
+    REPO_DIR.mkdir(parents=True, exist_ok=True)
+    
+    # Create the project directory if it doesn't exist
+    PROJECT_DIR.mkdir(parents=True, exist_ok=True)
+    
+    # Create llm_gen_code directory if it doesn't exist
+    LLM_GEN_CODE_DIR.mkdir(parents=True, exist_ok=True)
 
     # Set up Docker project directory - just use the project name, not the full path
     DOCKER_PROJECT_DIR = Path(f"/home/myuser/apps/{project_name}")

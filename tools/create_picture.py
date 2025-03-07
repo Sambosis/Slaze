@@ -23,10 +23,13 @@ class PictureGenerationTool(BaseAnthropicTool):
     description: str = "Creates pictures based on text prompts. This is how you will create pictures that you need for projects."
 
     def __init__(self, display=None):
-        super().__init__(display)
+        super().__init__(input_schema=None, display=display)
+        self.display = display  # Explicitly set self.display
 
     def to_params(self) -> dict:
-        return {
+        ic(f"PictureGenerationTool.to_params called with api_type: {self.api_type}")
+        # Use the format that has worked in the past
+        params = {
             "name": self.name,
             "description": self.description,
             "type": self.api_type,
@@ -58,27 +61,62 @@ class PictureGenerationTool(BaseAnthropicTool):
                 "required": ["command", "prompt"]
             }
         }
+        ic(f"PictureGenerationTool params: {params}")
+        return params
 
     async def generate_picture(self, prompt: str, output_path: str, width: int = None, height: int = None) -> dict:
-        """Generates a picture using the Flux Schnell model"""
+        """
+        Generate a picture using the Flux Schnell model.
+        
+        Args:
+            prompt: The text prompt to generate the image from
+            output_path: The path to save the image to
+            width: Optional width to resize the image to
+            height: Optional height to resize the image to
+            
+        Returns:
+            A dictionary with the result of the operation
+        """
         try:
-            # Convert the output_path to absolute path if it's relative to project path
-            project_dir = get_constant("PROJECT_DIR")
-            docker_project_dir = get_constant("DOCKER_PROJECT_DIR")
-
+            import replicate
+            import base64
+            from PIL import Image
+            from utils.file_logger import log_file_operation
+            from pathlib import Path
+            from config import get_constant
+            
             # Handle path conversion for Docker environment
-            # if docker_project_dir and str(docker_project_dir) in output_path:
-            #     # This is a Docker path, convert to local path for file operations
-            rel_path = Path(output_path).relative_to(docker_project_dir)
-            output_path = project_dir / rel_path
-
-            # Ensure output directory exists
-            output_dir = Path(output_path).parent
-            output_dir.mkdir(parents=True, exist_ok=True)
-
+            project_dir = get_constant('PROJECT_DIR')
+            # Ensure project_dir is a string
+            if isinstance(project_dir, Path):
+                project_dir = str(project_dir)
+                
+            # Try to get docker project dir, but if it doesn't exist, use a default
+            try:
+                docker_project_dir = get_constant('DOCKER_PROJECT_DIR')
+            except:
+                docker_project_dir = '/app'
+                
+            # Ensure docker_project_dir is a string
+            if isinstance(docker_project_dir, Path):
+                docker_project_dir = str(docker_project_dir)
+            
+            # Ensure output_path is a string
+            if isinstance(output_path, Path):
+                output_path = str(output_path)
+                
+            # Ensure output path is absolute
+            if not os.path.isabs(output_path):
+                output_path = os.path.join(project_dir, output_path)
+                
+            # Ensure the output directory exists
+            os.makedirs(os.path.dirname(output_path), exist_ok=True)
+            
+            # Create input data for the model
             input_data = {
                 "prompt": prompt,
-                "aspect_ratio": "1:1",
+                "width": 1024,
+                "height": 1024,
                 "safety_filter_level": "block_only_high"
             }
             # Get the image data from replicate
@@ -98,8 +136,16 @@ class PictureGenerationTool(BaseAnthropicTool):
             with open(output_path, 'wb') as f:
                 f.write(image_data)
 
-            # Log the file creation
-            log_file_operation(Path(output_path), 'create')
+            # Log the file creation with metadata
+            metadata = {
+                "prompt": prompt,
+                "dimensions": f"{width}x{height}" if width and height else "original",
+                "model": "google/imagen-3-fast",
+                "generation_params": input_data
+            }
+            # Convert output_path to Path for logging
+            output_path_obj = Path(output_path)
+            log_file_operation(output_path_obj, "create", metadata=metadata)
 
             # Create base64 for display
             base64_data = base64.b64encode(image_data).decode("utf-8")
@@ -115,58 +161,64 @@ class PictureGenerationTool(BaseAnthropicTool):
                 else:
                     ratio = height / img.height
                     new_size = (int(img.width * ratio), height)
-
-                resized_img = img.resize(new_size, Image.LANCZOS)
-                resized_img.save(output_path)
-
-            # For display purposes, convert back to Docker path if needed
-            display_path = output_path
-            if docker_project_dir and project_dir:
-                # Convert local path to Docker path for display
-                try:
-                    rel_path = Path(output_path).relative_to(project_dir)
-                    display_path = docker_project_dir / rel_path
-                except ValueError:
-                    # Not relative to project_dir, keep as is
-                    pass
-
-            # Display message
-            html_message = (
-                "<div>"
-                "<p>Generated image saved to: {}</p>"
-                f'<img src="data:image/png;base64,{base64_data}" alt="Generated Image" style="max-width:100%;">'
-                "</div>"
-            ).format(display_path)
-
-            if self.display:
-                self.display.add_message("tool", html_message)
-
+                
+                img = img.resize(new_size, Image.LANCZOS)
+                img.save(output_path)
+                
+                # Update metadata with new dimensions
+                metadata["dimensions"] = f"{new_size[0]}x{new_size[1]}"
+                log_file_operation(output_path_obj, "update", metadata=metadata)
+                
+                # Update base64 data
+                with open(output_path, 'rb') as f:
+                    image_data = f.read()
+                base64_data = base64.b64encode(image_data).decode("utf-8")
+            
+            # Convert the local output path to Docker path for display
+            docker_output_path = output_path
+            if output_path.startswith(project_dir):
+                docker_output_path = output_path.replace(project_dir, docker_project_dir)
+            
+            # Create HTML message for display
+            html_message = f"""
+            <div style="text-align: center;">
+                <p>Image generated and saved to: <code>{docker_output_path}</code></p>
+                <img src="data:image/png;base64,{base64_data}" style="max-width: 100%; max-height: 500px;">
+            </div>
+            """
+            
             return {
-                "status": "success",
-                "output_files": [str(display_path)],  # Use display path in output
-                "prompt": prompt
+                "output": f"Image generated successfully and saved to {docker_output_path}",
+                "base64_image": base64_data,
+                "message": html_message
             }
-
         except Exception as e:
-            return {
-                "status": "error",
-                "error": str(e)
-            }
+            import traceback
+            error_message = f"Error generating image: {str(e)}\n{traceback.format_exc()}"
+            return {"error": error_message}
 
     def format_output(self, data: dict) -> str:
-        """Format the output data as a readable string"""
-        output_lines = []
-        output_lines.append(f"Status: {data['status']}")
-
-        if data['status'] == 'success':
-            output_lines.append(f"Prompt: {data['prompt']}")
-            output_lines.append("Generated files:")
-            for file in data['output_files']:
-                output_lines.append(f"  - {file}")
-        else:
-            output_lines.append(f"Error: {data['error']}")
-
-        return "\n".join(output_lines)
+        """
+        Format the output of the tool for display.
+        
+        Args:
+            data: The data returned by the tool
+            
+        Returns:
+            A formatted string for display
+        """
+        if "error" in data and data["error"]:
+            return f"Error: {data['error']}"
+            
+        if "output" in data:
+            return data["output"]
+            
+        # For backward compatibility
+        if "message" in data:
+            return data["message"]
+            
+        # Default case
+        return str(data)
 
     async def __call__(
         self,
@@ -178,23 +230,49 @@ class PictureGenerationTool(BaseAnthropicTool):
         height: int = None,
         **kwargs,
     ) -> ToolResult:
-        """Executes the picture generation command"""
+        """
+        Execute the tool with the given command and parameters.
+        
+        Args:
+            command: The command to execute
+            prompt: The text prompt to generate the image from
+            output_path: The path to save the image to
+            width: Optional width to resize the image to
+            height: Optional height to resize the image to
+            **kwargs: Additional parameters
+            
+        Returns:
+            A ToolResult object with the result of the operation
+        """
         try:
-            if self.display:
-                self.display.add_message("user", f"Creating picture with description:\n{prompt}")
-
-            # No need to create directories here as generate_picture handles it
-
             if command == PictureCommand.CREATE:
-                result_data = await self.generate_picture(prompt, output_path, width, height)
+                result = await self.generate_picture(prompt, output_path, width, height)
+                
+                if "error" in result and result["error"]:
+                    return ToolResult(
+                        error=result["error"],
+                        tool_name=self.name,
+                        command=command
+                    )
+                    
+                return ToolResult(
+                    output=result.get("output", "Image generated successfully"),
+                    base64_image=result.get("base64_image"),
+                    message=result.get("message"),
+                    tool_name=self.name,
+                    command=command
+                )
             else:
-                return ToolResult(error=f"Unknown command: {command}")
-
-            formatted_output = self.format_output(result_data)
-
-            return ToolResult(output=formatted_output)
-
+                return ToolResult(
+                    error=f"Unknown command: {command}",
+                    tool_name=self.name,
+                    command=command
+                )
         except Exception as e:
-            if self.display:
-                self.display.add_message("user", f"PictureGenerationTool error: {str(e)}")
-            return ToolResult(error=f"Failed to execute {command}: {str(e)}")
+            import traceback
+            error_message = f"Error in PictureGenerationTool: {str(e)}\n{traceback.format_exc()}"
+            return ToolResult(
+                error=error_message,
+                tool_name=self.name,
+                command=command
+            )
