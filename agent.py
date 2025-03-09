@@ -19,7 +19,7 @@ from tools import (
     ProjectSetupTool,
     WriteCodeTool,
     PictureGenerationTool,
-    EditTool,
+    DockerEditTool,
     ToolCollection,
     ToolResult
 )
@@ -41,7 +41,7 @@ class Agent:
             ProjectSetupTool(display=self.display),
             BashTool(display=self.display),
             PictureGenerationTool(display=self.display),
-            EditTool(display=self.display),  # Uncommented and enabled
+            DockerEditTool(display=self.display),  # Uncommented and enabled for testing      
             display=self.display
         )
         self.output_manager = OutputManager(self.display)

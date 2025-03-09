@@ -11,6 +11,7 @@ from .windows_navigation import WindowsNavigationTool
 # from .test_navigation_tool import windows_navigate
 from .write_code import WriteCodeTool
 from .create_picture import PictureGenerationTool
+from .docker_edit import DockerEditTool
 __all__ = [
     "BaseAnthropicTool",
     "ToolError",
@@ -26,5 +27,6 @@ __all__ = [
     "WindowsNavigationTool",
     "WriteCodeTool",
     "PictureGenerationTool",
-    # "windows_navigate"
+    # "windows_navigate",
+    "DockerEditTool",
 ]

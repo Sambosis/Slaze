@@ -639,9 +639,6 @@ class WriteCodeTool(BaseAnthropicTool):
             # Convert to string for consistent logging
             file_path_str = str(file_path).replace('\\', '/')
 
-            # Research and generate code
-            if self.display is not None:
-                self.display.add_message("assistant", f"Generating code for: {file_path}")
             code = await self._research_and_generate_code(code_description, file_path)
             
             # Skip if no code was generated
@@ -705,9 +702,6 @@ class WriteCodeTool(BaseAnthropicTool):
     async def _research_and_generate_code(self, code_description: str, file_path: Path) -> str:
         """Research and generate code based on description."""
         try:
-            if self.display is not None:
-                self.display.add_message("assistant", f"Researching code for: {file_path}")
-                
             # Generate code using the LLM
             code = await self._call_llm_to_generate_code(
                 code_description,

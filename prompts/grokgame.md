@@ -1,1 +1,1 @@
-Create a game that is a mixture of two classic games. Make using pygame and make it look pretty.
+Create a game that is a mixture of two classic games. Have it so that the computer is playing the game and that there is no user input besides the user pressing esc key to exit the app.  It should continue playing the game until the user presses the escape key. Make it using pygame and make it look pretty.
