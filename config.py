@@ -195,7 +195,7 @@ def set_project_dir(project_name: str) -> Path:
     LLM_GEN_CODE_DIR.mkdir(parents=True, exist_ok=True)
 
     # Set up Docker project directory - just use the project name, not the full path
-    DOCKER_PROJECT_DIR = Path(f"/home/myuser/apps/{project_name}")
+    DOCKER_PROJECT_DIR =f"/home/myuser/apps/{project_name}"
 
     set_constant("PROJECT_DIR", str(PROJECT_DIR))
     set_constant("DOCKER_PROJECT_DIR", str(DOCKER_PROJECT_DIR))

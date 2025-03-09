@@ -13,49 +13,232 @@ from typing import Dict, List, Optional, Set, Tuple
 import mimetypes
 import base64
 
+try:
+    from config import get_constant
+    # Import the function but don't redefine it
+    try:
+        from config import convert_to_docker_path
+    except ImportError:
+        # Define our own if not available in config
+        def convert_to_docker_path(path: Union[str, Path]) -> str:
+            """
+            Convert a local Windows path to a Docker container path.
+            
+            Args:
+                path: The local path to convert
+                
+            Returns:
+                The Docker container path
+            """
+            if path is None:
+                return ""
+                
+            # Ensure path is a string
+            if isinstance(path, Path):
+                path = str(path)
+                
+            # Replace Windows-style paths with Linux-style for comparison
+            norm_path = path.replace('\\', '/')
+            
+            try:
+                # Get project directory constants
+                project_dir = get_constant('PROJECT_DIR')
+                repo_dir = get_constant('REPO_DIR')
+                
+                # Skip conversion if already in Docker format
+                if norm_path.startswith('/home/myuser/apps/'):
+                    return norm_path
+                    
+                # Ensure project_dir is normalized
+                if isinstance(project_dir, Path):
+                    project_dir = str(project_dir).replace('\\', '/')
+                
+                # First check if path is directly in the repo directory
+                if isinstance(repo_dir, Path):
+                    repo_dir = str(repo_dir).replace('\\', '/')
+                
+                # The correct conversion logic for mapping to Docker paths
+                if project_dir and norm_path.startswith(project_dir):
+                    # Extract just the prompt name (project name) from the project directory
+                    project_name = Path(project_dir).name
+                    
+                    # Get the path relative to the project directory
+                    rel_path = os.path.relpath(norm_path, project_dir)
+                    rel_path = rel_path.replace('\\', '/')
+                    
+                    # Build the Docker path
+                    if rel_path == '.':
+                        return f'/home/myuser/apps/{project_name}'
+                    else:
+                        return f'/home/myuser/apps/{project_name}/{rel_path}'
+                
+                # For files directly in the repo directory
+                elif repo_dir and norm_path.startswith(repo_dir):
+                    # Get path relative to repo dir
+                    rel_path = os.path.relpath(norm_path, repo_dir)
+                    rel_path = rel_path.replace('\\', '/')
+                    
+                    # Extract the prompt name if it's directly under repo
+                    parts = rel_path.split('/', 1)
+                    if len(parts) > 1:
+                        project_name = parts[0]
+                        sub_path = parts[1]
+                        return f'/home/myuser/apps/{project_name}/{sub_path}'
+                    else:
+                        return f'/home/myuser/apps/{rel_path}'
+            except Exception as e:
+                # Log the error but continue
+                print(f"Error in convert_to_docker_path: {e}")
+            
+            # Fallback to simple conversion if the above fails
+            norm_path = path.replace('\\', '/')
+            
+            # Remove Windows drive letter if present
+            if ':' in norm_path:
+                norm_path = norm_path.split(':', 1)[1]
+                
+            # Ensure the path starts with a forward slash
+            if not norm_path.startswith('/'):
+                norm_path = '/' + norm_path
+                
+            # Default docker path prefix - if all else fails
+            if not norm_path.startswith('/home/myuser/apps/'):
+                # Extract the last directory as project name
+                path_parts = norm_path.strip('/').split('/')
+                if len(path_parts) >= 2:
+                    project_name = path_parts[-2]  # Use second-to-last part as project name
+                    file_name = path_parts[-1]     # Use last part as file name
+                    return f'/home/myuser/apps/{project_name}/{file_name}'
+                else:
+                    return f'/home/myuser/apps/{norm_path.strip("/")}'
+            
+            return norm_path
+except ImportError:
+    # Fallback if config module is not available
+    def get_constant(name):
+        # Default values for essential constants
+        defaults = {
+            'PROJECT_DIR': os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            'DOCKER_PROJECT_DIR': '/home/myuser/apps',
+            'LOG_FILE': os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "logs", "file_log.json")
+        }
+        return defaults.get(name)
+        
+    def convert_to_docker_path(path: Union[str, Path]) -> str:
+        """
+        Convert a local Windows path to a Docker container path.
+        
+        Args:
+            path: The local path to convert
+            
+        Returns:
+            The Docker container path
+        """
+        if path is None:
+            return ""
+            
+        # Ensure path is a string
+        if isinstance(path, Path):
+            path = str(path)
+            
+        # Replace Windows-style paths with Linux-style for comparison
+        norm_path = path.replace('\\', '/')
+        
+        try:
+            # Get project directory constants
+            project_dir = get_constant('PROJECT_DIR')
+            repo_dir = get_constant('REPO_DIR')
+            
+            # Skip conversion if already in Docker format
+            if norm_path.startswith('/home/myuser/apps/'):
+                return norm_path
+                
+            # Ensure project_dir is normalized
+            if isinstance(project_dir, Path):
+                project_dir = str(project_dir).replace('\\', '/')
+            
+            # First check if path is directly in the repo directory
+            if isinstance(repo_dir, Path):
+                repo_dir = str(repo_dir).replace('\\', '/')
+            
+            # The correct conversion logic for mapping to Docker paths
+            if project_dir and norm_path.startswith(project_dir):
+                # Extract just the prompt name (project name) from the project directory
+                project_name = Path(project_dir).name
+                
+                # Get the path relative to the project directory
+                rel_path = os.path.relpath(norm_path, project_dir)
+                rel_path = rel_path.replace('\\', '/')
+                
+                # Build the Docker path
+                if rel_path == '.':
+                    return f'/home/myuser/apps/{project_name}'
+                else:
+                    return f'/home/myuser/apps/{project_name}/{rel_path}'
+            
+            # For files directly in the repo directory
+            elif repo_dir and norm_path.startswith(repo_dir):
+                # Get path relative to repo dir
+                rel_path = os.path.relpath(norm_path, repo_dir)
+                rel_path = rel_path.replace('\\', '/')
+                
+                # Extract the prompt name if it's directly under repo
+                parts = rel_path.split('/', 1)
+                if len(parts) > 1:
+                    project_name = parts[0]
+                    sub_path = parts[1]
+                    return f'/home/myuser/apps/{project_name}/{sub_path}'
+                else:
+                    return f'/home/myuser/apps/{rel_path}'
+        except Exception as e:
+            # Log the error but continue
+            print(f"Error in convert_to_docker_path: {e}")
+        
+        # Fallback to simple conversion if the above fails
+        norm_path = path.replace('\\', '/')
+        
+        # Remove Windows drive letter if present
+        if ':' in norm_path:
+            norm_path = norm_path.split(':', 1)[1]
+            
+        # Ensure the path starts with a forward slash
+        if not norm_path.startswith('/'):
+            norm_path = '/' + norm_path
+            
+        # Default docker path prefix - if all else fails
+        if not norm_path.startswith('/home/myuser/apps/'):
+            # Extract the last directory as project name
+            path_parts = norm_path.strip('/').split('/')
+            if len(path_parts) >= 2:
+                project_name = path_parts[-2]  # Use second-to-last part as project name
+                file_name = path_parts[-1]     # Use last part as file name
+                return f'/home/myuser/apps/{project_name}/{file_name}'
+            else:
+                return f'/home/myuser/apps/{norm_path.strip("/")}'
+        
+        return norm_path
+
+# File for logging operations
+try:
+    LOG_FILE = get_constant('LOG_FILE')
+except:
+    LOG_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "logs", "file_log.json")
+
+# In-memory tracking of file operations
+FILE_OPERATIONS = {}
+
+# Ensure log directory exists
+os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
+
+# If log file doesn't exist, create an empty one
+if not os.path.exists(LOG_FILE):
+    with open(LOG_FILE, 'w') as f:
+        json.dump({"files": {}}, f)
+
 # Track file operations
 file_operations = []
 tracked_files = set()
 file_contents = {}
-
-def convert_to_docker_path(path: Union[str, Path]) -> str:
-    """
-    Convert a host system path to a Docker container path.
-    
-    Args:
-        path: The host system path
-        
-    Returns:
-        The equivalent path in the Docker container
-    """
-    # Convert path to string if it's a Path object
-    if isinstance(path, Path):
-        path = str(path)
-        
-    # Get project directory constants
-    try:
-        project_dir = get_constant('PROJECT_DIR')
-        # Ensure project_dir is a string
-        if isinstance(project_dir, Path):
-            project_dir = str(project_dir)
-            
-        # Try to get docker project dir, but if it doesn't exist, use a default
-        try:
-            docker_project_dir = get_constant('DOCKER_PROJECT_DIR')
-        except:
-            docker_project_dir = '/app'
-            
-        # Ensure docker_project_dir is a string
-        if isinstance(docker_project_dir, Path):
-            docker_project_dir = str(docker_project_dir)
-    except:
-        # If constants aren't available, return the original path
-        return path
-        
-    # Convert the path if it starts with the project directory
-    if path.startswith(project_dir):
-        return path.replace(project_dir, docker_project_dir)
-    return path
 
 def log_file_operation(file_path: Path, operation: str, content: str = None, metadata: dict = None):
     """
@@ -67,150 +250,144 @@ def log_file_operation(file_path: Path, operation: str, content: str = None, met
         content: Optional content for the file
         metadata: Optional dictionary containing additional metadata (e.g., image generation prompt)
     """
+    # Defensively initialize metadata to prevent NoneType errors
+    if metadata is None:
+        metadata = {}
+    
     # Ensure file_path is a Path object
     if not isinstance(file_path, Path):
         file_path = Path(file_path)
         
+    # Create a string representation of the file path for consistent logging
+    file_path_str = str(file_path)
+    
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     extension = file_path.suffix.lower() if file_path.suffix else ""
     
     # Determine if the file is an image
     is_image = extension in ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.bmp']
-    mime_type = mimetypes.guess_type(str(file_path))[0]
+    mime_type = mimetypes.guess_type(file_path_str)[0]
     if mime_type and mime_type.startswith('image/'):
         is_image = True
     
-    # Convert file_path to string for storage
-    file_path_str = str(file_path)
-    
-    # Get Docker path
-    docker_path = convert_to_docker_path(file_path)
-    
-    # Create operation data for in-memory tracking
-    operation_data = {
-        'path': file_path_str,
-        'docker_path': docker_path,
-        'operation': operation,
-        'timestamp': timestamp,
-        'is_image': is_image,
-        'metadata': metadata or {}
-    }
-    
-    # Update in-memory tracking
-    if operation in ['create', 'update'] and content is not None:
-        file_contents[file_path_str] = content
-    elif operation == 'delete' and file_path_str in file_contents:
-        del file_contents[file_path_str]
-    
-    file_operations.append(operation_data)
-    tracked_files.add(file_path_str)
-    
-    # Now update the log file
-    LOG_FILE = Path(get_constant('LOG_FILE'))
-    log_data = {}
-    
-    # Create directory if it doesn't exist
-    LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
-    
-    # Read existing log if it exists
-    if LOG_FILE.exists():
-        try:
-            with open(LOG_FILE, 'r', encoding='utf-8') as f:
-                log_content = f.read()
-                if log_content:
-                    log_data = json.loads(log_content)
-        except (json.JSONDecodeError, FileNotFoundError) as e:
-            print(f"Error reading log file: {e}")
-            log_data = {}
-    
-    # Create or update file entry in log
-    if file_path_str not in log_data:
-        log_data[file_path_str] = {
-            "created_at": timestamp,
+    # Track file operations in memory
+    if file_path_str not in FILE_OPERATIONS:
+        FILE_OPERATIONS[file_path_str] = {
             "operations": [],
-            "docker_path": docker_path,
-            "file_type": "image" if is_image else "code" if extension in ['.py', '.js', '.html', '.css', '.ts', '.jsx', '.tsx', '.java', '.cpp', '.c', '.h', '.cs'] else "text" if extension in ['.json', '.md', '.yaml', '.yml', '.toml', '.ini', '.config', '.txt', '.csv'] else "other"
+            "last_updated": timestamp,
+            "extension": extension,
+            "is_image": is_image,
+            "mime_type": mime_type
         }
     
-    # Add this operation
-    log_data[file_path_str]["operations"].append({
-        "operation": operation,
-        "timestamp": timestamp
+    # Update the in-memory tracking
+    FILE_OPERATIONS[file_path_str]["operations"].append({
+        "timestamp": timestamp,
+        "operation": operation
+    })
+    FILE_OPERATIONS[file_path_str]["last_updated"] = timestamp
+    
+    # Load existing log data or create a new one
+    log_data = {
+        "files": {}
+    }
+    
+    if os.path.exists(LOG_FILE):
+        try:
+            with open(LOG_FILE, 'r') as f:
+                log_data = json.load(f)
+        except json.JSONDecodeError:
+            # If the log file is corrupted, start fresh
+            log_data = {"files": {}}
+    
+    # Create or update the file entry in the log
+    if file_path_str not in log_data["files"]:
+        log_data["files"][file_path_str] = {
+            "operations": [],
+            "metadata": {},
+            "content": None,
+            "extension": extension,
+            "is_image": is_image,
+            "mime_type": mime_type,
+            "last_updated": timestamp
+        }
+    
+    # Add the operation to the log
+    log_data["files"][file_path_str]["operations"].append({
+        "timestamp": timestamp,
+        "operation": operation
     })
     
-    # Handle different file types
-    if operation in ['create', 'update']:
-        try:
-            # If content is not provided but the file exists, read it directly from the file
-            # Don't use the log file content as the file content
-            file_content = content
-            if file_content is None and file_path.exists() and file_path.is_file():
-                try:
-                    if file_path.suffix.lower() in ['.png', '.jpg', '.jpeg', '.gif', '.bmp']:
-                        with open(file_path, 'rb') as f:
-                            content = base64.b64encode(f.read()).decode('utf-8')
-                            metadata['content'] = content
-                    elif file_path.suffix in ['.py', '.js', '.html', '.css', '.json', '.md']:
-                        with open(file_path, 'r', encoding='utf-8') as f:
-                            content = f.read()
-                            metadata['content'] = content
-                    else:
-                        with open(file_path, 'rb') as f:
-                            content = base64.b64encode(f.read()).decode('utf-8')
-                            metadata['content'] = content
-                except Exception as read_error:
-                    print(f"Error reading file content: {read_error}")
-                    file_content = None
+    # Update the metadata if provided
+    if metadata:
+        # Ensure we have a metadata dictionary
+        if "metadata" not in log_data["files"][file_path_str]:
+            log_data["files"][file_path_str]["metadata"] = {}
             
-            if file_content is not None:
-                # Store content based on file type
-                if is_image:
-                    # For images, store metadata and path
-                    log_data[file_path_str]["image_metadata"] = {
-                        "path": docker_path,
-                        "prompt": metadata.get("prompt", "No prompt available") if metadata else "No prompt available",
-                        "dimensions": metadata.get("dimensions", "Unknown") if metadata else "Unknown",
-                        "created_at": timestamp
-                    }
-                elif extension in ['.py', '.js', '.html', '.css', '.ts', '.jsx', '.tsx', '.java', '.cpp', '.c', '.h', '.cs']:
-                    # For code files, store both content and skeleton
-                    log_data[file_path_str]["content"] = file_content
-                    if extension == '.py':
-                        try:
-                            skeleton = extract_code_skeleton(file_content)
-                            log_data[file_path_str]["skeleton"] = skeleton
-                        except Exception as e:
-                            log_data[file_path_str]["skeleton_error"] = str(e)
-                elif extension in ['.json', '.md', '.yaml', '.yml', '.toml', '.ini', '.config', '.txt', '.csv']:
-                    # For text files, store full content
-                    log_data[file_path_str]["content"] = file_content
-                else:
-                    # For other files, just store basic info
-                    log_data[file_path_str]["basic_info"] = {
-                        "path": docker_path,
-                        "extension": extension,
-                        "mime_type": mime_type,
-                        "size": os.path.getsize(file_path) if os.path.exists(file_path) else 0
-                    }
-        except Exception as e:
-            log_data[file_path_str]["read_error"] = str(e)
+        # Update with new metadata
+        log_data["files"][file_path_str]["metadata"].update(metadata)
     
-    # Write updated log back to file - make sure we write valid JSON
+    # Store the content if provided, otherwise try to read it from the file
+    file_content = content
+    
     try:
-        with open(LOG_FILE, 'w', encoding='utf-8') as f:
+        # Only try to read the file if it exists and content wasn't provided
+        if file_content is None and file_path.exists() and file_path.is_file():
+            try:
+                # Handle different file types appropriately
+                if is_image:
+                    # For images, store base64 encoded content
+                    with open(file_path, 'rb') as f:
+                        img_content = f.read()
+                        log_data["files"][file_path_str]["content"] = base64.b64encode(img_content).decode('utf-8')
+                        # Add file size to metadata
+                        if "metadata" not in log_data["files"][file_path_str]:
+                            log_data["files"][file_path_str]["metadata"] = {}
+                        log_data["files"][file_path_str]["metadata"]["size"] = len(img_content)
+                
+                elif extension in ['.py', '.js', '.html', '.css', '.json', '.md']:
+                    # For code and text files, store as text
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        text_content = f.read()
+                        log_data["files"][file_path_str]["content"] = text_content
+                
+                else:
+                    # For other binary files, store base64 encoded
+                    with open(file_path, 'rb') as f:
+                        bin_content = f.read()
+                        log_data["files"][file_path_str]["content"] = base64.b64encode(bin_content).decode('utf-8')
+                        # Add file size to metadata
+                        if "metadata" not in log_data["files"][file_path_str]:
+                            log_data["files"][file_path_str]["metadata"] = {}
+                        log_data["files"][file_path_str]["metadata"]["size"] = len(bin_content)
+            
+            except Exception as read_error:
+                print(f"Error reading file content: {read_error}")
+                # Don't fail the entire operation, just log the error
+                if "metadata" not in log_data["files"][file_path_str]:
+                    log_data["files"][file_path_str]["metadata"] = {}
+                log_data["files"][file_path_str]["metadata"]["read_error"] = str(read_error)
+        
+        elif file_content is not None:
+            # Use the provided content
+            log_data["files"][file_path_str]["content"] = file_content
+    
+    except Exception as e:
+        print(f"Error processing file content: {e}")
+        # Don't fail the entire operation, just log the error
+        if "metadata" not in log_data["files"][file_path_str]:
+            log_data["files"][file_path_str]["metadata"] = {}
+        log_data["files"][file_path_str]["metadata"]["processing_error"] = str(e)
+    
+    # Update last_updated timestamp
+    log_data["files"][file_path_str]["last_updated"] = timestamp
+    
+    # Write the updated log data back to the log file
+    try:
+        with open(LOG_FILE, 'w') as f:
             json.dump(log_data, f, indent=2)
     except Exception as write_error:
         print(f"Error writing to log file: {write_error}")
-        # Try writing a simplified version if the full version fails
-        try:
-            # Create a minimal log entry to avoid circular references
-            minimal_log = {file_path_str: {"operation": operation, "timestamp": timestamp}}
-            with open(LOG_FILE, 'w', encoding='utf-8') as f:
-                json.dump(minimal_log, f)
-        except:
-            # If all else fails, try to reset the log file
-            with open(LOG_FILE, 'w', encoding='utf-8') as f:
-                f.write("{}")
 
 def aggregate_file_states() -> str:
     """
@@ -303,19 +480,7 @@ def aggregate_file_states() -> str:
             
             # Add syntax highlighting based on file extension
             extension = Path(code['path']).suffix.lower()
-            lang = ""
-            if extension == '.py':
-                lang = "python"
-            elif extension in ['.js', '.jsx']:
-                lang = "javascript"
-            elif extension in ['.ts', '.tsx']:
-                lang = "typescript"
-            elif extension == '.html':
-                lang = "html"
-            elif extension == '.css':
-                lang = "css"
-            elif extension in ['.java', '.cpp', '.c', '.cs']:
-                lang = "java" if extension == '.java' else "cpp" if extension in ['.cpp', '.c'] else "csharp"
+            lang = get_language_from_extension(extension)
             
             output.append(f"- **Structure**:")
             output.append(f"```{lang}")
@@ -336,15 +501,7 @@ def aggregate_file_states() -> str:
             
             # Add syntax highlighting based on file extension
             extension = Path(text['path']).suffix.lower()
-            lang = ""
-            if extension == '.json':
-                lang = "json"
-            elif extension == '.md':
-                lang = "markdown"
-            elif extension in ['.yaml', '.yml']:
-                lang = "yaml"
-            elif extension == '.toml':
-                lang = "toml"
+            lang = get_language_from_extension(extension)
             
             output.append(f"- **Content**:")
             output.append(f"```{lang}")
@@ -411,73 +568,148 @@ def list_images_created() -> str:
 
 def extract_files_content() -> str:
     """
-    Extract the content of all tracked files.
+    Extract structured file contents for use in prompts.
+    This function reads the log file and extracts the file contents in a structured way.
     
     Returns:
-        A formatted string with the content of all files.
+        A markdown-formatted string of file contents
     """
-    LOG_FILE = Path(get_constant('LOG_FILE'))
-    if not LOG_FILE.exists():
-        return "No files have been tracked yet."
-    
+    output = []
     try:
-        with open(LOG_FILE, 'r', encoding='utf-8') as f:
-            log_data = json.loads(f.read())
-    except (json.JSONDecodeError, FileNotFoundError):
-        return "Error reading log file."
-    
-    if not log_data:
-        return "No files have been tracked yet."
-    
-    output = ["# File Contents"]
-    
-    for file_path, file_info in log_data.items():
-        # Skip image files
-        if file_info.get("file_type") == "image":
-            continue
+        # Ensure log file exists and has valid structure
+        if not os.path.exists(LOG_FILE):
+            print(f"Log file not found: {LOG_FILE}")
+            # Initialize a new log file so future operations work
+            with open(LOG_FILE, 'w') as f:
+                json.dump({"files": {}}, f)
+            return "No files have been created yet."
             
-        # Get the Docker path for display
-        docker_path = file_info.get("docker_path", convert_to_docker_path(file_path))
-        
-        # Get content if available
-        content = file_info.get("content", "")
-        if not content:
-            continue
+        # Read log file with robust error handling
+        try:
+            with open(LOG_FILE, 'r', encoding='utf-8') as f:
+                log_data = json.load(f)
+        except json.JSONDecodeError:
+            print(f"Log file exists but contains invalid JSON: {LOG_FILE}")
+            # Reset the log file with valid JSON
+            with open(LOG_FILE, 'w') as f:
+                json.dump({"files": {}}, f)
+            return "Error reading log file. Log file has been reset."
+        except Exception as e:
+            print(f"Unexpected error reading log file: {e}")
+            return f"Error reading log file: {str(e)}"
             
-        # Add file header
-        output.append(f"## {docker_path}")
+        # Validate log structure
+        if not isinstance(log_data, dict) or "files" not in log_data:
+            print("Log file has invalid format (missing 'files' key)")
+            # Fix the format
+            log_data = {"files": {}}
+            with open(LOG_FILE, 'w') as f:
+                json.dump(log_data, f)
+            return "Error reading log file. Log file has been reset with correct structure."
+            
+        # If there are no files, return early
+        if not log_data.get("files"):
+            return "No files have been created yet."
+            
+        # Group files by type for better organization
+        code_files = []
+        text_files = []
+        other_files = []
         
-        # Add syntax highlighting based on file extension
-        extension = Path(docker_path).suffix.lower()
-        lang = ""
-        if extension == '.py':
-            lang = "python"
-        elif extension in ['.js', '.jsx']:
-            lang = "javascript"
-        elif extension in ['.ts', '.tsx']:
-            lang = "typescript"
-        elif extension == '.html':
-            lang = "html"
-        elif extension == '.css':
-            lang = "css"
-        elif extension == '.json':
-            lang = "json"
-        elif extension == '.md':
-            lang = "markdown"
-        elif extension in ['.yaml', '.yml']:
-            lang = "yaml"
-        elif extension == '.toml':
-            lang = "toml"
-        elif extension in ['.java', '.cpp', '.c', '.cs']:
-            lang = "java" if extension == '.java' else "cpp" if extension in ['.cpp', '.c'] else "csharp"
+        # Process each file in the log
+        for file_path, file_data in log_data.get("files", {}).items():
+            try:
+                # Skip files that have been deleted (last operation is 'delete')
+                operations = file_data.get("operations", [])
+                if operations and operations[-1].get("operation") == "delete":
+                    continue
+                    
+                # Get content and metadata
+                content = file_data.get("content")
+                if content is None:
+                    continue
+                    
+                extension = file_data.get("extension", "").lower()
+                is_image = file_data.get("is_image", False)
+                mime_type = file_data.get("mime_type", "")
+                
+                # Skip images for code context
+                if is_image or (mime_type and mime_type.startswith("image/")):
+                    continue
+                    
+                # Categorize file by type
+                if extension in ['.py', '.js', '.html', '.css', '.ts', '.jsx', '.tsx', '.java', '.cpp', '.c', '.h', '.cs']:
+                    code_files.append({
+                        "path": file_path,
+                        "content": content,
+                        "operation": operations[-1].get("operation") if operations else "unknown",
+                        "extension": extension
+                    })
+                elif extension in ['.json', '.md', '.yaml', '.yml', '.toml', '.ini', '.config', '.txt', '.csv']:
+                    text_files.append({
+                        "path": file_path,
+                        "content": content,
+                        "operation": operations[-1].get("operation") if operations else "unknown",
+                        "extension": extension
+                    })
+                else:
+                    # Skip binary files for code context
+                    file_size = len(content) if isinstance(content, str) else 0
+                    other_files.append({
+                        "path": file_path,
+                        "operation": operations[-1].get("operation") if operations else "unknown",
+                        "extension": extension,
+                        "mime_type": mime_type,
+                        "size": file_size
+                    })
+            except Exception as file_error:
+                print(f"Error processing file {file_path}: {file_error}")
+                # Continue to next file rather than failing entirely
+                
+        # Format the output
+        output.append("# All Code Files")
         
-        # Add content with syntax highlighting
-        output.append(f"```{lang}")
-        output.append(content)
-        output.append("```")
-        output.append("")
-    
-    return "\n".join(output)
+        if code_files:
+            for code in code_files:
+                try:
+                    output.append(f"## {code['path']}")
+                    output.append(f"```{get_language_from_extension(code['extension'])}")
+                    output.append(code['content'])
+                    output.append("```")
+                    output.append("")  # Empty line for readability
+                except Exception as format_error:
+                    print(f"Error formatting code file {code.get('path')}: {format_error}")
+                    # Add a simpler version without failing
+                    output.append(f"## {code.get('path', 'Unknown file')}")
+                    output.append("```")
+                    output.append("Error displaying file content")
+                    output.append("```")
+                    output.append("")
+        else:
+            output.append("No code files have been created yet.")
+            
+        if text_files:
+            output.append("# Text Files")
+            for text in text_files:
+                try:
+                    output.append(f"## {text['path']}")
+                    output.append(f"```{get_language_from_extension(text['extension'])}")
+                    output.append(text['content'])
+                    output.append("```")
+                    output.append("")
+                except Exception as format_error:
+                    print(f"Error formatting text file {text.get('path')}: {format_error}")
+                    output.append(f"## {text.get('path', 'Unknown file')}")
+                    output.append("```")
+                    output.append("Error displaying file content")
+                    output.append("```")
+                    output.append("")
+                    
+        return "\n".join(output)
+        
+    except Exception as e:
+        print(f"Critical error in extract_files_content: {e}")
+        return "Error reading log file. Please check application logs for details."
 
 def extract_code_skeleton(source_code: Union[str, Path]) -> str:
     """
@@ -734,65 +966,107 @@ def extract_code_skeleton(source_code: Union[str, Path]) -> str:
 
 def get_all_current_code() -> str:
     """
-    Get the content of all code files.
+    Returns all the current code in the project as a string.
+    This function is used to provide context about the existing code to the LLM.
     
     Returns:
-        A formatted string with the content of all code files.
+        A string with all the current code.
     """
-    LOG_FILE = Path(get_constant('LOG_FILE'))
-    if not LOG_FILE.exists():
-        return "No code files have been tracked yet."
-    
     try:
-        with open(LOG_FILE, 'r', encoding='utf-8') as f:
-            log_data = json.loads(f.read())
-    except (json.JSONDecodeError, FileNotFoundError):
-        return "Error reading log file."
-    
-    if not log_data:
-        return "No code files have been tracked yet."
-    
-    output = ["# All Code Files"]
-    
-    for file_path, file_info in log_data.items():
-        # Only include code files
-        if file_info.get("file_type") != "code":
-            continue
+        # Ensure log file exists
+        if not os.path.exists(LOG_FILE):
+            print(f"Log file not found: {LOG_FILE}")
+            # Initialize a new log file so future operations work
+            with open(LOG_FILE, 'w') as f:
+                json.dump({"files": {}}, f)
+            return "No code has been written yet."
             
-        # Get the Docker path for display
-        docker_path = file_info.get("docker_path", convert_to_docker_path(file_path))
-        
-        # Get content if available
-        content = file_info.get("content", "")
-        if not content:
-            continue
+        # Load log data with robust error handling
+        try:
+            with open(LOG_FILE, 'r', encoding='utf-8') as f:
+                log_data = json.load(f)
+        except json.JSONDecodeError:
+            print(f"Log file exists but contains invalid JSON: {LOG_FILE}")
+            # Reset the log file with valid JSON
+            with open(LOG_FILE, 'w') as f:
+                json.dump({"files": {}}, f)
+            return "Error reading log file. Log file has been reset."
+        except Exception as e:
+            print(f"Unexpected error reading log file: {e}")
+            return f"Error reading log file: {str(e)}"
             
-        # Add file header
-        output.append(f"## {docker_path}")
+        # Validate log structure
+        if not isinstance(log_data, dict) or "files" not in log_data:
+            print("Log file has invalid format (missing 'files' key)")
+            # Fix the format
+            log_data = {"files": {}}
+            with open(LOG_FILE, 'w') as f:
+                json.dump(log_data, f)
+            return "Error reading log file. Log file has been reset with correct structure."
+            
+        output = []
+        code_files = []
+
+        # Process each file in the log
+        for file_path, file_data in log_data.get("files", {}).items():
+            try:
+                # Skip files that have been deleted (last operation is 'delete')
+                operations = file_data.get("operations", [])
+                if operations and operations[-1].get("operation") == "delete":
+                    continue
+                
+                # Get content and metadata
+                content = file_data.get("content")
+                if content is None:
+                    continue
+                
+                # Skip images and binary files
+                is_image = file_data.get("is_image", False)
+                mime_type = file_data.get("mime_type", "")
+                extension = file_data.get("extension", "").lower()
+                
+                if is_image or (mime_type and mime_type.startswith("image/")):
+                    continue
+                    
+                # Only include code files
+                if extension in ['.py', '.js', '.html', '.css', '.ts', '.jsx', '.tsx', '.java', '.cpp', '.c', '.h', '.cs']:
+                    code_files.append({
+                        "path": file_path,
+                        "content": content,
+                        "extension": extension
+                    })
+            except Exception as file_error:
+                print(f"Error processing file {file_path}: {file_error}")
+                # Continue processing other files
         
-        # Add syntax highlighting based on file extension
-        extension = Path(docker_path).suffix.lower()
-        lang = ""
-        if extension == '.py':
-            lang = "python"
-        elif extension in ['.js', '.jsx']:
-            lang = "javascript"
-        elif extension in ['.ts', '.tsx']:
-            lang = "typescript"
-        elif extension == '.html':
-            lang = "html"
-        elif extension == '.css':
-            lang = "css"
-        elif extension in ['.java', '.cpp', '.c', '.cs']:
-            lang = "java" if extension == '.java' else "cpp" if extension in ['.cpp', '.c'] else "csharp"
+        # Sort files by path for consistent output
+        code_files.sort(key=lambda x: x["path"])
         
-        # Add content with syntax highlighting
-        output.append(f"```{lang}")
-        output.append(content)
-        output.append("```")
-        output.append("")
-    
-    return "\n".join(output)
+        # Format the output
+        output.append("# Code\n")
+        
+        if code_files:
+            for code in code_files:
+                try:
+                    output.append(f"## {code['path']}")
+                    lang = get_language_from_extension(code['extension'])
+                    output.append(f"```{lang}")
+                    output.append(code['content'])
+                    output.append("```\n")
+                except Exception as format_error:
+                    print(f"Error formatting code file {code.get('path')}: {format_error}")
+                    # Add a simpler version without failing
+                    output.append(f"## {code.get('path', 'Unknown file')}")
+                    output.append("```")
+                    output.append("Error displaying file content")
+                    output.append("```\n")
+        else:
+            output.append("No code files have been created yet.\n")
+            return "\n".join(output)
+
+    except Exception as e:
+        print(f"Critical error in get_all_current_code: {e}")
+        return "Error reading code files. Please check application logs for details."
 
 def get_all_current_skeleton() -> str:
     """
@@ -819,8 +1093,8 @@ def get_all_current_skeleton() -> str:
     for file_path, file_info in log_data.items():
         # Only include Python files
         if file_info.get("file_type") != "code" or not file_path.endswith('.py'):
-            continue
-            
+                continue
+
         # Get the Docker path for display
         docker_path = file_info.get("docker_path", convert_to_docker_path(file_path))
         
@@ -838,4 +1112,110 @@ def get_all_current_skeleton() -> str:
         output.append("```")
         output.append("")
     
-    return "\n".join(output)
+        return "\n".join(output)
+
+def get_language_from_extension(extension: str) -> str:
+    """
+    Map file extensions to programming languages for syntax highlighting.
+
+    Args:
+        extension: The file extension (e.g., '.py', '.js')
+
+    Returns:
+        The corresponding language name for syntax highlighting.
+    """
+    extension = extension.lower()
+    mapping = {
+        '.py': 'python',
+        '.js': 'javascript',
+        '.jsx': 'javascript',
+        '.ts': 'typescript',
+        '.tsx': 'typescript',
+        '.html': 'html',
+        '.css': 'css',
+        '.json': 'json',
+        '.md': 'markdown',
+        '.yaml': 'yaml',
+        '.yml': 'yaml',
+        '.toml': 'toml',
+        '.java': 'java',
+        '.cpp': 'cpp',
+        '.c': 'c',
+        '.cs': 'csharp',
+        '.sh': 'bash',
+        '.rb': 'ruby',
+        '.go': 'go',
+        '.php': 'php',
+        '.rs': 'rust',
+        '.swift': 'swift',
+        '.kt': 'kotlin',
+        '.sql': 'sql'
+    }
+    return mapping.get(extension, '')
+
+def test_file_logging():
+    """Test function to verify file logging functionality."""
+    print("Testing file logging functionality...")
+    
+    # Create a test file
+    test_path = Path(__file__).parent.parent / "test_logging.txt"
+    
+    try:
+        # Create the file directly
+        with open(test_path, 'w') as f:
+            f.write("Test content")
+        print(f"Successfully created test file at {test_path}")
+        
+        # Log the file operation
+        try:
+            log_file_operation(
+                file_path=test_path,
+                operation="create",
+                content="Test content",
+                metadata={"test": "metadata"}
+            )
+            print("Successfully logged file operation")
+        except Exception as e:
+            print(f"Error logging file operation: {e}")
+            
+        # Verify log file was updated
+        if os.path.exists(LOG_FILE):
+            with open(LOG_FILE, 'r') as f:
+                log_data = json.load(f)
+                print(f"Log file content: {json.dumps(log_data, indent=2)}")
+        else:
+            print(f"Log file not found at {LOG_FILE}")
+            
+    except Exception as e:
+        print(f"Error in test: {e}")
+    
+    return "Test completed"
+
+# Uncomment to run test when module is imported
+# print(test_file_logging())
+
+def should_skip_for_zip(path):
+    """
+    Determine if a file or directory should be skipped when creating a ZIP file.
+    
+    Args:
+        path: Path to check
+        
+    Returns:
+        bool: True if the path should be skipped, False otherwise
+    """
+    path_str = str(path).lower()
+    
+    # Skip virtual environment files and directories
+    if '.venv' in path_str:
+        # On Windows, particularly skip Linux-style virtual env paths
+        if os.name == 'nt' and ('bin/' in path_str or 'lib/' in path_str):
+            return True
+    
+    # Skip common directories not needed in the ZIP
+    dirs_to_skip = [
+        '__pycache__', '.git', '.idea', '.vscode', 
+        'node_modules', '.pytest_cache'
+    ]
+    
+    return any(skip_dir in path_str for skip_dir in dirs_to_skip)

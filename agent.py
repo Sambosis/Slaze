@@ -34,8 +34,8 @@ class Agent:
         self.task = task
         self.display = display
         self.context_recently_refreshed = False
-        self.refresh_count = 28
-        self.refresh_increment = 6 # the number to increase the refresh count by
+        self.refresh_count = 50
+        self.refresh_increment = 10 # the number to increase the refresh count by
         self.tool_collection = ToolCollection(
             WriteCodeTool(display=self.display),
             ProjectSetupTool(display=self.display),
@@ -52,6 +52,9 @@ class Agent:
         self.betas = [COMPUTER_USE_BETA_FLAG, PROMPT_CACHING_BETA_FLAG]
         self.image_truncation_threshold = 1
         self.only_n_most_recent_images = 2
+            # Add detailed logging of tool params
+        self.tool_params = self.tool_collection.to_params()
+
 
     def log_tool_results(self, combined_content, tool_name, tool_input):
         """
@@ -235,12 +238,7 @@ class Agent:
         if self.only_n_most_recent_images:
             self._maybe_filter_to_n_most_recent_images()
         try:
-            # Add detailed logging of tool params
-            tool_params = self.tool_collection.to_params()
-            ic("---- TOOL PARAMS SENT TO LLM ----")
-            ic(tool_params)
-            ic("---- END TOOL PARAMS ----")
-            
+
             truncated_messages = [
                 {"role": msg["role"], "content": truncate_message_content(msg["content"])}
                 for msg in messages
@@ -256,7 +254,7 @@ class Agent:
                     "max_tokens": MAX_SUMMARY_TOKENS,
                     "model": MAIN_MODEL,
                     "tool_choice": {"type": "auto"},
-                    "tools_count": len(tool_params),
+                    "tools_count": len(self.tool_params),
                     "betas": self.betas,
                 })
                 response = self.client.beta.messages.create(
@@ -265,7 +263,7 @@ class Agent:
                     model=MAIN_MODEL,
                     tool_choice={"type": "auto"},
                     system=system,
-                    tools=tool_params,
+                    tools=self.tool_params,
                     betas=self.betas,
                 )
                 ic("---- LLM RESPONSE SUCCESS ----")
@@ -328,7 +326,7 @@ class Agent:
                 self.display.add_message("assistant", f"Error generating summary: {str(summary_error)}")
                 quick_summary = "Summary generation failed."
 
-            self.display.add_message("user", f"{self.refresh_count+2 - len(messages)} More Messages Until Context Refresh: Currently {len(messages)} of {self.refresh_count}")
+            # self.display.add_message("user", f"{self.refresh_count+2 - len(messages)} More Messages Until Context Refresh: Currently {len(messages)} of {self.refresh_count}")
 
             # Rest of the method remains the same
             if (not tool_result_content) and (not self.context_recently_refreshed):
@@ -376,7 +374,7 @@ class Agent:
             ic(f"Error in sampling loop: {str(e).encode('ascii', errors='replace').decode('ascii')}")
             ic(f"The error occurred at the following message: {messages[-1] if messages else 'No messages'} and line: {e.__traceback__.tb_lineno}")
             ic(e.__traceback__.tb_frame.f_locals)
-            self.display.add_message("user", ("Error", str(e)))
+            self.display.add_message("assistant", ("Error", str(e)))
             # Try to recover by refreshing context
             try:
                 last_messages = messages[-3:] if len(messages) >= 3 else messages

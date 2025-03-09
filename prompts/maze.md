@@ -1,0 +1,1 @@
+create a maze app in pygame.  it should dynamically create a new maze each time.  There should be no user input besides hitting esc to quit the app.  The computer itself will try to navigate a character through the app.   Make the app look good visually and just have it create a new maze each time the computer finds it's way to the end and start over. 

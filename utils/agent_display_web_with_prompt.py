@@ -60,8 +60,8 @@ class AgentDisplayWebWithPrompt(AgentDisplayWeb):
                         api_key=OPENROUTER_API_KEY,
                         )
                     model = "anthropic/claude-3.7-sonnet:beta"
-                    prompt = f"""First, restate the problem in more detail.  At this stage if there are any decisons that were left for the developer, you should make the choices needed and include them in your restated description of the promlem. 
-                    After you have restated the expanded description. You will provide a file tree for the program.  Use src file format to structure the project files. You will use absolute imports.  Do not create any non code files such as pyproject, gitignore, readme, etc.. You will need to attempt to list every file that will be needed and be thorough. This is all code files that will need to be created,  all asset files etc. For each file, in additon to the path and filename, you should give a brief statement about the purpose of the file and explicitly give the correct way to import the file using absolut imports. Do not actually create any of the code for the project. Just the expanded description and the file tree with the extra info included. The structure should focus on simplicity and reduced subdirectories and files.
+                    prompt = f"""Do what would make sense as far as creating the final task definition.  If the user asks a simple non coding question you may simpley just repeat the task.  If it something unexpected then use your judgement to create a task definition that would work for the circumstance.  If it sounds like a programming project follow these instruction. First, restate the problem in more detail.  At this stage if there are any decisons that were left for the developer, you should make the choices needed and include them in your restated description of the promlem. 
+                    After you have restated the expanded description. You will provide a file tree for the program.  In general, lean towards creating less files and folders while still keeping things organized and manageable. You will use absolute imports.  Do not create any non code files such as pyproject, gitignore, readme, etc.. You will need to attempt to list every file that will be needed and be thorough. This is all code files that will need to be created,  all asset files etc. For each file, in additon to the path and filename, you should give a brief statement about the purpose of the file and explicitly give the correct way to import the file using absolut imports. Do not actually create any of the code for the project. Just the expanded description and the file tree with the extra info included. The structure should focus on simplicity and reduced subdirectories and files.
                     Task:  {task}"""
                     messages = [{"role": "user", "content": prompt}] 
                     completion =  client.chat.completions.create(
@@ -115,28 +115,56 @@ class AgentDisplayWebWithPrompt(AgentDisplayWeb):
         @self.app.route('/download_project_zip')
         def download_project_zip():
             try:
-                from flask import send_file
+                from flask import send_file, Response
                 import tempfile
                 import zipfile
                 import os
-                from config import PROJECT_DIR  # Ensure PROJECT_DIR is defined in config.py
+                from pathlib import Path
+                from config import PROJECT_DIR
+                from utils.docker_service import DockerService
+                from utils.file_logger import should_skip_for_zip
+                
                 if not os.path.exists(PROJECT_DIR):
-                    return "Project directory not found", 404
-
-                # Create a temporary zip file
-                with tempfile.NamedTemporaryFile(delete=False, suffix='.zip') as tmp:
-                    zip_path = tmp.name
-
-                with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-                    for root, dirs, files in os.walk(PROJECT_DIR):
+                    return Response(f"Project directory not found: {PROJECT_DIR}", status=404)
+                    
+                project_path = Path(PROJECT_DIR)
+                
+                # Create a temporary file for the zip
+                temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.zip')
+                temp_file.close()
+                
+                # Create a zip file
+                with zipfile.ZipFile(temp_file.name, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                    for root, dirs, files in os.walk(project_path):
+                        # Skip .venv directory and other unnecessary directories
+                        dirs[:] = [d for d in dirs if not d.startswith('.venv') and d not in ['.git', '__pycache__', 'node_modules']]
+                        
                         for file in files:
                             file_path = os.path.join(root, file)
-                            arcname = os.path.relpath(file_path, PROJECT_DIR)
-                            zipf.write(file_path, arcname)
-
-                return send_file(zip_path, as_attachment=True, download_name='project_documents.zip')
+                            
+                            # Skip files in virtual environment bin directory
+                            if '.venv' in root.split(os.sep) and file in ['python', 'python3', 'pip', 'pip3', 'activate']:
+                                continue
+                                
+                            try:
+                                # Get the relative path from project directory
+                                arcname = os.path.relpath(file_path, project_path)
+                                zipf.write(file_path, arcname)
+                            except (FileNotFoundError, PermissionError) as e:
+                                print(f"Error adding {file_path} to zip: {e}")
+                
+                # Send the zip file
+                project_name = project_path.name
+                return send_file(
+                    temp_file.name,
+                    mimetype='application/zip',
+                    as_attachment=True,
+                    download_name=f"{project_name}_project.zip"
+                )
             except Exception as e:
-                return f"Error creating zip file: {e}", 500
+                import traceback
+                traceback.print_exc()
+                return Response(f"Error creating zip file: {str(e)}", status=500)
 
 def create_app(loop=None):
     """Create and configure the application with an event loop"""

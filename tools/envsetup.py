@@ -6,6 +6,11 @@ import os
 from icecream import ic
 from utils.docker_service import DockerService, DockerResult, DockerServiceError
 from config import get_constant
+from utils.file_logger import convert_to_docker_path
+from loguru import logger as ll
+
+# Configure logging to a file
+ll.add("my_log_file.log", rotation="500 KB", level="DEBUG", format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {module}.{function}:{line} - {message}")
 
 
 class ProjectCommand(str, Enum):
@@ -27,6 +32,10 @@ class ProjectSetupTool(BaseAnthropicTool):
     api_type: Literal["custom"] = "custom"
     description: str = (
         "A tool for project management: setup projects, add dependencies, and run applications. "
+        "setup_project: Sets up a Python or Node.js project with virtual environment. Optionally, you can provide a list of dependencies to be installed. "
+        "add_dependencies: Adds additional dependencies to an existing project. "
+        "run_app: This is the only command that needs to be used any time you want to run a python file."
+        "run_project: Runs the entire project, including setup and dependencies. "
         "Supports Python and Node.js environments within Docker."
     )
 
@@ -67,7 +76,7 @@ class ProjectSetupTool(BaseAnthropicTool):
                     "packages": {
                         "type": "array",
                         "items": {"type": "string"},
-                        "description": "List of packages to install"
+                        "description": "List of packages to install, This can be used during the setup_project command or the add_dependencies command. this should be a list of strings with each package in quotes and separated by commas, with the list enclosed in square brackets. Example: ['package1', 'package2', 'package3']"
                     },
                     "entry_filename": {
                         "type": "string",
@@ -83,13 +92,26 @@ class ProjectSetupTool(BaseAnthropicTool):
 
     def get_docker_path(self, project_path: Path) -> str:
         """Convert a local Windows path to a Docker container path."""
+        try:
+            # First, try to use the more robust convert_to_docker_path function
+            docker_path = convert_to_docker_path(project_path)
+            
+            # Validate it's a proper Docker path
+            if docker_path.startswith('/home/myuser/apps/'):
+                return docker_path
+        except Exception as e:
+            # If that fails, fall back to our manual conversion
+            ic(f"Failed to convert path using central function: {e}")
+            
+        # Manual conversion as fallback
         if not isinstance(project_path, Path):
             project_path = Path(project_path)
             
         # If the path starts with /home/myuser/apps/, assume it's already in Docker format
-        if str(project_path).startswith("/home/myuser/apps/"):
+        str_path = str(project_path).replace('\\', '/')
+        if str_path.startswith("/home/myuser/apps/"):
             # Already in Docker format
-            return str(project_path)
+            return str_path
             
         # Get just the final directory name for Docker
         project_name = project_path.name
@@ -128,38 +150,45 @@ class ProjectSetupTool(BaseAnthropicTool):
         return "\n".join(output_lines)
         
     def validate_docker_path(self, docker_path: str) -> str:
-        """Ensure the Docker path is valid and in the correct format."""
-        # Remove any Windows-style drive letters
-        if ':' in docker_path:
-            parts = docker_path.split(':')
-            docker_path = parts[-1]
+        """
+        Ensure the Docker path is valid and properly formatted.
+        Handles Windows paths and normalizes them to Linux format.
+        
+        Args:
+            docker_path: Path to validate 
             
-        # Replace backslashes with forward slashes
+        Returns:
+            Properly formatted Docker path
+        """
+        # First check if it's already a proper Docker path
+        if docker_path.startswith("/home/myuser/apps/") and '\\' not in docker_path:
+            return docker_path
+            
+        # Convert to string if it's a Path object
+        if not isinstance(docker_path, str):
+            docker_path = str(docker_path)
+            
+        # Replace backslashes with forward slashes for Linux compatibility
         docker_path = docker_path.replace('\\', '/')
         
-        # Ensure it starts with /
+        # Remove Windows drive letter if present
+        if ':' in docker_path:
+            docker_path = docker_path.split(':', 1)[1]
+            
+        # Ensure the path starts with a forward slash
         if not docker_path.startswith('/'):
             docker_path = '/' + docker_path
             
-        # Basic validation - ensure the path starts with /home/myuser/apps
-        if not docker_path.startswith('/home/myuser/apps'):
+        # Check if the path should be in the Docker apps directory
+        if not docker_path.startswith('/home/myuser/apps/'):
             # Extract the project name
-            parts = docker_path.split('/')
-            project_name = parts[-1] if parts[-1] else parts[-2]  # Handle trailing slash
-            docker_path = f"/home/myuser/apps/{project_name}"
+            path_parts = docker_path.strip('/').split('/')
+            if len(path_parts) > 0:
+                project_name = path_parts[-1]  # Use the last part if nothing else
+                
+                # If it's just a bare project name, prefix with Docker apps path
+                docker_path = f'/home/myuser/apps/{project_name}'
         
-        # Ensure there are no double slashes or missing slashes
-        while '//' in docker_path:
-            docker_path = docker_path.replace('//', '/')
-            
-        # Ensure the path format is correct for Docker
-        parts = docker_path.split('/')
-        # Filter out empty parts that might come from consecutive slashes
-        parts = [part for part in parts if part]
-        
-        # Reconstruct the path with proper slashes
-        docker_path = '/' + '/'.join(parts)
-            
         return docker_path
         
     async def setup_project(self, project_path: Path, packages: List[str]) -> dict:
@@ -236,20 +265,7 @@ class ProjectSetupTool(BaseAnthropicTool):
             
             # Install base packages with pip in the virtual environment
             ic("Installing packages in Docker...")
-            base_packages = ["pytest", "pytest-xvfb", "pytest-cov"]
-            
-            for package in base_packages:
-                try:
-                    result = self.docker.execute_command(
-                        f"cd {docker_path} && .venv/bin/pip install {package}"
-                    )
-                    if result.success:
-                        installed_packages.append(package)
-                    else:
-                        ic(f"Failed to install {package}: {result.stderr}")
-                except Exception as e:
-                    ic(f"Error installing {package}: {str(e)}")
-                    
+
             # Install additional packages if provided
             if packages and len(packages) > 0:
                 ic(f"Installing additional packages: {packages}")
@@ -283,16 +299,16 @@ class ProjectSetupTool(BaseAnthropicTool):
             # Create a simple README.md file
             readme_content = f"""# Python Project
 
-This project was set up with the following packages:
-{', '.join(installed_packages)}
+                This project was set up with the following packages:
+                {', '.join(installed_packages)}
 
-## Running the project
+                ## Running the project
 
-To run the project, use:
-```
-python app.py
-```
-"""
+                To run the project, use:
+                ```
+                python app.py
+                ```
+                """
             try:
                 readme_path = f"{docker_path}/README.md"
                 self.docker.execute_command(f'echo "{readme_content}" > {readme_path}')
@@ -423,14 +439,15 @@ python app.py
         # Print paths for debugging
         ic(f"Windows project path: {project_path}")
         ic(f"Docker project path: {docker_path}")
-
+        ll.info(f"Windows project path: {project_path}")
         try:
+            ll.info(f"Running {filename} in Docker container at {docker_path}")
             # Run Python script with X11 forwarding
             ic(f"Running {filename} in Docker container at {docker_path}")
             
             # Check if self.display is not None before calling add_message
             if self.display is not None:
-                self.display.add_message("user", f"Running {filename} in Docker container")
+                self.display.add_message("assistant", f"Running {filename} in Docker container")
 
             # Check if virtual environment exists
             venv_check = self.docker.execute_command(
@@ -442,7 +459,7 @@ python app.py
                 cmd = f"cd {docker_path} && .venv/bin/python3 {filename}"
             else:
                 cmd = f"cd {docker_path} && python3 {filename}"
-
+            ll.info(f"Running command: {cmd}")
             # Execute with DISPLAY set for GUI applications
             result = self.docker.execute_command(
                 cmd, env_vars={"DISPLAY": "host.docker.internal:0"}
@@ -525,7 +542,7 @@ python app.py
                     )
                     installed_packages.append(package)
                     if self.display is not None:
-                        self.display.add_message("user", f"Installed {package}")
+                        self.display.add_message("assistant", f"Installed {package}")
                 except Exception:
                     if self.display is not None:
                         self.display.add_message(
@@ -755,14 +772,14 @@ python app.py
                 "error": "Docker is not available or not running",
                 "project_path": str(project_path)
             }
-            
+        ll.info("Original project_path passed to run_project: " + str(project_path))
         # Get Docker path with correct format
         docker_path = self.get_docker_path(project_path)
-        
+        ll.info(f"Converted project_path to Docker path: {docker_path}")
         # Ensure the entry file path is correctly formatted
         entry_file = f"{docker_path}/{entry_filename}"
         entry_file = entry_file.replace('//', '/')  # Remove any double slashes
-        
+        ll.info(f"Final entry file path: {entry_file}")
         try:
             # Check if the entry file exists
             ic(f"Checking if entry file exists: {entry_file}")
@@ -789,7 +806,7 @@ python app.py
             
             # Check if self.display is not None before calling add_message
             if self.display is not None:
-                self.display.add_message("user", f"Running {entry_filename} in Docker container")
+                self.display.add_message("assistant", f"Running {entry_filename} in Docker container")
 
             # Check if virtual environment exists
             venv_check = self.docker.execute_command(
@@ -801,7 +818,7 @@ python app.py
                 cmd = f"cd {docker_path} && .venv/bin/python3 {entry_file}"
             else:
                 cmd = f"cd {docker_path} && python3 {entry_file}"
-
+            ll.info(f"Running command: {cmd}")
             # Execute with DISPLAY set for GUI applications
             result = self.docker.execute_command(
                 cmd, env_vars={"DISPLAY": "host.docker.internal:0"}
@@ -817,7 +834,7 @@ python app.py
             }
         except Exception as e:
             if self.display is not None:
-                self.display.add_message("user", f"ProjectSetupTool error: {str(e)}")
+                self.display.add_message("assistant", f"ProjectSetupTool error: {str(e)}")
             return ToolResult(error=f"Failed to execute run_project: {str(e)}")
 
     async def __call__(
@@ -890,5 +907,5 @@ python app.py
             
         except Exception as e:
             if self.display is not None:
-                self.display.add_message("user", f"ProjectSetupTool error: {str(e)}")
+                self.display.add_message("assistant", f"ProjectSetupTool error: {str(e)}")
             return ToolResult(error=f"Failed to execute {command}: {str(e)}")

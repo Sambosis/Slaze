@@ -68,7 +68,22 @@ RUN apt-get update && \
     requests && \
     # Clean up apt cache to reduce image size
     rm -rf /var/lib/apt/lists/*
+# Install Node.js and npm (using NodeSource's apt repo for a modern release)
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends ca-certificates && \
+    curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
+    apt-get install -y nodejs
 
+# Optional: Install global CLI tools to support various web frameworks and backends
+RUN npm install -g \
+    @angular/cli \       # For Angular projects
+    create-react-app \   # For Create React App (optional)
+    create-next-app \    # For Next.js scaffolding (optional)
+    @vue/cli \           # For Vue CLI
+    create-nuxt-app \    # For Nuxt.js (optional)
+    express-generator \  # For Express scaffolding (optional)
+    @nestjs/cli \        # For NestJS scaffolding
+    yarn                 # If you prefer Yarn over npm
 # Create app directory that will be mounted
 RUN mkdir -p /home/myuser/apps && \
     chown -R myuser:myuser /home/myuser/apps

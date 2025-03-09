@@ -54,7 +54,7 @@ class OutputManager:
                 else:
                     output_text += "[red]Failed to save screenshot[/red]\n"
         
-        # self.display.add_message("user", output_text)
+        # self.display., output_text)
 
     def format_api_response(self, response: APIResponse):
         """Format and display API response."""
@@ -92,12 +92,12 @@ class OutputManager:
                         for item in content_block.get("content", []):
                             if item.get("type") == "text":
                                 text = self._truncate_string(item.get("text", ""))
-                            #     self.display.add_message("user", text)
+                            #     self.display., text)
                             # elif item.get("type") == "image":
-                            #     self.display.add_message("user", "📸 Screenshot captured")
+                            #     self.display., "📸 Screenshot captured")
         elif isinstance(content, str):
             text = self._truncate_string(content)
-            # self.display.add_message("user", text)
+            # self.display., text)
 
     def _format_assistant_content(self, content: Any):
         """Format and display assistant content."""
@@ -118,7 +118,7 @@ class OutputManager:
                                 input_text = "\n".join(f"{k}: {v}" for k, v in tool_input.items())
                             except json.JSONDecodeError:
                                 input_text = str(tool_input)
-                        # self.display.add_message("user", (tool_name, f"Input: {input_text}"))
+                        # self.display., (tool_name, f"Input: {input_text}"))
         elif isinstance(content, str):
             text = self._truncate_string(content)
             # self.display.add_message("assistant", text)

@@ -11,7 +11,7 @@ import os
 from PIL import Image
 from utils.file_logger import log_file_operation
 from config import get_constant, get_project_dir, to_docker_path
-
+from utils.docker_service import DockerService
 class PictureCommand(str, Enum):
     CREATE = "create"
 
@@ -66,52 +66,27 @@ class PictureGenerationTool(BaseAnthropicTool):
 
     async def generate_picture(self, prompt: str, output_path: str, width: int = None, height: int = None) -> dict:
         """
-        Generate a picture using the Flux Schnell model.
+        Generates an image based on the prompt and saves it to the output path.
         
         Args:
-            prompt: The text prompt to generate the image from
-            output_path: The path to save the image to
+            prompt: Text description of the image to generate
+            output_path: Path where the image should be saved
             width: Optional width to resize the image to
             height: Optional height to resize the image to
             
         Returns:
-            A dictionary with the result of the operation
+            A dictionary containing the result
         """
         try:
+            # Import necessary libraries
             import replicate
             import base64
             from PIL import Image
-            from utils.file_logger import log_file_operation
             from pathlib import Path
-            from config import get_constant
-            
-            # Handle path conversion for Docker environment
-            project_dir = get_constant('PROJECT_DIR')
-            # Ensure project_dir is a string
-            if isinstance(project_dir, Path):
-                project_dir = str(project_dir)
-                
-            # Try to get docker project dir, but if it doesn't exist, use a default
-            try:
-                docker_project_dir = get_constant('DOCKER_PROJECT_DIR')
-            except:
-                docker_project_dir = '/app'
-                
-            # Ensure docker_project_dir is a string
-            if isinstance(docker_project_dir, Path):
-                docker_project_dir = str(docker_project_dir)
-            
-            # Ensure output_path is a string
-            if isinstance(output_path, Path):
-                output_path = str(output_path)
-                
-            # Ensure output path is absolute
-            if not os.path.isabs(output_path):
-                output_path = os.path.join(project_dir, output_path)
-                
-            # Ensure the output directory exists
-            os.makedirs(os.path.dirname(output_path), exist_ok=True)
-            
+            import os
+            from config import get_constant, REPO_DIR
+            docker_service = DockerService()
+            output_path_obj = docker_service.from_docker_path(output_path)
             # Create input data for the model
             input_data = {
                 "prompt": prompt,
@@ -133,8 +108,7 @@ class PictureGenerationTool(BaseAnthropicTool):
                 raise Exception("No image data received from the model")
 
             # Save the raw bytes to file
-            with open(output_path, 'wb') as f:
-                f.write(image_data)
+            output_path_obj.write_bytes(image_data)
 
             # Log the file creation with metadata
             metadata = {
@@ -143,16 +117,24 @@ class PictureGenerationTool(BaseAnthropicTool):
                 "model": "google/imagen-3-fast",
                 "generation_params": input_data
             }
-            # Convert output_path to Path for logging
-            output_path_obj = Path(output_path)
-            log_file_operation(output_path_obj, "create", metadata=metadata)
-
+            
+            try:
+                from utils.file_logger import log_file_operation
+                log_file_operation(
+                    file_path=output_path_obj, 
+                    operation="create", 
+                    metadata=metadata
+                )
+            except Exception as log_error:
+                print(f"Warning: Failed to log image creation: {log_error}")
+                # Continue anyway - don't let logging failure prevent success
+            
             # Create base64 for display
             base64_data = base64.b64encode(image_data).decode("utf-8")
 
             # Handle resizing if needed
             if width or height:
-                img = Image.open(output_path)
+                img = Image.open(output_path_obj)
                 if width and height:
                     new_size = (width, height)
                 elif width:
@@ -163,39 +145,42 @@ class PictureGenerationTool(BaseAnthropicTool):
                     new_size = (int(img.width * ratio), height)
                 
                 img = img.resize(new_size, Image.LANCZOS)
-                img.save(output_path)
+                img.save(output_path_obj)
                 
                 # Update metadata with new dimensions
                 metadata["dimensions"] = f"{new_size[0]}x{new_size[1]}"
-                log_file_operation(output_path_obj, "update", metadata=metadata)
+                try:
+                    log_file_operation(output_path_obj, "update", metadata=metadata)
+                except Exception as log_error:
+                    print(f"Warning: Failed to log image resize: {log_error}")
+                    # Continue anyway - don't let logging failure prevent success
                 
                 # Update base64 data
-                with open(output_path, 'rb') as f:
-                    image_data = f.read()
+                image_data = output_path_obj.read_bytes()
                 base64_data = base64.b64encode(image_data).decode("utf-8")
             
             # Convert the local output path to Docker path for display
-            docker_output_path = output_path
-            if output_path.startswith(project_dir):
-                docker_output_path = output_path.replace(project_dir, docker_project_dir)
             
-            # Create HTML message for display
-            html_message = f"""
-            <div style="text-align: center;">
-                <p>Image generated and saved to: <code>{docker_output_path}</code></p>
-                <img src="data:image/png;base64,{base64_data}" style="max-width: 100%; max-height: 500px;">
-            </div>
-            """
-            
+            # Create a nice HTML message for the output
+            html_output = f'<div><p>Image generated from prompt: "{prompt}"</p>'
+            html_output += f'<p>Saved to: {output_path_obj}</p>'
+            html_output += f'<img src="data:image/png;base64,{base64_data}" style="max-width:100%; max-height:500px;"></div>'
+            self.display.add_message("tool", html_output)
             return {
-                "output": f"Image generated successfully and saved to {docker_output_path}",
-                "base64_image": base64_data,
-                "message": html_message
+                "status": "success",
+                "output_path": output_path_obj,
+                "html": html_output
             }
+            
         except Exception as e:
             import traceback
-            error_message = f"Error generating image: {str(e)}\n{traceback.format_exc()}"
-            return {"error": error_message}
+            error_stack = traceback.format_exc()
+            error_message = f"Error generating image: {str(e)}"
+            print(f"Error generating image: {str(e)}\n{error_stack}")
+            return {
+                "status": "error",
+                "message": error_message
+            }
 
     def format_output(self, data: dict) -> str:
         """
