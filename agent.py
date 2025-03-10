@@ -21,7 +21,8 @@ from tools import (
     PictureGenerationTool,
     EditTool,
     ToolCollection,
-    ToolResult
+    ToolResult,
+    FileManagerTool  # Pe2e1
 )
 from utils.agent_display_web_with_prompt import AgentDisplayWebWithPrompt
 from utils.context_helpers import *
@@ -42,6 +43,7 @@ class Agent:
             BashTool(display=self.display),
             PictureGenerationTool(display=self.display),
             EditTool(display=self.display),  # Uncommented and enabled
+            FileManagerTool(display=self.display),  # P192a
             display=self.display
         )
         self.output_manager = OutputManager(self.display)

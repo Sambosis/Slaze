@@ -12,6 +12,8 @@ from PIL import Image
 from utils.file_logger import log_file_operation
 from config import get_constant, get_project_dir, to_docker_path
 from utils.docker_service import DockerService
+from tools.file_manager import FileManagerTool
+
 class PictureCommand(str, Enum):
     CREATE = "create"
 
@@ -25,6 +27,7 @@ class PictureGenerationTool(BaseAnthropicTool):
     def __init__(self, display=None):
         super().__init__(input_schema=None, display=display)
         self.display = display  # Explicitly set self.display
+        self.file_manager = FileManagerTool(display=display)  # Initialize FileManagerTool
 
     def to_params(self) -> dict:
         ic(f"PictureGenerationTool.to_params called with api_type: {self.api_type}")
@@ -119,12 +122,7 @@ class PictureGenerationTool(BaseAnthropicTool):
             }
             
             try:
-                from utils.file_logger import log_file_operation
-                log_file_operation(
-                    file_path=output_path_obj, 
-                    operation="create", 
-                    metadata=metadata
-                )
+                self.file_manager.create_file(output_path_obj, image_data)  # Use FileManagerTool to log creation
             except Exception as log_error:
                 print(f"Warning: Failed to log image creation: {log_error}")
                 # Continue anyway - don't let logging failure prevent success
@@ -150,7 +148,7 @@ class PictureGenerationTool(BaseAnthropicTool):
                 # Update metadata with new dimensions
                 metadata["dimensions"] = f"{new_size[0]}x{new_size[1]}"
                 try:
-                    log_file_operation(output_path_obj, "update", metadata=metadata)
+                    self.file_manager.edit_file(output_path_obj, image_data)  # Use FileManagerTool to log edit
                 except Exception as log_error:
                     print(f"Warning: Failed to log image resize: {log_error}")
                     # Continue anyway - don't let logging failure prevent success
