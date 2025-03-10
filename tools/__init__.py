@@ -11,6 +11,8 @@ from .windows_navigation import WindowsNavigationTool
 # from .test_navigation_tool import windows_navigate
 from .write_code import WriteCodeTool
 from .create_picture import PictureGenerationTool
+from .file_manager import FileManagerTool
+
 __all__ = [
     "BaseAnthropicTool",
     "ToolError",
@@ -26,5 +28,6 @@ __all__ = [
     "WindowsNavigationTool",
     "WriteCodeTool",
     "PictureGenerationTool",
+    "FileManagerTool",
     # "windows_navigate"
 ]
