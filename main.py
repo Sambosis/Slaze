@@ -35,7 +35,7 @@ from utils.context_helpers import *
 from utils.output_manager import *
 from config import *  # Make sure config.py defines the constants
 from agent import Agent
-
+from min_agent import lmin_agent
 write_constants_to_file()
 load_dotenv()
 install()
@@ -233,6 +233,7 @@ async def sampling_loop(
     while running:
         try:
             running = await agent.step()
+            # response = await lmin_agent()
         except UnicodeEncodeError as ue:
             ic(f"UnicodeEncodeError: {ue}")
             rr(f"Unicode encoding error: {ue}")

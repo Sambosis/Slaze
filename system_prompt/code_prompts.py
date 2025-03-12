@@ -117,6 +117,8 @@ def code_prompt_generate(current_code_base, code_description, code_skeleton):
                     "text": f"""At the bottom is a detailed description of code that you need to write, followed by a code skeleton that provides the structure.
             
             Your task is to implement the full code based on the description and skeleton. Make sure you provide your response in the requested programming language. Your response should include the code for the entire file including proper imports lines, but do not actually include the code from other files.
+
+            You should print verbose output to the console to show the progress of the code execution. This will help the user understand what is happening at each step of the process.
             
             If you are requested to make changes to an existing file, please provide the full file with the correction made as your response. Please keep your changes limited to what was requested and keep the rest of the code unchanged.
             

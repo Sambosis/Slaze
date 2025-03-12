@@ -380,13 +380,13 @@ class WriteCodeTool(BaseAnthropicTool):
         current_code_base = get_all_current_skeleton()
         
         OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-        client = AsyncOpenAI(
-            base_url="https://openrouter.ai/api/v1",
-            api_key=OPENROUTER_API_KEY,
-            )
-        model = "google/gemini-2.0-flash-001"
-        # client = AsyncOpenAI()
-        # model = "o3-mini"
+        # client = AsyncOpenAI(
+        #     base_url="https://openrouter.ai/api/v1",
+        #     api_key=OPENROUTER_API_KEY,
+        #     )
+        # model = "google/gemini-2.0-flash-001"
+        client = AsyncOpenAI()
+        model = "o3-mini"
 
         # Prepare messages
         messages = code_prompt_generate(current_code_base, code_description, research_string)
@@ -598,7 +598,7 @@ class WriteCodeTool(BaseAnthropicTool):
         """Generate and write code to a file based on description."""
         try:
             from config import get_constant, get_project_dir, get_docker_project_dir, REPO_DIR
-            from utils.file_logger import convert_to_docker_path
+            from utils.file_logger import convert_to_docker_path, extract_code_skeleton
             import os
             
             # Ensure project_path is a Path object
@@ -639,7 +639,13 @@ class WriteCodeTool(BaseAnthropicTool):
             # Convert to string for consistent logging
             file_path_str = str(file_path).replace('\\', '/')
 
-            code = await self._research_and_generate_code(code_description, file_path)
+            # First, generate the code skeleton
+            # ll.info(f"Generating code skeleton for {file_path}")
+            code_skeleton = await self._call_llm_for_code_skeleton(code_description, file_path)
+            
+            # Then, generate the full code
+            # ll.info(f"Generating full code for {file_path} with skeleton")
+            code = await self._call_llm_to_generate_code(code_description, code_skeleton, file_path)
             
             # Skip if no code was generated
             if not code:
@@ -653,18 +659,18 @@ class WriteCodeTool(BaseAnthropicTool):
             
             # Write the code to the file
             file_path.write_text(code, encoding="utf-8")
-            ll.info(f"Code written to {file_path}")
+            # ll.info(f"Code written to {file_path}")
             # Convert to Docker path for display
             docker_path = convert_to_docker_path(file_path)
-            ll.info(f"Converted to Docker path: {docker_path}")
-            # Log the file operation
+            # ll.info(f"Converted to Docker path: {docker_path}")
+            # Log the file operation with the skeleton in metadata
             try:
                 from utils.file_logger import log_file_operation
                 log_file_operation(
                     file_path=file_path,
                     operation=operation,
                     content=code,
-                    metadata={"code_description": code_description}
+                    metadata={"code_description": code_description, "skeleton": code_skeleton}
                 )
             except Exception as log_error:
                 ic(f"Warning: Failed to log code writing: {str(log_error)}")
@@ -686,7 +692,8 @@ class WriteCodeTool(BaseAnthropicTool):
                 "message": f"Successfully wrote code to {docker_path}",
                 "file_path": str(docker_path),
                 "code": code,
-                "html": formatted_code
+                # "skeleton": code_skeleton,
+                # "html": formatted_code
             }
             return result
 
@@ -702,10 +709,13 @@ class WriteCodeTool(BaseAnthropicTool):
     async def _research_and_generate_code(self, code_description: str, file_path: Path) -> str:
         """Research and generate code based on description."""
         try:
-            # Generate code using the LLM
+            # Generate skeleton first
+            skeleton = await self._call_llm_for_code_skeleton(code_description, file_path)
+            
+            # Generate code using the LLM and the skeleton
             code = await self._call_llm_to_generate_code(
                 code_description,
-                await self._call_llm_to_research_code(code_description, file_path),
+                skeleton,
                 file_path
             )
             

@@ -1081,38 +1081,52 @@ def get_all_current_skeleton() -> str:
     
     try:
         with open(LOG_FILE, 'r', encoding='utf-8') as f:
-            log_data = json.loads(f.read())
+            log_data = json.load(f)
     except (json.JSONDecodeError, FileNotFoundError):
         return "Error reading log file."
     
-    if not log_data:
+    if not log_data or not log_data.get("files"):
         return "No Python files have been tracked yet."
     
     output = ["# All Python File Skeletons"]
     
-    for file_path, file_info in log_data.items():
-        # Only include Python files
-        if file_info.get("file_type") != "code" or not file_path.endswith('.py'):
-                continue
-
-        # Get the Docker path for display
-        docker_path = file_info.get("docker_path", convert_to_docker_path(file_path))
-        
-        # Get skeleton if available
-        skeleton = file_info.get("skeleton", "")
-        if not skeleton:
+    for file_path, file_info in log_data.get("files", {}).items():
+        # Skip files that have been deleted (last operation is 'delete')
+        operations = file_info.get("operations", [])
+        if operations and operations[-1].get("operation") == "delete":
             continue
             
-        # Add file header
-        output.append(f"## {docker_path}")
+        # Only process Python files
+        extension = file_info.get("extension", "").lower()
+        if extension != '.py':
+            continue
+            
+        # Get Docker path for display
+        docker_path = convert_to_docker_path(file_path)
         
-        # Add skeleton with syntax highlighting
-        output.append("```python")
-        output.append(skeleton)
-        output.append("```")
-        output.append("")
+        # Look for skeleton in metadata
+        metadata = file_info.get("metadata", {})
+        skeleton = metadata.get("skeleton", "")
+        
+        # If no skeleton in metadata, try to extract it from the content
+        if not skeleton and file_info.get("content"):
+            try:
+                skeleton = extract_code_skeleton(file_info.get("content", ""))
+            except Exception as e:
+                print(f"Error extracting skeleton from {file_path}: {e}")
+                skeleton = "# Failed to extract skeleton"
+        
+        if skeleton:
+            # Add file header
+            output.append(f"## {docker_path}")
+            
+            # Add skeleton with syntax highlighting
+            output.append("```python")
+            output.append(skeleton)
+            output.append("```")
+            output.append("")
     
-        return "\n".join(output)
+    return "\n".join(output)
 
 def get_language_from_extension(extension: str) -> str:
     """

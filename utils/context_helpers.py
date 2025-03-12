@@ -344,6 +344,12 @@ async def refresh_context_async(task: str, messages: List[Dict], display: AgentD
     if len(file_contents) > 200000:
         file_contents = file_contents[:70000] + " ... [TRUNCATED] ... " + file_contents[-70000:]
     
+    # Get code skeletons
+    from utils.file_logger import get_all_current_skeleton
+    code_skeletons = get_all_current_skeleton()
+    if not code_skeletons or code_skeletons == "No Python files have been tracked yet.":
+        code_skeletons = "No code skeletons available."
+    
     # Extract information about images generated
     images_info = ""
     if "## Generated Images:" in file_contents:
@@ -359,6 +365,9 @@ DO NOT recreate any existing files or redo completed steps. Continue the work fr
 
 Current Project Files and Assets:
 {file_contents}
+
+Code Skeletons (Structure of Python files):
+{code_skeletons}
 
 COMPLETED STEPS (These have ALL been successfully completed - DO NOT redo these):
 {completed}

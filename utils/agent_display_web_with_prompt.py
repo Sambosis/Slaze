@@ -67,7 +67,6 @@ class AgentDisplayWebWithPrompt(AgentDisplayWeb):
                     completion =  client.chat.completions.create(
                         model=model,
                         messages=messages)
-                    print(completion)
                     task = completion.choices[0].message.content
                     from config import set_project_dir, set_constant
                     project_dir = set_project_dir(filename)

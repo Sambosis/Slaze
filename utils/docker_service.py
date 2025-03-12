@@ -13,7 +13,7 @@ logger = logging.getLogger("DockerService")
 # set the logger level to DEBUG
 # logger.setLevel(logging.DEBUG)
 # set the logger level to INFO
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.CRITICAL)
 
 @dataclass
 class DockerResult:
@@ -58,8 +58,9 @@ class DockerService:
         self._default_display = "host.docker.internal:0"
 
         if self._docker_available:
-            logger.info(f"Docker service initialized with container: {self._container_name}")
-            logger.info(f"Docker project directory: {self._docker_project_dir}")
+            # logger.info(f"Docker service initialized with container: {self._container_name}")
+            # logger.info(f"Docker project directory: {self._docker_project_dir}")
+            pass
         else:
             logger.warning("Docker not available. Operations will fail.")
 
@@ -146,7 +147,7 @@ class DockerService:
                 docker_path = f"{docker_base}/{host_path.name}"
 
             # Log the path translation for debugging
-            logger.debug(f"Path translation: {host_path} -> {docker_path}")
+            # logger.debug(f"Path translation: {host_path} -> {docker_path}")
 
             # Cache and return result
             docker_path = Path(docker_path)
@@ -218,7 +219,7 @@ class DockerService:
                 host_path = project_dir / Path(docker_path_str).name
 
             # Log the path translation
-            logger.debug(f"Reverse path translation: {docker_path_str} -> {host_path}")
+            # logger.debug(f"Reverse path translation: {docker_path_str} -> {host_path}")
 
             # Cache and return
             self._reverse_path_cache[docker_path_str] = host_path
@@ -350,7 +351,7 @@ class DockerService:
         docker_dir = self._format_docker_path(self._docker_project_dir)
 
         # Log the directory we're using
-        logger.info(f"Creating virtual environment in directory: {docker_dir}")
+        # logger.info(f"Creating virtual environment in directory: {docker_dir}")
 
         commands = [
             f"cd {docker_dir}",

@@ -75,15 +75,7 @@ RUN apt-get update && \
     apt-get install -y nodejs
 
 # Optional: Install global CLI tools to support various web frameworks and backends
-RUN npm install -g \
-    @angular/cli \       # For Angular projects
-    create-react-app \   # For Create React App (optional)
-    create-next-app \    # For Next.js scaffolding (optional)
-    @vue/cli \           # For Vue CLI
-    create-nuxt-app \    # For Nuxt.js (optional)
-    express-generator \  # For Express scaffolding (optional)
-    @nestjs/cli \        # For NestJS scaffolding
-    yarn                 # If you prefer Yarn over npm
+RUN npm install -g @angular/cli create-react-app create-next-app @vue/cli create-nuxt-app express-generator @nestjs/cli yarn
 # Create app directory that will be mounted
 RUN mkdir -p /home/myuser/apps && \
     chown -R myuser:myuser /home/myuser/apps

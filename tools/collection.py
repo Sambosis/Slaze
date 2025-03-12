@@ -28,9 +28,16 @@ class ToolCollection:
             *tools: Tools to add to the collection
             display: Optional display object for UI interaction
         """
+        from loguru import logger 
+        t_log  = logger.bind(name="tool")
+
+        self.t_log = t_log
         self.tools: Dict[str, BaseAnthropicTool] = {}
         self.display = display
-        
+
+        # Configure logging to a file
+        self.t_log.add("tool.log", rotation="500 KB", level="DEBUG", format="{time:YYYY-MM-DD HH:mm} | {level: <8} | {module}.{function}:{line} - {message}")
+
         # Add each tool to the collection
         for tool in tools:
             if hasattr(tool, 'name'):
@@ -86,7 +93,36 @@ class ToolCollection:
         
         try:
             # Execute the tool and get the result
+            # Log the exact contents of tool_input in a more readable format
+            formatted_input = json.dumps(tool_input, indent=2)
+            self.t_log.debug(f"EXACT TOOL INPUT: \n{formatted_input}")
+            
             result = await tool(**tool_input)
+            # This unpacks tool_input as keyword arguments to the tool's __call__ method
+            # 
+            # For example, if:
+            # - tool name is "write_code" 
+            # - tool_input is:
+            #   {
+            #     "command": "write_code_to_file",
+            #     "project_path": "/home/myuser/apps/bogame",
+            #     "python_filename": "settings.py",
+            #     "code_description": "Create a settings.py file that contains all game constants..."
+            #   }
+            #
+            # This becomes equivalent to:
+            # result = await write_code_tool.__call__(
+            #     command="write_code_to_file",
+            #     project_path="/home/myuser/apps/bogame",
+            #     python_filename="settings.py",
+            #     code_description="Create a settings.py file that contains all game constants..."
+            # )
+            #
+            # The tool's __call__ method then handles these arguments:
+            # 1. It reads the command parameter to determine which internal method to call
+            #    (e.g., write_code_to_file, write_and_exec, etc.)
+            # 2. It passes the remaining parameters to that method
+            # 3. The tool returns a ToolResult object with the operation's outcome
             
             # If the result is None or not a ToolResult, create a proper one
             if result is None:

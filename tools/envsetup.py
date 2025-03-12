@@ -32,7 +32,7 @@ class ProjectSetupTool(BaseAnthropicTool):
     api_type: Literal["custom"] = "custom"
     description: str = (
         "A tool for project management: setup projects, add dependencies, and run applications. "
-        "setup_project: Sets up a Python or Node.js project with virtual environment. Optionally, you can provide a list of dependencies to be installed. "
+        ": Sets up a Python or Node.js project with virtual environment. Optionally, you can provide a list of dependencies to be installed. "
         "add_dependencies: Adds additional dependencies to an existing project. "
         "run_app: This is the only command that needs to be used any time you want to run a python file."
         "run_project: Runs the entire project, including setup and dependencies. "
@@ -49,7 +49,7 @@ class ProjectSetupTool(BaseAnthropicTool):
 
     def to_params(self) -> dict:
         """Convert the tool to a parameters dictionary for the API."""
-        ic(f"ProjectSetupTool.to_params called with api_type: {self.api_type}")
+        # ic(f"ProjectSetupTool.to_params called with api_type: {self.api_type}")
         # Use the format that has worked in the past
         params = {
             "name": self.name,
@@ -87,7 +87,7 @@ class ProjectSetupTool(BaseAnthropicTool):
                 "required": ["command", "project_path"]
             }
         }
-        ic(f"ProjectSetupTool params: {params}")
+        #ic(f"ProjectSetupTool params: {params}")
         return params
 
     def get_docker_path(self, project_path: Path) -> str:
@@ -129,7 +129,7 @@ class ProjectSetupTool(BaseAnthropicTool):
         output_lines = []
         output_lines.append(f"Command: {data['command']}")
         output_lines.append(f"Status: {data['status']}")
-        output_lines.append(f"Project Path: {data['project_path']}")
+        # output_lines.append(f"Project Path: {data['project_path']}")
         
         if 'docker_path' in data:
             output_lines.append(f"Docker Path: {data['docker_path']}")
@@ -209,7 +209,7 @@ class ProjectSetupTool(BaseAnthropicTool):
         
         try:
             # Create the project directory in Docker
-            ic(f"Creating directory in Docker: {docker_path}")
+            #ic(f"Creating directory in Docker: {docker_path}")
             if self.display is not None:
                 self.display.add_message(
                     "user", f"Creating project directory in Docker: {docker_path}"
@@ -217,7 +217,7 @@ class ProjectSetupTool(BaseAnthropicTool):
             
             # Log the exact command being executed
             mkdir_cmd = f"mkdir -p {docker_path}"
-            ic(f"Docker mkdir command: {mkdir_cmd}")
+            #ic(f"Docker mkdir command: {mkdir_cmd}")
             
             # Execute the command to create the directory
             mkdir_result = self.docker.execute_command(mkdir_cmd)
@@ -233,10 +233,10 @@ class ProjectSetupTool(BaseAnthropicTool):
             # Verify the directory was created
             verify_cmd = f"ls -la {docker_path}"
             verify_result = self.docker.execute_command(verify_cmd)
-            ic(f"Directory verification: {verify_result.stdout}")
+            #ic(f"Directory verification: {verify_result.stdout}")
             
             # Create a virtual environment in Docker
-            ic("Creating virtual environment in Docker...")
+            #ic("Creating virtual environment in Docker...")
             if self.display is not None:
                 self.display.add_message(
                     "user", "Creating Python virtual environment in Docker"
@@ -265,6 +265,13 @@ class ProjectSetupTool(BaseAnthropicTool):
             
             # Install base packages with pip in the virtual environment
             ic("Installing packages in Docker...")
+
+            # Create a symbolic link so 'python' points to 'python3' within the venv
+            symlink_result = self.docker.execute_command(
+                f"ln -s /usr/bin/python3 {docker_path}/.venv/bin/python"
+            )
+            if not symlink_result.success:
+                ic(f"Failed to create symbolic link: {symlink_result.stderr}")
 
             # Install additional packages if provided
             if packages and len(packages) > 0:
@@ -367,7 +374,7 @@ class ProjectSetupTool(BaseAnthropicTool):
             
             # Install each package
             for i, package in enumerate(packages, 1):
-                ic(f"Installing package {i}/{len(packages)}: {package}")
+                #ic(f"Installing package {i}/{len(packages)}: {package}")
                 if self.display is not None:
                     self.display.add_message(
                         "user", f"Installing package {i}/{len(packages)}: {package}"
@@ -437,13 +444,11 @@ class ProjectSetupTool(BaseAnthropicTool):
         docker_path = self.validate_docker_path(docker_path)
 
         # Print paths for debugging
-        ic(f"Windows project path: {project_path}")
-        ic(f"Docker project path: {docker_path}")
-        ll.info(f"Windows project path: {project_path}")
+        #ic(f"Windows project path: {project_path}")
+        ll.info(f"Docker project path: {docker_path}")
         try:
             ll.info(f"Running {filename} in Docker container at {docker_path}")
             # Run Python script with X11 forwarding
-            ic(f"Running {filename} in Docker container at {docker_path}")
             
             # Check if self.display is not None before calling add_message
             if self.display is not None:
@@ -501,7 +506,7 @@ class ProjectSetupTool(BaseAnthropicTool):
 
         try:
             # Create the project directory in Docker
-            ic(f"Creating directory in Docker: {docker_path}")
+            # ic(f"Creating directory in Docker: {docker_path}")
             if self.display is not None:
                 self.display.add_message(
                     "user", f"Creating project directory in Docker: {docker_path}"
@@ -846,7 +851,7 @@ class ProjectSetupTool(BaseAnthropicTool):
         packages: List[str] = None,
         entry_filename: str = "app.py",
         **kwargs,
-    ) -> ToolResult:
+        ) -> ToolResult:
         """Executes the specified command for project management."""
         try:
             # Handle both string and Enum types for command

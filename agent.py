@@ -1,11 +1,11 @@
-# agent.py 
+# agent.py
 """is the main file that contains the Agent class. The Agent class is responsible for interfacing with the LLM API and running the tools. It receives messages from the user, sends them to the LLM API, and processes the response. It also manages the state of the conversation, such as the context and the messages exchanged between the user and the assistant. The Agent class uses the ToolCollection class to run the tools and generate the responses. The Agent class also uses the OutputManager class to format the messages and display them in the web interface. The Agent class uses the TokenTracker class to track the token usage and display it in the web interface. The Agent class uses the AgentDisplayWebWithPrompt class to display the messages in the web interface and prompt the user for input. The Agent class is used by the run.py and serve.py scripts to start the application and run the web server. 
 """
 import asyncio
 import json
 import os
 from typing import List, Dict
-
+from rich import print as rr
 from anthropic import Anthropic
 from anthropic.types.beta import (
     BetaCacheControlEphemeralParam,
@@ -52,9 +52,8 @@ class Agent:
         self.betas = [COMPUTER_USE_BETA_FLAG, PROMPT_CACHING_BETA_FLAG]
         self.image_truncation_threshold = 1
         self.only_n_most_recent_images = 2
-            # Add detailed logging of tool params
+        # Add detailed logging of tool params
         self.tool_params = self.tool_collection.to_params()
-
 
     def log_tool_results(self, combined_content, tool_name, tool_input):
         """
@@ -70,7 +69,7 @@ class Agent:
             f.write(f"TOOL EXECUTION: {tool_name}\n")
             f.write(f"INPUT: {json.dumps(tool_input, indent=2)}\n")
             f.write("-"*80 + "\n")
-            
+
             for item in combined_content:
                 f.write(f"CONTENT TYPE: {item['type']}\n")
                 if item['type'] == 'tool_result':
@@ -90,8 +89,8 @@ class Agent:
     async def run_tool(self, content_block):
         result = ToolResult(output="Tool execution not started", tool_name=content_block["name"])
         try:
-            ic(content_block['name'])
-            ic(content_block["input"])
+            # ic(content_block['name'])
+            # ic(content_block["input"])
             result = await self.tool_collection.run(
                 name=content_block["name"],
                 tool_input=content_block["input"],
@@ -102,7 +101,7 @@ class Agent:
             result = ToolResult(output=f"Tool execution failed: {str(e)}", tool_name=content_block["name"], error=str(e))
         finally:
             tool_result = self._make_api_tool_result(result, content_block["id"])
-            ic(tool_result)
+            # ic(tool_result)
             tool_output = result.output if hasattr(result, 'output') and result.output else str(result)
             tool_name = content_block['name']
             if len(tool_name) > 64:
@@ -121,17 +120,17 @@ class Agent:
                 "role": "user",
                 "content": combined_content
             })
-            
+
             # Use the dedicated logging function instead of inline logging
             self.log_tool_results(combined_content, tool_name, content_block['input'])
-            
+
             return tool_result
 
     def _make_api_tool_result(self, result: ToolResult, tool_use_id: str) -> Dict:
         """Create a tool result dictionary."""
         tool_result_content = []
         is_error = False
-        
+
         if result is None:
             is_error = True
             tool_result_content.append({"type": "text", "text": "Tool execution resulted in None"})
@@ -143,11 +142,11 @@ class Agent:
             if hasattr(result, 'error') and result.error:
                 is_error = True
                 tool_result_content.append({"type": "text", "text": result.error})
-            
+
             # Add output if it exists
             if hasattr(result, 'output') and result.output:
                 tool_result_content.append({"type": "text", "text": result.output})
-            
+
             # Add image if it exists
             if hasattr(result, 'base64_image') and result.base64_image:
                 tool_result_content.append({
@@ -244,19 +243,19 @@ class Agent:
                 for msg in messages
                 ]   
             summary_task = asyncio.create_task(summarize_recent_messages(messages[-4:] if len(messages) >= 4 else messages, self.display))
-            ic(f"NUMBER_OF_MESSAGES: {len(messages)}")
+            # ic(f"NUMBER_OF_MESSAGES: {len(messages)}")
 
             # --- MAIN LLM CALL ---
             response = None  # Initialize response to avoid UnboundLocalError
             try:
-                ic("---- SENDING LLM REQUEST ----")
-                ic({
-                    "max_tokens": MAX_SUMMARY_TOKENS,
-                    "model": MAIN_MODEL,
-                    "tool_choice": {"type": "auto"},
-                    "tools_count": len(self.tool_params),
-                    "betas": self.betas,
-                })
+                # ic("---- SENDING LLM REQUEST ----")
+                # ic({
+                #     "max_tokens": MAX_SUMMARY_TOKENS,
+                #     "model": MAIN_MODEL,
+                #     "tool_choice": {"type": "auto"},
+                #     "tools_count": len(self.tool_params),
+                #     "betas": self.betas,
+                # })
                 response = self.client.beta.messages.create(
                     max_tokens=MAX_SUMMARY_TOKENS,
                     messages=truncated_messages,
@@ -266,11 +265,11 @@ class Agent:
                     tools=self.tool_params,
                     betas=self.betas,
                 )
-                ic("---- LLM RESPONSE SUCCESS ----")
+                # ic("---- LLM RESPONSE SUCCESS ----")
             except Exception as llm_error:
-                ic("---- LLM REQUEST ERROR ----")
-                ic(llm_error)
-                ic("---- END LLM ERROR ----")
+                # ic("---- LLM REQUEST ERROR ----")
+                # ic(llm_error)
+                # ic("---- END LLM ERROR ----")
                 self.display.add_message("assistant", f"LLM call failed: {str(llm_error)}")
                 last_3_messages = messages[-3:] if len(messages) >= 3 else messages
                 new_context = await refresh_context_async(task, last_3_messages, self.display)
@@ -306,7 +305,7 @@ class Agent:
                 f.write(message_string)
 
             tool_result_content = []  # Initialize as empty list
-            
+
             # Only process tool use blocks if there are response parameters
             if response_params:
                 for content_block in response_params:
@@ -386,3 +385,93 @@ class Agent:
             except Exception as recovery_error:
                 self.display.add_message("assistant", f"Recovery attempt failed: {str(recovery_error)}")
                 raise
+
+    async def example_explicit_tool_call(self, tool_name: str, tool_input: dict) -> ToolResult:
+        """Example of explicitly calling a tool."""
+        tool_result = await self.run_tool(
+            {"name": tool_name, "input": tool_input, "id": f"{tool_name}_123"}
+        )
+        return tool_result
+    async def call_write_code(self, command: str, code_description: str, project_path: str, python_filename: str, **kwargs) -> ToolResult:
+        """
+        Execute the tool with the given command and parameters.
+
+        Args:
+            command: The command to execute
+            code_description: Description of the code to write
+            project_path: Path to the project directory
+            python_filename: Name of the file to write
+            **kwargs: Additional parameters
+
+        Returns:
+            A ToolResult object with the result of the operation
+        """
+        tool_input = {
+            "command": command,
+            "code_description": code_description,
+            "project_path": project_path,
+            "python_filename": python_filename,
+            **kwargs
+        }
+        return await self.run_tool({"name": "write_code", "input": tool_input, "id": "write_code_123"})
+
+    async def call_project_setup(self, project_path: str, **kwargs) -> ToolResult:
+        """
+        Execute the tool with the given command and parameters.
+
+        Args:
+            project_path: Path to the project directory
+            **kwargs: Additional parameters
+
+        Returns:
+            A ToolResult object with the result of the operation
+        """
+        tool_input = {
+            "project_path": project_path,
+            **kwargs
+        }
+        return await self.run_tool({"name": "project_setup", "input": tool_input, "id": "project_setup_123"})
+
+
+
+    
+# async def main():
+#     example_agent  = Agent("example", AgentDisplayWebWithPrompt())
+#     # project setup with python venv
+#     tool_input = {
+#         "command": "add_additional_depends",
+
+#             "project_path": "/home/myuser/apps/nogame",
+#             "add_dependencies": ["pandas", "pygame"]
+#             }
+
+#     output = await example_agent.call_project_setup(**tool_input)
+#     rr(output)
+
+
+# if __name__ == "__main__":
+#     asyncio.run(main())
+
+# tool_input = {
+#                 "command": "write_code_to_file",
+#                 "project_path": "/home/myuser/apps/bogame",
+#                 "python_filename": "settings.py",
+#                 "code_description": "Create a settings.py file that contains all game constants..."
+#             }
+# tool_input = {
+#                 "command": "write_code_to_file",
+#                 "project_path": "/home/myuser/apps/bogame",
+#                 "python_filename": "settings.py",
+#                 "code_description": "Create a settings.py file that contains all game constants..."
+#             }
+# tool_name = "write_code"
+
+# output = await example_agent.call_write_code(**tool_input)
+# output = await example_agent.example_explicit_tool_call(tool_name, tool_input)
+# Create an instance of the tool
+
+
+#
+# Call the tool to set up a Python project with some dependencies.
+# result = await tool(command="setup_project", project_path="/home/myuser/apps/nogame",environment="python", packages=["numpy", "pandas"],)
+# result = await tool(command=ProjectCommand.SETUP_PROJECT, project_path="/home/myuser/apps/nogame",environment="python", packages=["numpy", "pandas"], # entry_filename="app.py",
