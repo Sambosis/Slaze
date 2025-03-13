@@ -95,6 +95,7 @@ class ToolCollection:
             # Execute the tool and get the result
             # Log the exact contents of tool_input in a more readable format
             formatted_input = json.dumps(tool_input, indent=2)
+            
             self.t_log.debug(f"EXACT TOOL INPUT: \n{formatted_input}")
             
             result = await tool(**tool_input)
