@@ -432,9 +432,11 @@ class Agent:
         }
         return await self.run_tool({"name": "project_setup", "input": tool_input, "id": "project_setup_123"})
 
+    async def get_messages(self):
+        return self.messages
 
-
-    
+    async def get_task(self):
+        return self.task
 # async def main():
 #     example_agent  = Agent("example", AgentDisplayWebWithPrompt())
 #     # project setup with python venv

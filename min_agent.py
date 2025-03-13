@@ -6,7 +6,9 @@ from tools.envsetup import ProjectSetupTool, ProjectCommand
 from tools.write_code import WriteCodeTool
 from tools import ToolResult
 from rich import print as rr
-
+from openai import OpenAI, AsyncOpenAI
+import agent
+from config import PROMPTS_DIR, LOGS_DIR, get_project_dir, get_docker_project_dir, set_project_dir
 # -----------------------------------------------------------------------------
 # Helper Functions
 # -----------------------------------------------------------------------------
@@ -121,10 +123,22 @@ async def run_python_app(project_path: str, entry_filename: str) -> ToolResult:
 # -----------------------------------------------------------------------------
 
 
-async def lmin_agent():
+async def lmin_agent(agent):
+    DOCKER_DIR = get_docker_project_dir()
+    task = await agent.get_task()
+    client = AsyncOpenAI()
+    model = "o3-mini"
+    full_task = f""" Your job is to provide python code to create the program in the given task.  You are not to directly write the code for the task.
+    You have several functions available to you in order to create the program.  These functions are:
+    - create_python_venv
+    - write_code_to_file
+    - write_code_multiple_files
+    - run_python_app
+    Here is an example of how to use each. 
+    
     # Example 1: Create Python virtual environment in Docker
     venv_result = await create_python_venv(
-        project_path="/home/myuser/apps/nogame", packages=["numpy", "pandas"]
+        project_path= DOCKER_DIR, packages=["numpy", "pandas"]
     )
     rr(venv_result)
 
@@ -134,7 +148,7 @@ async def lmin_agent():
         "and a method called 'greet' that returns a greeting message. Include proper import statements and docstrings."
     )
     single_file_result = await write_code_to_file(
-        project_path="/home/myuser/apps/nogame",
+        project_path= DOCKER_DIR,
         python_filename="src/greeter.py",
         code_description=single_file_description,
     )
@@ -153,18 +167,93 @@ async def lmin_agent():
         },
     ]
     multiple_files_result = await write_code_multiple_files(
-        project_path="/home/myuser/apps/nogame",
+        project_path= DOCKER_DIR,
         files=files_to_create,
     )
     rr(multiple_files_result)
 
     # Example 4: Run the main Python application using the run_app command
     run_result = await run_python_app(
-        project_path="/home/myuser/apps/nogame",
+        project_path= DOCKER_DIR,
         entry_filename="src/greeter.py",  
     )
     rr(run_result)
 
+    completion = await client.chat.completions.create(
+        model=model,
+        messages=messages,
+    )
+    print(completion.choices[0].message.content)
+
+
+    Now provide code that would write the program in the following task.
+    Task: {task}
+    """
+
+
+    messages = [
+                    {
+                        "role": "user", 
+                        "content": full_task
+                     }
+                ]
+
+
+
+    completion = await client.chat.completions.create(
+        model=model,
+        messages=messages,
+    )
+    print(completion.choices[0].message.content)
+
+    # Example 1: Create Python virtual environment in Docker
+    venv_result = await create_python_venv(
+        project_path= DOCKER_DIR, packages=["numpy", "pandas"]
+    )
+    rr(venv_result)
+
+    # Example 2: Write a single code file using the write_code tool
+    single_file_description = (
+        "Create a Python class named 'Greeter' with an __init__ that accepts a 'name' (str) "
+        "and a method called 'greet' that returns a greeting message. Include proper import statements and docstrings."
+    )
+    single_file_result = await write_code_to_file(
+        project_path= DOCKER_DIR,
+        python_filename="src/greeter.py",
+        code_description=single_file_description,
+    )
+    rr(single_file_result)
+
+    # Example 3: Write multiple code files using the write_code tool
+    files_to_create = [
+        {
+            "file_path": "src/config.py",
+            "code_description": "Define game configuration constants such as screen dimensions, colors, and basic game rules.",
+        },
+
+        {
+            "file_path": "src/utils/logger.py",
+            "code_description": "Create a logging utility that supports multiple log levels (debug, info, warning, error) and outputs logs to both a file and the console.",
+        },
+    ]
+    multiple_files_result = await write_code_multiple_files(
+        project_path= DOCKER_DIR,
+        files=files_to_create,
+    )
+    rr(multiple_files_result)
+
+    # Example 4: Run the main Python application using the run_app command
+    run_result = await run_python_app(
+        project_path= DOCKER_DIR,
+        entry_filename="src/greeter.py",  
+    )
+    rr(run_result)
+
+    completion = await client.chat.completions.create(
+        model=model,
+        messages=messages,
+    )
+    print(completion.choices[0].message.content)
 
 if __name__ == "__main__":
     asyncio.run(main())

@@ -232,8 +232,8 @@ async def sampling_loop(
     running = True
     while running:
         try:
-            running = await agent.step()
-            # response = await lmin_agent()
+            # running = await agent.step()
+            response = await lmin_agent(agent)
         except UnicodeEncodeError as ue:
             ic(f"UnicodeEncodeError: {ue}")
             rr(f"Unicode encoding error: {ue}")
@@ -257,7 +257,7 @@ async def run_sampling_loop(task: str, display: AgentDisplayWebWithPrompt) -> Li
     agent.messages.append({"role": "user", "content": task})
     messages = await sampling_loop(
         agent=agent,
-        max_tokens=28000,
+        max_tokens=120000,
     )
     return messages
 
