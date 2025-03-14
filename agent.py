@@ -242,7 +242,7 @@ class Agent:
                 {"role": msg["role"], "content": truncate_message_content(msg["content"])}
                 for msg in messages
                 ]   
-            summary_task = asyncio.create_task(summarize_recent_messages(messages[-4:] if len(messages) >= 4 else messages, self.display))
+            summary_task = asyncio.create_task(summarize_recent_messages(truncated_messages[-4:] if len(messages) >= 4 else messages, self.display))
             # ic(f"NUMBER_OF_MESSAGES: {len(messages)}")
 
             # --- MAIN LLM CALL ---

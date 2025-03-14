@@ -226,7 +226,7 @@ def _maybe_filter_to_n_most_recent_images(messages: List[BetaMessageParam], imag
 async def sampling_loop(
     *,
     agent: Agent,
-    max_tokens: int = 28000,
+    max_tokens: int = 180000,
     ) -> List[BetaMessageParam]:
     """Main loop for agentic sampling."""
     running = True

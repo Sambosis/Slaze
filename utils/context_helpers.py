@@ -115,10 +115,20 @@ async def summarize_recent_messages(short_messages: List[BetaMessageParam], disp
                 content = content[:70000] + " ... [TRUNCATED] ... " + content[-70000:]
             conversation_text += f"\n{role}: {content}"
     ic(f"conversation_text: {conversation_text}")
-    summary_prompt = f"""Please provide a concise casual natural language summary of the messages. 
-        They are the actual LLM messages log of the interaction and you will provide several brief statements informing someone what was done. 
-        Focus on the actions taken and provide the names of any files, functions, directories, or paths mentioned and a basic idea of what was done and why. 
-        If known, provide the outcome of the action and whether it was successful or not.
+    summary_prompt = f"""Please provide your response in a concise markdown format with short statements that document what happened. Structure your response as a list with clear labels for each step, such as:
+
+        - **Action:** [brief description of what was done]
+        - **Tool:** [specific tool or method used]
+        - **Result:** [outcome of the action]
+        - **Note:** [any important observations or considerations]
+
+        For example:
+        - **Action:** Created configuration file
+        - **Tool:** Text editor
+        - **Result:** Successfully generated config.json
+        - **Note:** Default parameters were applied
+
+        Please be specific but concise, focusing on documenting the sequence of events in this structured format.
         Messages to summarize:
         {conversation_text}"""
     messages_prompt = [
