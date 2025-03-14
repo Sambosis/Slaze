@@ -64,7 +64,7 @@ class Agent:
             tool_name: The name of the tool that was executed
             tool_input: The input provided to the tool
         """
-        with open("./logs/tool.txt", 'a', encoding='utf-8') as f:
+        with open(LOGS_DIR / "tool.txt", 'a', encoding='utf-8') as f:
             f.write("\n" + "="*80 + "\n")
             f.write(f"TOOL EXECUTION: {tool_name}\n")
             f.write(f"INPUT: {json.dumps(tool_input, indent=2)}\n")
