@@ -230,21 +230,22 @@ async def sampling_loop(
     ) -> List[BetaMessageParam]:
     """Main loop for agentic sampling."""
     running = True
-    while running:
-        try:
-            # running = await agent.step()
-            response = await lmin_agent(agent)
-        except UnicodeEncodeError as ue:
-            ic(f"UnicodeEncodeError: {ue}")
-            rr(f"Unicode encoding error: {ue}")
-            rr(f"ascii: {ue.args[1].encode('ascii', errors='replace').decode('ascii')}")
-            break
-        except Exception as e:
-            ic(f"Error in sampling loop: {str(e).encode('ascii', errors='replace').decode('ascii')}")
-            ic(f"The error occurred at the following message: {agent.messages[-1]} and line: {e.__traceback__.tb_lineno}")
-            ic(e.__traceback__.tb_frame.f_locals)
-            agent.display.add_message("user", ("Error", str(e)))
-            raise
+    # while running:
+    try:
+        # running = await agent.step()
+        response = await lmin_agent(agent)
+    # except UnicodeEncodeError as ue:
+    #     ic(f"UnicodeEncodeError: {ue}")
+    #     rr(f"Unicode encoding error: {ue}")
+    #     rr(f"ascii: {ue.args[1].encode('ascii', errors='replace').decode('ascii')}")
+    #     break
+    except Exception as e:
+        ic(f"Error in sampling loop: {str(e).encode('ascii', errors='replace').decode('ascii')}")
+        ic(f"The error occurred at the following message: {agent.messages[-1]} and line: {e.__traceback__.tb_lineno}")
+        ic(e.__traceback__.tb_frame.f_locals)
+        agent.display.add_message("user", ("Error", str(e)))
+        raise
+    print("Out of the sampling loop")
     return agent.messages
 
 async def run_sampling_loop(task: str, display: AgentDisplayWebWithPrompt) -> List[BetaMessageParam]:

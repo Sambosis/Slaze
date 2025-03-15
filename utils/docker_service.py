@@ -40,27 +40,46 @@ class DockerNotAvailableError(DockerServiceError):
     """Exception raised when Docker is not available"""
     pass
 
+
 class DockerService:
-    """Service class for Docker operations in the project"""
+    """Service class for Docker operations in the project."""
 
     def __init__(self):
-        """Initialize the Docker service"""
-        self._container_name = get_constant("DOCKER_CONTAINER_NAME") or "python-dev-container"
-        self._docker_available = self._check_docker_available()
-        self._path_cache = {}  # Cache for path translations
+        """
+        Initialize the Docker service.
 
-        # Get Docker project directory from config
+        This sets up:
+        - The target Docker container name.
+        - A check for Docker availability.
+        - Caches for path translations.
+        - The Docker project directory (formatted according to Docker path rules).
+        - The host-side project directory.
+        - Default display settings for X11 forwarding.
+        """
+        self._container_name = (
+            get_constant("DOCKER_CONTAINER_NAME") or "python-dev-container"
+        )
+        self._docker_available = self._check_docker_available()
+        self._path_cache = {}  # Cache for host to Docker path translations
+
+        # Get and format the Docker project directory based on configuration,
+        # if one is provided.
         raw_docker_dir = get_constant("DOCKER_PROJECT_DIR")
-        self._docker_project_dir = self._format_docker_path(raw_docker_dir) if raw_docker_dir else None
+        self._docker_project_dir = (
+            self._format_docker_path(raw_docker_dir) if raw_docker_dir else None
+        )
+
+        # Project directory on the host machine.
         self._project_dir = get_constant("PROJECT_DIR")
 
-        # Default display settings
+        # Default X11 display setting for Docker container.
         self._default_display = "host.docker.internal:0"
 
         if self._docker_available:
-            # logger.info(f"Docker service initialized with container: {self._container_name}")
-            # logger.info(f"Docker project directory: {self._docker_project_dir}")
-            pass
+            logger.info(
+                f"Docker service initialized with container: {self._container_name}"
+            )
+            logger.info(f"Docker project directory: {self._docker_project_dir}")
         else:
             logger.warning("Docker not available. Operations will fail.")
 
@@ -83,151 +102,124 @@ class DockerService:
         self._docker_available = self._check_docker_available()
         return self._docker_available
 
+
     def _format_docker_path(self, path: Union[str, Path]) -> str:
         """Format a path for use in Docker commands to ensure proper slashes."""
         if path is None:
             return None
 
-        # Convert to string if it's a Path
-        docker_path = str(path)
+        # Convert to a Path if it isn't already
+        p = Path(path)
 
-        # Replace backslashes with forward slashes
-        docker_path = docker_path.replace('\\', '/')
+        # Normalize the path and get a POSIX version
+        docker_path = p.resolve().as_posix()
 
-        # Ensure there are no double slashes
-        while '//' in docker_path:
-            docker_path = docker_path.replace('//', '/')
+        # Remove any double forward slashes (though as_posix() usually avoids them)
+        while "//" in docker_path:
+            docker_path = docker_path.replace("//", "/")
 
-        # Ensure it starts with /
-        if not docker_path.startswith('/'):
-            docker_path = '/' + docker_path
+        # Ensure the path starts with a slash
+        if not docker_path.startswith("/"):
+            docker_path = "/" + docker_path
 
-        # Split the path and filter out empty parts
-        parts = docker_path.split('/')
-        parts = [part for part in parts if part]
-
-        # Reconstruct the path with proper slashes
-        docker_path = '/' + '/'.join(parts)
+        # Finally, clean up to remove any accidental empty parts
+        parts = [part for part in docker_path.split("/") if part]
+        docker_path = "/" + "/".join(parts)
 
         return docker_path
-
     def to_docker_path(self, host_path: Union[str, Path]) -> Path:
-        """Convert a host path to a Docker container path"""
+        """Convert a host path to a Docker container path, preserving any subdirectory structure"""
         if isinstance(host_path, str):
             host_path = Path(host_path)
 
-        # Check cache first
+        # Use cache if available.
         cache_key = str(host_path)
         if cache_key in self._path_cache:
             return self._path_cache[cache_key]
 
-        # If no project directory is set, we can't do path translation
         project_dir = self._project_dir
         if not project_dir:
             raise DockerServiceError("Project directory not set in configuration")
 
-        # Extract project name (directory name only, not full path)
+        # Extract the project name (only directory name, not full path)
         project_name = project_dir.name
 
-        # Set the Docker base path
+        # Docker base path
         docker_base = "/home/myuser/apps"
 
         try:
-            # Determine if path is within project directory
+            # If host_path is within the project directory,
+            # calculate the relative path and append it to the base project path.
             if host_path == project_dir or project_dir in host_path.parents:
-                # Get the relative path from project directory
                 rel_path = host_path.relative_to(project_dir)
-                # Construct proper Docker path
-                if str(rel_path) == ".":  # If it's the project directory itself
+                if str(rel_path) == ".":
                     docker_path = f"{docker_base}/{project_name}"
                 else:
-                    docker_path = f"{docker_base}/{project_name}/{rel_path}"
+                    # Using POSIX style separator for Docker containers.
+                    docker_path = f"{docker_base}/{project_name}/{rel_path.as_posix()}"
             else:
-                # Not within project directory, use default handling
+                # If outside of the project directory, simply return a path based on the filename.
                 docker_path = f"{docker_base}/{host_path.name}"
 
-            # Log the path translation for debugging
-            # logger.debug(f"Path translation: {host_path} -> {docker_path}")
-
-            # Cache and return result
             docker_path = Path(docker_path)
             self._path_cache[cache_key] = docker_path
             return docker_path
 
         except ValueError:
-            # Fallback if relative_to raises error
+            # Fallback if relative_to fails.
             docker_path = Path(f"{docker_base}/{host_path.name}")
             self._path_cache[cache_key] = docker_path
             return docker_path
 
     def from_docker_path(self, docker_path: Union[str, Path]) -> Path:
-        """Convert a Docker container path to a host path"""
-        # Convert to string for consistent handling
-        docker_path_str = str(docker_path).replace('\\', '/')
-
-        # Check cache first
-        if not hasattr(self, "_reverse_path_cache"):
-            self._reverse_path_cache = {}
+        """Convert a Docker container path to a host path, preserving the subdirectory structure."""
+        docker_path_str = str(docker_path).replace("\\", "/")
 
         if docker_path_str in self._reverse_path_cache:
             return self._reverse_path_cache[docker_path_str]
 
-        # If no project directory is set, we can't do path translation
         project_dir = self._project_dir
         if not project_dir:
             raise DockerServiceError("Project directory not set in configuration")
 
-        # Extract project name (directory name only, not full path)
         project_name = project_dir.name
-
-        # Set the Docker base path
         docker_base = "/home/myuser/apps"
         docker_project_path = f"{docker_base}/{project_name}"
 
-        try:
-            # Path translation logic
-            host_path = None
+        host_path = None
 
-            # Case 1: Docker path is exactly the project directory
+        try:
+            # Case 1: Docker path exactly matches the project directory.
             if docker_path_str == docker_project_path:
                 host_path = project_dir
 
-            # Case 2: Docker path is within the project directory
+            # Case 2: Docker path is within the project directory.
             elif docker_path_str.startswith(f"{docker_project_path}/"):
-                rel_path_str = docker_path_str[len(docker_project_path) + 1:]
-                host_path = project_dir / rel_path_str
+                rel_path_str = docker_path_str[len(docker_project_path) + 1 :]
+                # Use PosixPath to ensure we get the right parts, then construct the host path.
+                host_path = project_dir / Path(rel_path_str)
 
-            # Case 3: Docker path is within the base directory but not the project
+            # Case 3: Docker path is inside the base directory but not in this project.
             elif docker_path_str.startswith(f"{docker_base}/"):
-                rel_to_base = docker_path_str[len(docker_base) + 1:]
-                parts = rel_to_base.split('/', 1)
-
+                rel_to_base = docker_path_str[len(docker_base) + 1 :]
+                parts = rel_to_base.split("/", 1)
                 if parts and parts[0] != project_name:
-                    # Another project or directory in the base directory
                     other_name = parts[0]
                     host_path = project_dir.parent / other_name
-
                     if len(parts) > 1:
-                        # There's a path after the project/directory name
                         host_path = host_path / parts[1]
                 else:
-                    # Should not happen given the previous conditions, but handle anyway
-                    host_path = project_dir / (rel_to_base if rel_to_base else '')
-
-            # Case 4: Fallback for other Docker paths
+                    host_path = project_dir / (rel_to_base if rel_to_base else "")
+            # Case 4: Fallback to use the filename only.
             if not host_path:
                 host_path = project_dir / Path(docker_path_str).name
 
-            # Log the path translation
-            # logger.debug(f"Reverse path translation: {docker_path_str} -> {host_path}")
-
-            # Cache and return
             self._reverse_path_cache[docker_path_str] = host_path
             return host_path
 
         except Exception as e:
-            # Fallback if there's an error
-            logger.error(f"Error in reverse path translation: {str(e)}")
+            # Fallback in the event of an unexpected error.
+            print(f"Error in reverse path translation: {str(e)}")
             host_path = project_dir / Path(docker_path_str).name
             self._reverse_path_cache[docker_path_str] = host_path
             return host_path

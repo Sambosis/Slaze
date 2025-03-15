@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 from tools.envsetup import ProjectSetupTool, ProjectCommand
 from tools.write_code import WriteCodeTool
+from utils.docker_service import DockerService
 from tools import ToolResult
 from rich import print as rr
 from openai import OpenAI, AsyncOpenAI
@@ -16,7 +17,7 @@ from config import PROMPTS_DIR, LOGS_DIR, get_project_dir, get_docker_project_di
 
 async def create_python_venv(
     project_path: str, packages: list[str] = None
-) -> ToolResult:
+    ) -> ToolResult:
     """
     Create a Python virtual environment (venv) for the project in Docker.
 
@@ -42,7 +43,7 @@ async def create_python_venv(
 
 async def write_code_to_file(
     project_path: str, python_filename: str, code_description: str
-) -> ToolResult:
+    ) -> ToolResult:
     """
     Write a single code file to the project using the WriteCodeTool.
 
@@ -122,139 +123,212 @@ async def run_python_app(project_path: str, entry_filename: str) -> ToolResult:
 # Main Function for Testing
 # -----------------------------------------------------------------------------
 
+import os
+import re
+import ast
+import asyncio
+from openai import AsyncOpenAI
+
+# --- Helper Functions ---
+# We only need extract_local_imports, since you handle the LLM call and writing.
+
+
+# --- Helper Functions ---
+import ast
+
+
+import os
+import ast
+from pathlib import Path
+from typing import List
+
 
 async def lmin_agent(agent):
-    DOCKER_DIR = get_docker_project_dir()
+    """
+    Main agent function that:
+      - Retrieves the project task.
+      - Gets a comma-separated list of relative file paths from the LLM.
+      - Converts the relative paths (with forward slashes) to full Windows paths.
+      - Iteratively generates files and checks each file for local imports.
+    """
+    project_dir = get_project_dir()  # Should return a Path (Windows-style)
     task = await agent.get_task()
+    print(f"Project Dir = {project_dir}")
+
     client = AsyncOpenAI()
-    model = "o3-mini"
-    full_task = f""" Your job is to provide python code to create the program in the given task.  You are not to directly write the code for the task.
-            You have several functions available to you in order to create the program.  These functions are:
-            - create_python_venv
-            - write_code_to_file
-            - write_code_multiple_files
-            - run_python_app
-            Here is an example of how to use each. 
-            
-            # Example 1: Create Python virtual environment in Docker
-            venv_result = await create_python_venv(
-                project_path= DOCKER_DIR, packages=["numpy", "pandas"]
-            )
-            rr(venv_result)
+    model = "gpt-4o"
 
-            # Example 2: Write a single code file using the write_code tool
-            single_file_description = (
-                "Create a Python class named 'Greeter' with an __init__ that accepts a 'name' (str) "
-                "and a method called 'greet' that returns a greeting message. Include proper import statements and docstrings."
-            )
-            single_file_result = await write_code_to_file(
-                project_path= DOCKER_DIR,
-                python_filename="src/greeter.py",
-                code_description=single_file_description,
-            )
-            rr(single_file_result)
+    # --- 1. Get the list of files ---
+    initial_prompt = f"""
+        You are an AI assistant tasked with creating a Python project.
+        Given the following task, generate a list of the files needed for the project.
+        Provide the list of files in a comma-separated format, including the file extension.
+        Do not provide any additional explanation. Only provide file names.
+        If the file should be in a subdirectory include that in the name.
+        Task: {task}
+        """
 
-            # Example 3: Write multiple code files using the write_code tool
-            files_to_create = [
-                {{
-                     "file_path": "src/config.py",
-                    "code_description": "Define game configuration constants such as screen dimensions, colors, and basic game rules.",
-                }},
-
-                {{
-                    "file_path": "src/utils/logger.py",
-                    "code_description": "Create a logging utility that supports multiple log levels (debug, info, warning, error) and outputs logs to both a file and the console.",
-                }},
-            ]
-            multiple_files_result = await write_code_multiple_files(
-                project_path= DOCKER_DIR,
-                files=files_to_create,
-            )
-            rr(multiple_files_result)
-
-            # Example 4: Run the main Python application using the run_app command
-            run_result = await run_python_app(
-                project_path= DOCKER_DIR,
-                entry_filename="src/greeter.py",  
-            )
-            rr(run_result)
-
-            completion = await client.chat.completions.create(
-                model=model,
-                messages=messages,
-            )
-            print(completion.choices[0].message.content)
-
-
-            Now provide code that would write the program in the following task.
-            Task: {task}
-            """
-
-
-    messages = [
-                    {
-                        "role": "user", 
-                        "content": full_task
-                     }
-                ]
-
-
+    messages = [{"role": "user", "content": initial_prompt}]
 
     completion = await client.chat.completions.create(
         model=model,
         messages=messages,
-    )
-    print(completion.choices[0].message.content)
+        )
 
-    # Example 1: Create Python virtual environment in Docker
-    venv_result = await create_python_venv(
-        project_path= DOCKER_DIR, packages=["numpy", "pandas"]
-    )
-    rr(venv_result)
+    file_list_str = completion.choices[0].message.content
+    rr(f"String from LLM    {file_list_str}")
+    file_list = [f.strip() for f in file_list_str.split(",") if f.strip()]
+    print(f"File list: {file_list}")
 
-    # Example 2: Write a single code file using the write_code tool
-    single_file_description = (
-        "Create a Python class named 'Greeter' with an __init__ that accepts a 'name' (str) "
-        "and a method called 'greet' that returns a greeting message. Include proper import statements and docstrings."
-    )
-    single_file_result = await write_code_to_file(
-        project_path= DOCKER_DIR,
-        python_filename="src/greeter.py",
-        code_description=single_file_description,
-    )
-    rr(single_file_result)
+    written_files = set()
+    files_to_write = [file_list[0]]  # Start with the first file
 
-    # Example 3: Write multiple code files using the write_code tool
-    files_to_create = [
-        {
-            "file_path": "src/config.py",
-            "code_description": "Define game configuration constants such as screen dimensions, colors, and basic game rules.",
-        },
+    while files_to_write:
+        current_file = files_to_write.pop(0)
+        if current_file in written_files:
+            continue
 
-        {
-            "file_path": "src/utils/logger.py",
-            "code_description": "Create a logging utility that supports multiple log levels (debug, info, warning, error) and outputs logs to both a file and the console.",
-        },
-    ]
-    multiple_files_result = await write_code_multiple_files(
-        project_path= DOCKER_DIR,
-        files=files_to_create,
+        # Convert the Linux-style relative path to a Windows path.
+        full_path = project_dir / Path(current_file.replace("/", os.sep))
+
+        # Generate code for the file. Using a simple description here.
+        code_description = f"Generate code for {current_file}. This is part of the project. Task: {task}"
+        success = await write_code_to_file(
+            project_path=project_dir,
+            python_filename=current_file,
+            code_description=code_description,
+        )
+        if not success:
+            print(f"Error writing {current_file}")
+            return
+
+        written_files.add(current_file)
+        # Read the current file to check for local imports.
+        with open(full_path, "r") as f:
+            code = f.read()
+        # Check for local imports in the newly written file.
+        local_imports = find_local_imports(code, file_list)
+        print(f"For file {current_file}, found local imports: {local_imports}")
+        for imp in local_imports:
+            candidate = imp  # already a path like 'ui/stats_display.py'
+            if candidate not in written_files and candidate in file_list:
+                files_to_write.append(candidate)
+                rr(f"Adding {candidate} to files_to_write")
+
+
+def find_local_imports(code: str, file_list: set) -> set:
+    imports = set(
+        re.findall(
+            r"^\s*import ([\w\.]+)|^\s*from ([\w\.]+) import", code, re.MULTILINE
+        )
     )
-    rr(multiple_files_result)
+    flat_imports = set()
+    for imp in imports:
+        imp_name = imp[0] or imp[1]
+        imp_file_path = imp_name.replace(".", "/") + ".py"
+        if imp_file_path in file_list:
+            flat_imports.add(imp_file_path)
+    return flat_imports
 
-    # Example 4: Run the main Python application using the run_app command
-    run_result = await run_python_app(
-        project_path= DOCKER_DIR,
-        entry_filename="src/greeter.py",  
-    )
-    rr(run_result)
 
-    completion = await client.chat.completions.create(
-        model=model,
-        messages=messages,
-    )
-    print(completion.choices[0].message.content)
+# async def lmin_agent(agent):
+#     docker_tool = DockerService()
+#     DOCKER_DIR = get_docker_project_dir()
+#     PROJECT_DIR = get_project_dir()
+#     task = await agent.get_task()
+#     client = AsyncOpenAI()
+#     model = "gpt-3.5-turbo-1106"
+#     print(f"Docker Project Dir = {DOCKER_DIR}")
+#     print(f"Project Dir = {PROJECT_DIR}")
+#     tool_project = docker_tool.from_docker_path(DOCKER_DIR)
+#     print(f"tool_project = {tool_project}")
+#     test_file = "dog.py"
+#     test_file_path = docker_tool.from_docker_path(test_file)
+#     print(f"test_file_path = {test_file_path}")
+#     docker_file = docker_tool.to_docker_path(test_file)
+#     print(f"docker_file = {docker_file}")
+#     # --- 1. Get the list of files ---
+#     initial_prompt = f"""
+#     You are an AI assistant tasked with creating a Python project.
+#     Given the following task, generate a list of the files needed for the project.
+#     Provide the list of files in a comma-separated format, including the file extension.
+#     Do not provide any additional explanation. Only provide file names.
+#     If the file should be in a subdirectory include that in the name.
+#     Task: {task}
+#     """
+#     messages = [{"role": "user", "content": initial_prompt}]
+#     try:
+#         completion = await client.chat.completions.create(
+#             model=model,
+#             messages=messages,
+#         )
+#         file_list_str = completion.choices[0].message.content
+#         # Normalize paths in file_list to use os.path.join
+#         file_list = [
+#             os.path.normpath(os.path.join(DOCKER_DIR, f.strip()))
+#             for f in file_list_str.split(",")
+#             if f.strip()
+#         ]
 
+#         print(f"File List: {file_list}")
+#     except Exception as e:
+#         print(f"Error generating file list: {e}")
+#         return
+
+#     # --- 2. Generate code iteratively ---
+
+#     written_files = set()
+#     files_to_write = [file_list[0]]  # Start with the first file
+#     while files_to_write:
+#         current_file = files_to_write.pop(0)
+#         if current_file in written_files:
+#             continue
+
+#         # full_file_path = os.path.join(DOCKER_DIR, current_file) # Already have the full path
+
+#         if current_file == file_list[0]:
+#             code_description = f"Generate the code for {os.path.basename(current_file)}. This is the entry point of the application. Project Task: {task}"
+#         else:
+#             code_description = f"Generate the code for {os.path.basename(current_file)}. Project Task: {task}"
+
+#         # Use YOUR write_code_to_file function
+#         result = await write_code_to_file(
+#             project_path=DOCKER_DIR,
+#             python_filename=os.path.relpath(
+#                 current_file, DOCKER_DIR
+#             ),  # Pass relative path
+#             code_description=code_description,
+#         )
+#         # Check for errors using the __bool__ method of ToolResult
+#         if not result:
+#             print(f"Error writing {current_file}: {result.error}")
+#             return
+
+#         written_files.add(current_file)
+
+#         # Find local imports and add them to the queue.
+#         imports = extract_local_imports(
+#             current_file, file_list
+#         )  # current_file already has full path
+#         for imported_module in imports:
+#             # Construct full paths for imported modules
+#             imported_file_rel = imported_module.replace(".", "/") + ".py"
+#             imported_file = os.path.normpath(
+#                 os.path.join(DOCKER_DIR, imported_file_rel)
+#             )
+
+#             if imported_file not in written_files and imported_file in file_list:
+#                 files_to_write.append(imported_file)  # Use full path
+#             # Handle cases where import is just the module name (no subdirs)
+#             elif imported_module + ".py" not in written_files:
+#                 imported_file_simple = os.path.normpath(
+#                     os.path.join(DOCKER_DIR, imported_module + ".py")
+#                 )
+#                 if imported_file_simple in file_list:
+#                     converted_path = docker_tool.from_docker_path(imported_file_simple)
+#                     files_to_write.append(converted_path)
+
+#
 async def main():
     import asyncio
 
@@ -359,7 +433,101 @@ async def main():
     rr(run_result)
 
 
-
-
 if __name__ == "__main__":
     asyncio.run(main())
+
+
+# --- Main Agent Function (Modified) ---
+
+
+# async def lmin_agent(agent):
+#     docker_tool = DockerService()
+#     DOCKER_DIR = agent.get_docker_project_dir()
+#     task = await agent.get_task()
+#     client = AsyncOpenAI()
+#     model = "gpt-3.5-turbo-1106"
+#     print(f"Docker Project Dir = {DOCKER_DIR}")
+
+#     # --- 1. Get the list of files ---
+#     initial_prompt = f"""
+#     You are an AI assistant tasked with creating a Python project.
+#     Given the following task, generate a list of the files needed for the project.
+#     Provide the list of files in a comma-separated format, including the file extension.
+#     Do not provide any additional explanation. Only provide file names.
+#     If the file should be in a subdirectory include that in the name.
+#     Task: {task}
+#     """
+#     messages = [{"role": "user", "content": initial_prompt}]
+#     try:
+#         completion = await client.chat.completions.create(
+#             model=model,
+#             messages=messages,
+#         )
+#         file_list_str = completion.choices[0].message.content
+#         # Normalize paths in file_list to use os.path.join
+#         file_list = [
+#             os.path.normpath(os.path.join(DOCKER_DIR, f.strip()))
+#             for f in file_list_str.split(",")
+#             if f.strip()
+#         ]
+#         print(f"File List: {file_list}")
+#     except Exception as e:
+#         print(f"Error generating file list: {e}")
+#         return
+
+#     # --- 2. Generate code iteratively ---
+
+#     written_files = set()
+#     files_to_write = [file_list[0]]  # Start with the first file
+
+#     while files_to_write:
+#         current_file = files_to_write.pop(0)
+#         if current_file in written_files:
+#             continue
+
+#         # full_file_path = os.path.join(DOCKER_DIR, current_file) # Already have the full path
+
+#         if current_file == file_list[0]:
+#             code_description = f"Generate the code for {os.path.basename(current_file)}. This is the entry point of the application. Project Task: {task}"
+#         else:
+#             code_description = f"Generate the code for {os.path.basename(current_file)}. Project Task: {task}"
+
+#         # Use YOUR write_code_to_file function
+#         result = await write_code_to_file(
+#             project_path=DOCKER_DIR,
+#             python_filename=os.path.relpath(
+#                 current_file, DOCKER_DIR
+#             ),  # Pass relative path
+#             code_description=code_description,
+#         )
+#         # Check for errors using the __bool__ method of ToolResult
+#         if not result:
+#             print(f"Error writing {current_file}: {result.error}")
+#             return
+
+#         written_files.add(current_file)
+
+#         # Find local imports and add them to the queue.
+#         imports = extract_local_imports(
+#             current_file, file_list
+#         )  # current_file already has full path
+#         for imported_module in imports:
+#             # Construct full paths for imported modules
+#             imported_file_rel = imported_module.replace(".", "/") + ".py"
+#             imported_file = os.path.normpath(
+#                 os.path.join(DOCKER_DIR, imported_file_rel)
+#             )
+
+#             if imported_file not in written_files and imported_file in file_list:
+#                 files_to_write.append(imported_file)  # Use full path
+#             # Handle cases where import is just the module name (no subdirs)
+#             elif imported_module + ".py" not in written_files:
+#                 imported_file_simple = os.path.normpath(
+#                     os.path.join(DOCKER_DIR, imported_module + ".py")
+#                 )
+#                 if imported_file_simple in file_list:
+#                     files_to_write.append(imported_file_simple)
+#     await agent.set_status("completed")
+
+
+# --- Main Agent Function (Modified) ---
