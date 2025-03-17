@@ -6,7 +6,19 @@ Create a Python application using Pygame and reinforcement learning that simulat
 
 
 
+
+
+
+
+
+
+
+
 1. Core Components:
+
+
+
+
 
 
 
@@ -14,11 +26,23 @@ Create a Python application using Pygame and reinforcement learning that simulat
 
 
 
+
+
+
+
 - Create a reinforcement learning agent that focuses on bet sizing optimization
 
 
 
+
+
+
+
 - Enforce basic strategy for all playing decisions (hit, stand, double, split)
+
+
+
+
 
 
 
@@ -30,7 +54,19 @@ Create a Python application using Pygame and reinforcement learning that simulat
 
 
 
+
+
+
+
+
+
+
+
 2. Game Logic Requirements:
+
+
+
+
 
 
 
@@ -38,11 +74,23 @@ Create a Python application using Pygame and reinforcement learning that simulat
 
 
 
+
+
+
+
 - Implement standard blackjack rules (dealer stands on soft 17, blackjack pays 3:2)
 
 
 
+
+
+
+
 - Track the running count and true count for bet sizing decisions
+
+
+
+
 
 
 
@@ -54,7 +102,19 @@ Create a Python application using Pygame and reinforcement learning that simulat
 
 
 
+
+
+
+
+
+
+
+
 3. Reinforcement Learning Components:
+
+
+
+
 
 
 
@@ -62,7 +122,15 @@ Create a Python application using Pygame and reinforcement learning that simulat
 
 
 
+
+
+
+
 - Action space should be a discrete set of possible bet sizes
+
+
+
+
 
 
 
@@ -70,7 +138,15 @@ Create a Python application using Pygame and reinforcement learning that simulat
 
 
 
+
+
+
+
 - Use Q-learning or SARSA for the learning algorithm
+
+
+
+
 
 
 
@@ -82,7 +158,19 @@ Create a Python application using Pygame and reinforcement learning that simulat
 
 
 
+
+
+
+
+
+
+
+
 4. Display and Visualization:
+
+
+
+
 
 
 
@@ -90,7 +178,15 @@ Create a Python application using Pygame and reinforcement learning that simulat
 
 
 
+
+
+
+
 - Update and display training statistics every 10 games, including:
+
+
+
+
 
 
 
@@ -98,7 +194,15 @@ Create a Python application using Pygame and reinforcement learning that simulat
 
 
 
+
+
+
+
   * Bankroll graph
+
+
+
+
 
 
 
@@ -106,11 +210,23 @@ Create a Python application using Pygame and reinforcement learning that simulat
 
 
 
+
+
+
+
   * Average bet size
 
 
 
+
+
+
+
   * Maximum drawdown
+
+
+
+
 
 
 
@@ -122,7 +238,19 @@ Create a Python application using Pygame and reinforcement learning that simulat
 
 
 
+
+
+
+
+
+
+
+
 5. Technical Requirements:
+
+
+
+
 
 
 
@@ -130,7 +258,15 @@ Create a Python application using Pygame and reinforcement learning that simulat
 
 
 
+
+
+
+
 - Implement proper separation of concerns (game logic, RL agent, visualization)
+
+
+
+
 
 
 
@@ -138,7 +274,15 @@ Create a Python application using Pygame and reinforcement learning that simulat
 
 
 
+
+
+
+
 - Add configuration options for:
+
+
+
+
 
 
 
@@ -146,7 +290,15 @@ Create a Python application using Pygame and reinforcement learning that simulat
 
 
 
+
+
+
+
   * Betting limits
+
+
+
+
 
 
 
@@ -154,7 +306,19 @@ Create a Python application using Pygame and reinforcement learning that simulat
 
 
 
+
+
+
+
   * Training parameters
+
+
+
+
+
+
+
+
 
 
 

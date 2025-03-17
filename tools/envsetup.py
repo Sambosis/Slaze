@@ -202,10 +202,10 @@ class ProjectSetupTool(BaseAnthropicTool):
             }
             
         # Make sure local directory exists
-        project_path.mkdir(parents=True, exist_ok=True)
-        
+        # project_path.mkdir(parents=True, exist_ok=True)
+        # 
         # Get Docker path with correct format
-        docker_path = self.get_docker_path(project_path)
+        docker_path = project_path
         
         try:
             # Create the project directory in Docker

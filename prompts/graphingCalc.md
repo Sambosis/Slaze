@@ -1,1 +1,3 @@
-create a graphing calculator python gui app.
+
+          Select a prompt to view or create a new one...
+        
