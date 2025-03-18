@@ -1,0 +1,53 @@
+# Expanded Description: Pygame Battleship Game
+
+I'll create a simple version of the classic Battleship game using Pygame. In this implementation:
+
+- The game will have two 10x10 grids: one for the player's ships and one for the computer's ships
+- Ships will be represented by simple polygons (rectangles of different sizes)
+- The player will place ships initially by clicking on the grid and pressing a key to rotate
+- Standard Battleship ships will be used: Carrier (5), Battleship (4), Cruiser (3), Submarine (3), and Destroyer (2)
+- The player will use the mouse to select coordinates to attack on the computer's grid
+- The computer will make random valid moves against the player's grid
+- Hits and misses will be visually indicated with different colors
+- The game will display whose turn it is and announce a winner when all ships are sunk
+- No sound effects will be included
+- Simple text-based UI elements will show game state and instructions
+- The game will have basic states: setup (placing ships), playing, and game over
+
+# File Tree
+
+1. `main.py`
+   - Purpose: Entry point for the game, initializes Pygame, manages game loop and state transitions
+   - Import: N/A (This is the main executable file)
+
+2. `game/constants.py`
+   - Purpose: Contains all game constants, colors, sizes, and configuration
+   - Import: `from game.constants import *`
+
+3. `game/board.py`
+   - Purpose: Implements the Board class which manages a 10x10 grid, ship placement, and hit tracking
+   - Import: `from game.board import Board`
+
+4. `game/ship.py`
+   - Purpose: Implements the Ship class with properties for size, position, rotation, and hit status
+   - Import: `from game.ship import Ship`
+
+5. `game/player.py`
+   - Purpose: Implements the Player class (for human player) with methods for interaction and moves
+   - Import: `from game.player import Player`
+
+6. `game/computer.py`
+   - Purpose: Implements the Computer class with AI logic for ship placement and attacks
+   - Import: `from game.computer import Computer`
+
+7. `game/game_state.py`
+   - Purpose: Manages game state (setup, player turn, computer turn, game over), transitions and rules
+   - Import: `from game.game_state import GameState`
+
+8. `game/renderer.py`
+   - Purpose: Handles all drawing operations, rendering boards, ships, hits/misses, and UI elements
+   - Import: `from game.renderer import Renderer`
+
+9. `game/__init__.py`
+   - Purpose: Makes the game directory a proper package for absolute imports
+   - Import: N/AStart testing as soon as possible. DO NOT start making fixes or improvements until you have tested to see if it is working as is.  Your project directory is /home/myuser/apps/battleship. You need to make sure that all files you create and work you do is done in that directory.

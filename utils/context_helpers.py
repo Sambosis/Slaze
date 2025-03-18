@@ -88,6 +88,7 @@ async def summarize_recent_messages(short_messages: List[BetaMessageParam], disp
         base_url="https://openrouter.ai/api/v1",
         api_key=OPENROUTER_API_KEY,
         )
+    all_summaries = get_all_summaries()
     model = "google/gemini-2.0-flash-lite-001"
     # sum_client = OpenAI()
     # model = "o3-mini"
@@ -127,7 +128,9 @@ async def summarize_recent_messages(short_messages: List[BetaMessageParam], disp
         - **Tool:** Text editor
         - **Result:** Successfully generated config.json
         - **Note:** Default parameters were applied
-
+        - Here are the actions that have been logged so far.  You should not repeat these, they are only to give you context to what is going on. 
+        Previous Actions:
+        {all_summaries}
         Please be specific but concise, focusing on documenting the sequence of events in this structured format.
         Messages to summarize:
         {conversation_text}"""

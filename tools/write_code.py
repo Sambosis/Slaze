@@ -342,7 +342,7 @@ class WriteCodeTool(BaseAnthropicTool):
         Returns tuple of (content, language).
         """
         # If a file_path is provided and it's a Markdown file, return text as-is.
-        if file_path is not None and str(file_path).lower().endswith(('.md', '.markdown')):
+        if file_path is not None and str(file_path).toLower().endsWith(('.md', '.markdown')):
             return text, "markdown"
 
         # Original code block extraction logic for other files
@@ -388,8 +388,11 @@ class WriteCodeTool(BaseAnthropicTool):
         client = AsyncOpenAI()
         model = "o3-mini"
 
+        # Get the original task from the config if available
+        from config import get_constant
+        agent_task = get_constant("TASK")
         # Prepare messages
-        messages = code_prompt_generate(current_code_base, code_description, research_string)
+        messages = code_prompt_generate(current_code_base, code_description, research_string, agent_task)
         ic(f"Here are the messages being sent to Generate the Code\n +++++ \n +++++ \n{messages}")
         try:
             completion = await client.chat.completions.create(
@@ -641,8 +644,8 @@ class WriteCodeTool(BaseAnthropicTool):
 
             # First, generate the code skeleton
             # ll.info(f"Generating code skeleton for {file_path}")
-            code_skeleton = await self._call_llm_for_code_skeleton(code_description, file_path)
-            
+            # code_skeleton = await self._call_llm_for_code_skeleton(code_description, file_path)
+            code_skeleton = None
             # Then, generate the full code
             # ll.info(f"Generating full code for {file_path} with skeleton")
             code = await self._call_llm_to_generate_code(code_description, code_skeleton, file_path)

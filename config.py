@@ -43,7 +43,6 @@ CODE_FILE = LOGS_DIR / "code_messages.py"
 USER_LOG_FILE = LOGS_DIR / "user_messages.log"
 ASSISTANT_LOG_FILE = LOGS_DIR / "assistant_messages.log"
 TOOL_LOG_FILE = LOGS_DIR / "tool_messages.log"
-
 MAX_SUMMARY_MESSAGES = 40
 MAX_SUMMARY_TOKENS = 8000
 
@@ -113,6 +112,7 @@ def write_constants_to_file():
         "MESSAGES_FILE": str(MESSAGES_FILE),
         "ICECREAM_OUTPUT_FILE": str(ICECREAM_OUTPUT_FILE),
         "CODE_FILE": str(CODE_FILE),
+        "TASK": "NOT YET CREATED",
     }
     with open(CACHE_DIR / "constants.json", "w") as f:
         json.dump(constants, f, indent=4)

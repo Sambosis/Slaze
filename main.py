@@ -252,7 +252,7 @@ async def run_sampling_loop(task: str, display: AgentDisplayWebWithPrompt) -> Li
     api_key = os.getenv("ANTHROPIC_API_KEY")
     if not api_key:
         raise ValueError("API key not found. Please set the ANTHROPIC_API_KEY environment variable.")
-    
+    # set the task as a constant in config
     agent = Agent(task=task, display=display)
     agent.messages.append({"role": "user", "content": task})
     messages = await sampling_loop(

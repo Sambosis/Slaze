@@ -1,0 +1,1 @@
+create a simple pygame version of the game battleship. Just use polygons to represent the pieces. Do not create any sound, get a working version where the user plays against the computer. The user use the mouse to play the game. 

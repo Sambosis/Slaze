@@ -32,10 +32,11 @@ from token_tracker import TokenTracker
 class Agent:
     def __init__(self, task: str, display: AgentDisplayWebWithPrompt):
         self.task = task
+        # set the task to TASK  in config
         self.display = display
         self.context_recently_refreshed = False
         self.refresh_count = 50
-        self.refresh_increment = 10 # the number to increase the refresh count by
+        self.refresh_increment = 10 # the number     to increase the refresh count by
         self.tool_collection = ToolCollection(
             WriteCodeTool(display=self.display),
             ProjectSetupTool(display=self.display),
@@ -88,6 +89,7 @@ class Agent:
 
     async def run_tool(self, content_block):
         result = ToolResult(output="Tool execution not started", tool_name=content_block["name"])
+        # SET THE CONSTANT TASK to self.task
         try:
             # ic(content_block['name'])
             # ic(content_block["input"])
@@ -433,8 +435,6 @@ class Agent:
         return await self.run_tool({"name": "project_setup", "input": tool_input, "id": "project_setup_123"})
 
 
-
-    
 # async def main():
 #     example_agent  = Agent("example", AgentDisplayWebWithPrompt())
 #     # project setup with python venv

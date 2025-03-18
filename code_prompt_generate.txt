@@ -1,0 +1,935 @@
+At the bottom is a detailed description of code that you need to write, followed by a code skeleton that provides the structure.
+                    
+        Active Task: # Expanded Description: Pygame Battleship Game
+
+I'll create a simple version of the classic Battleship game using Pygame. In this implementation:
+
+- The game will have two 10x10 grids: one for the player's ships and one for the computer's ships
+- Ships will be represented by simple polygons (rectangles of different sizes)
+- The player will place ships initially by clicking on the grid and pressing a key to rotate
+- Standard Battleship ships will be used: Carrier (5), Battleship (4), Cruiser (3), Submarine (3), and Destroyer (2)
+- The player will use the mouse to select coordinates to attack on the computer's grid
+- The computer will make random valid moves against the player's grid
+- Hits and misses will be visually indicated with different colors
+- The game will display whose turn it is and announce a winner when all ships are sunk
+- No sound effects will be included
+- Simple text-based UI elements will show game state and instructions
+- The game will have basic states: setup (placing ships), playing, and game over
+
+# File Tree
+
+1. `main.py`
+   - Purpose: Entry point for the game, initializes Pygame, manages game loop and state transitions
+   - Import: N/A (This is the main executable file)
+
+2. `game/constants.py`
+   - Purpose: Contains all game constants, colors, sizes, and configuration
+   - Import: `from game.constants import *`
+
+3. `game/board.py`
+   - Purpose: Implements the Board class which manages a 10x10 grid, ship placement, and hit tracking
+   - Import: `from game.board import Board`
+
+4. `game/ship.py`
+   - Purpose: Implements the Ship class with properties for size, position, rotation, and hit status
+   - Import: `from game.ship import Ship`
+
+5. `game/player.py`
+   - Purpose: Implements the Player class (for human player) with methods for interaction and moves
+   - Import: `from game.player import Player`
+
+6. `game/computer.py`
+   - Purpose: Implements the Computer class with AI logic for ship placement and attacks
+   - Import: `from game.computer import Computer`
+
+7. `game/game_state.py`
+   - Purpose: Manages game state (setup, player turn, computer turn, game over), transitions and rules
+   - Import: `from game.game_state import GameState`
+
+8. `game/renderer.py`
+   - Purpose: Handles all drawing operations, rendering boards, ships, hits/misses, and UI elements
+   - Import: `from game.renderer import Renderer`
+
+9. `game/__init__.py`
+   - Purpose: Makes the game directory a proper package for absolute imports
+   - Import: N/AStart testing as soon as possible. DO NOT start making fixes or improvements until you have tested to see if it is working as is.  Your project directory is /home/myuser/apps/battleship. You need to make sure that all files you create and work you do is done in that directory.
+
+
+        Your task is to implement the full code based on the description and skeleton. Make sure you provide your response in the requested programming language. Your response should include the code for the entire file including proper import lines, but do not actually include the code from other files.
+
+        You should print verbose output to the console to show the progress of the code execution. This will help the user understand what is happening at each step of the process.
+                    
+        If you are requested to make changes to an existing file, please provide the full file with the correction made as your response. Please keep your changes limited to what was requested and keep the rest of the code unchanged.
+                    
+        If you see possible errors that are outside of the scope of the request, please make a note of them using inline comments in the code. Provide additional explanation as needed in comments.
+                    
+        If you see additional improvements that could be made to the code, please make a note of them at the bottom of the code in the comments, but do not make the changes.
+                    
+        You may be occasionally asked to provide non-typical file responses, such as Markdown, Readme, ipynb, txt, etc. Please provide the file in the requested format instead of providing code that would generate the file.
+
+        All of the code that you provide needs to be enclosed in a single markdown style code block with the language specified.
+        Here is an example of what your response should look like:
+        ```python
+        # Your code goes here
+        ```
+        If it was javascript it would look like this:
+        ```javascript
+        // Your code goes here
+        ```
+                    
+        Here is all of the code that has been created for the project so far:
+        Code:
+        # All Python File Skeletons
+## /home/myuser/apps/battleship/game/__init__.py
+```python
+# Error parsing code: invalid syntax (<unknown>, line 3)
+# Failed to parse code block: 'str' object has no attribute 'toLower'
+
+```python
+# This file marks the game directory as a Python package.
+# It is intentionally left blank.
+```
+```
+
+## /home/myuser/apps/battleship/game/constants.py
+```python
+# Error parsing code: invalid syntax (<unknown>, line 3)
+# Failed to parse code block: 'str' object has no attribute 'toLower'
+
+```python
+"""
+File: /home/myuser/apps/battleship/game/constants.py
+Description: This file contains all game constants including window dimensions, grid settings, colors, FPS,
+             and standard ship definitions for the Battleship game.
+"""
+
+# Pygame requires initialization for fonts; however, for constants we just define the parameters.
+
+# Window settings
+WINDOW_WIDTH = 800
+WINDOW_HEIGHT = 600
+FPS = 30  # Frames per second for the game loop
+
+# Grid settings
+GRID_ROWS = 10
+GRID_COLS = 10
+CELL_SIZE = 40  # Size (in pixels) for each grid cell
+GRID_MARGIN = 5  # Margin between cells
+
+# Calculate board dimensions (for clarity, each board is 10x10 cells)
+BOARD_WIDTH = GRID_COLS * CELL_SIZE + (GRID_COLS + 1) * GRID_MARGIN
+BOARD_HEIGHT = GRID_ROWS * CELL_SIZE + (GRID_ROWS + 1) * GRID_MARGIN
+
+# Define positions for the two boards on the window
+# Player's board on the left, computer's board on the right.
+PLAYER_BOARD_POS = (50, 50)
+COMPUTER_BOARD_POS = (WINDOW_WIDTH - BOARD_WIDTH - 50, 50)
+
+# Colors (RGB tuples)
+WHITE       = (255, 255, 255)
+BLACK       = (0, 0, 0)
+GRAY        = (128, 128, 128)
+LIGHT_GRAY  = (200, 200, 200)
+BLUE        = (0, 0, 255)
+RED         = (255, 0, 0)
+GREEN       = (0, 255, 0)
+YELLOW      = (255, 255, 0)
+DARK_BLUE   = (0, 0, 139)
+
+# Colors for indicating board states
+COLOR_SHIP        = LIGHT_GRAY    # Color for player's ship locations (could be hidden for computer)
+COLOR_HIT         = RED           # Color for a hit shot
+COLOR_MISS        = WHITE         # Color for a miss shot
+COLOR_BG          = DARK_BLUE     # Background color for boards
+
+# Define standard Battleship ships with their sizes (the number indicates the number of cells occupied)
+SHIP_TYPES = {
+    'Carrier': 5,      # 5 cells
+    'Battleship': 4,   # 4 cells
+    'Cruiser': 3,      # 3 cells
+    'Submarine': 3,    # 3 cells
+    'Destroyer': 2     # 2 cells
+}
+
+# UI Constants
+FONT_NAME = 'freesansbold.ttf'
+FONT_SIZE = 20
+TITLE_FONT_SIZE = 32
+
+# Verbose debug flag (set to True to print debug information to the console)
+DEBUG = True
+
+if DEBUG:
+    print("Loaded game constants:")
+    print(f"WINDOW_WIDTH: {WINDOW_WIDTH}, WINDOW_HEIGHT: {WINDOW_HEIGHT}")
+    print(f"FPS: {FPS}")
+    print(f"GRID: {GRID_ROWS} rows x {GRID_COLS} cols, CELL_SIZE: {CELL_SIZE}, GRID_MARGIN: {GRID_MARGIN}")
+    print(f"Player board position: {PLAYER_BOARD_POS}")
+    print(f"Computer board position: {COMPUTER_BOARD_POS}")
+    print("Ship types and sizes:", SHIP_TYPES)
+```
+```
+
+## /home/myuser/apps/battleship/game/ship.py
+```python
+# Error parsing code: invalid syntax (<unknown>, line 3)
+# Failed to parse code block: 'str' object has no attribute 'toLower'
+
+```python
+"""
+File: /home/myuser/apps/battleship/game/ship.py
+Description: Implements the Ship class with properties for size, position, rotation, and hit status.
+"""
+
+from game.constants import DEBUG
+
+class Ship:
+    def __init__(self, name, size, position=(0, 0), orientation=0):
+        """
+        Initialize a Ship instance.
+
+        Args:
+            name (str): The type/name of the ship (e.g., 'Carrier', 'Battleship', etc.).
+            size (int): The number of grid cells occupied by the ship.
+            position (tuple): The starting (x, y) grid coordinate of the ship.
+            orientation (int): Orientation of the ship (0 for horizontal, 1 for vertical).
+        """
+        self.name = name
+        self.size = size
+        self.position = position  # Starting position on the board (x, y)
+        self.orientation = orientation  # 0: horizontal, 1: vertical
+        self.hits = set()  # Set to store coordinates where the ship has been hit
+
+        if DEBUG:
+            print(f"[DEBUG] Initialized Ship: {self}")
+
+    def rotate(self):
+        """
+        Rotate the ship by toggling its orientation between horizontal and vertical.
+        """
+        self.orientation = (self.orientation + 1) % 2
+        if DEBUG:
+            orient = "Horizontal" if self.orientation == 0 else "Vertical"
+            print(f"[DEBUG] Ship '{self.name}' rotated. New orientation: {orient}")
+    
+    def get_occupied_cells(self):
+        """
+        Calculate and return the list of grid cells the ship occupies based on its position and orientation.
+
+        Returns:
+            List[tuple]: A list of (x, y) tuples representing occupied grid cells.
+        """
+        cells = []
+        x, y = self.position
+        for i in range(self.size):
+            if self.orientation == 0:
+                # Horizontal placement: move in the x direction.
+                cells.append((x + i, y))
+            else:
+                # Vertical placement: move in the y direction.
+                cells.append((x, y + i))
+        if DEBUG:
+            print(f"[DEBUG] Ship '{self.name}' occupies cells: {cells}")
+        return cells
+
+    def register_hit(self, coordinate):
+        """
+        Register a hit on the ship if the provided coordinate is part of its occupied cells.
+
+        Args:
+            coordinate (tuple): The (x, y) coordinate of the attempted hit.
+
+        Returns:
+            bool: True if the hit registered on the ship, False otherwise.
+        """
+        if coordinate in self.get_occupied_cells():
+            self.hits.add(coordinate)
+            if DEBUG:
+                print(f"[DEBUG] Ship '{self.name}' got hit at {coordinate}. Total hits: {self.hits}")
+            return True
+        if DEBUG:
+            print(f"[DEBUG] Attempted hit at {coordinate} missed ship '{self.name}'.")
+        return False
+
+    def is_sunk(self):
+        """
+        Determine if the ship is sunk (i.e., all its cells have been hit).
+
+        Returns:
+            bool: True if the ship is sunk, False otherwise.
+        """
+        sunk = len(self.hits) >= self.size
+        if DEBUG:
+            print(f"[DEBUG] Checking if Ship '{self.name}' is sunk: {sunk}")
+        return sunk
+
+    def __repr__(self):
+        orientation_str = "Horizontal" if self.orientation == 0 else "Vertical"
+        return (f"Ship(name={self.name}, size={self.size}, position={self.position}, "
+                f"orientation={orientation_str}, hits={self.hits})")
+```
+
+# Inline Comments and Explanation:
+# - The Ship class is designed to hold the details of a battleship, including its type, size, starting position, orientation, and any hits it has taken.
+# - The rotate() method toggles the orientation between horizontal (0) and vertical (1).
+# - The get_occupied_cells() method computes which grid cells the ship occupies based on the orientation and position.
+# - The register_hit() method checks if a given coordinate is part of the ship’s occupied cells; if so, it records a hit.
+# - The is_sunk() method determines if the number of hits equals or exceeds the ship's size, thus considering it sunk.
+#
+# Additional Notes:
+# - It might be beneficial in future iterations to add boundary checks during ship placement.
+# - Also, consider integrating collision detection (overlap) between ships in the Board class logic.
+```
+```
+
+## /home/myuser/apps/battleship/game/board.py
+```python
+# Error parsing code: invalid syntax (<unknown>, line 3)
+# Failed to parse code block: 'str' object has no attribute 'toLower'
+
+```python
+"""
+File: /home/myuser/apps/battleship/game/board.py
+Description: Implements the Board class which manages a 10x10 grid, ship placement, and hit tracking.
+"""
+
+from game.constants import GRID_ROWS, GRID_COLS, DEBUG
+from game.ship import Ship
+
+class Board:
+    def __init__(self, board_position=(0, 0)):
+        """
+        Initialize a Board instance with an empty grid, list of ships, and attack tracking.
+
+        Args:
+            board_position (tuple): The (x, y) position on the window where the board is drawn.
+        """
+        self.position = board_position
+        self.ships = []  # List to store ships placed on the board
+        self.attacks = {}  # Dictionary to store attacks: key=(x, y), value='hit' or 'miss'
+        
+        if DEBUG:
+            print(f"[DEBUG] Board initialized at position {self.position} with grid size {GRID_ROWS}x{GRID_COLS}")
+
+    def is_within_bounds(self, cell):
+        """
+        Check if a given cell coordinate is within the boundaries of the board.
+
+        Args:
+            cell (tuple): The (x, y) coordinate to check.
+
+        Returns:
+            bool: True if the cell is within bounds, False otherwise.
+        """
+        x, y = cell
+        within = 0 <= x < GRID_COLS and 0 <= y < GRID_ROWS
+        if DEBUG:
+            print(f"[DEBUG] Checking bounds for cell {cell}: {within}")
+        return within
+
+    def is_valid_ship_placement(self, ship):
+        """
+        Check whether a ship's placement is valid:
+            - All occupied cells are within board bounds.
+            - No occupied cell overlaps with an already placed ship.
+
+        Args:
+            ship (Ship): The ship instance to validate.
+
+        Returns:
+            bool: True if placement is valid, False otherwise.
+        """
+        for cell in ship.get_occupied_cells():
+            if not self.is_within_bounds(cell):
+                if DEBUG:
+                    print(f"[DEBUG] Ship '{ship.name}' cell {cell} is out of bounds.")
+                return False
+            # Check for collisions with existing ships
+            for other_ship in self.ships:
+                if cell in other_ship.get_occupied_cells():
+                    if DEBUG:
+                        print(f"[DEBUG] Ship '{ship.name}' cell {cell} overlaps with ship '{other_ship.name}'.")
+                    return False
+        return True
+
+    def place_ship(self, ship):
+        """
+        Place a ship on the board if its position is valid.
+        
+        Args:
+            ship (Ship): The ship to place.
+            
+        Returns:
+            bool: True if the ship is successfully placed; False otherwise.
+        """
+        if self.is_valid_ship_placement(ship):
+            self.ships.append(ship)
+            if DEBUG:
+                orient = "Horizontal" if ship.orientation == 0 else "Vertical"
+                print(f"[DEBUG] Ship '{ship.name}' placed at {ship.position} with orientation {orient}.")
+            return True
+        else:
+            if DEBUG:
+                print(f"[DEBUG] Failed to place ship '{ship.name}' at {ship.position}.")
+            return False
+
+    def receive_attack(self, cell):
+        """
+        Process an attack on the board at the specified cell.
+        
+        Args:
+            cell (tuple): The (x, y) coordinate of the attack.
+            
+        Returns:
+            str: 'hit' if a ship is hit, 'miss' if no ship occupies the cell, 
+                 or 'already' if the cell was previously attacked.
+        """
+        if cell in self.attacks:
+            if DEBUG:
+                print(f"[DEBUG] Cell {cell} was already attacked.")
+            return 'already'
+        
+        for ship in self.ships:
+            if cell in ship.get_occupied_cells():
+                ship.register_hit(cell)
+                self.attacks[cell] = 'hit'
+                if DEBUG:
+                    print(f"[DEBUG] Attack at {cell} is a hit on ship '{ship.name}'.")
+                return 'hit'
+        
+        self.attacks[cell] = 'miss'
+        if DEBUG:
+            print(f"[DEBUG] Attack at {cell} is a miss.")
+        return 'miss'
+
+    def all_ships_sunk(self):
+        """
+        Check whether all ships on the board have been sunk.
+        
+        Returns:
+            bool: True if all ships are sunk; False otherwise.
+        """
+        for ship in self.ships:
+            if not ship.is_sunk():
+                if DEBUG:
+                    print(f"[DEBUG] Ship '{ship.name}' is still afloat.")
+                return False
+        if DEBUG:
+            print("[DEBUG] All ships on the board have been sunk!")
+        return True
+
+    def reset(self):
+        """
+        Reset the board for a new game. This clears all ships and attack records.
+        """
+        self.ships.clear()
+        self.attacks.clear()
+        if DEBUG:
+            print("[DEBUG] Board reset: ships and attacks cleared.")
+
+
+# Additional Notes:
+# - Future improvements could include ship placement hints, more robust error handling,
+#   and support for different board sizes.
+```
+```
+
+## /home/myuser/apps/battleship/game/player.py
+```python
+# Error parsing code: invalid syntax (<unknown>, line 3)
+# Failed to parse code block: 'str' object has no attribute 'toLower'
+
+```python
+"""
+File: /home/myuser/apps/battleship/game/player.py
+Description: Implements the Player class for human interaction and moves during the Battleship game.
+             The Player can place ships on their board and make attacks against the opponent's board.
+             This version includes methods to convert pixel coordinates (from mouse clicks) into grid cells.
+"""
+
+from game.constants import CELL_SIZE, GRID_MARGIN, DEBUG
+from game.board import Board
+
+class Player:
+    def __init__(self, board: Board):
+        """
+        Initialize a Player instance with a given Board.
+
+        Args:
+            board (Board): The board on which the player's ships are placed.
+        """
+        self.board = board
+        if DEBUG:
+            print(f"[DEBUG] Player initialized with board at position {self.board.position}")
+
+    def place_ship(self, ship):
+        """
+        Attempt to place a ship on the player's board.
+
+        Args:
+            ship (Ship): The ship to be placed.
+
+        Returns:
+            bool: True if successfully placed, False otherwise.
+        """
+        success = self.board.place_ship(ship)
+        if DEBUG:
+            if success:
+                print(f"[DEBUG] Player placed ship '{ship.name}' at {ship.position} with orientation " +
+                      f"{'Horizontal' if ship.orientation == 0 else 'Vertical'}.")
+            else:
+                print(f"[DEBUG] Player failed to place ship '{ship.name}' at {ship.position}.")
+        return success
+
+    def make_move(self, opponent_board, cell):
+        """
+        Make an attack move against an opponent's board at the specified grid cell.
+
+        Args:
+            opponent_board (Board): The board of the opponent to target.
+            cell (tuple): A (col, row) tuple representing the target grid cell.
+
+        Returns:
+            str: The outcome of the attack: 'hit', 'miss', or 'already' if previously attacked.
+        """
+        result = opponent_board.receive_attack(cell)
+        if DEBUG:
+            print(f"[DEBUG] Player attacking cell {cell}. Outcome: {result}")
+        return result
+
+    def pixel_to_grid(self, pos):
+        """
+        Convert a pixel coordinate (from a mouse click) to a grid cell coordinate on the player's board.
+
+        Args:
+            pos (tuple): The (x, y) pixel tuple from the mouse click.
+
+        Returns:
+            tuple or None: A (col, row) tuple representing the grid cell, or None if outside the board.
+        """
+        board_x, board_y = self.board.position
+        px, py = pos
+
+        # Calculate relative position on the board.
+        rel_x = px - board_x
+        rel_y = py - board_y
+
+        if rel_x < 0 or rel_y < 0:
+            if DEBUG:
+                print(f"[DEBUG] Click position {pos} is outside the board boundaries (negative offset).")
+            return None
+
+        # Calculate grid indices using cell size and grid margin.
+        col = rel_x // (CELL_SIZE + GRID_MARGIN)
+        row = rel_y // (CELL_SIZE + GRID_MARGIN)
+
+        # Check if the calculated grid cell is within the valid range
+        if col < 0 or col >= 10 or row < 0 or row >= 10:
+            if DEBUG:
+                print(f"[DEBUG] Click position {pos} converts to grid cell ({col}, {row}) which is outside valid range.")
+            return None
+
+        if DEBUG:
+            print(f"[DEBUG] Converted pixel position {pos} to grid cell ({col}, {row}).")
+        return (col, row)
+
+# Additional Notes:
+# - In a complete implementation, you would connect this Player class to the Pygame event loop to capture
+#   mouse click events and key presses (for ship rotation) during the ship placement phase.
+# - Future improvements might include more robust error handling, visual feedback for invalid placements,
+#   and integration with a UI Renderer.
+```
+```
+
+## /home/myuser/apps/battleship/game/computer.py
+```python
+# Error parsing code: invalid syntax (<unknown>, line 3)
+# Failed to parse code block: 'str' object has no attribute 'toLower'
+
+```python
+"""
+File: /home/myuser/apps/battleship/game/computer.py
+Description: Implements the Computer class with AI logic for ship placement and attacks. The Computer
+             automatically places its ships on its board using random valid positions and orientations, 
+             and it makes random valid moves against the opponent's board.
+"""
+
+import random
+from game.constants import GRID_ROWS, GRID_COLS, SHIP_TYPES, DEBUG
+from game.ship import Ship
+from game.board import Board
+
+class Computer:
+    def __init__(self, board: Board):
+        """
+        Initialize the Computer instance with its board and available moves for attacks.
+
+        Args:
+            board (Board): The board on which the computer's ships are placed.
+        """
+        self.board = board
+        # Generate all possible moves as a list of (col, row) tuples.
+        self.available_moves = [(col, row) for col in range(GRID_COLS) for row in range(GRID_ROWS)]
+        if DEBUG:
+            print(f"[DEBUG] Computer initialized with board at position {self.board.position}")
+            print(f"[DEBUG] Available moves initialized with {len(self.available_moves)} cells.")
+
+    def place_ships(self):
+        """
+        Automatically place all standard ships on the computer's board using random positions and orientations.
+
+        The ship placements are re-attempted until a valid placement is found for each ship.
+        """
+        for ship_name, ship_size in SHIP_TYPES.items():
+            placed = False
+            attempt = 0
+            # Try placing the ship until successful.
+            while not placed:
+                attempt += 1
+                orientation = random.choice([0, 1])  # 0 for horizontal, 1 for vertical
+                # Determine the maximum valid starting coordinates based on ship size and orientation.
+                if orientation == 0:  # horizontal
+                    max_x = GRID_COLS - ship_size
+                    max_y = GRID_ROWS - 1
+                else:  # vertical
+                    max_x = GRID_COLS - 1
+                    max_y = GRID_ROWS - ship_size
+
+                pos_x = random.randint(0, max_x)
+                pos_y = random.randint(0, max_y)
+                ship = Ship(name=ship_name, size=ship_size, position=(pos_x, pos_y), orientation=orientation)
+                
+                if self.board.place_ship(ship):
+                    placed = True
+                    if DEBUG:
+                        orient_str = "Horizontal" if orientation == 0 else "Vertical"
+                        print(f"[DEBUG] Computer placed ship '{ship_name}' at {ship.position} "
+                              f"with orientation {orient_str} after {attempt} attempt(s).")
+                else:
+                    if DEBUG:
+                        print(f"[DEBUG] Computer failed to place ship '{ship_name}' at {(pos_x, pos_y)} "
+                              f"with orientation {'Horizontal' if orientation == 0 else 'Vertical'} on attempt {attempt}.")
+
+    def make_move(self, opponent_board):
+        """
+        Select a random move from the available moves and perform an attack against the opponent's board.
+
+        Args:
+            opponent_board (Board): The board of the opponent to target.
+
+        Returns:
+            tuple: A tuple (cell, result) where 'cell' is the coordinate attacked and 'result' is the outcome:
+                   'hit', 'miss', or 'already' if the cell was previously attacked.
+        """
+        if not self.available_moves:
+            # No available moves left; this should rarely happen if moves are managed correctly.
+            if DEBUG:
+                print("[DEBUG] No available moves left for the computer!")
+            return None, None
+
+        # Randomly select a move from the available moves.
+        cell = random.choice(self.available_moves)
+        self.available_moves.remove(cell)
+        if DEBUG:
+            print(f"[DEBUG] Computer attacking cell {cell} from {len(self.available_moves)} remaining moves.")
+
+        result = opponent_board.receive_attack(cell)
+        if DEBUG:
+            print(f"[DEBUG] Computer attack on cell {cell} resulted in: {result}.")
+        return cell, result
+``` 
+
+# Additional notes:
+# - Ensure that the main game loop calls the Computer's place_ships() method during the setup phase.
+# - The make_move() function utilizes a list of available moves to avoid repeated attacks.
+# - Future improvements may include smarter AI strategies for ship placement and attacking.
+```
+```
+
+## /home/myuser/apps/battleship/game/game_state.py
+```python
+# Error parsing code: invalid syntax (<unknown>, line 3)
+# Failed to parse code block: 'str' object has no attribute 'toLower'
+
+```python
+"""
+File: /home/myuser/apps/battleship/game/game_state.py
+Description: Manages game state transitions and rules for the Battleship game. This includes handling
+             the phases of the game (setup, player's turn, computer's turn, and game over), checking
+             victory conditions, and resetting the game if needed.
+"""
+
+from game.constants import DEBUG
+
+class GameState:
+    # Define state constants
+    STATE_SETUP = 'setup'
+    STATE_PLAYER_TURN = 'player_turn'
+    STATE_COMPUTER_TURN = 'computer_turn'
+    STATE_GAME_OVER = 'game_over'
+
+    def __init__(self, player_board, computer_board):
+        """
+        Initialize the game state manager.
+
+        Args:
+            player_board (Board): The player's board instance.
+            computer_board (Board): The computer's board instance.
+        """
+        self.player_board = player_board
+        self.computer_board = computer_board
+        self.state = GameState.STATE_SETUP
+        if DEBUG:
+            print("[DEBUG] GameState initialized. Current state: SETUP")
+
+    def start_game(self):
+        """
+        Transition from setup phase to the player's turn to begin the game.
+        """
+        # Verify if setup phase is complete (e.g., player's ships are placed)
+        self.state = GameState.STATE_PLAYER_TURN
+        if DEBUG:
+            print("[DEBUG] Game started. Transitioning to PLAYER_TURN state.")
+
+    def switch_turn(self, last_attacker):
+        """
+        After a move is made, switch turn between player and computer.
+        
+        Args:
+            last_attacker (str): Indicates who made the last move. Expected values: 'player' or 'computer'.
+        """
+        if last_attacker == 'player':
+            self.state = GameState.STATE_COMPUTER_TURN
+            if DEBUG:
+                print("[DEBUG] Last move by player. Switching turn to COMPUTER_TURN.")
+        else:
+            self.state = GameState.STATE_PLAYER_TURN
+            if DEBUG:
+                print("[DEBUG] Last move by computer. Switching turn to PLAYER_TURN.")
+
+    def check_game_over(self):
+        """
+        Checks the boards to determine whether the game has been won by either side.
+        If either board has all its ships sunk, updates the state to GAME_OVER.
+        
+        Returns:
+            str or None: Returns 'player' if the player wins, 'computer' if the computer wins,
+                         or None if the game is still ongoing.
+        """
+        if self.computer_board.all_ships_sunk():
+            self.state = GameState.STATE_GAME_OVER
+            if DEBUG:
+                print("[DEBUG] All computer ships have been sunk. Player wins!")
+            return 'player'
+        if self.player_board.all_ships_sunk():
+            self.state = GameState.STATE_GAME_OVER
+            if DEBUG:
+                print("[DEBUG] All player ships have been sunk. Computer wins!")
+            return 'computer'
+        return None
+
+    def force_game_over(self, winner):
+        """
+        Forces the game to end with the specified winner.
+
+        Args:
+            winner (str): 'player' or 'computer'
+        """
+        self.state = GameState.STATE_GAME_OVER
+        if DEBUG:
+            print(f"[DEBUG] Game forced to end. Winner: {winner}")
+
+    def reset(self):
+        """
+        Reset the game state to initial setup. Typically called to start a new game.
+        Resets both the player's and computer's boards.
+        """
+        self.state = GameState.STATE_SETUP
+        self.player_board.reset()
+        self.computer_board.reset()
+        if DEBUG:
+            print("[DEBUG] GameState reset to SETUP. Player and computer boards have been cleared.")
+
+    def get_state(self):
+        """
+        Return the current game state.
+
+        Returns:
+            str: Current state of the game.
+        """
+        if DEBUG:
+            print(f"[DEBUG] Current game state requested: {self.state}")
+        return self.state
+
+# Additional Notes:
+# - This GameState class is designed to be used by the main game loop in main.py.
+#   The loop will check the current state and, based on user input or computer moves, call
+#   the appropriate methods (start_game, switch_turn, check_game_over, reset, etc.).
+# - Future improvements could include time delays between turns, additional states for animations,
+#   or more detailed step-by-step state transitions.
+```
+```
+
+## /home/myuser/apps/battleship/game/renderer.py
+```python
+# Error parsing code: invalid syntax (<unknown>, line 3)
+# Failed to parse code block: 'str' object has no attribute 'toLower'
+
+```python
+"""
+File: /home/myuser/apps/battleship/game/renderer.py
+Description: Handles all drawing operations for the Battleship game. It renders the boards, ships,
+             hit/miss markers, and UI elements such as game state messages.
+"""
+
+import pygame
+from game.constants import (WINDOW_WIDTH, WINDOW_HEIGHT, CELL_SIZE, GRID_MARGIN, GRID_ROWS, GRID_COLS,
+                            PLAYER_BOARD_POS, COMPUTER_BOARD_POS, COLOR_BG, COLOR_SHIP, COLOR_HIT, COLOR_MISS,
+                            WHITE, BLACK, FONT_NAME, FONT_SIZE, TITLE_FONT_SIZE, DEBUG)
+
+class Renderer:
+    def __init__(self, screen):
+        """
+        Initialize the Renderer with the Pygame screen and fonts.
+
+        Args:
+            screen (pygame.Surface): The game screen to render graphics onto.
+        """
+        self.screen = screen
+        pygame.font.init()
+        self.font = pygame.font.Font(FONT_NAME, FONT_SIZE)
+        self.title_font = pygame.font.Font(FONT_NAME, TITLE_FONT_SIZE)
+        if DEBUG:
+            print("[DEBUG] Renderer initialized with screen size "
+                  f"{self.screen.get_width()}x{self.screen.get_height()}.")
+
+    def draw_board(self, board, show_ships=True):
+        """
+        Draws the grid for a given board, including ships and attack markers.
+
+        Args:
+            board: Board instance containing position, ships, and attacks.
+            show_ships (bool): Whether to show the ships on the board. For the computer board, this is False.
+        """
+        board_x, board_y = board.position
+
+        # Draw board background
+        board_rect = pygame.Rect(board_x, board_y,
+                                 GRID_COLS * (CELL_SIZE + GRID_MARGIN) + GRID_MARGIN,
+                                 GRID_ROWS * (CELL_SIZE + GRID_MARGIN) + GRID_MARGIN)
+        pygame.draw.rect(self.screen, COLOR_BG, board_rect)
+        if DEBUG:
+            print(f"[DEBUG] Drawing board background at {board.position} with dimensions {board_rect.size}.")
+
+        # Draw each cell of the grid
+        for row in range(GRID_ROWS):
+            for col in range(GRID_COLS):
+                cell_x = board_x + GRID_MARGIN + col * (CELL_SIZE + GRID_MARGIN)
+                cell_y = board_y + GRID_MARGIN + row * (CELL_SIZE + GRID_MARGIN)
+                cell_rect = pygame.Rect(cell_x, cell_y, CELL_SIZE, CELL_SIZE)
+                
+                # Fill cell with white background (or leave as board background) before drawing ship or attack markers.
+                pygame.draw.rect(self.screen, WHITE, cell_rect)
+
+                # Draw grid border
+                pygame.draw.rect(self.screen, BLACK, cell_rect, 1)
+        
+        # If ships should be drawn, render them.
+        if show_ships:
+            for ship in board.ships:
+                for (col, row) in ship.get_occupied_cells():
+                    # Only draw if within bounds so errors are avoided.
+                    if 0 <= col < GRID_COLS and 0 <= row < GRID_ROWS:
+                        cell_x = board_x + GRID_MARGIN + col * (CELL_SIZE + GRID_MARGIN)
+                        cell_y = board_y + GRID_MARGIN + row * (CELL_SIZE + GRID_MARGIN)
+                        cell_rect = pygame.Rect(cell_x, cell_y, CELL_SIZE, CELL_SIZE)
+                        pygame.draw.rect(self.screen, COLOR_SHIP, cell_rect)
+                        if DEBUG:
+                            print(f"[DEBUG] Drawing ship '{ship.name}' part at cell ({col},{row}).")
+
+        # Draw attack markers
+        for (col, row), result in board.attacks.items():
+            if 0 <= col < GRID_COLS and 0 <= row < GRID_ROWS:
+                cell_x = board_x + GRID_MARGIN + col * (CELL_SIZE + GRID_MARGIN)
+                cell_y = board_y + GRID_MARGIN + row * (CELL_SIZE + GRID_MARGIN)
+                cell_rect = pygame.Rect(cell_x, cell_y, CELL_SIZE, CELL_SIZE)
+                if result == 'hit':
+                    pygame.draw.rect(self.screen, COLOR_HIT, cell_rect)
+                    if DEBUG:
+                        print(f"[DEBUG] Drawing hit marker at cell ({col},{row}).")
+                elif result == 'miss':
+                    pygame.draw.rect(self.screen, COLOR_MISS, cell_rect)
+                    if DEBUG:
+                        print(f"[DEBUG] Drawing miss marker at cell ({col},{row}).")
+                # Redraw border
+                pygame.draw.rect(self.screen, BLACK, cell_rect, 1)
+
+    def draw_text(self, text, pos, font=None, color=BLACK):
+        """
+        Draws text on the screen at the specified position.
+
+        Args:
+            text (str): The text string to render.
+            pos (tuple): (x, y) coordinates on the screen.
+            font (pygame.font.Font): Optional font to use; if None, uses the default font.
+            color (tuple): Color of the text.
+        """
+        if font is None:
+            font = self.font
+        text_surface = font.render(text, True, color)
+        self.screen.blit(text_surface, pos)
+        if DEBUG:
+            print(f"[DEBUG] Rendering text '{text}' at position {pos}.")
+
+    def render(self, game_state, player_board, computer_board, additional_message=""):
+        """
+        Renders the entire game frame including both boards and UI elements based on the game state.
+
+        Args:
+            game_state (str): Current game state: setup, player turn, computer turn, or game over.
+            player_board: The player's Board instance.
+            computer_board: The computer's Board instance.
+            additional_message (str): Any additional message to display on the UI.
+        """
+        # Fill the entire screen with a background color
+        self.screen.fill(COLOR_BG)
+        if DEBUG:
+            print("[DEBUG] Screen cleared and background filled.")
+
+        # Draw the player's board (always show ships)
+        self.draw_board(player_board, show_ships=True)
+        self.draw_text("Player Board", (player_board.position[0], player_board.position[1] - TITLE_FONT_SIZE), 
+                       font=self.title_font, color=WHITE)
+
+        # Draw the computer's board (hide ships, only show hit/miss markers)
+        self.draw_board(computer_board, show_ships=False)
+        self.draw_text("Computer Board", (computer_board.position[0], computer_board.position[1] - TITLE_FONT_SIZE), 
+                       font=self.title_font, color=WHITE)
+
+        # Display game state information at the bottom of the screen.
+        ui_y = WINDOW_HEIGHT - TITLE_FONT_SIZE - 20
+        state_text = f"Game State: {game_state.upper()}"
+        self.draw_text(state_text, (50, ui_y), font=self.title_font, color=WHITE)
+        if additional_message:
+            self.draw_text(additional_message, (50, ui_y - TITLE_FONT_SIZE - 10), font=self.font, color=WHITE)
+            if DEBUG:
+                print(f"[DEBUG] Additional UI message rendered: {additional_message}")
+
+        # Update the display
+        pygame.display.flip()
+        if DEBUG:
+            print("[DEBUG] Display updated (pygame.display.flip()).")
+
+# Additional Notes:
+# - Improvements could include animations, sound cues on attacks, and more detailed UI instructions.
+# - The current implementation assumes that the main game loop will provide updated board objects and game states.
+```
+```
+
+                    
+        Here is the description of the code:
+        This is the entry point for the Battleship game. It initializes Pygame, manages the game loop, and handles the flow between different game states.
+                    
+        Here is the code skeleton to implement:
+        None
+        

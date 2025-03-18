@@ -68,15 +68,19 @@ class AgentDisplayWebWithPrompt(AgentDisplayWeb):
                         model=model,
                         messages=messages)
                     task = completion.choices[0].message.content
+                    # WRITE THE TASK TO TASK.TXT
+
                     from config import set_project_dir, set_constant
                     project_dir = set_project_dir(filename)
                     set_constant("PROJECT_DIR", str(project_dir))
+                    set_constant("TASK", task)
                     docker_project_dir = get_docker_project_dir()
                     task += (
                         f"Start testing as soon as possible. DO NOT start making fixes or improvements until you have tested to see if it is working as is.  Your project directory is {docker_project_dir}. "
                         "You need to make sure that all files you create and work you do is done in that directory.\n"
                     )
-
+                    with open("task.txt", "w") as f:
+                        f.write(task)
                     self.socketio.start_background_task(start_sampling_loop, task, self)
 
                     return redirect(url_for('index'))
@@ -122,36 +126,36 @@ class AgentDisplayWebWithPrompt(AgentDisplayWeb):
                 from config import PROJECT_DIR
                 from utils.docker_service import DockerService
                 from utils.file_logger import should_skip_for_zip
-                
+
                 if not os.path.exists(PROJECT_DIR):
                     return Response(f"Project directory not found: {PROJECT_DIR}", status=404)
-                    
+
                 project_path = Path(PROJECT_DIR)
-                
+
                 # Create a temporary file for the zip
                 temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.zip')
                 temp_file.close()
-                
+
                 # Create a zip file
                 with zipfile.ZipFile(temp_file.name, 'w', zipfile.ZIP_DEFLATED) as zipf:
                     for root, dirs, files in os.walk(project_path):
                         # Skip .venv directory and other unnecessary directories
                         dirs[:] = [d for d in dirs if not d.startswith('.venv') and d not in ['.git', '__pycache__', 'node_modules']]
-                        
+
                         for file in files:
                             file_path = os.path.join(root, file)
-                            
+
                             # Skip files in virtual environment bin directory
                             if '.venv' in root.split(os.sep) and file in ['python', 'python3', 'pip', 'pip3', 'activate']:
                                 continue
-                                
+
                             try:
                                 # Get the relative path from project directory
                                 arcname = os.path.relpath(file_path, project_path)
                                 zipf.write(file_path, arcname)
                             except (FileNotFoundError, PermissionError) as e:
                                 print(f"Error adding {file_path} to zip: {e}")
-                
+
                 # Send the zip file
                 project_name = project_path.name
                 return send_file(
