@@ -233,7 +233,11 @@ async def sampling_loop(
     while running:
         try:
             running = await agent.step()
+<<<<<<< Updated upstream
             # response = await lmin_agent()
+=======
+            # response = await lmin_agent(agent)
+>>>>>>> Stashed changes
         except UnicodeEncodeError as ue:
             ic(f"UnicodeEncodeError: {ue}")
             rr(f"Unicode encoding error: {ue}")
@@ -245,6 +249,10 @@ async def sampling_loop(
             ic(e.__traceback__.tb_frame.f_locals)
             agent.display.add_message("user", ("Error", str(e)))
             raise
+<<<<<<< Updated upstream
+=======
+    print("Out of the sampling loop")
+>>>>>>> Stashed changes
     return agent.messages
 
 async def run_sampling_loop(task: str, display: AgentDisplayWebWithPrompt) -> List[BetaMessageParam]:
