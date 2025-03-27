@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Union, Optional, Dict, Tuple, List
 import logging
 from dataclasses import dataclass
-
+from rich import print as rr
 from config import get_constant, set_constant
 
 # Set up logging
@@ -113,6 +113,11 @@ class DockerService:
 
     def to_docker_path(self, host_path: Union[str, Path]) -> Path:
         """Convert a host path to a Docker container path"""
+        # If the path already appears to be a Docker path, return it as-is
+        host_path_str = host_path if isinstance(host_path, str) else str(host_path)
+        if host_path_str.startswith("/home/myuser/apps"):
+            return Path(host_path_str)
+
         if isinstance(host_path, str):
             host_path = Path(host_path)
 
@@ -250,7 +255,7 @@ class DockerService:
         docker_command = f'docker exec {self._container_name} bash -c "{env_string}{escaped_command}"'
         # ic(docker_command)
         logger.info(f"Executing Docker command: {docker_command}")
-
+        rr(docker_command)
         try:
             result = subprocess.run(
                 docker_command,
@@ -261,7 +266,8 @@ class DockerService:
                 errors='replace',
                 check=False
             )
-
+            rr("std out:", result.stdout)
+            rr("std err:", result.stderr)
             return DockerResult(
                 success=(result.returncode == 0),
                 stdout=result.stdout,

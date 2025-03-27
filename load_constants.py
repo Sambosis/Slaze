@@ -44,8 +44,9 @@ COMPUTER_USE_BETA_FLAG = "computer-use-2024-10-22"
 PROMPT_CACHING_BETA_FLAG = "prompt-caching-2024-07-31"
 
 # Model configuration constants
-SUMMARY_MODEL = "claude-3-5-haiku-latest"  # Model used for generating summaries
-MAIN_MODEL = "claude-3-5-sonnet-latest"    # Primary model for main operations
+SUMMARY_MODEL = "claude-3-7-sonnet-latest"  # Model used for generating summaries
+MAIN_MODEL = "claude-3-7-sonnet-latest"
+# Primary model for main operations
 # Add near the top with other Path definitions
 # PROJECT_DIR = TOP_LEVEL_DIR  # Default value
 
@@ -126,4 +127,3 @@ def load_system_prompts() -> str:
         return SYSTEM_PROMPT
     except FileNotFoundError as e:
         raise Exception(f"Failed to load system prompts: {e}")
-

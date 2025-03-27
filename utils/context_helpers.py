@@ -9,10 +9,11 @@ from anthropic.types.beta import (
 )
 import os
 from utils.agent_display_web_with_prompt import AgentDisplayWebWithPrompt
-from load_constants import write_to_file, ICECREAM_OUTPUT_FILE
+from load_constants import *
 from utils.file_logger import aggregate_file_states
 from openai import OpenAI
 from icecream import ic, install
+from rich import print as rr
 ic.configureOutput(includeContext=True, outputFunction=write_to_file)
 
 QUICK_SUMMARIES = []
@@ -89,7 +90,7 @@ async def summarize_recent_messages(short_messages: List[BetaMessageParam], disp
         api_key=OPENROUTER_API_KEY,
         )
     all_summaries = get_all_summaries()
-    model = "google/gemini-2.0-flash-lite-001"
+    model = "google/gemini-2.0-flash-001"
     # sum_client = OpenAI()
     # model = "o3-mini"
     conversation_text = ""
@@ -344,7 +345,7 @@ async def reorganize_context(messages: List[BetaMessageParam], summary: str) -> 
         # Return default values in case of error
         return "Error processing context. Please try again.", "Error processing steps. Please try again."
 
-async def refresh_context_async(task: str, messages: List[Dict], display: AgentDisplayWebWithPrompt) -> str:
+async def refresh_context_async(task: str, messages: List[Dict], display: AgentDisplayWebWithPrompt,client) -> str:
     """
     Create a combined context string by filtering and (if needed) summarizing messages
     and appending current file contents.
@@ -356,13 +357,13 @@ async def refresh_context_async(task: str, messages: List[Dict], display: AgentD
     file_contents = aggregate_file_states()
     if len(file_contents) > 200000:
         file_contents = file_contents[:70000] + " ... [TRUNCATED] ... " + file_contents[-70000:]
-    
+
     # Get code skeletons
     from utils.file_logger import get_all_current_skeleton
     code_skeletons = get_all_current_skeleton()
     if not code_skeletons or code_skeletons == "No Python files have been tracked yet.":
         code_skeletons = "No code skeletons available."
-    
+
     # Extract information about images generated
     images_info = ""
     if "## Generated Images:" in file_contents:
@@ -370,27 +371,62 @@ async def refresh_context_async(task: str, messages: List[Dict], display: AgentD
         if "##" in images_section:
             images_section = images_section.split("##")[0]
         images_info = "## Generated Images:\n" + images_section.strip()
+
+    # call the LLM and pass it all current messages then the task and ask it to give an updated version of the task
+    # client = OpenAI(
+    #     base_url="https://openrouter.ai/api/v1",
+    #     api_key=os.getenv("OPENROUTER_API_KEY"),
+    # )
+    # model = "anthropic/claude-3.7-sonnet:beta"
+    prompt = f""" Your job is to update the task based on the current state of the project.
+    The task is: {task}
+    The current state of the project is:
+    {file_contents}
+    {code_skeletons}
+    {completed}
+    {next_steps}
+    {images_info}
+
+    Once again, here is the task that I need you to give an updated version of.  
+    Make sure that you give any tips, lessons learned,  what has been done, and what needs to be done.
+    Make sure you give clear guidance on how to import various files and in general how they should work together.
+    """
+
+    # client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+    messages = [{"role": "user", "content": prompt}]
+    response = client.beta.messages.create(
+        model=MAIN_MODEL,
+        messages=messages,
+        max_tokens=MAX_SUMMARY_TOKENS,
+    )
+    new_task = response.content[0].text
+
+
+    combined_content = f"""Original request: 
+    {task}
     
-    combined_content = f"""Original request: {task}
+    IMPORTANT: This is a CONTINUING PROJECT. All files listed below ALREADY EXIST and are FULLY FUNCTIONAL.
+    DO NOT recreate any existing files or redo completed steps. Continue the work from where it left off.
 
-IMPORTANT: This is a CONTINUING PROJECT. All files listed below ALREADY EXIST and are FULLY FUNCTIONAL.
-DO NOT recreate any existing files or redo completed steps. Continue the work from where it left off.
+    Current Project Files and Assets:
+    {file_contents}
 
-Current Project Files and Assets:
-{file_contents}
+    Code Skeletons (Structure of Python files):
+    {code_skeletons}
 
-Code Skeletons (Structure of Python files):
-{code_skeletons}
+    COMPLETED STEPS (These have ALL been successfully completed - DO NOT redo these):
+    {completed}
 
-COMPLETED STEPS (These have ALL been successfully completed - DO NOT redo these):
-{completed}
+    NEXT STEPS (Continue the project by completing these):
+    {next_steps}
 
-NEXT STEPS (Continue the project by completing these):
-{next_steps}
 
-NOTES: 
-- All files mentioned in completed steps ALREADY EXIST in the locations specified.
-- All completed steps have ALREADY BEEN DONE successfully.
-- Continue the project by implementing the next steps, building on the existing work.
-"""
+    Updated Request:
+    {new_task}
+    NOTES: 
+    - All files mentioned in completed steps ALREADY EXIST in the locations specified.
+    - All completed steps have ALREADY BEEN DONE successfully.
+    - Continue the project by implementing the next steps, building on the existing work.
+    """
+    rr(f"combined_content: {combined_content}")
     return combined_content

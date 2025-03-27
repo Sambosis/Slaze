@@ -51,28 +51,28 @@ class PictureGenerationTool(BaseAnthropicTool):
                     },
                     "width": {
                         "type": "integer",
-                        "description": "Optional width to resize the image"
+                        "description": "Width to resize the image (required)"
                     },
                     "height": {
                         "type": "integer",
-                        "description": "Optional height to resize the image"
+                        "description": "Height to resize the image (required)"
                     }
                 },
-                "required": ["command", "prompt"]
+                "required": ["command", "prompt", "width", "height"]
             }
         }
         ic(f"PictureGenerationTool params: {params}")
         return params
 
-    async def generate_picture(self, prompt: str, output_path: str, width: int = None, height: int = None) -> dict:
+    async def generate_picture(self, prompt: str, output_path: str, width: int, height: int) -> dict:
         """
-        Generates an image based on the prompt and saves it to the output path.
+        Generates an image based on the prompt using the specified width and height, and saves it to the output path.
         
         Args:
             prompt: Text description of the image to generate
             output_path: Path where the image should be saved
-            width: Optional width to resize the image to
-            height: Optional height to resize the image to
+            width: Width to resize the image to (required)
+            height: Height to resize the image to (required)
             
         Returns:
             A dictionary containing the result
@@ -211,8 +211,8 @@ class PictureGenerationTool(BaseAnthropicTool):
         command: PictureCommand,
         prompt: str,
         output_path: str = "output",
-        width: int = None,
-        height: int = None,
+        width: int,
+        height: int,
         **kwargs,
     ) -> ToolResult:
         """
@@ -222,8 +222,8 @@ class PictureGenerationTool(BaseAnthropicTool):
             command: The command to execute
             prompt: The text prompt to generate the image from
             output_path: The path to save the image to
-            width: Optional width to resize the image to
-            height: Optional height to resize the image to
+            width: Width to resize the image (required)
+            height: Height to resize the image (required)
             **kwargs: Additional parameters
             
         Returns:

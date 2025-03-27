@@ -1062,7 +1062,9 @@ def get_all_current_code() -> str:
                     output.append("```\n")
         else:
             output.append("No code files have been created yet.\n")
-            return "\n".join(output)
+        
+        # Return the formatted output (This was missing)
+        return "\n".join(output)
 
     except Exception as e:
         print(f"Critical error in get_all_current_code: {e}")

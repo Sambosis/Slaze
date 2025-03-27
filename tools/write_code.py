@@ -162,7 +162,7 @@ class CodeCommand(str, Enum):
     WRITE_CODE_TO_FILE = "write_code_to_file"
     WRITE_AND_EXEC = "write_and_exec"
     WRITE_CODE_MULTIPLE_FILES = "write_code_multiple_files"  # Added new command
-    GET_ALL_CODE = "get_all_current_skeleton"
+    GET_ALL_CODE = "get_all_current_code"  # Fixed to match the function name
     GET_REVISED_VERSION = "get_revised_version"  # Add new command
 
 class WriteCodeTool(BaseAnthropicTool):
@@ -239,22 +239,22 @@ class WriteCodeTool(BaseAnthropicTool):
             A ToolResult object with the result of the operation
         """
         import traceback
-        
+
         try:
             # Convert project_path to Path object if it's a string
             if isinstance(project_path, str):
                 from pathlib import Path
                 project_path = Path(project_path)
-            
+
             # Ensure the project directory exists
             project_path.mkdir(parents=True, exist_ok=True)
-            
+
             # Handle different commands
             if command == CodeCommand.WRITE_CODE_TO_FILE:
                 result = await self.write_code_to_file(
                     code_description, project_path, python_filename
                 )
-                
+
                 # Check if we have an error in the result
                 if "error" in result and result["error"]:
                     return ToolResult(
@@ -263,13 +263,13 @@ class WriteCodeTool(BaseAnthropicTool):
                         tool_name=self.name,
                         command=command
                     )
-                
+
                 return ToolResult(
                     output=self.format_output(result),
                     tool_name=self.name,
                     command=command
                 )
-                
+
             elif command == CodeCommand.WRITE_CODE_MULTIPLE_FILES:
                 files = kwargs.get("files", [])
                 if not files:
@@ -278,9 +278,9 @@ class WriteCodeTool(BaseAnthropicTool):
                         tool_name=self.name,
                         command=command
                     )
-                    
+
                 result = await self.write_multiple_files(project_path, files)
-                
+
                 # Check if we have an error in the result
                 if "error" in result and result["error"]:
                     return ToolResult(
@@ -289,13 +289,13 @@ class WriteCodeTool(BaseAnthropicTool):
                         tool_name=self.name,
                         command=command
                     )
-                
+
                 return ToolResult(
                     output=self.format_output(result),
                     tool_name=self.name,
                     command=command
                 )
-                
+
             elif command == CodeCommand.GET_ALL_CODE:
                 from utils.file_logger import get_all_current_code
                 return ToolResult(
@@ -303,7 +303,7 @@ class WriteCodeTool(BaseAnthropicTool):
                     tool_name=self.name,
                     command=command
                 )
-                
+
             elif command == CodeCommand.GET_REVISED_VERSION:
                 file_path = kwargs.get("file_path", "")
                 if not file_path:
@@ -312,14 +312,14 @@ class WriteCodeTool(BaseAnthropicTool):
                         tool_name=self.name,
                         command=command
                     )
-                    
+
                 # TODO: Implement get_revised_version
                 return ToolResult(
                     error="get_revised_version command not implemented yet",
                     tool_name=self.name,
                     command=command
                 )
-                
+
             else:
                 return ToolResult(
                     error=f"Unknown command: {command}",
@@ -342,7 +342,7 @@ class WriteCodeTool(BaseAnthropicTool):
         Returns tuple of (content, language).
         """
         # If a file_path is provided and it's a Markdown file, return text as-is.
-        if file_path is not None and str(file_path).toLower().endsWith(('.md', '.markdown')):
+        if file_path is not None and str(file_path).lower().endswith(('.md', '.markdown')):
             return text, "markdown"
 
         # Original code block extraction logic for other files
@@ -377,8 +377,8 @@ class WriteCodeTool(BaseAnthropicTool):
 
         code_string = "no code created"
 
-        current_code_base = get_all_current_skeleton()
-        
+        current_code_base = get_all_current_code()
+        # rr(current_code_base)
         OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
         # client = AsyncOpenAI(
         #     base_url="https://openrouter.ai/api/v1",
@@ -404,7 +404,7 @@ class WriteCodeTool(BaseAnthropicTool):
             if completion is None or not hasattr(completion, 'choices') or not completion.choices:
                 ic("No valid completion received from LLM")
                 return f"# Failed to generate code for {file_path}\n# Please try again with more detailed description."
-                
+
             code_string = completion.choices[0].message.content
             if not code_string:
                 ic("Empty content returned from LLM")
@@ -468,7 +468,7 @@ class WriteCodeTool(BaseAnthropicTool):
         # Return BOTH the highlighted code and the CSS
         if self.display is not None:
             self.display.add_message("tool", {"code": code_display, "css": css_styles})
-            
+
         # send_email_attachment_of_code(str(file_path), code_string)
         return code_string
 
@@ -476,9 +476,9 @@ class WriteCodeTool(BaseAnthropicTool):
         """Call LLM to generate code based on the code description"""
         if self.display is not None:
             self.display.add_message("assistant", f"Researching code for: {file_path}")
-            
+
         code_string = "no code created"
-        current_code_base = get_all_current_skeleton()
+        current_code_base = get_all_current_code()
         OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
         client = AsyncOpenAI(
             base_url="https://openrouter.ai/api/v1",
@@ -515,10 +515,10 @@ class WriteCodeTool(BaseAnthropicTool):
     async def _call_llm_for_code_skeleton(self, code_description: str, file_path) -> str:
         """Call LLM to generate code skeleton based on the code description"""
         # if self.display is not None:
-            # self.display.add_message("assistant", f"Creating code skeleton for: {file_path}")
-            
+        # self.display.add_message("assistant", f"Creating code skeleton for: {file_path}")
+
         skeleton_string = "no code created"
-        current_code_base = get_all_current_skeleton()
+        current_code_base = aggregate_file_states()
         OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
         client = AsyncOpenAI(
             base_url="https://openrouter.ai/api/v1",
@@ -565,35 +565,35 @@ class WriteCodeTool(BaseAnthropicTool):
         """
         if "error" in data:
             return f"Error: {data['error']}"
-            
+
         if "output" in data:
             return data["output"]
-            
+
         # Handle different commands
         command = data.get("command", "")
-        
+
         if command == "write_code_to_file":
             if data.get("status") == "success":
                 return f"Successfully wrote code to {data.get('file_path', 'unknown file')}"
             else:
                 return f"Failed to write code: {data.get('error', 'Unknown error')}"
-                
+
         elif command == "write_code_multiple_files":
             if data.get("status") in ["success", "partial_success"]:
                 return f"Wrote {data.get('files_processed', 0)} files to {data.get('project_path', 'unknown path')}\n{data.get('files_results', '')}"
             else:
                 return f"Failed to write files: {data.get('errors', 'Unknown error')}"
-                
+
         elif command == "get_all_current_skeleton":
             from utils.file_logger import get_all_current_skeleton
             return get_all_current_skeleton()
-            
+
         elif command == "get_revised_version":
             if data.get("status") == "success":
                 return f"Successfully revised {data.get('file_path', 'unknown file')}"
             else:
                 return f"Failed to revise file: {data.get('error', 'Unknown error')}"
-                
+
         # Default case
         return str(data)
 
@@ -603,42 +603,42 @@ class WriteCodeTool(BaseAnthropicTool):
             from config import get_constant, get_project_dir, get_docker_project_dir, REPO_DIR
             from utils.file_logger import convert_to_docker_path, extract_code_skeleton
             import os
-            
+
             # Ensure project_path is a Path object
             if not isinstance(project_path, Path):
                 project_path = Path(project_path)
-                
+
             # Ensure we're using the correct project directory structure
             repo_dir = get_constant('REPO_DIR')
             if repo_dir and isinstance(repo_dir, str):
                 repo_dir = Path(repo_dir)
-                
+
             # Extract the project name (prompt name) from the project path
             project_name = project_path.name
-            
+
             # Check if we need to adjust the project path to be within repo directory
             if repo_dir and not str(project_path).startswith(str(repo_dir)):
                 # Create correct project path within repo
                 project_path = repo_dir / project_name
-                
+
             # Ensure project_path exists
             project_path.mkdir(parents=True, exist_ok=True)
-            
+
             # Get the Docker project directory for logging
             docker_project_dir = f"/home/myuser/apps/{project_name}"
-            
+
             # Normalize paths for consistent handling
             project_path_str = str(project_path).replace('\\', '/')
-            
+
             # Determine file path
             if os.path.isabs(filename):
                 file_path = Path(filename)
             else:
                 file_path = project_path / filename
-                
+
             # Create parent directories if needed
             file_path.parent.mkdir(parents=True, exist_ok=True)
-            
+
             # Convert to string for consistent logging
             file_path_str = str(file_path).replace('\\', '/')
 
@@ -649,17 +649,17 @@ class WriteCodeTool(BaseAnthropicTool):
             # Then, generate the full code
             # ll.info(f"Generating full code for {file_path} with skeleton")
             code = await self._call_llm_to_generate_code(code_description, code_skeleton, file_path)
-            
+
             # Skip if no code was generated
             if not code:
                 return {
                     "status": "error",
                     "message": "No code was generated."
                 }
-                
+
             # Determine the operation (create or modify)
             operation = "modify" if file_path.exists() else "create"
-            
+            code = "# Generated with write_code_to_file\n" + code
             # Write the code to the file
             file_path.write_text(code, encoding="utf-8")
             # ll.info(f"Code written to {file_path}")
@@ -677,17 +677,17 @@ class WriteCodeTool(BaseAnthropicTool):
                 )
             except Exception as log_error:
                 ic(f"Warning: Failed to log code writing: {str(log_error)}")
-            
+
             # If we have a display, add a message showing what happened
             if self.display is not None:
                 self.display.add_message(
                     "user", f"Code for {docker_path} generated successfully:"
                 )
-                
+
             # Format the code for HTML display
             language = get_language_from_extension(file_path.suffix)
             formatted_code = html_format_code(code, language)
-            
+
             # Return result dictionary
             result = {
                 "status": "success",
@@ -714,18 +714,18 @@ class WriteCodeTool(BaseAnthropicTool):
         try:
             # Generate skeleton first
             skeleton = await self._call_llm_for_code_skeleton(code_description, file_path)
-            
+
             # Generate code using the LLM and the skeleton
             code = await self._call_llm_to_generate_code(
                 code_description,
                 skeleton,
                 file_path
             )
-            
+
             # Extract only the code block if the LLM returned extra text
             if code:
                 code, _ = self.extract_code_block(code, file_path)
-                
+
             return code
         except Exception as e:
             ic(f"Error in code research: {str(e)}")
@@ -749,33 +749,33 @@ class WriteCodeTool(BaseAnthropicTool):
             from config import get_constant, REPO_DIR
             from utils.file_logger import convert_to_docker_path
             import os
-            
+
             # Ensure project_path is a Path object
             if not isinstance(project_path, Path):
                 project_path = Path(project_path)
-                
+
             # Ensure we're using the correct project directory structure
             repo_dir = get_constant('REPO_DIR')
             if repo_dir and isinstance(repo_dir, str):
                 repo_dir = Path(repo_dir)
-                
+
             # Extract the project name (prompt name) from the project path
             project_name = project_path.name
-            
+
             # Check if we need to adjust the project path to be within repo directory
             if repo_dir and not str(project_path).startswith(str(repo_dir)):
                 # Create correct project path within repo
                 project_path = repo_dir / project_name
-            
+
             # Ensure project_path exists
             project_path.mkdir(parents=True, exist_ok=True)
-            
+
             # Get the Docker project directory for logging
             docker_project_dir = f"/home/myuser/apps/{project_name}"
-                
+
             # Tasks to execute (may be completed results or coroutines to await)
             tasks = []
-            
+
             # For each file specified
             for file_info in files:
                 try:
@@ -784,25 +784,25 @@ class WriteCodeTool(BaseAnthropicTool):
                         # New format with direct content
                         filename = file_info["filename"]
                         content = file_info["content"]
-                        
+
                         # Determine file path
                         if os.path.isabs(filename):
                             file_path = Path(filename)
                         else:
                             file_path = project_path / filename
-                            
+
                         # Create parent directories if needed
                         file_path.parent.mkdir(parents=True, exist_ok=True)
-                        
+
                         # Determine operation (create or modify)
                         operation = "modify" if file_path.exists() else "create"
-                        
+
                         # Write the file
                         file_path.write_text(content, encoding="utf-8")
-                        
+
                         # Convert to Docker path for display
                         docker_path = convert_to_docker_path(file_path)
-                        
+
                         # Log the file operation
                         try:
                             from utils.file_logger import log_file_operation
@@ -814,7 +814,7 @@ class WriteCodeTool(BaseAnthropicTool):
                             )
                         except Exception as log_error:
                             ic(f"Warning: Failed to log code writing: {str(log_error)}")
-                            
+
                         # Add a completed result instead of a task
                         result = {
                             "status": "success", 
@@ -828,7 +828,7 @@ class WriteCodeTool(BaseAnthropicTool):
                         # Old format that requires code generation
                         file_path = file_info["file_path"]
                         code_description = file_info["code_description"]
-                        
+
                         # Create a coroutine to generate and write the file
                         # We'll await it later
                         task = self.write_code_to_file(
@@ -866,17 +866,17 @@ class WriteCodeTool(BaseAnthropicTool):
                             "status": "error",
                             "message": f"Error writing file: {str(e)}",
                             })
-            
+
             # Check how many succeeded and failed
             success_count = sum(1 for r in results if r.get("status") == "success")
             error_count = sum(1 for r in results if r.get("status") == "error")
-            
+
             # Create the summary message
             if error_count == 0:
                 message = f"Successfully wrote {success_count} files to {docker_project_dir}"
             else:
                 message = f"Wrote {success_count} files, {error_count} failed"
-                
+
             # Return the overall result
             return {
                 "status": "success" if error_count == 0 else "partial",
@@ -884,7 +884,7 @@ class WriteCodeTool(BaseAnthropicTool):
                 "results": results,
                 "project_path": str(docker_project_dir),
             }
-            
+
         except Exception as e:
             import traceback
             stack_trace = traceback.format_exc()

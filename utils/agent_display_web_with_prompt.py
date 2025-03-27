@@ -8,6 +8,7 @@ from config import PROMPTS_DIR, LOGS_DIR, get_project_dir, get_docker_project_di
 from pathlib import Path
 from openai import OpenAI, AsyncOpenAI
 import os
+import ftfy
 def start_sampling_loop(task, display):
     """
     Simple wrapper function that spins up a fresh event loop
@@ -43,6 +44,7 @@ class AgentDisplayWebWithPrompt(AgentDisplayWeb):
                         # Handle editing existing prompt
                         prompt_path = PROMPTS_DIR / choice
                         print(f"Using/updating prompt at {prompt_path}")
+                        prompt_text = ftfy.fix_text(prompt_text)  # Fix any text issues
                         # If we have prompt text, it means the user edited the prompt
                         if prompt_text:
                             with open(prompt_path, 'w', encoding='utf-8') as f:
@@ -69,7 +71,7 @@ class AgentDisplayWebWithPrompt(AgentDisplayWeb):
                         messages=messages)
                     task = completion.choices[0].message.content
                     # WRITE THE TASK TO TASK.TXT
-
+                    task = ftfy.fix_text(task)  # Fix any text issues
                     from config import set_project_dir, set_constant
                     project_dir = set_project_dir(filename)
                     set_constant("PROJECT_DIR", str(project_dir))
@@ -79,7 +81,7 @@ class AgentDisplayWebWithPrompt(AgentDisplayWeb):
                         f"Start testing as soon as possible. DO NOT start making fixes or improvements until you have tested to see if it is working as is.  Your project directory is {docker_project_dir}. "
                         "You need to make sure that all files you create and work you do is done in that directory.\n"
                     )
-                    with open("task.txt", "w") as f:
+                    with open("task.txt", "w", encoding="utf-8") as f:
                         f.write(task)
                     self.socketio.start_background_task(start_sampling_loop, task, self)
 

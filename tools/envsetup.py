@@ -8,7 +8,7 @@ from utils.docker_service import DockerService, DockerResult, DockerServiceError
 from config import get_constant
 from utils.file_logger import convert_to_docker_path
 from loguru import logger as ll
-
+from rich import print as rr
 # Configure logging to a file
 ll.add("my_log_file.log", rotation="500 KB", level="DEBUG", format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {module}.{function}:{line} - {message}")
 
@@ -268,7 +268,7 @@ class ProjectSetupTool(BaseAnthropicTool):
 
             # Create a symbolic link so 'python' points to 'python3' within the venv
             symlink_result = self.docker.execute_command(
-                f"ln -s /usr/bin/python3 {docker_path}/.venv/bin/python"
+                f"ln -s /usr/bin/python {docker_path}/.venv/bin/python3"
             )
             if not symlink_result.success:
                 ic(f"Failed to create symbolic link: {symlink_result.stderr}")
@@ -469,6 +469,9 @@ class ProjectSetupTool(BaseAnthropicTool):
             result = self.docker.execute_command(
                 cmd, env_vars={"DISPLAY": "host.docker.internal:0"}
             )
+            rr(f"Here is the stdout of the command:\n{result.stdout}")
+            rr(f"Here is the stderr of the command:\n{result.stderr}")
+            
 
             return {
                 "command": "run_app",

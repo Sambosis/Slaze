@@ -35,8 +35,8 @@ ICECREAM_OUTPUT_FILE = LOGS_DIR / "debug_log.md"
 LOGS_DIR.mkdir(parents=True, exist_ok=True)
 LOG_FILE = LOGS_DIR / "file_creation_log.json"
 MESSAGES_FILE = LOGS_DIR / "messages.md"
-SUMMARY_MODEL = "claude-3-5-haiku-latest"
-MAIN_MODEL = "claude-3-7-sonnet-20250219"
+SUMMARY_MODEL = "claude-3-7-sonnet-latest"
+MAIN_MODEL = "claude-3-7-sonnet-latest"
 COMPUTER_USE_BETA_FLAG = "computer-use-2024-10-22"
 PROMPT_CACHING_BETA_FLAG = "prompt-caching-2024-07-31"
 CODE_FILE = LOGS_DIR / "code_messages.py"
@@ -44,7 +44,7 @@ USER_LOG_FILE = LOGS_DIR / "user_messages.log"
 ASSISTANT_LOG_FILE = LOGS_DIR / "assistant_messages.log"
 TOOL_LOG_FILE = LOGS_DIR / "tool_messages.log"
 MAX_SUMMARY_MESSAGES = 40
-MAX_SUMMARY_TOKENS = 8000
+MAX_SUMMARY_TOKENS = 20000
 
 # Create a cache directory if it does not exist
 CACHE_DIR = TOP_LEVEL_DIR / "cache"

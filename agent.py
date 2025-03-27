@@ -35,8 +35,8 @@ class Agent:
         # set the task to TASK  in config
         self.display = display
         self.context_recently_refreshed = False
-        self.refresh_count = 50
-        self.refresh_increment = 10 # the number     to increase the refresh count by
+        self.refresh_count = 15
+        self.refresh_increment = 15 # the number     to increase the refresh count by
         self.tool_collection = ToolCollection(
             WriteCodeTool(display=self.display),
             ProjectSetupTool(display=self.display),
@@ -274,7 +274,7 @@ class Agent:
                 # ic("---- END LLM ERROR ----")
                 self.display.add_message("assistant", f"LLM call failed: {str(llm_error)}")
                 last_3_messages = messages[-3:] if len(messages) >= 3 else messages
-                new_context = await refresh_context_async(task, last_3_messages, self.display)
+                new_context = await refresh_context_async(task, messages, self.display, self.client)
                 self.messages = [{"role": "user", "content": new_context}]
                 self.context_recently_refreshed = True
 
@@ -339,14 +339,14 @@ class Agent:
                 else:
                     self.messages.append({"role": "user", "content": user_input})
                     last_3_messages = messages[-4:]
-                    new_context = await refresh_context_async(task, last_3_messages, self.display)
+                    new_context = await refresh_context_async(task, messages, self.display, self.client)
                     self.context_recently_refreshed = True
                     self.messages =[{"role": "user", "content": new_context}]
             else:
                 if (len(messages) > self.refresh_count):
                     last_3_messages = messages[-4:]
                     self.display.add_message("user", "refreshing")
-                    new_context = await refresh_context_async(task, last_3_messages, self.display)
+                    new_context = await refresh_context_async(task, messages, self.display, self.client)
                     self.context_recently_refreshed = True
                     self.messages =[{"role": "user", "content": new_context}]
                     self.refresh_count += self.refresh_increment
@@ -379,7 +379,7 @@ class Agent:
             # Try to recover by refreshing context
             try:
                 last_messages = messages[-3:] if len(messages) >= 3 else messages
-                new_context = await refresh_context_async(task, last_messages, self.display)
+                new_context = await refresh_context_async(task, last_messages, self.display, self.client)
                 self.messages = [{"role": "user", "content": new_context}]
                 self.context_recently_refreshed = True
                 self.display.add_message("assistant", "Attempting recovery by refreshing context.")

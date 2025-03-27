@@ -1,1 +1,1 @@
-Build a very simple minecraft game using pygame.  Keep it simple.
+Build a very simple minecraft game using pygame. No sound and no documentation is needed. 

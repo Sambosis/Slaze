@@ -4,6 +4,7 @@ from typing import ClassVar, Literal
 from anthropic.types.beta import BetaToolBash20241022Param
 import os
 import subprocess
+import re
 from dotenv import load_dotenv
 from config import get_constant, check_docker_available
 from .base import BaseAnthropicTool, ToolError, ToolResult
@@ -55,8 +56,33 @@ class BashTool(BaseAnthropicTool):
 
     async def __call__(self, command: str | None = None, **kwargs):
         if command is not None:
-            return await self._run_command(command)
+            # Modify commands to exclude hidden files/paths
+            modified_command = self._modify_command_if_needed(command)
+            return await self._run_command(modified_command)
         raise ToolError("no command provided.")
+
+    def _modify_command_if_needed(self, command: str) -> str:
+        """Modify find and ls commands to exclude hidden files/paths."""
+        # Handle find command
+        find_pattern = r"^find\s+(\S+)\s+-type\s+f"
+        find_match = re.match(find_pattern, command)
+        if find_match:
+            path = find_match.group(1)
+            # Extract the part after the path and -type f
+            rest_of_command = command[find_match.end() :]
+            # Add the exclusion for hidden files/paths
+            return f'find {path} -type f -not -path "*/\\.*"{rest_of_command}'
+
+        # Handle ls -la command
+        ls_pattern = r"^ls\s+-la\s+(\S+)"
+        ls_match = re.match(ls_pattern, command)
+        if ls_match:
+            path = ls_match.group(1)
+            # Use ls with grep to filter out hidden entries
+            return f'ls -la {path} | grep -v "^d*\\."'
+
+        # Return the original command if it doesn't match any patterns
+        return command
 
     async def _run_command(self, command: str):
         """Execute a command in the Docker container."""
@@ -74,7 +100,9 @@ class BashTool(BaseAnthropicTool):
                     self.display.add_message("assistant", f"Error: {error}")
                 return ToolResult(error=error, tool_name=self.name)
 
-            docker_project_dir = get_constant("DOCKER_PROJECT_DIR") or "/home/myuser/apps"
+            docker_project_dir = (
+                get_constant("DOCKER_PROJECT_DIR") or "/home/myuser/apps"
+            )
             # Use proper Linux path format
             docker_project_dir = str(docker_project_dir).replace("\\", "/")
             # Add prefix to ensure we're in the correct directory in Docker
@@ -91,13 +119,11 @@ class BashTool(BaseAnthropicTool):
                 output = output[:100000] + " ... [TRUNCATED] ... " + output[-100000:]
             if len(error) > 200000:
                 error = error[:100000] + " ... [TRUNCATED] ... " + error[-100000:]
-                
+
             formatted_output = f"command: {command}\nsuccess: {str(success).lower()}\noutput: {output}\nerror: {error}"
             # Create a new ToolResult instead of modifying an existing one
             return ToolResult(
-                output=formatted_output, 
-                tool_name=self.name,
-                command=command
+                output=formatted_output, tool_name=self.name, command=command
             )
 
         except Exception as e:
