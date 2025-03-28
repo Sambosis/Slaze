@@ -263,15 +263,16 @@ class ProjectSetupTool(BaseAnthropicTool):
             # Initialize installed packages list
             installed_packages = []
             
-            # Install base packages with pip in the virtual environment
-            ic("Installing packages in Docker...")
-
-            # Create a symbolic link so 'python' points to 'python3' within the venv
-            symlink_result = self.docker.execute_command(
-                f"ln -s /usr/bin/python {docker_path}/.venv/bin/python3"
+            # Create symbolic link if it does not already exist
+            existing_symlink = self.docker.execute_command(
+                f"test -L {docker_path}/.venv/bin/python && echo 'exists'"
             )
-            if not symlink_result.success:
-                ic(f"Failed to create symbolic link: {symlink_result.stderr}")
+            if 'exists' not in existing_symlink.stdout:
+                symlink_result = self.docker.execute_command(
+                    f"ln -s /usr/bin/python3 {docker_path}/.venv/bin/python"
+                )
+                if not symlink_result.success:
+                    ic(f"Failed to create symbolic link: {symlink_result.stderr}")
 
             # Install additional packages if provided
             if packages and len(packages) > 0:
@@ -288,39 +289,22 @@ class ProjectSetupTool(BaseAnthropicTool):
                 try:
                     # Install packages one by one to better track failures
                     for package in packages:
+                        # Clean package to remove extra brackets, quotes, commas, spaces
+                        clean_pkg = package.strip("[],'\" ")
                         result = self.docker.execute_command(
-                            f"cd {docker_path} && .venv/bin/pip install {package}"
+                            f"cd {docker_path} && .venv/bin/pip install {clean_pkg}"
                         )
                         if result.success:
-                            installed_packages.append(package)
+                            installed_packages.append(clean_pkg)
                         else:
-                            ic(f"Failed to install {package}: {result.stderr}")
+                            ic(f"Failed to install {clean_pkg}: {result.stderr}")
                 except Exception as e:
                     ic(f"Error installing packages: {str(e)}")
-            
+                
             if self.display is not None:
                 self.display.add_message(
                     "user", f"Project setup complete in {docker_path}"
                 )
-                
-            # Create a simple README.md file
-            readme_content = f"""# Python Project
-
-                This project was set up with the following packages:
-                {', '.join(installed_packages)}
-
-                ## Running the project
-
-                To run the project, use:
-                ```
-                python app.py
-                ```
-                """
-            try:
-                readme_path = f"{docker_path}/README.md"
-                self.docker.execute_command(f'echo "{readme_content}" > {readme_path}')
-            except Exception as e:
-                ic(f"Error creating README: {str(e)}")
                 
             return {
                 "command": "setup_project",

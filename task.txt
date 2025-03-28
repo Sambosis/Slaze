@@ -1,62 +1,11 @@
-# Expanded Task Description
+# Expanded Description
 
-I'll create a simple 2D platformer game using Pygame. The game will feature:
-
-1. A player character that can:
-   - Move left and right with arrow keys
-   - Jump with the space bar
-   - Be affected by gravity (fall when not on a platform)
-
-2. Multiple platforms for the player to stand on and navigate
-
-3. A static background image
-
-4. Basic collision detection to ensure the player can stand on platforms
-
-5. Simple game states (running, game over if player falls off-screen)
-
-The game will use object-oriented programming with classes for the player and platforms. I'll implement basic physics for movement and jumping, and include a simple game loop that handles events, updates game state, and renders everything to the screen.
-
-For distribution, I'll ensure the game can be packaged as an executable file using PyInstaller, allowing it to run on various operating systems without requiring a Python installation.
+I'll create a basic "Hello World" GUI application in Python. The application will display a simple window with the text "Hello, World!" on it. I'll use Tkinter, which is a standard GUI toolkit that comes bundled with Python, making it accessible without additional installations. The application will consist of a single window with the greeting message centrally displayed.
 
 # File Tree
 
-```
-platformer_game/
-│
-├── main.py                 # Entry point of the game, contains the game loop
-│                           # Import: from platformer_game.main import main
-│
-├── game.py                 # Game class that manages the game state
-│                           # Import: from platformer_game.game import Game
-│
-├── entities/
-│   ├── __init__.py         # Makes entities a package
-│   │                       # Import: import platformer_game.entities
-│   │
-│   ├── player.py           # Player class with movement and physics
-│   │                       # Import: from platformer_game.entities.player import Player
-│   │
-│   └── platform.py         # Platform class for collision detection
-│                           # Import: from platformer_game.entities.platform import Platform
-│
-├── utils/
-│   ├── __init__.py         # Makes utils a package
-│   │                       # Import: import platformer_game.utils
-│   │
-│   └── physics.py          # Contains physics calculations like gravity
-│                           # Import: from platformer_game.utils.physics import apply_gravity
-│
-├── resources/
-│   ├── images/
-│   │   ├── background.png  # Background image asset
-│   │   ├── player.png      # Player sprite
-│   │   └── platform.png    # Platform sprite
-│   │
-│   └── sounds/
-│       ├── jump.wav        # Sound effect for jumping
-│       └── game_music.mp3  # Background music
-│
-└── build.py                # Script to create executable using PyInstaller
-                            # Import: from platformer_game.build import build_executable
-```Start testing as soon as possible. DO NOT start making fixes or improvements until you have tested to see if it is working as is.  Your project directory is /home/myuser/apps/execgame. You need to make sure that all files you create and work you do is done in that directory.
+1. **main.py**
+   - Purpose: The main entry point of the application that creates and displays a window with "Hello, World!" text
+   - Import: This is the top-level file, so no imports of other project files are needed
+
+This simple project only requires a single file since it's a basic hello world GUI application. No additional assets or code files are necessary.Start testing as soon as possible. DO NOT start making fixes or improvements until you have tested to see if it is working as is.  Your project directory is /home/myuser/apps/heyworld. You need to make sure that all files you create and work you do is done in that directory.

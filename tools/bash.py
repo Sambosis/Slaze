@@ -97,7 +97,10 @@ class BashTool(BaseAnthropicTool):
             if not self._docker_available:
                 error = "Docker is not available or the container is not running."
                 if self.display is not None:
-                    self.display.add_message("assistant", f"Error: {error}")
+                    try:
+                        self.display.add_message("assistant", f"Error: {error}")
+                    except Exception as display_error:
+                        ic(f"Error displaying message: {display_error}")
                 return ToolResult(error=error, tool_name=self.name)
 
             docker_project_dir = (
@@ -129,7 +132,10 @@ class BashTool(BaseAnthropicTool):
         except Exception as e:
             error = str(e)
             if self.display is not None:
-                self.display.add_message("assistant", f"Error: {error}")
+                try:
+                    self.display.add_message("assistant", f"Error: {error}")
+                except Exception as display_error:
+                    ic(f"Error displaying message: {display_error}")
             return ToolResult(error=error, tool_name=self.name, command=command)
 
     def to_params(self) -> BetaToolBash20241022Param:
