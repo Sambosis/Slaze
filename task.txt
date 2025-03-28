@@ -1,11 +1,75 @@
-# Expanded Description
+# Expanded Description: GUI Abacus Web App
 
-I'll create a basic "Hello World" GUI application in Python. The application will display a simple window with the text "Hello, World!" on it. I'll use Tkinter, which is a standard GUI toolkit that comes bundled with Python, making it accessible without additional installations. The application will consist of a single window with the greeting message centrally displayed.
+This project involves creating a web-based abacus calculator that performs calculations in real-time. The abacus will have a graphical interface that mimics a traditional abacus with beads that can be moved up and down. As users interact with the abacus, calculations will be displayed immediately.
+
+For the web platform, we'll use React.js for the frontend due to its efficiency in handling real-time state changes and rendering. For the backend, we'll use Express.js (Node.js) as a lightweight server to serve the React application. This combination provides a modern, responsive web application that can be easily deployed and maintained.
+
+The abacus will support basic arithmetic operations (addition, subtraction, multiplication, division) and will include multiple rows to represent different place values (ones, tens, hundreds, etc.). The user interface will be intuitive, allowing users to drag beads up and down or click them to change their positions. The current calculation result will be displayed prominently on the screen.
+
+To handle the installation and initialization of the project, we'll create Python scripts that automate the setup process, including installing Node.js, npm packages, and initializing the project. We'll also create a script to start the server in a non-blocking way using Python's subprocess module to track the process ID for later use.
 
 # File Tree
 
-1. **main.py**
-   - Purpose: The main entry point of the application that creates and displays a window with "Hello, World!" text
-   - Import: This is the top-level file, so no imports of other project files are needed
+1. `main.py`
+   - Purpose: Main entry point of the application that handles setup, installation, and server operations
+   - Import: Not imported by other files (root script)
 
-This simple project only requires a single file since it's a basic hello world GUI application. No additional assets or code files are necessary.Start testing as soon as possible. DO NOT start making fixes or improvements until you have tested to see if it is working as is.  Your project directory is /home/myuser/apps/heyworld. You need to make sure that all files you create and work you do is done in that directory.
+2. `setup.py`
+   - Purpose: Handles checking for and installing Node.js and npm if not present
+   - Import: `from setup import check_and_install_dependencies`
+
+3. `project_initializer.py`
+   - Purpose: Creates the React project structure and installs necessary npm packages
+   - Import: `from project_initializer import initialize_project`
+
+4. `server_controller.py`
+   - Purpose: Contains functions to start, check status, and stop the server in a non-blocking way
+   - Import: `from server_controller import start_server, stop_server, check_server_status`
+
+5. `web_app/package.json`
+   - Purpose: Configuration file for npm dependencies and scripts for the React app
+   - Not imported (configuration file)
+
+6. `web_app/src/index.js`
+   - Purpose: Entry point for the React application
+   - Not imported by Python (executed by React)
+
+7. `web_app/src/App.js`
+   - Purpose: Main React component that contains the overall application structure
+   - Not imported by Python (imported within React)
+
+8. `web_app/src/components/Abacus.js`
+   - Purpose: React component that renders the interactive abacus
+   - Not imported by Python (imported within React)
+
+9. `web_app/src/components/AbacusRow.js`
+   - Purpose: Component representing a single row of the abacus
+   - Not imported by Python (imported within React)
+
+10. `web_app/src/components/AbacusBead.js`
+    - Purpose: Component representing a single bead in the abacus
+    - Not imported by Python (imported within React)
+
+11. `web_app/src/components/Display.js`
+    - Purpose: Component for displaying the calculation results
+    - Not imported by Python (imported within React)
+
+12. `web_app/src/utils/calculations.js`
+    - Purpose: Functions for performing abacus calculations
+    - Not imported by Python (imported within React)
+
+13. `web_app/src/styles/index.css`
+    - Purpose: Global CSS styles for the application
+    - Not imported by Python (imported within React)
+
+14. `web_app/src/styles/Abacus.css`
+    - Purpose: Specific styles for the abacus components
+    - Not imported by Python (imported within React)
+
+15. `web_app/public/index.html`
+    - Purpose: Main HTML file that serves as the container for the React app
+    - Not imported (static file)
+
+16. `web_app/server.js`
+    - Purpose: Express.js server to serve the React application
+    - Not imported by Python (executed by Node.js)Start testing as soon as possible. DO NOT start making fixes or improvements until you have tested to see if it is working as is.  Your project directory is /home/myuser/apps/abacus. You need to make sure that all files you create and work you do is done in that directory.
