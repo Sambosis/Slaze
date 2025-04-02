@@ -87,7 +87,7 @@ class ProjectSetupTool(BaseAnthropicTool):
                 "required": ["command", "project_path"]
             }
         }
-        #ic(f"ProjectSetupTool params: {params}")
+        # ic(f"ProjectSetupTool params: {params}")
         return params
 
     def get_docker_path(self, project_path: Path) -> str:
@@ -95,60 +95,60 @@ class ProjectSetupTool(BaseAnthropicTool):
         try:
             # First, try to use the more robust convert_to_docker_path function
             docker_path = convert_to_docker_path(project_path)
-            
+
             # Validate it's a proper Docker path
             if docker_path.startswith('/home/myuser/apps/'):
                 return docker_path
         except Exception as e:
             # If that fails, fall back to our manual conversion
             ic(f"Failed to convert path using central function: {e}")
-            
+
         # Manual conversion as fallback
         if not isinstance(project_path, Path):
             project_path = Path(project_path)
-            
+
         # If the path starts with /home/myuser/apps/, assume it's already in Docker format
         str_path = str(project_path).replace('\\', '/')
         if str_path.startswith("/home/myuser/apps/"):
             # Already in Docker format
             return str_path
-            
+
         # Get just the final directory name for Docker
         project_name = project_path.name
-        
+
         # Construct the Docker path with proper slashes
         docker_path = f"/home/myuser/apps/{project_name}"
-        
+
         # Ensure proper formatting
         docker_path = self.validate_docker_path(docker_path)
-        
+
         return docker_path
-        
+
     def format_output(self, data: dict) -> str:
         """Format the output data as a readable string."""
         output_lines = []
         output_lines.append(f"Command: {data['command']}")
         output_lines.append(f"Status: {data['status']}")
         # output_lines.append(f"Project Path: {data['project_path']}")
-        
+
         if 'docker_path' in data:
             output_lines.append(f"Docker Path: {data['docker_path']}")
-        
+
         if data['status'] == 'error':
             output_lines.append(f"\nErrors:")
             output_lines.append(f"{data.get('error', 'Unknown error')}")
-        
+
         if 'packages_installed' in data:
             output_lines.append(f"\nPackages Installed:")
             for package in data['packages_installed']:
                 output_lines.append(f"- {package}")
-        
+
         if 'run_output' in data and data['run_output']:
             output_lines.append(f"\nOutput:")
             output_lines.append(data['run_output'])
-                
+
         return "\n".join(output_lines)
-        
+
     def validate_docker_path(self, docker_path: str) -> str:
         """
         Ensure the Docker path is valid and properly formatted.
@@ -163,34 +163,34 @@ class ProjectSetupTool(BaseAnthropicTool):
         # First check if it's already a proper Docker path
         if docker_path.startswith("/home/myuser/apps/") and '\\' not in docker_path:
             return docker_path
-            
+
         # Convert to string if it's a Path object
         if not isinstance(docker_path, str):
             docker_path = str(docker_path)
-            
+
         # Replace backslashes with forward slashes for Linux compatibility
         docker_path = docker_path.replace('\\', '/')
-        
+
         # Remove Windows drive letter if present
         if ':' in docker_path:
             docker_path = docker_path.split(':', 1)[1]
-            
+
         # Ensure the path starts with a forward slash
         if not docker_path.startswith('/'):
             docker_path = '/' + docker_path
-            
+
         # Check if the path should be in the Docker apps directory
         if not docker_path.startswith('/home/myuser/apps/'):
             # Extract the project name
             path_parts = docker_path.strip('/').split('/')
             if len(path_parts) > 0:
                 project_name = path_parts[-1]  # Use the last part if nothing else
-                
+
                 # If it's just a bare project name, prefix with Docker apps path
                 docker_path = f'/home/myuser/apps/{project_name}'
-        
+
         return docker_path
-        
+
     async def setup_project(self, project_path: Path, packages: List[str]) -> dict:
         """Sets up a Python project inside the Docker container."""
         if not self._docker_available:
@@ -200,25 +200,25 @@ class ProjectSetupTool(BaseAnthropicTool):
                 "error": "Docker is not available or not running",
                 "project_path": str(project_path)
             }
-            
+
         # Make sure local directory exists
         project_path.mkdir(parents=True, exist_ok=True)
-        
+
         # Get Docker path with correct format
         docker_path = self.get_docker_path(project_path)
-        
+
         try:
             # Create the project directory in Docker
-            #ic(f"Creating directory in Docker: {docker_path}")
+            # ic(f"Creating directory in Docker: {docker_path}")
             if self.display is not None:
                 self.display.add_message(
                     "user", f"Creating project directory in Docker: {docker_path}"
                 )
-            
+
             # Log the exact command being executed
             mkdir_cmd = f"mkdir -p {docker_path}"
-            #ic(f"Docker mkdir command: {mkdir_cmd}")
-            
+            # ic(f"Docker mkdir command: {mkdir_cmd}")
+
             # Execute the command to create the directory
             mkdir_result = self.docker.execute_command(mkdir_cmd)
             if not mkdir_result.success:
@@ -229,28 +229,28 @@ class ProjectSetupTool(BaseAnthropicTool):
                     "project_path": str(project_path),
                     "docker_path": docker_path
                 }
-            
+
             # Verify the directory was created
             verify_cmd = f"ls -la {docker_path}"
             verify_result = self.docker.execute_command(verify_cmd)
-            #ic(f"Directory verification: {verify_result.stdout}")
-            
+            # ic(f"Directory verification: {verify_result.stdout}")
+
             # Create a virtual environment in Docker
-            #ic("Creating virtual environment in Docker...")
+            # ic("Creating virtual environment in Docker...")
             if self.display is not None:
                 self.display.add_message(
                     "user", "Creating Python virtual environment in Docker"
                 )
-                
+
             # Set the Docker project directory for the Docker service
             self.docker._docker_project_dir = docker_path
-                
+
             # Ensure packages is a list of strings
             if isinstance(packages, str):
                 packages = packages.split()
-                
+
             venv_result = self.docker.create_virtual_env()
-            
+
             if not venv_result.success:
                 return {
                     "command": "setup_project",
@@ -259,10 +259,10 @@ class ProjectSetupTool(BaseAnthropicTool):
                     "project_path": str(project_path),
                     "docker_path": docker_path
                 }
-                
+
             # Initialize installed packages list
             installed_packages = []
-            
+
             # Create symbolic link if it does not already exist
             existing_symlink = self.docker.execute_command(
                 f"test -L {docker_path}/.venv/bin/python && echo 'exists'"
@@ -281,18 +281,19 @@ class ProjectSetupTool(BaseAnthropicTool):
                     self.display.add_message(
                         "user", f"Installing packages: {', '.join(packages)}"
                     )
-                    
+
                 # Ensure packages is a list of strings
                 if isinstance(packages, str):
                     packages = packages.split()
-                    
+
                 try:
                     # Install packages one by one to better track failures
                     for package in packages:
                         # Clean package to remove extra brackets, quotes, commas, spaces
                         clean_pkg = package.strip("[],'\" ")
                         result = self.docker.execute_command(
-                            f"cd {docker_path} && .venv/bin/pip install {clean_pkg}"
+                            # f"cd {docker_path} && .venv/bin/pip install {clean_pkg}"
+                            f"cd {docker_path} && uv pip install {clean_pkg}"
                         )
                         if result.success:
                             installed_packages.append(clean_pkg)
@@ -300,12 +301,12 @@ class ProjectSetupTool(BaseAnthropicTool):
                             ic(f"Failed to install {clean_pkg}: {result.stderr}")
                 except Exception as e:
                     ic(f"Error installing packages: {str(e)}")
-                
+
             if self.display is not None:
                 self.display.add_message(
                     "user", f"Project setup complete in {docker_path}"
                 )
-                
+
             return {
                 "command": "setup_project",
                 "status": "success",
@@ -313,7 +314,7 @@ class ProjectSetupTool(BaseAnthropicTool):
                 "docker_path": docker_path,
                 "packages_installed": installed_packages
             }
-            
+
         except Exception as e:
             error_message = str(e)
             ic(f"Error in setup_project: {error_message}")
@@ -328,7 +329,7 @@ class ProjectSetupTool(BaseAnthropicTool):
                 "project_path": str(project_path),
                 "docker_path": docker_path if 'docker_path' in locals() else None
             }
-            
+
     async def add_dependencies(self, project_path: Path, packages: List[str]) -> dict:
         """Adds additional Python dependencies to an existing project."""
         if not self._docker_available:
@@ -338,13 +339,13 @@ class ProjectSetupTool(BaseAnthropicTool):
                 "error": "Docker is not available or not running",
                 "project_path": str(project_path)
             }
-            
+
         # Get Docker path with correct format
         docker_path = self.get_docker_path(project_path)
-        
+
         # Validate and fix the Docker path if needed
         docker_path = self.validate_docker_path(docker_path)
-        
+
         try:
             # Install packages
             ic(f"Installing additional packages in Docker: {packages}")
@@ -352,13 +353,13 @@ class ProjectSetupTool(BaseAnthropicTool):
                 self.display.add_message(
                     "user", f"Installing additional packages in Docker: {packages}"
                 )
-                
+
             # Initialize the list of installed packages
             installed_packages = []
-            
+
             # Install each package
             for i, package in enumerate(packages, 1):
-                #ic(f"Installing package {i}/{len(packages)}: {package}")
+                # ic(f"Installing package {i}/{len(packages)}: {package}")
                 if self.display is not None:
                     self.display.add_message(
                         "user", f"Installing package {i}/{len(packages)}: {package}"
@@ -366,7 +367,8 @@ class ProjectSetupTool(BaseAnthropicTool):
 
                 try:
                     result = self.docker.execute_command(
-                        f"cd {docker_path} && .venv/bin/pip install {package}"
+                        # f"cd {docker_path} && .venv/bin/pip install {package}"
+                        f"cd {docker_path} && uv pip install {package}"
                     )
                     installed_packages.append(package)
                     if self.display is not None:
@@ -428,12 +430,12 @@ class ProjectSetupTool(BaseAnthropicTool):
         docker_path = self.validate_docker_path(docker_path)
 
         # Print paths for debugging
-        #ic(f"Windows project path: {project_path}")
+        # ic(f"Windows project path: {project_path}")
         ll.info(f"Docker project path: {docker_path}")
         try:
             ll.info(f"Running {filename} in Docker container at {docker_path}")
             # Run Python script with X11 forwarding
-            
+
             # Check if self.display is not None before calling add_message
             if self.display is not None:
                 self.display.add_message("assistant", f"Running {filename} in Docker container")
@@ -455,7 +457,6 @@ class ProjectSetupTool(BaseAnthropicTool):
             )
             rr(f"Here is the stdout of the command:\n{result.stdout}")
             rr(f"Here is the stderr of the command:\n{result.stderr}")
-            
 
             return {
                 "command": "run_app",
@@ -506,12 +507,12 @@ class ProjectSetupTool(BaseAnthropicTool):
                 self.display.add_message(
                     "user", "Initializing Node.js project in Docker"
                 )
-            
+
             # Create package.json with npm init -y
             init_result = self.docker.execute_command(
                 f"cd {docker_path} && npm init -y"
             )
-            
+
             if not init_result.success:
                 return {
                     "command": "setup_project",
@@ -520,13 +521,13 @@ class ProjectSetupTool(BaseAnthropicTool):
                     "project_path": str(project_path),
                     "docker_path": docker_path
                 }
-                
+
             # Initialize installed packages list
             installed_packages = []
-            
+
             # Install base development packages
             base_packages = ["jest", "eslint"]
-            
+
             for package in base_packages:
                 try:
                     result = self.docker.execute_command(
@@ -540,7 +541,7 @@ class ProjectSetupTool(BaseAnthropicTool):
                         self.display.add_message(
                             "user", f"Warning: Failed to install {package}, continuing anyway"
                         )
-                    
+
             # Install user-specified packages
             if packages:
                 for package in packages:
@@ -562,12 +563,12 @@ class ProjectSetupTool(BaseAnthropicTool):
                             "docker_path": docker_path,
                             "packages_installed": installed_packages,
                         }
-                        
+
             if self.display is not None:
                 self.display.add_message(
                     "user", "Node.js project setup completed successfully in Docker"
                 )
-                
+
             return {
                 "command": "setup_project",
                 "status": "success",
@@ -575,7 +576,7 @@ class ProjectSetupTool(BaseAnthropicTool):
                 "docker_path": docker_path,
                 "packages_installed": installed_packages,
             }
-            
+
         except Exception as e:
             return {
                 "command": "setup_project",
@@ -584,7 +585,7 @@ class ProjectSetupTool(BaseAnthropicTool):
                 "project_path": str(project_path),
                 "docker_path": docker_path if 'docker_path' in locals() else "unknown",
             }
-    
+
     async def add_dependencies_node(
         self, project_path: Path, packages: List[str]
         ) -> dict:
@@ -596,13 +597,13 @@ class ProjectSetupTool(BaseAnthropicTool):
                 "error": "Docker is not available or not running",
                 "project_path": str(project_path)
             }
-            
+
         # Get Docker path with correct format
         docker_path = self.get_docker_path(project_path)
-        
+
         # Validate and fix the Docker path if needed
         docker_path = self.validate_docker_path(docker_path)
-        
+
         try:
             # Install packages
             ic(f"Installing additional Node.js packages in Docker: {packages}")
@@ -610,15 +611,15 @@ class ProjectSetupTool(BaseAnthropicTool):
                 self.display.add_message(
                     "user", f"Installing additional Node.js packages in Docker: {packages}"
                 )
-                
+
             # Initialize the list of installed packages
             installed_packages = []
-            
+
             # Check if package.json exists
             pkg_json_check = self.docker.execute_command(
                 f"[ -f {docker_path}/package.json ] && echo 'exists' || echo 'not exists'"
             )
-            
+
             if "not exists" in pkg_json_check.stdout:
                 return {
                     "command": "add_additional_depends",
@@ -627,7 +628,7 @@ class ProjectSetupTool(BaseAnthropicTool):
                     "project_path": str(project_path),
                     "docker_path": docker_path
                 }
-                
+
             # Install each package
             for i, package in enumerate(packages, 1):
                 ic(f"Installing package {i}/{len(packages)}: {package}")
@@ -640,12 +641,12 @@ class ProjectSetupTool(BaseAnthropicTool):
                     # Check if it's a dev dependency
                     is_dev = any(dev_keyword in package.lower() for dev_keyword in 
                                 ['test', 'jest', 'mocha', 'chai', 'eslint', 'prettier', 'babel', 'webpack', 'typescript'])
-                    
+
                     if is_dev:
                         cmd = f"cd {docker_path} && npm install --save-dev {package}"
                     else:
                         cmd = f"cd {docker_path} && npm install {package}"
-                        
+
                     result = self.docker.execute_command(cmd)
                     installed_packages.append(package)
                     if self.display is not None:
@@ -689,7 +690,7 @@ class ProjectSetupTool(BaseAnthropicTool):
                     installed_packages if "installed_packages" in locals() else []
                 ),
             }
-            
+
     async def run_app_node(self, project_path: Path, filename: str) -> dict:
         """Runs a Node.js application inside the Docker container."""
         if not self._docker_available:
@@ -722,7 +723,7 @@ class ProjectSetupTool(BaseAnthropicTool):
             pkg_json_check = self.docker.execute_command(
                 f"[ -f {docker_path}/package.json ] && echo 'exists' || echo 'not exists'"
             )
-            
+
             if "not exists" in pkg_json_check.stdout:
                 return {
                     "command": "run_app",
@@ -754,7 +755,7 @@ class ProjectSetupTool(BaseAnthropicTool):
                 "docker_path": docker_path,
                 "errors": f"Failed to run Node.js app in Docker: {str(e)}",
             }
-    
+
     async def run_project(self, project_path: Path, entry_filename: str = "app.py") -> dict:
         """Runs a Python project inside the Docker container."""
         if not self._docker_available:
@@ -779,11 +780,11 @@ class ProjectSetupTool(BaseAnthropicTool):
                 self.display.add_message(
                     "user", f"Checking if entry file exists: {entry_file}"
                 )
-                
+
             # Verify the file exists
             file_check_cmd = f"[ -f {entry_file} ] && echo 'exists' || echo 'not exists'"
             file_check = self.docker.execute_command(file_check_cmd)
-            
+
             if "not exists" in file_check.stdout:
                 return {
                     "command": "run_project",
@@ -795,7 +796,7 @@ class ProjectSetupTool(BaseAnthropicTool):
 
             # Run Python script with X11 forwarding
             ic(f"Running {entry_filename} in Docker container at {docker_path}")
-            
+
             # Check if self.display is not None before calling add_message
             if self.display is not None:
                 self.display.add_message("assistant", f"Running {entry_filename} in Docker container")
@@ -855,48 +856,48 @@ class ProjectSetupTool(BaseAnthropicTool):
                         error=f"Unknown command: {command}",
                         tool_name=self.name
                     )
-            
+
             if self.display is not None:
                 self.display.add_message(
                     "user", f"ProjectSetupTool Command: {command_value}"
                 )
-                
+
             # Set default packages if not provided
             if packages is None:
                 packages = []
-                
+
             # Convert string path to Path object
             project_path = Path(project_path)
-            
+
             if command == ProjectCommand.SETUP_PROJECT:
                 if environment == "python":
                     result = await self.setup_project(project_path, packages)
                 else:
                     result = await self.setup_project_node(project_path, packages)
-                
+
             elif command == ProjectCommand.ADD_DEPENDENCIES:
                 if environment == "python":
                     result = await self.add_dependencies(project_path, packages)
                 else:
                     result = await self.add_dependencies_node(project_path, packages)
-                
+
             elif command == ProjectCommand.RUN_APP:
                 if environment == "python":
                     result = await self.run_project(project_path, entry_filename)
                 else:
                     result = await self.run_app_node(project_path, entry_filename)
-                    
+
             elif command == ProjectCommand.RUN_PROJECT:
                 result = await self.run_project(project_path, entry_filename)
-                
+
             else:
                 return ToolResult(
                     error=f"Unknown command: {command}",
                     tool_name=self.name
                 )
-                
+
             return ToolResult(output=self.format_output(result))
-            
+
         except Exception as e:
             if self.display is not None:
                 self.display.add_message("assistant", f"ProjectSetupTool error: {str(e)}")

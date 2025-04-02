@@ -369,6 +369,7 @@ class WriteCodeTool(BaseAnthropicTool):
 
         return code_block if code_block else "No Code Found", language
 
+    @retry(stop=stop_after_attempt(3), wait=wait_fixed(8))
     async def _call_llm_to_generate_code(self, code_description: str, research_string: str, file_path) -> str:
         """Call LLM to generate code based on the code description"""
 
@@ -657,7 +658,7 @@ class WriteCodeTool(BaseAnthropicTool):
 
             # Determine the operation (create or modify)
             operation = "modify" if file_path.exists() else "create"
-            code = "# Generated with write_code_to_file\n" + code
+            # code = "# Generated with write_code_to_file\n" + code
             # Write the code to the file
             file_path.write_text(code, encoding="utf-8")
             # ll.info(f"Code written to {file_path}")

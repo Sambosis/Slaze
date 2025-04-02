@@ -53,6 +53,7 @@ RUN apt-get update && \
     chown myuser:myuser /home/myuser/.Xauthority && \
     # Install common Python packages
     pip3 install --no-cache-dir --upgrade pip && \
+    pip3 install --no-cache-dir uv && \
     pip3 install --no-cache-dir \
     notebook \
     matplotlib \

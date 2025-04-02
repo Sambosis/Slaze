@@ -1,75 +1,92 @@
-# Expanded Description: GUI Abacus Web App
+# Expanded Description: Reinforcement Learning Model for a Strategy Based War Game
 
-This project involves creating a web-based abacus calculator that performs calculations in real-time. The abacus will have a graphical interface that mimics a traditional abacus with beads that can be moved up and down. As users interact with the abacus, calculations will be displayed immediately.
+The task is to create a reinforcement learning model that learns to play a turn-based strategy war game by playing against itself. The war game will involve two agents, each controlling an army on a grid-based map, with the objective of defeating the enemy army. 
 
-For the web platform, we'll use React.js for the frontend due to its efficiency in handling real-time state changes and rendering. For the backend, we'll use Express.js (Node.js) as a lightweight server to serve the React application. This combination provides a modern, responsive web application that can be easily deployed and maintained.
+To make this more concrete, I'll define the following game mechanics:
 
-The abacus will support basic arithmetic operations (addition, subtraction, multiplication, division) and will include multiple rows to represent different place values (ones, tens, hundreds, etc.). The user interface will be intuitive, allowing users to drag beads up and down or click them to change their positions. The current calculation result will be displayed prominently on the screen.
+1. **Game Environment**: 
+   - A 2D grid map (15x15) with various terrain types (plains, forests, hills, water) that affect movement and combat.
+   - Each cell can contain units from only one player at a time.
 
-To handle the installation and initialization of the project, we'll create Python scripts that automate the setup process, including installing Node.js, npm packages, and initializing the project. We'll also create a script to start the server in a non-blocking way using Python's subprocess module to track the process ID for later use.
+2. **Units and Resources**:
+   - Each army starts with a base and a set number of resource points.
+   - Players can spend resources to create different unit types (infantry, cavalry, archers).
+   - Units have different attributes: health, attack power, range, movement points.
+
+3. **Game Flow**:
+   - Turn-based gameplay where each player takes all their actions before passing to the opponent.
+   - Actions include: creating units, moving units, attacking enemy units.
+   - Game ends when one player's base is destroyed or after a set number of turns (200 turns).
+
+4. **Learning Approach**:
+   - Will implement a novel "Hierarchical Policy Gradient" approach, where the agent learns at two levels:
+     - Strategic level: resource allocation and unit production decisions
+     - Tactical level: movement and combat decisions for individual units
+   - The hierarchical approach allows the agent to learn more efficiently by structuring the problem.
+   - Will use self-play with policy gradients and experience replay to improve learning.
+
+5. **Visualization**:
+   - A simple 2D visualization using Pygame that shows the state of the game board.
+   - Different colors will represent different units, terrain, and players.
+   - Every 50 training iterations, a full game will be visualized to show learning progress.
+
+6. **Technical Implementation**:
+   - Will ensure compatibility with both CPU and GPU through PyTorch's device-agnostic code.
+   - A save/load system for the trained models.
+   - An option to exit the visualization or training at any point.
 
 # File Tree
 
-1. `main.py`
-   - Purpose: Main entry point of the application that handles setup, installation, and server operations
-   - Import: Not imported by other files (root script)
+1. **main.py**
+   - Purpose: Entry point for the program, handles command line arguments and starts the training or visualization process.
+   - Import: `import main`
 
-2. `setup.py`
-   - Purpose: Handles checking for and installing Node.js and npm if not present
-   - Import: `from setup import check_and_install_dependencies`
+2. **environment/game.py**
+   - Purpose: Defines the Game class that manages game state, rules, and turn progression.
+   - Import: `from environment.game import Game`
 
-3. `project_initializer.py`
-   - Purpose: Creates the React project structure and installs necessary npm packages
-   - Import: `from project_initializer import initialize_project`
+3. **environment/map.py**
+   - Purpose: Implements the Map class and terrain functionality.
+   - Import: `from environment.map import Map, TerrainType`
 
-4. `server_controller.py`
-   - Purpose: Contains functions to start, check status, and stop the server in a non-blocking way
-   - Import: `from server_controller import start_server, stop_server, check_server_status`
+4. **environment/units.py**
+   - Purpose: Defines different unit types, their attributes and behaviors.
+   - Import: `from environment.units import Unit, Infantry, Cavalry, Archer, Base`
 
-5. `web_app/package.json`
-   - Purpose: Configuration file for npm dependencies and scripts for the React app
-   - Not imported (configuration file)
+5. **agents/agent.py**
+   - Purpose: Abstract base class for different agent implementations.
+   - Import: `from agents.agent import Agent`
 
-6. `web_app/src/index.js`
-   - Purpose: Entry point for the React application
-   - Not imported by Python (executed by React)
+6. **agents/hierarchical_agent.py**
+   - Purpose: Implements the Hierarchical Policy Gradient agent.
+   - Import: `from agents.hierarchical_agent import HierarchicalAgent`
 
-7. `web_app/src/App.js`
-   - Purpose: Main React component that contains the overall application structure
-   - Not imported by Python (imported within React)
+7. **agents/random_agent.py**
+   - Purpose: Implements a randomly acting agent for baseline comparison.
+   - Import: `from agents.random_agent import RandomAgent`
 
-8. `web_app/src/components/Abacus.js`
-   - Purpose: React component that renders the interactive abacus
-   - Not imported by Python (imported within React)
+8. **learning/experience_buffer.py**
+   - Purpose: Implements the experience replay buffer for storing and sampling game experiences.
+   - Import: `from learning.experience_buffer import ExperienceBuffer`
 
-9. `web_app/src/components/AbacusRow.js`
-   - Purpose: Component representing a single row of the abacus
-   - Not imported by Python (imported within React)
+9. **learning/policy_network.py**
+   - Purpose: Defines the neural networks for the policy gradients algorithm.
+   - Import: `from learning.policy_network import StrategicNetwork, TacticalNetwork`
 
-10. `web_app/src/components/AbacusBead.js`
-    - Purpose: Component representing a single bead in the abacus
-    - Not imported by Python (imported within React)
+10. **learning/trainer.py**
+    - Purpose: Contains the self-play training loop and learning algorithms.
+    - Import: `from learning.trainer import Trainer`
 
-11. `web_app/src/components/Display.js`
-    - Purpose: Component for displaying the calculation results
-    - Not imported by Python (imported within React)
+11. **visualization/renderer.py**
+    - Purpose: Handles the visualization of the game state using Pygame.
+    - Import: `from visualization.renderer import GameRenderer`
 
-12. `web_app/src/utils/calculations.js`
-    - Purpose: Functions for performing abacus calculations
-    - Not imported by Python (imported within React)
+12. **utils/save_load.py**
+    - Purpose: Utility functions for saving and loading models and game states.
+    - Import: `from utils.save_load import save_model, load_model, save_game_state, load_game_state`
 
-13. `web_app/src/styles/index.css`
-    - Purpose: Global CSS styles for the application
-    - Not imported by Python (imported within React)
+13. **utils/config.py**
+    - Purpose: Contains configuration parameters for the game, agents, and learning process.
+    - Import: `from utils.config import GameConfig, TrainingConfig`
 
-14. `web_app/src/styles/Abacus.css`
-    - Purpose: Specific styles for the abacus components
-    - Not imported by Python (imported within React)
-
-15. `web_app/public/index.html`
-    - Purpose: Main HTML file that serves as the container for the React app
-    - Not imported (static file)
-
-16. `web_app/server.js`
-    - Purpose: Express.js server to serve the React application
-    - Not imported by Python (executed by Node.js)Start testing as soon as possible. DO NOT start making fixes or improvements until you have tested to see if it is working as is.  Your project directory is /home/myuser/apps/abacus. You need to make sure that all files you create and work you do is done in that directory.
+This structure aims for simplicity while maintaining clear separation of concerns between different parts of the system.Start testing as soon as possible. DO NOT start making fixes or improvements until you have tested to see if it is working as is.  Your project directory is /home/myuser/apps/warlearn. You need to make sure that all files you create and work you do is done in that directory.
