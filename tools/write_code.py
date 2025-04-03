@@ -369,6 +369,7 @@ class WriteCodeTool(BaseAnthropicTool):
 
         return code_block if code_block else "No Code Found", language
 
+    @retry(stop=stop_after_attempt(3), wait=wait_fixed(8))
     async def _call_llm_to_generate_code(self, code_description: str, research_string: str, file_path) -> str:
         """Call LLM to generate code based on the code description"""
 
@@ -380,13 +381,13 @@ class WriteCodeTool(BaseAnthropicTool):
         current_code_base = get_all_current_code()
         # rr(current_code_base)
         OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-        # client = AsyncOpenAI(
-        #     base_url="https://openrouter.ai/api/v1",
-        #     api_key=OPENROUTER_API_KEY,
-        #     )
-        # model = "google/gemini-2.0-flash-001"
-        client = AsyncOpenAI()
-        model = "o3-mini"
+        client = AsyncOpenAI(
+            base_url="https://openrouter.ai/api/v1",
+            api_key=OPENROUTER_API_KEY,
+            )
+        model = "google/gemini-2.5-pro-exp-03-25:free"
+        # client = AsyncOpenAI()
+        # model = "o3-mini"
 
         # Get the original task from the config if available
         from config import get_constant
@@ -514,8 +515,6 @@ class WriteCodeTool(BaseAnthropicTool):
 
     async def _call_llm_for_code_skeleton(self, code_description: str, file_path) -> str:
         """Call LLM to generate code skeleton based on the code description"""
-        # if self.display is not None:
-        # self.display.add_message("assistant", f"Creating code skeleton for: {file_path}")
 
         skeleton_string = "no code created"
         current_code_base = aggregate_file_states()
@@ -524,7 +523,7 @@ class WriteCodeTool(BaseAnthropicTool):
             base_url="https://openrouter.ai/api/v1",
             api_key=OPENROUTER_API_KEY,
             )
-        model = "google/gemini-2.0-flash-001"
+        model = "google/gemini-2.5-pro-exp-03-25:free"
 
         # Prepare messages
         messages = code_skeleton_prompt(code_description)
@@ -659,7 +658,7 @@ class WriteCodeTool(BaseAnthropicTool):
 
             # Determine the operation (create or modify)
             operation = "modify" if file_path.exists() else "create"
-            code = "# Generated with write_code_to_file\n" + code
+            # code = "# Generated with write_code_to_file\n" + code
             # Write the code to the file
             file_path.write_text(code, encoding="utf-8")
             # ll.info(f"Code written to {file_path}")

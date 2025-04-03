@@ -84,85 +84,100 @@ async def summarize_recent_messages(short_messages: List[BetaMessageParam], disp
     """ 
     Summarize the most recent messages. 
     """
-    OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-    sum_client = OpenAI(
-        base_url="https://openrouter.ai/api/v1",
-        api_key=OPENROUTER_API_KEY,
-        )
-    all_summaries = get_all_summaries()
-    model = "google/gemini-2.0-flash-001"
-    # sum_client = OpenAI()
-    # model = "o3-mini"
-    conversation_text = ""
-    for msg in short_messages:
-        role = msg['role'].upper()
-        if isinstance(msg['content'], list):
-            for block in msg['content']:
-                if isinstance(block, dict):
-                    if block.get('type') == 'text':
-                        content = block.get('text', '')
-                        if len(content) > 150000:
-                            content = content[:70000] + " ... [TRUNCATED] ... " + content[-70000:]
-                        conversation_text += f"\n{role}: {content}"
-                    elif block.get('type') == 'tool_result':
-                        for item in block.get('content', []):
-                            if item.get('type') == 'text':
-                                content = item.get('text', '')
-                                if len(content) > 150000:
-                                    content = content[:70000] + " ... [TRUNCATED] ... " + content[-70000:]
-                                conversation_text += f"\n{role} (Tool Result): {content}"
-        else:
-            content = msg['content']
-            if len(content) > 150000:
-                content = content[:70000] + " ... [TRUNCATED] ... " + content[-70000:]
-            conversation_text += f"\n{role}: {content}"
-    ic(f"conversation_text: {conversation_text}")
-    summary_prompt = f"""Please provide your response in a concise markdown format with short statements that document what happened. Structure your response as a list with clear labels for each step, such as:
+    try:
+        OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+        sum_client = OpenAI(
+            base_url="https://openrouter.ai/api/v1",
+            api_key=OPENROUTER_API_KEY,
+            )
+        all_summaries = get_all_summaries()
+        model = "openai/gpt-4o-mini"
+        conversation_text = ""
+        for msg in short_messages:
+            role = msg['role'].upper()
+            if isinstance(msg['content'], list):
+                for block in msg['content']:
+                    if isinstance(block, dict):
+                        if block.get('type') == 'text':
+                            content = block.get('text', '')
+                            if len(content) > 150000:
+                                content = content[:70000] + " ... [TRUNCATED] ... " + content[-70000:]
+                            conversation_text += f"\n{role}: {content}"
+                        elif block.get('type') == 'tool_result':
+                            for item in block.get('content', []):
+                                if item.get('type') == 'text':
+                                    content = item.get('text', '')
+                                    if len(content) > 150000:
+                                        content = content[:70000] + " ... [TRUNCATED] ... " + content[-70000:]
+                                    conversation_text += f"\n{role} (Tool Result): {content}"
+            else:
+                content = msg['content']
+                if len(content) > 150000:
+                    content = content[:70000] + " ... [TRUNCATED] ... " + content[-70000:]
+                conversation_text += f"\n{role}: {content}"
+        ic(f"conversation_text: {conversation_text}")
+        summary_prompt = f"""Please provide your response in a concise markdown format with short statements that document what happened. Structure your response as a list with clear labels for each step, such as:
 
-        - **Action:** [brief description of what was done]
-        - **Tool:** [specific tool or method used]
-        - **Result:** [outcome of the action]
-        - **Note:** [any important observations or considerations]
+            - **Action:** [brief description of what was done]
+            - **Tool:** [specific tool or method used]
+            - **Result:** [outcome of the action]
+            - **Note:** [any important observations or considerations]
 
-        For example:
-        - **Action:** Created configuration file
-        - **Tool:** Text editor
-        - **Result:** Successfully generated config.json
-        - **Note:** Default parameters were applied
-        - Here are the actions that have been logged so far.  You should not repeat these, they are only to give you context to what is going on. 
-        Previous Actions:
-        {all_summaries}
-        Please be specific but concise, focusing on documenting the sequence of events in this structured format.
-        Messages to summarize:
-        {conversation_text}"""
-    messages_prompt = [
-        {
-            "role": "user",
-            "content": 
-                [
-                    {
-                        "type": "text",
-                        "text": summary_prompt
-                    },
-                ]
-        }
-            ]
-    # completion = sum_client.chat.completions.create(
-    #             model=model,
-    #             messages=messages_prompt)
-    response = sum_client.chat.completions.create(
-        model=model,
-        messages=[
+            For example:
+            - **Action:** Created configuration file
+            - **Tool:** Text editor
+            - **Result:** Successfully generated config.json
+            - **Note:** Default parameters were applied
+            - Here are the actions that have been logged so far.  You should not repeat these, they are only to give you context to what is going on. 
+            Previous Actions:
+            {all_summaries}
+            Please be specific but concise, focusing on documenting the sequence of events in this structured format.
+            Messages to summarize:
+            {conversation_text}"""
+        messages_prompt = [
             {
                 "role": "user",
-                "content": summary_prompt
+                "content": 
+                    [
+                        {
+                            "type": "text",
+                            "text": summary_prompt
+                        },
+                    ]
             }
-        ]
-    )
-    ic(f"response: {response}")
-    summary = response.choices[0].message.content
-    ic(f"summary: {summary}")
-    return summary
+                ]
+        response = sum_client.chat.completions.create(
+            model=model,
+            messages=[
+                {
+                    "role": "user",
+                    "content": summary_prompt
+                }
+            ]
+        )
+        ic(f"response: {response}")
+
+        # Add error handling for response
+        if not response or not response.choices or len(response.choices) == 0:
+            error_msg = "Error: No valid response received from API"
+            print(response)
+            ic(error_msg)
+            return "Error generating summary: No valid response received from API"
+
+        summary = response.choices[0].message.content
+
+        # Check if summary is None or empty
+        if not summary:
+            error_msg = "Error: Empty summary received from API"
+            ic(error_msg)
+            return "Error generating summary: Empty summary received from API"
+
+        ic(f"summary: {summary}")
+        return summary
+    except Exception as e:
+        error_msg = f"Error generating summary: {str(e)}"
+        ic(error_msg)
+        return error_msg
 
 def filter_messages(messages: List[Dict]) -> List[Dict]:
     """    
@@ -232,10 +247,10 @@ def get_all_summaries() -> str:
 async def reorganize_context(messages: List[BetaMessageParam], summary: str) -> str:
     """ Reorganize the context by filtering and summarizing messages. """
     conversation_text = ""
-    
+
     # Look for tool results related to image generation
     image_generation_results = []
-    
+
     for msg in messages:
         role = msg['role'].upper()
         if isinstance(msg['content'], list):
@@ -249,7 +264,7 @@ async def reorganize_context(messages: List[BetaMessageParam], summary: str) -> 
                             for item in block.get('content', []):
                                 if item.get('type') == 'text' and 'Generated image' in item.get('text', ''):
                                     image_generation_results.append(item.get('text', ''))
-                        
+
                         for item in block.get('content', []):
                             if item.get('type') == 'text':
                                 conversation_text += f"\n{role} (Tool Result): {item.get('text', '')}"
@@ -297,17 +312,17 @@ async def reorganize_context(messages: List[BetaMessageParam], summary: str) -> 
     {conversation_text}
     </MESSAGES>
     """
-    
+
     try:
         OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
         if not OPENROUTER_API_KEY:
             raise ValueError("OPENROUTER_API_KEY environment variable is not set")
-            
+
         sum_client = OpenAI(
             base_url="https://openrouter.ai/api/v1",
             api_key=OPENROUTER_API_KEY,
         )
-        model = "google/gemini-2.0-flash-001"
+        model = "meta-llama/llama-3.3-70b-instruct:nitro"
         response = sum_client.chat.completions.create(
             model=model,
             messages=[{
@@ -318,28 +333,28 @@ async def reorganize_context(messages: List[BetaMessageParam], summary: str) -> 
         ic(f"response: {response}")
         if not response or not response.choices:
             raise ValueError("No response received from OpenRouter API")
-            
+
         summary = response.choices[0].message.content
         ic(f"summary: {summary}")
         if not summary:
             raise ValueError("Empty response content from OpenRouter API")
-            
+
         start_tag = "<COMPLETED>"
         end_tag = "</COMPLETED>"
         if start_tag in summary and end_tag in summary:
             completed_items = summary[summary.find(start_tag)+len(start_tag):summary.find(end_tag)]
         else:
             completed_items = "No completed items found."
-            
+
         start_tag = "<NEXT_STEPS>"
         end_tag = "</NEXT_STEPS>"
         if start_tag in summary and end_tag in summary:
             steps = summary[summary.find(start_tag)+len(start_tag):summary.find(end_tag)]
         else:
             steps = "No steps found."
-            
+
         return completed_items, steps
-        
+
     except Exception as e:
         ic(f"Error in reorganize_context: {str(e)}")
         # Return default values in case of error
@@ -373,11 +388,6 @@ async def refresh_context_async(task: str, messages: List[Dict], display: AgentD
         images_info = "## Generated Images:\n" + images_section.strip()
 
     # call the LLM and pass it all current messages then the task and ask it to give an updated version of the task
-    # client = OpenAI(
-    #     base_url="https://openrouter.ai/api/v1",
-    #     api_key=os.getenv("OPENROUTER_API_KEY"),
-    # )
-    # model = "anthropic/claude-3.7-sonnet:beta"
     prompt = f""" Your job is to update the task based on the current state of the project.
     The task is: {task}
     The current state of the project is:
@@ -392,7 +402,6 @@ async def refresh_context_async(task: str, messages: List[Dict], display: AgentD
     Make sure you give clear guidance on how to import various files and in general how they should work together.
     """
 
-    # client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
     messages = [{"role": "user", "content": prompt}]
     response = client.beta.messages.create(
         model=MAIN_MODEL,

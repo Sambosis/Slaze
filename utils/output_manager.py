@@ -25,11 +25,16 @@ class OutputManager:
 
     def save_image(self, base64_data: str) -> Optional[Path]:
         """Save base64 image data to file and return path."""
-        self.image_counter += 1
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        image_hash = hashlib.md5(base64_data.encode()).hexdigest()[:8]
-        image_path = self.image_dir / f"image_{timestamp}_{image_hash}.png"
+        if not base64_data:
+            ic("Error: No base64 data provided to save_image")
+            return None
+            
         try:
+            self.image_counter += 1
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            image_hash = hashlib.md5(base64_data.encode()).hexdigest()[:8]
+            image_path = self.image_dir / f"image_{timestamp}_{image_hash}.png"
+            
             image_data = base64.b64decode(base64_data)
             with open(image_path, 'wb') as f:
                 f.write(image_data)
@@ -40,12 +45,16 @@ class OutputManager:
 
     def format_tool_output(self, result: "ToolResult", tool_name: str):
         """Format and display tool output."""
+        if result is None:
+            ic("Error: None result provided to format_tool_output")
+            return
+            
         output_text = f"Used Tool: {tool_name}\n"
         
         if isinstance(result, str):
             output_text += f"{result}"
         else:
-            text = self._truncate_string(str(result.output) or "")
+            text = self._truncate_string(str(result.output) if result.output is not None else "")
             output_text += f"Output: {text}\n"
             if result.base64_image:
                 image_path = self.save_image(result.base64_image)
@@ -58,23 +67,31 @@ class OutputManager:
 
     def format_api_response(self, response: APIResponse):
         """Format and display API response."""
-        if hasattr(response.content[0], 'text'):
+        if response is None or not hasattr(response, 'content') or not response.content:
+            ic("Error: Invalid API response in format_api_response")
+            return
+            
+        if response.content and hasattr(response.content[0], 'text'):
             text = self._truncate_string(response.content[0].text)
-            # self.display.add_message("assistant", f"{text}")
 
     def format_content_block(self, block: BetaContentBlock) -> None:
         """Format and display content block."""
+        if block is None:
+            ic("Error: None block provided to format_content_block")
+            return
+            
         if getattr(block, 'type', None) == "tool_use":
             tool_name = block.name
             safe_input = {k: v for k, v in block.input.items()
                          if not isinstance(v, str) or len(v) < 1000}
             input_text = json.dumps(safe_input) if isinstance(safe_input, dict) else str(safe_input)
-            # self.display.add_message("assistant", f"[cyan]Using tool:[/cyan] {tool_name}\n[cyan]Input:[/cyan] {input_text}")
-        # elif hasattr(block, 'text'):
-        #     self.display.add_message("assistant", block.text)
 
     def format_recent_conversation(self, messages: List[BetaMessageParam], num_recent: int = 10):
         """Format and display recent conversation."""
+        if messages is None or not messages:
+            ic("Error: No messages provided to format_recent_conversation")
+            return
+            
         # recent_messages = messages[:num_recent] if len(messages) > num_recent else messages
         recent_messages = messages[-num_recent:]
         for msg in recent_messages:
@@ -85,6 +102,10 @@ class OutputManager:
 
     def _format_user_content(self, content: Any):
         """Format and display user content."""
+        if content is None:
+            ic("Error: None content provided to _format_user_content")
+            return
+            
         if isinstance(content, list):
             for content_block in content:
                 if isinstance(content_block, dict):
@@ -101,12 +122,15 @@ class OutputManager:
 
     def _format_assistant_content(self, content: Any):
         """Format and display assistant content."""
+        if content is None:
+            ic("Error: None content provided to _format_assistant_content")
+            return
+            
         if isinstance(content, list):
             for content_block in content:
                 if isinstance(content_block, dict):
                     if content_block.get("type") == "text":
                         text = self._truncate_string(content_block.get("text", ""))
-                        # self.display.add_message("assistant", text)
                     elif content_block.get("type") == "tool_use":
                         tool_name = content_block.get('name')
                         tool_input = content_block.get('input', "")
@@ -121,10 +145,12 @@ class OutputManager:
                         # self.display., (tool_name, f"Input: {input_text}"))
         elif isinstance(content, str):
             text = self._truncate_string(content)
-            # self.display.add_message("assistant", text)
 
     def _truncate_string(self, text: str, max_length: int = 500) -> str:
         """Truncate a string to a max length with ellipsis."""
+        if text is None:
+            return ""
+            
         if len(text) > max_length:
             return text[:200] + "\n...\n" + text[-200:]
         return text

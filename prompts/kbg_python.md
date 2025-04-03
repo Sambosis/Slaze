@@ -1,0 +1,3 @@
+Python Knowledge based graph
+
+create an app that takes a github repo and creates a knowledge based graph of it designed specifically for python.  it should capture how the code relates and connects to each other.  Consider how to represent things like what calls what, what imports what, defines what, assigns what etc. These are just suggestions, use your vast expertise to find a way to implement it such that it represents the python code in the github repo which it is provided. there is a .env file in your project directory that has ANTHROPIC_API_KEY and OPENAI_API_KEY defined. if you need to use them.

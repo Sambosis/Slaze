@@ -35,7 +35,7 @@ class Agent:
         # set the task to TASK  in config
         self.display = display
         self.context_recently_refreshed = False
-        self.refresh_count = 15
+        self.refresh_count = 45
         self.refresh_increment = 15 # the number     to increase the refresh count by
         self.tool_collection = ToolCollection(
             WriteCodeTool(display=self.display),
@@ -44,7 +44,7 @@ class Agent:
             PictureGenerationTool(display=self.display),
             DockerEditTool(display=self.display),  # Uncommented and enabled for testing      
             display=self.display
-        )
+            )
         self.output_manager = OutputManager(self.display)
         self.token_tracker = TokenTracker(self.display)
         self.messages = []
@@ -179,42 +179,6 @@ class Agent:
                     content[-1].pop("cache_control", None)
                     break
 
-    def _maybe_filter_to_n_most_recent_images(self):
-        messages = self.messages
-        images_to_keep = self.only_n_most_recent_images
-        min_removal_threshold = self.image_truncation_threshold
-        if images_to_keep is None:
-            return messages
-
-        tool_result_blocks = [
-            item
-            for message in messages
-            for item in (message["content"] if isinstance(message["content"], list) else [])
-            if isinstance(item, dict) and item.get("type") == "tool_result"
-        ]
-
-        images_to_remove = 0
-        images_found = 0
-        for tool_result in reversed(tool_result_blocks):
-            if isinstance(tool_result.get("content"), list):
-                for content in reversed(tool_result.get("content", [])):
-                    if isinstance(content, dict) and content.get("type") == "image":
-                        images_found += 1
-
-        images_to_remove = max(0, images_found - images_to_keep)
-
-        removed = 0
-        for tool_result in tool_result_blocks:
-            if isinstance(tool_result.get("content"), list):
-                new_content = []
-                for content in tool_result.get("content", []):
-                    if isinstance(content, dict) and content.get("type") == "image":
-                        if removed < images_to_remove:
-                            removed += 1
-                            continue
-                    new_content.append(content)
-                tool_result["content"] = new_content
-
     def _sanitize_tool_name(self, name: str) -> str:
         """Sanitize tool name to match pattern '^[a-zA-Z0-9_-]{1,64}$'"""
         import re
@@ -236,8 +200,7 @@ class Agent:
                 "text": SYSTEM_PROMPT,
                 "cache_control": {"type": "ephemeral"}
             }]
-        if self.only_n_most_recent_images:
-            self._maybe_filter_to_n_most_recent_images()
+
         try:
 
             truncated_messages = [
@@ -245,19 +208,11 @@ class Agent:
                 for msg in messages
                 ]   
             summary_task = asyncio.create_task(summarize_recent_messages(truncated_messages[-4:] if len(messages) >= 4 else messages, self.display))
-            # ic(f"NUMBER_OF_MESSAGES: {len(messages)}")
 
             # --- MAIN LLM CALL ---
             response = None  # Initialize response to avoid UnboundLocalError
             try:
-                # ic("---- SENDING LLM REQUEST ----")
-                # ic({
-                #     "max_tokens": MAX_SUMMARY_TOKENS,
-                #     "model": MAIN_MODEL,
-                #     "tool_choice": {"type": "auto"},
-                #     "tools_count": len(self.tool_params),
-                #     "betas": self.betas,
-                # })
+
                 response = self.client.beta.messages.create(
                     max_tokens=MAX_SUMMARY_TOKENS,
                     messages=truncated_messages,
@@ -285,7 +240,7 @@ class Agent:
                     for block in response.content:
                         if hasattr(block, 'text'):
                             response_params.append({"type": "text", "text": block.text})
-                            self.display.add_message("assistant", block.text)
+                            # self.display.add_message("assistant", block.text)
                         elif getattr(block, 'type', None) == "tool_use":
                             sanitized_name = self._sanitize_tool_name(block.name)
                             response_params.append({
