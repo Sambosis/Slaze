@@ -1,0 +1,1 @@
+Write a python gui app that uses an llm to create and run apps based on the user input. Use OpenAi model "o3-mini"  You have a .env file in your project directory with your OPENAI_API_KEY.

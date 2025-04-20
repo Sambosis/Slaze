@@ -362,7 +362,7 @@ class ProjectSetupTool(BaseAnthropicTool):
                 # ic(f"Installing package {i}/{len(packages)}: {package}")
                 if self.display is not None:
                     self.display.add_message(
-                        "user", f"Installing package {i}/{len(packages)}: {package}"
+                        "user", f"WITH UV: Installing package {i}/{len(packages)}: {package}"
                     )
 
                 try:

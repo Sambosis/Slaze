@@ -1,92 +1,89 @@
-# Expanded Description: Reinforcement Learning Model for a Strategy Based War Game
+# Expanded Description: Reinforcement Learning Model for Strategy-Based War Game
 
-The task is to create a reinforcement learning model that learns to play a turn-based strategy war game by playing against itself. The war game will involve two agents, each controlling an army on a grid-based map, with the objective of defeating the enemy army. 
+The project involves creating a reinforcement learning (RL) system where two AI agents control opposing armies in a turn-based strategy war game. The agents will learn optimal strategies by playing against each other repeatedly (self-play). The system will use a novel approach to learning by combining traditional reinforcement learning algorithms with a hierarchical policy structure that separates strategic and tactical decision-making.
 
-To make this more concrete, I'll define the following game mechanics:
+The war game will be implemented as a grid-based environment where each army has various unit types with different capabilities. Each agent must make decisions about unit movement, attacks, resource management, and territory control. The state space will include the positions of all units, their health, resources available, and terrain information.
 
-1. **Game Environment**: 
-   - A 2D grid map (15x15) with various terrain types (plains, forests, hills, water) that affect movement and combat.
-   - Each cell can contain units from only one player at a time.
+Key features of the system will include:
+- A visual representation of the game board that updates periodically to show learning progress
+- A hierarchical reinforcement learning approach where agents learn both high-level strategies and low-level tactical maneuvers
+- Experience replay with prioritized sampling to focus learning on important game states
+- Curriculum learning where the complexity of scenarios gradually increases
+- Ability to save and load trained models
+- Support for both CPU and GPU training, with automatic detection and utilization
+- A simple interface to watch AI matches and monitor learning metrics
+- Exit functionality to terminate training or gameplay sessions
 
-2. **Units and Resources**:
-   - Each army starts with a base and a set number of resource points.
-   - Players can spend resources to create different unit types (infantry, cavalry, archers).
-   - Units have different attributes: health, attack power, range, movement points.
-
-3. **Game Flow**:
-   - Turn-based gameplay where each player takes all their actions before passing to the opponent.
-   - Actions include: creating units, moving units, attacking enemy units.
-   - Game ends when one player's base is destroyed or after a set number of turns (200 turns).
-
-4. **Learning Approach**:
-   - Will implement a novel "Hierarchical Policy Gradient" approach, where the agent learns at two levels:
-     - Strategic level: resource allocation and unit production decisions
-     - Tactical level: movement and combat decisions for individual units
-   - The hierarchical approach allows the agent to learn more efficiently by structuring the problem.
-   - Will use self-play with policy gradients and experience replay to improve learning.
-
-5. **Visualization**:
-   - A simple 2D visualization using Pygame that shows the state of the game board.
-   - Different colors will represent different units, terrain, and players.
-   - Every 50 training iterations, a full game will be visualized to show learning progress.
-
-6. **Technical Implementation**:
-   - Will ensure compatibility with both CPU and GPU through PyTorch's device-agnostic code.
-   - A save/load system for the trained models.
-   - An option to exit the visualization or training at any point.
+The novel approach will involve implementing a curiosity-driven exploration mechanism combined with a meta-learning framework that allows agents to adapt their strategies based on the opponent's playing style. This will help prevent the agents from settling into predictable patterns and enable them to develop more robust strategies.
 
 # File Tree
 
-1. **main.py**
-   - Purpose: Entry point for the program, handles command line arguments and starts the training or visualization process.
-   - Import: `import main`
+1. `main.py`
+   - Purpose: Entry point for the application, handles command-line arguments, and orchestrates the training and visualization processes
+   - Import: Not imported by other files
 
-2. **environment/game.py**
-   - Purpose: Defines the Game class that manages game state, rules, and turn progression.
-   - Import: `from environment.game import Game`
+2. `environment/game.py`
+   - Purpose: Implements the war game rules, state representation, and game mechanics
+   - Import: `from environment.game import WarGame`
 
-3. **environment/map.py**
-   - Purpose: Implements the Map class and terrain functionality.
-   - Import: `from environment.map import Map, TerrainType`
+3. `environment/units.py`
+   - Purpose: Defines different unit types, their attributes, and capabilities
+   - Import: `from environment.units import Unit, Infantry, Cavalry, Artillery`
 
-4. **environment/units.py**
-   - Purpose: Defines different unit types, their attributes and behaviors.
-   - Import: `from environment.units import Unit, Infantry, Cavalry, Archer, Base`
+4. `environment/map.py`
+   - Purpose: Handles the game map, terrain types, and their effects on gameplay
+   - Import: `from environment.map import GameMap, Terrain`
 
-5. **agents/agent.py**
-   - Purpose: Abstract base class for different agent implementations.
+5. `agents/agent.py`
+   - Purpose: Base class for all agents with common functionality
    - Import: `from agents.agent import Agent`
 
-6. **agents/hierarchical_agent.py**
-   - Purpose: Implements the Hierarchical Policy Gradient agent.
-   - Import: `from agents.hierarchical_agent import HierarchicalAgent`
+6. `agents/rl_agent.py`
+   - Purpose: Reinforcement learning agent implementation with the novel approach
+   - Import: `from agents.rl_agent import RLAgent`
 
-7. **agents/random_agent.py**
-   - Purpose: Implements a randomly acting agent for baseline comparison.
-   - Import: `from agents.random_agent import RandomAgent`
+7. `agents/hierarchy_policy.py`
+   - Purpose: Implements hierarchical policy structure for strategic and tactical decision-making
+   - Import: `from agents.hierarchy_policy import StrategyPolicy, TacticalPolicy`
 
-8. **learning/experience_buffer.py**
-   - Purpose: Implements the experience replay buffer for storing and sampling game experiences.
-   - Import: `from learning.experience_buffer import ExperienceBuffer`
+8. `learning/model.py`
+   - Purpose: Neural network architecture for the RL agents
+   - Import: `from learning.model import PolicyNetwork, ValueNetwork`
 
-9. **learning/policy_network.py**
-   - Purpose: Defines the neural networks for the policy gradients algorithm.
-   - Import: `from learning.policy_network import StrategicNetwork, TacticalNetwork`
+9. `learning/memory.py`
+   - Purpose: Experience replay buffer with prioritized sampling
+   - Import: `from learning.memory import ReplayBuffer`
 
-10. **learning/trainer.py**
-    - Purpose: Contains the self-play training loop and learning algorithms.
-    - Import: `from learning.trainer import Trainer`
+10. `learning/curiosity.py`
+    - Purpose: Implements the curiosity-driven exploration mechanism
+    - Import: `from learning.curiosity import CuriosityModule`
 
-11. **visualization/renderer.py**
-    - Purpose: Handles the visualization of the game state using Pygame.
+11. `learning/meta_learning.py`
+    - Purpose: Meta-learning framework for strategy adaptation
+    - Import: `from learning.meta_learning import MetaLearner`
+
+12. `visualization/renderer.py`
+    - Purpose: Handles visual representation of the game state
     - Import: `from visualization.renderer import GameRenderer`
 
-12. **utils/save_load.py**
-    - Purpose: Utility functions for saving and loading models and game states.
-    - Import: `from utils.save_load import save_model, load_model, save_game_state, load_game_state`
+13. `visualization/metrics.py`
+    - Purpose: Tracks and visualizes learning metrics
+    - Import: `from visualization.metrics import LearningMetrics`
 
-13. **utils/config.py**
-    - Purpose: Contains configuration parameters for the game, agents, and learning process.
+14. `utils/config.py`
+    - Purpose: Configuration parameters for the game, agents, and training process
     - Import: `from utils.config import GameConfig, TrainingConfig`
 
-This structure aims for simplicity while maintaining clear separation of concerns between different parts of the system.Start testing as soon as possible. DO NOT start making fixes or improvements until you have tested to see if it is working as is.  Your project directory is /home/myuser/apps/warlearn. You need to make sure that all files you create and work you do is done in that directory.
+15. `utils/device.py`
+    - Purpose: Handles device detection (CPU/GPU) and tensor operations
+    - Import: `from utils.device import get_device, to_tensor`
+
+16. `assets/textures.py`
+    - Purpose: Manages game textures and visual assets
+    - Import: `from assets.textures import UnitTextures, TerrainTextures`
+
+17. `assets/images/units/`
+    - Directory containing unit image assets (Not a Python file)
+
+18. `assets/images/terrain/`
+    - Directory containing terrain image assets (Not a Python file)Start testing as soon as possible. DO NOT start making fixes or improvements until you have tested to see if it is working as is.  Your project directory is /home/myuser/apps/warlearn. You need to make sure that all files you create and work you do is done in that directory.

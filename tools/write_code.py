@@ -385,7 +385,7 @@ class WriteCodeTool(BaseAnthropicTool):
             base_url="https://openrouter.ai/api/v1",
             api_key=OPENROUTER_API_KEY,
             )
-        model = "google/gemini-2.5-pro-exp-03-25:free"
+        model = "openai/gpt-4.1"
         # client = AsyncOpenAI()
         # model = "o3-mini"
 
@@ -470,7 +470,7 @@ class WriteCodeTool(BaseAnthropicTool):
         if self.display is not None:
             self.display.add_message("tool", {"code": code_display, "css": css_styles})
 
-        # send_email_attachment_of_code(str(file_path), code_string)
+        send_email_attachment_of_code(str(file_path), code_string)
         return code_string
 
     async def _call_llm_to_research_code(self, code_description: str, file_path) -> str:
@@ -523,7 +523,7 @@ class WriteCodeTool(BaseAnthropicTool):
             base_url="https://openrouter.ai/api/v1",
             api_key=OPENROUTER_API_KEY,
             )
-        model = "google/gemini-2.5-pro-exp-03-25:free"
+        model = "openai/gpt-4.1"
 
         # Prepare messages
         messages = code_skeleton_prompt(code_description)
