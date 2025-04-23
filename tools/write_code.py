@@ -1,29 +1,33 @@
 import asyncio
 from enum import Enum
-from typing import Literal, Optional, List
+from typing import Literal, Optional, List, Dict, Any
 from pathlib import Path
 from .base import ToolResult, BaseAnthropicTool
 import os
-import subprocess
 from icecream import ic
 from rich import print as rr
 import json
 from pydantic import BaseModel
-import tempfile
-from load_constants import write_to_file, ICECREAM_OUTPUT_FILE
+from load_constants import (
+    write_to_file,
+    ICECREAM_OUTPUT_FILE,
+)  # Assuming ICECREAM_OUTPUT_FILE is used elsewhere
 from tenacity import retry, stop_after_attempt, wait_fixed
-from config import *
-from openai import OpenAI, AsyncOpenAI
-from utils.file_logger import *
-from utils.context_helpers import *
+from config import *  # Ensure PROJECT_DIR and REPO_DIR are available via this import
+from openai import AsyncOpenAI
+from utils.file_logger import *  # Ensure convert_to_docker_path, log_file_operation are here
+from utils.context_helpers import *  # Ensure get_language_from_extension is here
 import time
 from system_prompt.code_prompts import (
-    code_prompt_research,
     code_prompt_generate,
     code_skeleton_prompt,
-    )
+)
 import logging
-from utils.docker_service import DockerService, DockerResult, DockerServiceError
+from utils.docker_service import (
+    DockerService,
+    DockerResult,
+    DockerServiceError,
+)  # Assuming DockerService might be used elsewhere
 from pygments import highlight
 from pygments.lexers import PythonLexer
 from pygments.formatters import HtmlFormatter
@@ -32,32 +36,35 @@ from dotenv import load_dotenv
 import ftfy
 from pygments.lexers import get_lexer_by_name, guess_lexer
 from loguru import logger as ll
+import traceback
 
 # Configure logging to a file
 ll.add(
     "my_log_file.log",
-    rotation="500 KB",
+    rotation="1500 KB",
     level="DEBUG",
-    format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {module}.{function}:{line} - {message}")
+    format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {module}.{function}:{line} - {message}",
+)
+
 
 def html_format_code(code, extension):
     """Format code with syntax highlighting for HTML display."""
     try:
         # Try to get a lexer based on the file extension
         try:
-            lexer = get_lexer_by_name(extension.lower().lstrip('.'))
+            lexer = get_lexer_by_name(extension.lower().lstrip("."))
         except:
             # If that fails, try to guess the lexer from the code content
             lexer = guess_lexer(code)
-            
+
         # Use a nice style for the highlighting
-        formatter = HtmlFormatter(style='monokai', linenos=True, cssclass="source")
-        
+        formatter = HtmlFormatter(style="monokai", linenos=True, cssclass="source")
+
         # Highlight the code
         highlighted = highlight(code, lexer, formatter)
-        
+
         # Add some CSS for better display
-        css = formatter.get_style_defs('.source')
+        css = formatter.get_style_defs(".source")
         html = f"""
         <style>
         {css}
@@ -68,123 +75,57 @@ def html_format_code(code, extension):
         return html
     except Exception as e:
         # If highlighting fails, return plain code in a pre tag
+        # ll.warning(f"HTML code formatting failed: {e}")
         return f"<pre>{code}</pre>"
-
-def send_email_attachment_of_code(filename, code_string):
-    import os
-from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import Mail, Attachment, FileContent, FileName, FileType, Disposition, ContentId
-import base64
-load_dotenv()
-
-ic.configureOutput(includeContext=True, outputFunction=write_to_file)
-
-
-def write_chat_completion_to_file(response, filepath):
-    """Appends an OpenAI ChatCompletion object to a file in a human-readable format."""
-    try:
-        with open(filepath, 'a', encoding='utf-8') as f:
-            f.write(f"Created: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(response.get('created', 0)))}\n")
-            f.write(f"Model: {response.get('model', 'N/A')}\n")
-            f.write("\nUsage:\n")
-            usage = response.get("usage", {})
-            for key, value in usage.items():
-                if isinstance(value, dict):  # Nested details
-                    f.write(f"  {key}:\n")
-                    for k, v in value.items():
-                        f.write(f"    {k}: {v}\n")
-                else:
-                    f.write(f"  {key}: {value}\n")
-
-            f.write("\nChoices:\n")
-            for i, choice in enumerate(response.get("choices", [])):
-                f.write(f"  Choice {i+1}:\n")
-                f.write(f"    Index: {choice.get('index', 'N/A')}\n")
-                f.write(f"    Finish Reason: {choice.get('finish_reason', 'N/A')}\n")
-
-                message = choice.get('message', {})
-                if message:
-                    f.write("    Message:\n")
-                    f.write(f"      Role: {message.get('role', 'N/A')}\n")
-                    f.write(f"      Content: {message.get('content', 'None')}\n")
-                    
-                    if 'refusal' in message:
-                        f.write(f"      Refusal: {message['refusal']}\n")
-
-
-                f.write("\n")
-
-    except Exception as e:
-        print(f"Error writing to file: {e}")
-
-def send_email_attachment_of_code(filename, code_string):
-    
-    message = Mail(
-        from_email='sambosisai@outlook.com',
-        to_emails='sambosis@gmail.com',
-        subject=f"Code File: {filename}",
-        html_content='<strong>Here is the file</strong>',
-    )
-
-
-    content = base64.b64encode(code_string.encode('utf-8'))
-
-    message.attachment = Attachment(
-                                    FileContent(content.decode('utf-8')),
-                                    FileName(filename),
-                                    FileType('application/text'),
-                                    Disposition('attachment'),
-                                    ContentId('Content ID 1')
-                                    )
-        
-    try:
-        sg = SendGridAPIClient(os.environ.get('SENDGRID_API_KEY'))
-        response = sg.send(message)
-        print(response.status_code)
-        print(response.body)
-        print(response.headers)
-    except Exception as e:
-        print(str(e))
-
-
+googlepro = "google/gemini-2.5-pro-preview-03-25"
+oa4omini = "openai/o4-mini-high" 
+MODEL_STRING = googlepro  # Default model string, can be overridden in config
 class CodeCommand(str, Enum):
     """
     An enumeration of possible commands for the WriteCodeTool.
-
-    Attributes:
-        WRITE_CODE_TO_FILE (str): Command to write code to a file.
-        WRITE_AND_EXEC (str): Command to write and execute code.
-        WRITE_CODE_MULTIPLE_FILES (str): Command to write multiple files.
-        GET_ALL_CODE (str): Command to get all current code.
-        GET_REVISED_VERSION (str): Command to get a revised version of an existing file.
-
     """
-    WRITE_CODE_TO_FILE = "write_code_to_file"
-    WRITE_AND_EXEC = "write_and_exec"
-    WRITE_CODE_MULTIPLE_FILES = "write_code_multiple_files"  # Added new command
-    GET_ALL_CODE = "get_all_current_code"  # Fixed to match the function name
-    GET_REVISED_VERSION = "get_revised_version"  # Add new command
+
+    WRITE_CODEBASE = "write_codebase"
+
+
+class FileDetail(BaseModel):
+    """Model for specifying file details for code generation."""
+
+    filename: str
+    code_description: str
+    external_imports: Optional[List[str]] = None
+    internal_imports: Optional[List[str]] = None
+
 
 class WriteCodeTool(BaseAnthropicTool):
     """
-    A tool that takes a description of code that needs to be written and provides the actual programming code in the specified language. It can either execute the code or write it to a file depending on the command.
+    A tool that takes a description of a codebase, including files, external and internal imports,
+    generates code skeletons, and then generates the full code for each file asynchronously,
+    writing them to the correct host path.
     """
 
-    name: Literal["write_code"] = "write_code"
+    name: Literal["write_codebase_tool"] = "write_codebase_tool"
     api_type: Literal["custom"] = "custom"
-    description: str = "A tool that takes a description of code that needs to be written and provides the actual programming code in the specified language. It can either execute the code or write it to a file depending on the command. It is also able to return all of the code written so far so you can view the contents of all files."
+    description: str = (
+        "Generates a codebase consisting of multiple files based on descriptions, skeletons, and import lists. Creates skeletons first, then generates full code asynchronously, writing to the host filesystem."
+    )
+
     def __init__(self, display=None):
         super().__init__(input_schema=None, display=display)
-        self.display = display  # Explicitly set self.display
-        # Initialize Docker service
-        self.docker = DockerService()
-        self._docker_available = self.docker.is_available()
+        self.display = display
+        # DockerService might be needed for other potential features, keep initialization
+        try:
+            self.docker = DockerService()
+            self._docker_available = self.docker.is_available()
+        except Exception as docker_init_err:
+            # ll.warning(f"Failed to initialize DockerService: {docker_init_err}")
+            self.docker = None
+            self._docker_available = False
         ic("Initializing WriteCodeTool")
         ic(f"Docker available: {self._docker_available}")
 
     def to_params(self) -> dict:
         ic(f"WriteCodeTool.to_params called with api_type: {self.api_type}")
-        # Use the format that has worked in the past
         params = {
             "name": self.name,
             "description": self.description,
@@ -194,24 +135,46 @@ class WriteCodeTool(BaseAnthropicTool):
                 "properties": {
                     "command": {
                         "type": "string",
-                        "enum": [cmd.value for cmd in CodeCommand],
-                        "description": "Command to perform. Options: write_code_to_file, write_and_exec, write_code_multiple_files, get_all_current_code, get_revised_version"
+                        "enum": [CodeCommand.WRITE_CODEBASE.value],
+                        "description": "Command to perform. Only 'write_codebase' is supported.",
                     },
-                    "code_description": {
-                        "type": "string",
-                        "description": "Description for single file code generation. This should be a very detailed description of the code to be created. Include any assumption and specific details including necessary imports and how to interact with other aspects of the code."
+                    "files": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "filename": {
+                                    "type": "string",
+                                    "description": "Name/path of the file relative to the project path.",
+                                },
+                                "code_description": {
+                                    "type": "string",
+                                    "description": "Detailed description of the code for this file.",
+                                },
+                                "external_imports": {
+                                    "type": "array",
+                                    "items": {"type": "string"},
+                                    "description": "List of external libraries/packages required specifically for this file.",
+                                    "default": [],
+                                },
+                                "internal_imports": {
+                                    "type": "array",
+                                    "items": {"type": "string"},
+                                    "description": "List of internal modules/files within the codebase imported specifically by this file.",
+                                    "default": [],
+                                },
+                            },
+                            "required": ["filename", "code_description"],
+                        },
+                        "description": "List of files to generate, each with a filename, description, and optional specific imports.",
                     },
                     "project_path": {
                         "type": "string",
-                        "description": "Path to the project directory."
+                        "description": "Path to the project directory (can be Docker-style or just project name). The actual write path will be resolved relative to the configured REPO_DIR on the host.",
                     },
-                    "python_filename": {
-                        "type": "string",
-                        "description": "Filename for write_code_to_file command."
-                    }
                 },
-                "required": ["command"]
-            }
+                "required": ["command", "files", "project_path"],
+            },
         }
         ic(f"WriteCodeTool params: {params}")
         return params
@@ -220,675 +183,665 @@ class WriteCodeTool(BaseAnthropicTool):
         self,
         *,
         command: CodeCommand,
-        code_description: str = "",  # default empty for multi-file command
-        project_path: str = PROJECT_DIR,
-        python_filename: str = "you_need_to_name_me.py",
+        files: List[Dict[str, Any]],
+        project_path: str,  # This might be a docker-style path or just a project name
         **kwargs,
-        ) -> ToolResult:
+    ) -> ToolResult:
         """
-        Execute the tool with the given command and parameters.
-        
+        Execute the write_codebase command.
+
         Args:
-            command: The command to execute
-            code_description: Description of the code to write
-            project_path: Path to the project directory
-            python_filename: Name of the file to write
-            **kwargs: Additional parameters
-            
+            command: The command to execute (should always be WRITE_CODEBASE).
+            files: List of file details (filename, code_description, optional external_imports, optional internal_imports).
+            project_path: Path/name identifier for the project.
+            **kwargs: Additional parameters (ignored).
+
         Returns:
-            A ToolResult object with the result of the operation
+            A ToolResult object with the result of the operation.
         """
-        import traceback
-
-        try:
-            # Convert project_path to Path object if it's a string
-            if isinstance(project_path, str):
-                from pathlib import Path
-                project_path = Path(project_path)
-
-            # Ensure the project directory exists
-            project_path.mkdir(parents=True, exist_ok=True)
-
-            # Handle different commands
-            if command == CodeCommand.WRITE_CODE_TO_FILE:
-                result = await self.write_code_to_file(
-                    code_description, project_path, python_filename
-                )
-
-                # Check if we have an error in the result
-                if "error" in result and result["error"]:
-                    return ToolResult(
-                        error=result["error"],
-                        output=result.get("output", "Failed to write code"),
-                        tool_name=self.name,
-                        command=command
-                    )
-
-                return ToolResult(
-                    output=self.format_output(result),
-                    tool_name=self.name,
-                    command=command
-                )
-
-            elif command == CodeCommand.WRITE_CODE_MULTIPLE_FILES:
-                files = kwargs.get("files", [])
-                if not files:
-                    return ToolResult(
-                        error="No files specified for write_code_multiple_files command",
-                        tool_name=self.name,
-                        command=command
-                    )
-
-                result = await self.write_multiple_files(project_path, files)
-
-                # Check if we have an error in the result
-                if "error" in result and result["error"]:
-                    return ToolResult(
-                        error=result["error"],
-                        output=result.get("output", "Failed to write multiple files"),
-                        tool_name=self.name,
-                        command=command
-                    )
-
-                return ToolResult(
-                    output=self.format_output(result),
-                    tool_name=self.name,
-                    command=command
-                )
-
-            elif command == CodeCommand.GET_ALL_CODE:
-                from utils.file_logger import get_all_current_code
-                return ToolResult(
-                    output=get_all_current_code(),
-                    tool_name=self.name,
-                    command=command
-                )
-
-            elif command == CodeCommand.GET_REVISED_VERSION:
-                file_path = kwargs.get("file_path", "")
-                if not file_path:
-                    return ToolResult(
-                        error="No file_path specified for get_revised_version command",
-                        tool_name=self.name,
-                        command=command
-                    )
-
-                # TODO: Implement get_revised_version
-                return ToolResult(
-                    error="get_revised_version command not implemented yet",
-                    tool_name=self.name,
-                    command=command
-                )
-
-            else:
-                return ToolResult(
-                    error=f"Unknown command: {command}",
-                    tool_name=self.name,
-                    command=command
-                )
-
-        except Exception as e:
-            error_message = f"Error in WriteCodeTool: {str(e)}\n{traceback.format_exc()}"
-            print(error_message)  # Print to console for debugging
+        if command != CodeCommand.WRITE_CODEBASE:
             return ToolResult(
-                error=error_message,
+                error=f"Unsupported command: {command}. Only 'write_codebase' is supported.",
                 tool_name=self.name,
-                command=command
+                command=command,
             )
 
-    def extract_code_block(self, text: str, file_path: Optional[Path] = None) -> tuple[str, str]:
+        host_project_path_obj = None  # Initialize to None
+
+        try:
+            # --- START: Path Correction Logic ---
+            # Ensure REPO_DIR is imported/available, e.g., from config import REPO_DIR
+            host_repo_dir = get_constant("REPO_DIR")
+            if not host_repo_dir:
+                raise ValueError(
+                    "REPO_DIR is not configured in config.py. Cannot determine host write path."
+                )
+            host_repo_path = Path(host_repo_dir)
+            if not host_repo_path.is_dir():
+                ll.warning(
+                    f"Configured REPO_DIR '{host_repo_dir}' does not exist or is not a directory."
+                )
+                # Decide if you want to raise an error or attempt to create it
+                # For now, let's proceed and let mkdir handle creation/errors later
+
+            # Assume project_path might be a full docker path or just the project name.
+            # We want the final component to use relative to the host REPO_DIR.
+            project_name = Path(project_path).name
+            if not project_name or project_name in [".", ".."]:
+                raise ValueError(
+                    f"Could not extract a valid project name from input project_path: {project_path}"
+                )
+
+            # Construct the ACTUAL host path where files should be written
+            host_project_path_obj = (
+                host_repo_path / project_name
+            ).resolve()  # Resolve to absolute path early
+            ll.info(f"Resolved HOST project path for writing: {host_project_path_obj}")
+
+            # Ensure the HOST directory exists
+            host_project_path_obj.mkdir(parents=True, exist_ok=True)
+            ll.debug(f"Ensured host project directory exists: {host_project_path_obj}")
+            # --- END: Path Correction Logic ---
+
+            # Validate files input
+            try:
+                file_details = [FileDetail(**f) for f in files]
+            except Exception as pydantic_error:
+                ll.error(f"Pydantic validation error for 'files': {pydantic_error}")
+                return ToolResult(
+                    error=f"Invalid format for 'files' parameter: {pydantic_error}",
+                    tool_name=self.name,
+                    command=command,
+                )
+
+            if not file_details:
+                return ToolResult(
+                    error="No files specified for write_codebase command",
+                    tool_name=self.name,
+                    command=command,
+                )
+
+            # --- Step 1: Generate Skeletons Asynchronously ---
+            if self.display:
+                self.display.add_message(
+                    "assistant",
+                    f"Generating skeletons for {len(file_details)} files...",
+                )
+
+            skeleton_tasks = [
+                # Pass the intended final host path to the skeleton generator for context
+                self._call_llm_for_code_skeleton(
+                    file.code_description, host_project_path_obj / file.filename
+                )
+                for file in file_details
+            ]
+            skeleton_results = await asyncio.gather(
+                *skeleton_tasks, return_exceptions=True
+            )
+
+            skeletons: Dict[str, str] = {}
+            errors_skeleton = []
+            for i, result in enumerate(skeleton_results):
+                # Use the relative filename as the key for the skeletons dictionary
+                filename_key = file_details[i].filename
+                if isinstance(result, Exception):
+                    error_msg = (
+                        f"Error generating skeleton for {filename_key}: {result}"
+                    )
+                    ll.error(error_msg)
+                    errors_skeleton.append(error_msg)
+                    skeletons[filename_key] = (
+                        f"# Error generating skeleton: {result}"  # Placeholder
+                    )
+                else:
+                    skeletons[filename_key] = result
+                    if self.display:
+                        self.display.add_message(
+                            "assistant", f"Skeleton generated for {filename_key}"
+                        )
+
+            # --- Step 2: Generate Full Code Asynchronously ---
+            if self.display:
+                self.display.add_message(
+                    "assistant",
+                    f"Generating full code for {len(file_details)} files using skeletons and specific imports...",
+                )
+
+            code_gen_tasks = [
+                self._call_llm_to_generate_code(
+                    file.code_description,
+                    skeletons,
+                    file.external_imports or [],
+                    file.internal_imports or [],
+                    # Pass the intended final host path to the code generator for context
+                    host_project_path_obj / file.filename,
+                )
+                for file in file_details
+            ]
+            code_results = await asyncio.gather(*code_gen_tasks, return_exceptions=True)
+
+            # --- Step 3: Write Files ---
+            write_results = []
+            errors_code_gen = []
+            errors_write = []
+            success_count = 0
+
+            ll.info(
+                f"Starting file writing phase for {len(code_results)} results to HOST path: {host_project_path_obj}"
+            )
+
+            for i, result in enumerate(code_results):
+                file_detail = file_details[i]
+                filename = file_detail.filename  # Relative filename
+                # >>> USE THE CORRECTED HOST PATH FOR WRITING <<<
+                absolute_path = (
+                    host_project_path_obj / filename
+                ).resolve()  # Ensure absolute path
+                ll.debug(
+                    f"Processing result for: {filename} (Host Path: {absolute_path})"
+                )
+
+                if isinstance(result, Exception):
+                    error_msg = f"Error generating code for {filename}: {result}"
+                    ll.error(error_msg)
+                    errors_code_gen.append(error_msg)
+                    write_results.append(
+                        {"filename": filename, "status": "error", "message": error_msg}
+                    )
+                    # Attempt to write error file to the resolved host path
+                    try:
+                        ll.warning(
+                            f"Attempting to write error file for {filename} to {absolute_path}"
+                        )
+                        absolute_path.parent.mkdir(parents=True, exist_ok=True)
+                        error_content = f"# Code generation failed: {result}\n\n# Skeleton:\n{skeletons.get(filename, '# Skeleton not available')}"
+                        absolute_path.write_text(
+                            error_content, encoding="utf-8", errors="replace"
+                        )
+                        ll.info(
+                            f"Successfully wrote error file for {filename} to {absolute_path}"
+                        )
+                    except Exception as write_err:
+                        ll.error(
+                            f"Failed to write error file for {filename} to {absolute_path}: {write_err}"
+                        )
+
+                else:  # Code generation successful
+                    code_content = result
+                    ll.info(
+                        f"Code generation successful for {filename}. Attempting to write to absolute host path: {absolute_path}"
+                    )
+
+                    if not code_content or not code_content.strip():
+                        ll.warning(
+                            f"Generated code content for {filename} is empty or whitespace only. Skipping write."
+                        )
+                        write_results.append(
+                            {
+                                "filename": filename,
+                                "status": "error",
+                                "message": "Generated code was empty",
+                            }
+                        )
+                        continue  # Skip to next file
+
+                    try:
+                        ll.debug(f"Ensuring directory exists: {absolute_path.parent}")
+                        absolute_path.parent.mkdir(parents=True, exist_ok=True)
+                        operation = "modify" if absolute_path.exists() else "create"
+                        ll.debug(f"Operation type for {filename}: {operation}")
+
+                        fixed_code = ftfy.fix_text(code_content)
+                        ll.debug(
+                            f"Code content length for {filename} (after ftfy): {len(fixed_code)}"
+                        )
+
+                        # >>> THE WRITE CALL to the HOST path <<<
+                        ll.info(f"Executing write_text for: {absolute_path}")
+                        absolute_path.write_text(
+                            fixed_code, encoding="utf-8", errors="replace"
+                        )
+                        ll.info(
+                            f"Successfully executed write_text for: {absolute_path}"
+                        )
+
+                        # File existence and size check
+                        if absolute_path.exists():
+                            ll.info(
+                                f"CONFIRMED: File exists at {absolute_path} after write."
+                            )
+                            try:
+                                size = absolute_path.stat().st_size
+                                ll.info(f"CONFIRMED: File size is {size} bytes.")
+                                if size == 0 and len(fixed_code) > 0:
+                                    ll.warning(
+                                        f"File size is 0 despite non-empty content being written!"
+                                    )
+                            except Exception as stat_err:
+                                ll.warning(
+                                    f"Could not get file stats for {absolute_path}: {stat_err}"
+                                )
+                        else:
+                            ll.error(
+                                f"FAILED: File DOES NOT exist at {absolute_path} immediately after write_text call!"
+                            )
+
+                        # Convert to Docker path FOR DISPLAY/LOGGING PURPOSES ONLY
+                        docker_path_display = str(
+                            absolute_path
+                        )  # Default to host path if conversion fails
+                        try:
+                            # Ensure convert_to_docker_path can handle the absolute host path
+                            docker_path_display = convert_to_docker_path(absolute_path)
+                            ll.debug(
+                                f"Converted host path {absolute_path} to display path {docker_path_display}"
+                            )
+                        except Exception as conv_err:
+                            ll.warning(
+                                f"Could not convert host path {absolute_path} to docker path for display: {conv_err}. Using host path for display."
+                            )
+
+                        # Log operation (using absolute_path for logging context)
+                        try:
+                            log_file_operation(
+                                file_path=absolute_path,  # Log using the actual host path written to
+                                operation=operation,
+                                content=fixed_code,
+                                metadata={
+                                    "code_description": file_detail.code_description,
+                                    "skeleton": skeletons.get(
+                                        filename
+                                    ),  # Use relative filename key
+                                },
+                            )
+                            ll.debug(f"Logged file operation for {absolute_path}")
+                        except Exception as log_error:
+                            ll.warning(
+                                f"Failed to log code writing for {filename} ({absolute_path}): {log_error}"
+                            )
+
+                        # Use docker_path_display in the results if that's what the UI expects
+                        write_results.append(
+                            {
+                                "filename": str(docker_path_display),
+                                "status": "success",
+                                "operation": operation,
+                            }
+                        )
+                        success_count += 1
+                        ll.info(
+                            f"Successfully processed and wrote {filename} to {absolute_path}"
+                        )
+
+                        # Display generated code (use docker_path_display if needed by UI)
+                        if self.display:
+                            self.display.add_message(
+                                "user",
+                                f"Code for {docker_path_display} generated successfully:",
+                            )  # Use display path
+                            language = get_language_from_extension(absolute_path.suffix)
+                            formatted_code = html_format_code(fixed_code, language)
+                            # Ensure display can handle html format correctly
+                            self.display.add_message("tool", {"html": formatted_code})
+
+                    except Exception as write_error:
+                        ll.exception(
+                            f"Caught exception during write operation for {filename} at path {absolute_path}"
+                        )
+                        errors_write.append(
+                            f"Error writing file {filename}: {write_error}"
+                        )
+                        write_results.append(
+                            {
+                                "filename": filename,
+                                "status": "error",
+                                "message": f"Error writing file {filename}: {write_error}",
+                            }
+                        )
+
+            # --- Step 4: Format and Return Result ---
+            final_status = "success"
+            if errors_skeleton or errors_code_gen or errors_write:
+                final_status = "partial_success" if success_count > 0 else "error"
+
+            # Use the resolved host path in the final message
+            output_message = f"Codebase generation finished. Status: {final_status}. {success_count}/{len(file_details)} files written successfully to HOST path '{host_project_path_obj}'."
+            if errors_skeleton:
+                output_message += f"\nSkeleton Errors: {len(errors_skeleton)}"
+            if errors_code_gen:
+                output_message += f"\nCode Generation Errors: {len(errors_code_gen)}"
+            if errors_write:
+                output_message += f"\nFile Write Errors: {len(errors_write)}"
+
+            result_data = {
+                "status": final_status,
+                "message": output_message,
+                "files_processed": len(file_details),
+                "files_successful": success_count,
+                "project_path": str(
+                    host_project_path_obj
+                ),  # Report the actual host path used
+                "results": write_results,
+                "errors": errors_skeleton + errors_code_gen + errors_write,
+            }
+
+            return ToolResult(
+                output=self.format_output(result_data),
+                tool_name=self.name,
+                command=command,
+            )
+
+        except ValueError as ve:  # Catch specific config/path errors
+            error_message = f"Configuration Error in WriteCodeTool __call__: {str(ve)}\n{traceback.format_exc()}"
+            ll.error(error_message)
+            return ToolResult(error=error_message, tool_name=self.name, command=command)
+        except Exception as e:
+            error_message = f"Critical Error in WriteCodeTool __call__: {str(e)}\n{traceback.format_exc()}"
+            ll.exception("Critical error during codebase generation")
+            # Optionally include host_project_path_obj if it was set
+            if host_project_path_obj:
+                error_message += f"\nAttempted Host Path: {host_project_path_obj}"
+            print(error_message)
+            return ToolResult(error=error_message, tool_name=self.name, command=command)
+
+    def extract_code_block(
+        self, text: str, file_path: Optional[Path] = None
+    ) -> tuple[str, str]:
         """
         Extracts code based on file type. Special handling for Markdown files.
+        Improved language guessing.
         Returns tuple of (content, language).
         """
-        # If a file_path is provided and it's a Markdown file, return text as-is.
-        if file_path is not None and str(file_path).lower().endswith(('.md', '.markdown')):
+        if file_path is not None and str(file_path).lower().endswith(
+            (".md", ".markdown")
+        ):
             return text, "markdown"
 
-        # Original code block extraction logic for other files
-        if not text.strip():
-            return "No Code Found", "Unknown"
+        if not text or not text.strip():
+            return "No Code Found", "unknown"  # Consistent 'unknown'
 
         start_marker = text.find("```")
-        if (start_marker == -1):
-            return text, "code"
+        if start_marker == -1:
+            # No backticks, try guessing language from content
+            try:
+                language = guess_lexer(text).aliases[0]
+                # Return the whole text as the code block
+                return text.strip(), language
+            except Exception:  # pygments.util.ClassNotFound or others
+                ll.warning("Could not guess language for code without backticks.")
+                return text.strip(), "unknown"  # Return unknown if guess fails
 
-        # Determine language (text immediately after opening delimiter)
+        # Found opening backticks ```
         language_line_end = text.find("\n", start_marker)
-        if (language_line_end == -1):
-            language_line_end = start_marker + 3
-        language = text[start_marker + 3:language_line_end].strip()
-        if not language:
-            language = "code"
+        if language_line_end == -1:  # Handle case where ``` is at the very end
+            language_line_end = len(text)
 
-        end_marker = text.find("```", language_line_end)
-        if (end_marker == -1):
-            code_block = text[language_line_end:].strip()
+        language = text[start_marker + 3 : language_line_end].strip().lower()
+
+        code_start = language_line_end + 1
+        end_marker = text.find("```", code_start)
+
+        if end_marker == -1:
+            # No closing backticks found, assume rest of text is code
+            code_block = text[code_start:].strip()
         else:
-            code_block = text[language_line_end:end_marker].strip()
+            code_block = text[code_start:end_marker].strip()
+
+        # If language wasn't specified after ```, try guessing from the extracted block
+        if not language and code_block:
+            try:
+                language = guess_lexer(code_block).aliases[0]
+            except Exception:
+                ll.warning(
+                    f"Could not guess language for extracted code block (File: {file_path})."
+                )
+                language = "unknown"  # Fallback if guess fails
+
+        # If language is still empty, default to 'unknown'
+        if not language:
+            language = "unknown"
 
         return code_block if code_block else "No Code Found", language
 
     @retry(stop=stop_after_attempt(3), wait=wait_fixed(8))
-    async def _call_llm_to_generate_code(self, code_description: str, research_string: str, file_path) -> str:
-        """Call LLM to generate code based on the code description"""
+    async def _call_llm_to_generate_code(
+        self,
+        code_description: str,
+        all_skeletons: Dict[str, str],
+        external_imports: List[str],
+        internal_imports: List[str],
+        file_path: Path,
+        ) -> str:  # file_path is the intended final host path
+        """Call LLM to generate code based on the code description, skeletons, and specific imports for this file."""
 
         if self.display is not None:
-            self.display.add_message("assistant", f"Generating code for: {file_path}")
+            self.display.add_message(
+                "assistant", f"Generating code for: {file_path.name}"
+                )  # Display relative name
 
-        code_string = "no code created"
+        code_string = f"# Error: Code generation failed for {file_path.name}"
 
-        current_code_base = get_all_current_code()
-        # rr(current_code_base)
-        OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-        client = AsyncOpenAI(
-            base_url="https://openrouter.ai/api/v1",
-            api_key=OPENROUTER_API_KEY,
+        # Create context from skeletons, using relative filenames
+        skeleton_context = "\n\n---\n\n".join(
+            f"### Skeleton for {fname}:\n```\n{skel}\n```"
+            for fname, skel in all_skeletons.items()  # fname is already relative key
             )
-        model = "openai/gpt-4.1"
-        # client = AsyncOpenAI()
-        # model = "o3-mini"
 
-        # Get the original task from the config if available
-        from config import get_constant
-        agent_task = get_constant("TASK")
-        # Prepare messages
-        messages = code_prompt_generate(current_code_base, code_description, research_string, agent_task)
-        ic(f"Here are the messages being sent to Generate the Code\n +++++ \n +++++ \n{messages}")
+        agent_task = get_constant("TASK") or "No overall task description provided."
+
+        messages = code_prompt_generate(
+            current_code_base="",  # Consider if current codebase context is needed differently now
+            code_description=code_description,
+            research_string="",  # Research step removed in this version
+            agent_task=agent_task,
+            skeletons=skeleton_context,
+            external_imports=external_imports,
+            internal_imports=internal_imports,
+            target_file=str(file_path.name),  # Pass relative filename to prompt
+            )
+
+        ic(
+            f"Messages for Code Generation ({file_path.name}):\n +++++ \n{messages}\n +++++"
+            )
+
         try:
+            OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+            if not OPENROUTER_API_KEY:
+                raise ValueError("OPENROUTER_API_KEY environment variable not set.")
+
+            client = AsyncOpenAI(
+                base_url="https://openrouter.ai/api/v1",
+                api_key=OPENROUTER_API_KEY,
+                )
+            # Consider making model configurable
+            model = get_constant("CODE_GEN_MODEL") or MODEL_STRING
+            ll.debug(f"Using model {model} for code generation.")
+
             completion = await client.chat.completions.create(
                 model=model,
                 messages=messages,
+                # Consider adding temperature, max_tokens etc. if needed
             )
 
-            # Ensure we handle None completion or empty response
-            if completion is None or not hasattr(completion, 'choices') or not completion.choices:
-                ic("No valid completion received from LLM")
-                return f"# Failed to generate code for {file_path}\n# Please try again with more detailed description."
+            if (
+                completion
+                and completion.choices
+                and completion.choices[0].message
+                and completion.choices[0].message.content
+            ):
+                raw_code_string = completion.choices[0].message.content
+                # Pass the host file_path to extract_code_block for context (e.g., .md handling)
+                code_string, detected_language = self.extract_code_block(
+                    raw_code_string, file_path
+                )
+                ll.debug(
+                    f"Extracted code block for {file_path.name}. Detected language: {detected_language}"
+                )
+                if code_string == "No Code Found":
+                    # If extraction fails but content exists, use the raw response
+                    if raw_code_string.strip():
+                        code_string = raw_code_string
+                        ll.warning(
+                            f"Could not extract code block for {file_path.name}, using raw response."
+                        )
+                    else:
+                        ll.error(
+                            f"LLM response for {file_path.name} was effectively empty."
+                        )
+                        code_string = f"# Failed to generate code for {file_path.name}\n# LLM response was empty."
 
-            code_string = completion.choices[0].message.content
-            if not code_string:
-                ic("Empty content returned from LLM")
-                return f"# Failed to generate code for {file_path}\n# Empty response received."
+            else:
+                ic(f"No valid completion received for {file_path.name}")
+                ll.error(
+                    f"Invalid or empty completion received from LLM for {file_path.name}"
+                )
+                code_string = f"# Failed to generate code for {file_path.name}\n# LLM response was empty or invalid."
 
         except Exception as e:
-            ic(f"error in _call_llm_to_generate_code: {e}")
-            return f"# Error generating code: {str(e)}"
+            ic(f"Error in _call_llm_to_generate_code for {file_path.name}: {e}")
+            ll.exception(f"LLM call failed for {file_path.name}")
+            code_string = f"# Error generating code for {file_path.name}: {str(e)}"
 
-        # Extract code using the new function
+        # Log the generated code (or error message) to a central file if configured
         try:
-            code_string, detected_language = self.extract_code_block(code_string, file_path)
-        except Exception as parse_error:
-            ic(f"Error parsing code block: {parse_error}")
-            # Return a safer fallback
-            return f"# Failed to parse code block: {str(parse_error)}\n\n{code_string}"
-
-        # Log the extraction
-        try:
-            CODE_FILE = Path(get_constant("CODE_FILE"))
-            with open(CODE_FILE, "a", encoding="utf-8") as f:
-                f.write(f"File Path: {str(file_path)}\n")
-                f.write(f"Language detected: {detected_language}\n")
-                f.write(f"{code_string}\n")
+            code_log_file_path = get_constant("CODE_FILE")
+            if code_log_file_path:
+                CODE_FILE = Path(code_log_file_path)
+                CODE_FILE.parent.mkdir(
+                    parents=True, exist_ok=True
+                )  # Ensure log dir exists
+                with open(CODE_FILE, "a", encoding="utf-8") as f:
+                    f.write(
+                        f"\n--- Generated Code for: {str(file_path)} ({time.strftime('%Y-%m-%d %H:%M:%S')}) ---\n"
+                    )
+                    f.write(f"{code_string}\n")
+                    f.write(f"--- End Code for: {str(file_path)} ---\n")
         except Exception as file_error:
-            # Log failure but don't stop execution
-            if self.display is not None:
-                try:
-                    self.display.add_message("assistant", f"Failed to log code: {str(file_error)}")
-                except Exception:
-                    pass
+            ll.warning(
+                f"Failed to log generated code for {file_path.name} to {get_constant('CODE_FILE')}: {file_error}"
+            )
 
-        if detected_language == "html":
-            # Send the HTML content directly to the display for rendering
-            if self.display is not None:
-                self.display.add_message("tool", {"html": code_string})
-            code_display = "HTML rendered in display."
-            css_styles = ""
-        else:
-            ### Highlight the code
-            # Attempt to get a lexer based on the detected language, otherwise guess
-            try:
-                if detected_language and detected_language != 'code':
-                    lexer = get_lexer_by_name(detected_language, stripall=True)
-                else:
-                    lexer = guess_lexer(code_string)
-            except Exception:
-                lexer = PythonLexer()  # Fallback to Python lexer
-
-            # Create an HTML formatter with full=False
-            formatter = HtmlFormatter(style="monokai", full=False, linenos=True, wrap=True)        
-
-            code_temp=f"#{str(file_path)}\n{code_string}"
-
-            # Highlight the code
-            code_display = highlight(code_temp, lexer, formatter)
-
-            # Get CSS styles
-            css_styles = formatter.get_style_defs(".highlight")
-
-        # Return BOTH the highlighted code and the CSS
-        if self.display is not None:
-            self.display.add_message("tool", {"code": code_display, "css": css_styles})
-
-        send_email_attachment_of_code(str(file_path), code_string)
         return code_string
 
-    async def _call_llm_to_research_code(self, code_description: str, file_path) -> str:
-        """Call LLM to generate code based on the code description"""
-        if self.display is not None:
-            self.display.add_message("assistant", f"Researching code for: {file_path}")
-
-        code_string = "no code created"
-        current_code_base = get_all_current_code()
-        OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-        client = AsyncOpenAI(
-            base_url="https://openrouter.ai/api/v1",
-            api_key=OPENROUTER_API_KEY,
-            )
-        model = "google/gemini-2.0-flash-001"
-
-        # Prepare messages
-        messages = code_prompt_research(current_code_base, code_description)
-        ic(f"Here are the messages being sent to Research the Code\n +++++ \n +++++ \n{messages}")
-        try:
-            completion =  await client.chat.completions.create(
-                model=model,
-                messages=messages,
-            )
-        except Exception as e:
-            ic(completion)
-            ic(f"error: {e}")
-            return code_description   
-
-        # Handle both OpenRouter and standard OpenAI response formats
-        try:
-            if hasattr(completion.choices[0].message, 'content'):
-                research_string = completion.choices[0].message.content
-            else:
-                research_string = completion.choices[0].message['content']
-        except (AttributeError, KeyError, IndexError) as e:
-            ic(f"Error extracting content: {e}")
-            return code_description
-        research_string = ftfy.fix_text(research_string)
-
-        return research_string
-
-    async def _call_llm_for_code_skeleton(self, code_description: str, file_path) -> str:
+    @retry(stop=stop_after_attempt(3), wait=wait_fixed(8))
+    async def _call_llm_for_code_skeleton(
+        self, code_description: str, file_path: Path
+        ) -> str:  # file_path is the intended final host path
         """Call LLM to generate code skeleton based on the code description"""
+        if self.display:
+            self.display.add_message(
+                "assistant", f"Generating skeleton for {file_path.name}"
+            )  # Display relative name
 
-        skeleton_string = "no code created"
-        current_code_base = aggregate_file_states()
-        OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-        client = AsyncOpenAI(
-            base_url="https://openrouter.ai/api/v1",
-            api_key=OPENROUTER_API_KEY,
-            )
-        model = "openai/gpt-4.1"
+        skeleton_string = f"# Error: Skeleton generation failed for {file_path.name}"
 
-        # Prepare messages
-        messages = code_skeleton_prompt(code_description)
-        ic(f"Here are the messages being sent to Create Code Skeleton\n +++++ \n +++++ \n{messages}")
         try:
+            OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+            if not OPENROUTER_API_KEY:
+                raise ValueError("OPENROUTER_API_KEY environment variable not set.")
+
+            client = AsyncOpenAI(
+                base_url="https://openrouter.ai/api/v1",
+                api_key=OPENROUTER_API_KEY,
+            )
+            # Consider making model configurable
+            model = (
+                get_constant("SKELETON_GEN_MODEL") or MODEL_STRING
+                )  # Maybe use a faster model?
+            ll.debug(f"Using model {model} for skeleton generation.")
+
+            messages = code_skeleton_prompt(
+                code_description, str(file_path.name)
+            )  # Pass relative filename
+            ic(
+                f"Messages for Skeleton ({file_path.name}):\n +++++ \n{messages}\n +++++"
+            )
+
             completion = await client.chat.completions.create(
                 model=model,
                 messages=messages,
             )
-        except Exception as e:
-            ic(completion)
-            ic(f"error: {e}")
-            return code_description   
 
-        # Handle both OpenRouter and standard OpenAI response formats
-        try:
-            if hasattr(completion.choices[0].message, 'content'):
-                skeleton_string = completion.choices[0].message.content
+            if (
+                completion
+                and completion.choices
+                and completion.choices[0].message
+                and completion.choices[0].message.content
+            ):
+                raw_skeleton = completion.choices[0].message.content
+                # Pass the host file_path to extract_code_block for context
+                skeleton_string, detected_language = self.extract_code_block(
+                    raw_skeleton, file_path
+                )
+                ll.debug(
+                    f"Extracted skeleton block for {file_path.name}. Detected language: {detected_language}"
+                )
+
+                if skeleton_string == "No Code Found":
+                    if raw_skeleton.strip():
+                        skeleton_string = raw_skeleton  # Use raw if extraction fails but content exists
+                        ll.warning(
+                            f"Could not extract skeleton block for {file_path.name}, using raw response."
+                        )
+                    else:
+                        ll.error(
+                            f"LLM response for skeleton {file_path.name} was effectively empty."
+                        )
+                        skeleton_string = f"# Failed to generate skeleton for {file_path.name}\n# LLM response was empty."
+
+                skeleton_string = ftfy.fix_text(skeleton_string)
             else:
-                skeleton_string = completion.choices[0].message['content']
-        except (AttributeError, KeyError, IndexError) as e:
-            ic(f"Error extracting content: {e}")
-            return code_description
+                ic(f"No valid skeleton completion received for {file_path.name}")
+                ll.error(
+                    f"Invalid or empty completion received from LLM for skeleton {file_path.name}"
+                )
+                skeleton_string = f"# Failed to generate skeleton for {file_path.name}\n# LLM response was empty or invalid."
 
-        skeleton_string = ftfy.fix_text(skeleton_string)
-        ic(skeleton_string)
+        except Exception as e:
+            ic(f"Error in _call_llm_for_code_skeleton for {file_path.name}: {e}")
+            ll.exception(f"LLM skeleton call failed for {file_path.name}")
+            skeleton_string = (
+                f"# Error generating skeleton for {file_path.name}: {str(e)}"
+            )
+
+        ic(f"Skeleton for {file_path.name}:\n{skeleton_string}")
         return skeleton_string
 
     def format_output(self, data: dict) -> str:
         """
         Format the output of the tool for display.
-        
+
         Args:
-            data: The data returned by the tool
-            
+            data: The data returned by the tool's operation.
+
         Returns:
-            A formatted string for display
+            A formatted string for display.
         """
-        if "error" in data:
-            return f"Error: {data['error']}"
+        status = data.get("status", "Unknown")
+        message = data.get("message", "No message provided.")
+        errors = data.get("errors", [])
+        files_processed = data.get("files_processed", 0)
+        files_successful = data.get("files_successful", 0)
 
-        if "output" in data:
-            return data["output"]
+        output = f"Operation Status: {status.upper()}\n"
+        output += f"Message: {message}\n"
+        output += (
+            f"Files Processed: {files_processed}, Successful: {files_successful}\n"
+        )
 
-        # Handle different commands
-        command = data.get("command", "")
+        if errors:
+            output += f"\nErrors Encountered ({len(errors)}):\n"
+            # Show first few errors
+            for i, err in enumerate(errors[:5]):
+                output += f"- {err}\n"
+            if len(errors) > 5:
+                output += f"... and {len(errors) - 5} more errors.\n"
+            output += "(Check logs for full details)\n"
 
-        if command == "write_code_to_file":
-            if data.get("status") == "success":
-                return f"Successfully wrote code to {data.get('file_path', 'unknown file')}"
-            else:
-                return f"Failed to write code: {data.get('error', 'Unknown error')}"
+        # Optionally add details about successful files if needed
+        # results = data.get("results", [])
+        # successful_files = [r['filename'] for r in results if r.get('status') == 'success']
+        # if successful_files:
+        #    output += f"\nSuccessful Files:\n" + "\n".join([f"- {f}" for f in successful_files])
 
-        elif command == "write_code_multiple_files":
-            if data.get("status") in ["success", "partial_success"]:
-                return f"Wrote {data.get('files_processed', 0)} files to {data.get('project_path', 'unknown path')}\n{data.get('files_results', '')}"
-            else:
-                return f"Failed to write files: {data.get('errors', 'Unknown error')}"
-
-        elif command == "get_all_current_skeleton":
-            from utils.file_logger import get_all_current_skeleton
-            return get_all_current_skeleton()
-
-        elif command == "get_revised_version":
-            if data.get("status") == "success":
-                return f"Successfully revised {data.get('file_path', 'unknown file')}"
-            else:
-                return f"Failed to revise file: {data.get('error', 'Unknown error')}"
-
-        # Default case
-        return str(data)
-
-    async def write_code_to_file(self, code_description: str, project_path: Path, filename) -> dict:
-        """Generate and write code to a file based on description."""
-        try:
-            from config import get_constant, get_project_dir, get_docker_project_dir, REPO_DIR
-            from utils.file_logger import convert_to_docker_path, extract_code_skeleton
-            import os
-
-            # Ensure project_path is a Path object
-            if not isinstance(project_path, Path):
-                project_path = Path(project_path)
-
-            # Ensure we're using the correct project directory structure
-            repo_dir = get_constant('REPO_DIR')
-            if repo_dir and isinstance(repo_dir, str):
-                repo_dir = Path(repo_dir)
-
-            # Extract the project name (prompt name) from the project path
-            project_name = project_path.name
-
-            # Check if we need to adjust the project path to be within repo directory
-            if repo_dir and not str(project_path).startswith(str(repo_dir)):
-                # Create correct project path within repo
-                project_path = repo_dir / project_name
-
-            # Ensure project_path exists
-            project_path.mkdir(parents=True, exist_ok=True)
-
-            # Get the Docker project directory for logging
-            docker_project_dir = f"/home/myuser/apps/{project_name}"
-
-            # Normalize paths for consistent handling
-            project_path_str = str(project_path).replace('\\', '/')
-
-            # Determine file path
-            if os.path.isabs(filename):
-                file_path = Path(filename)
-            else:
-                file_path = project_path / filename
-
-            # Create parent directories if needed
-            file_path.parent.mkdir(parents=True, exist_ok=True)
-
-            # Convert to string for consistent logging
-            file_path_str = str(file_path).replace('\\', '/')
-
-            # First, generate the code skeleton
-            # ll.info(f"Generating code skeleton for {file_path}")
-            # code_skeleton = await self._call_llm_for_code_skeleton(code_description, file_path)
-            code_skeleton = None
-            # Then, generate the full code
-            # ll.info(f"Generating full code for {file_path} with skeleton")
-            code = await self._call_llm_to_generate_code(code_description, code_skeleton, file_path)
-
-            # Skip if no code was generated
-            if not code:
-                return {
-                    "status": "error",
-                    "message": "No code was generated."
-                }
-
-            # Determine the operation (create or modify)
-            operation = "modify" if file_path.exists() else "create"
-            # code = "# Generated with write_code_to_file\n" + code
-            # Write the code to the file
-            file_path.write_text(code, encoding="utf-8")
-            # ll.info(f"Code written to {file_path}")
-            # Convert to Docker path for display
-            docker_path = convert_to_docker_path(file_path)
-            # ll.info(f"Converted to Docker path: {docker_path}")
-            # Log the file operation with the skeleton in metadata
-            try:
-                from utils.file_logger import log_file_operation
-                log_file_operation(
-                    file_path=file_path,
-                    operation=operation,
-                    content=code,
-                    metadata={"code_description": code_description, "skeleton": code_skeleton}
-                )
-            except Exception as log_error:
-                ic(f"Warning: Failed to log code writing: {str(log_error)}")
-
-            # If we have a display, add a message showing what happened
-            if self.display is not None:
-                self.display.add_message(
-                    "user", f"Code for {docker_path} generated successfully:"
-                )
-
-            # Format the code for HTML display
-            language = get_language_from_extension(file_path.suffix)
-            formatted_code = html_format_code(code, language)
-
-            # Return result dictionary
-            result = {
-                "status": "success",
-                "operation": operation,
-                "message": f"Successfully wrote code to {docker_path}",
-                "file_path": str(docker_path),
-                "code": code,
-                # "skeleton": code_skeleton,
-                # "html": formatted_code
-            }
-            return result
-
-        except Exception as e:
-            import traceback
-            stack_trace = traceback.format_exc()
-            ic(f"Error in write_code_to_file: {str(e)}\n{stack_trace}")
-            return {
-                "status": "error",
-                "message": f"Error in write_code_to_file: {str(e)}"
-            }
-
-    async def _research_and_generate_code(self, code_description: str, file_path: Path) -> str:
-        """Research and generate code based on description."""
-        try:
-            # Generate skeleton first
-            skeleton = await self._call_llm_for_code_skeleton(code_description, file_path)
-
-            # Generate code using the LLM and the skeleton
-            code = await self._call_llm_to_generate_code(
-                code_description,
-                skeleton,
-                file_path
-            )
-
-            # Extract only the code block if the LLM returned extra text
-            if code:
-                code, _ = self.extract_code_block(code, file_path)
-
-            return code
-        except Exception as e:
-            ic(f"Error in code research: {str(e)}")
-            return ""
-
-    async def write_multiple_files(self, project_path: Path, files: list) -> dict:
-        """
-        Write multiple files with content at once.
-        
-        Args:
-            project_path: Path to the project directory
-            files: List of file information. Each entry should have:
-                  - file_path or filename: Path to file (relative to project_path)
-                  - content: The content to write (optional if code_description is provided)
-                  - code_description: Description of the code to generate (optional if content is provided)
-            
-        Returns:
-            Dictionary with operation results
-        """
-        try:
-            from config import get_constant, REPO_DIR
-            from utils.file_logger import convert_to_docker_path
-            import os
-
-            # Ensure project_path is a Path object
-            if not isinstance(project_path, Path):
-                project_path = Path(project_path)
-
-            # Ensure we're using the correct project directory structure
-            repo_dir = get_constant('REPO_DIR')
-            if repo_dir and isinstance(repo_dir, str):
-                repo_dir = Path(repo_dir)
-
-            # Extract the project name (prompt name) from the project path
-            project_name = project_path.name
-
-            # Check if we need to adjust the project path to be within repo directory
-            if repo_dir and not str(project_path).startswith(str(repo_dir)):
-                # Create correct project path within repo
-                project_path = repo_dir / project_name
-
-            # Ensure project_path exists
-            project_path.mkdir(parents=True, exist_ok=True)
-
-            # Get the Docker project directory for logging
-            docker_project_dir = f"/home/myuser/apps/{project_name}"
-
-            # Tasks to execute (may be completed results or coroutines to await)
-            tasks = []
-
-            # For each file specified
-            for file_info in files:
-                try:
-                    # Check which format we're dealing with (new or old)
-                    if "content" in file_info and "filename" in file_info:
-                        # New format with direct content
-                        filename = file_info["filename"]
-                        content = file_info["content"]
-
-                        # Determine file path
-                        if os.path.isabs(filename):
-                            file_path = Path(filename)
-                        else:
-                            file_path = project_path / filename
-
-                        # Create parent directories if needed
-                        file_path.parent.mkdir(parents=True, exist_ok=True)
-
-                        # Determine operation (create or modify)
-                        operation = "modify" if file_path.exists() else "create"
-
-                        # Write the file
-                        file_path.write_text(content, encoding="utf-8")
-
-                        # Convert to Docker path for display
-                        docker_path = convert_to_docker_path(file_path)
-
-                        # Log the file operation
-                        try:
-                            from utils.file_logger import log_file_operation
-                            log_file_operation(
-                                file_path=file_path,
-                                operation=operation,
-                                content=content,
-                                metadata={"code_description": file_info.get("description", "")}
-                            )
-                        except Exception as log_error:
-                            ic(f"Warning: Failed to log code writing: {str(log_error)}")
-
-                        # Add a completed result instead of a task
-                        result = {
-                            "status": "success", 
-                            "operation": operation,
-                            "message": f"Successfully wrote code to {docker_path}",
-                            "file_path": str(docker_path), 
-                            "code": content
-                        }
-                        tasks.append(result)
-                    elif "file_path" in file_info and "code_description" in file_info:
-                        # Old format that requires code generation
-                        file_path = file_info["file_path"]
-                        code_description = file_info["code_description"]
-
-                        # Create a coroutine to generate and write the file
-                        # We'll await it later
-                        task = self.write_code_to_file(
-                            code_description, 
-                            project_path, 
-                            file_path
-                        )
-                        tasks.append(task)
-                    else:
-                        # Invalid file format
-                        tasks.append({
-                            "status": "error",
-                            "message": f"Invalid file info: Must have either 'content'+'filename' or 'file_path'+'code_description'",
-                            "file_info": str(file_info),
-                        })
-                except Exception as file_error:
-                    ic(f"Error preparing file: {str(file_error)}")
-                    tasks.append({
-                        "status": "error",
-                        "message": f"Error preparing file: {str(file_error)}",
-                        "file_path": file_info.get("file_path", file_info.get("filename", "unknown")),
-                    })    
-
-            # Execute all file creation tasks concurrently (for code_description tasks only)
-            results = []
-            for task in tasks:
-                if isinstance(task, dict):  # Already completed task
-                    results.append(task)
-                else:  # Coroutine to await
-                    try:
-                        result = await task
-                        results.append(result)
-                    except Exception as e:
-                        results.append({
-                            "status": "error",
-                            "message": f"Error writing file: {str(e)}",
-                            })
-
-            # Check how many succeeded and failed
-            success_count = sum(1 for r in results if r.get("status") == "success")
-            error_count = sum(1 for r in results if r.get("status") == "error")
-
-            # Create the summary message
-            if error_count == 0:
-                message = f"Successfully wrote {success_count} files to {docker_project_dir}"
-            else:
-                message = f"Wrote {success_count} files, {error_count} failed"
-
-            # Return the overall result
-            return {
-                "status": "success" if error_count == 0 else "partial",
-                "message": message,
-                "results": results,
-                "project_path": str(docker_project_dir),
-            }
-
-        except Exception as e:
-            import traceback
-            stack_trace = traceback.format_exc()
-            ic(f"Error in write_multiple_files: {str(e)}\n{stack_trace}")
-            return {
-                "status": "error",
-                "message": f"Error in write_multiple_files: {str(e)}"
-        }
+        return output.strip()

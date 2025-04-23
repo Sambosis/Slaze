@@ -1,89 +1,65 @@
-# Expanded Description: Reinforcement Learning Model for Strategy-Based War Game
+# Expanded Description: Pong with Physics-Based Flippers and RL Training
 
-The project involves creating a reinforcement learning (RL) system where two AI agents control opposing armies in a turn-based strategy war game. The agents will learn optimal strategies by playing against each other repeatedly (self-play). The system will use a novel approach to learning by combining traditional reinforcement learning algorithms with a hierarchical policy structure that separates strategic and tactical decision-making.
+This project will create a modified version of the classic Pong game where the paddles behave like pinball flippers rather than the traditional rigid paddles. The flippers will be able to:
 
-The war game will be implemented as a grid-based environment where each army has various unit types with different capabilities. Each agent must make decisions about unit movement, attacks, resource management, and territory control. The state space will include the positions of all units, their health, resources available, and terrain information.
+1. Move vertically along the edges of the screen (like traditional Pong)
+2. Rotate/swing toward the ball to hit it at different angles and speeds
+3. Influence the ball's trajectory and velocity based on the swing mechanics
 
-Key features of the system will include:
-- A visual representation of the game board that updates periodically to show learning progress
-- A hierarchical reinforcement learning approach where agents learn both high-level strategies and low-level tactical maneuvers
-- Experience replay with prioritized sampling to focus learning on important game states
-- Curriculum learning where the complexity of scenarios gradually increases
-- Ability to save and load trained models
-- Support for both CPU and GPU training, with automatic detection and utilization
-- A simple interface to watch AI matches and monitor learning metrics
-- Exit functionality to terminate training or gameplay sessions
+Two reinforcement learning (RL) agents will train against each other in this environment, learning optimal strategies for both vertical positioning and swing timing. The game will use physics-based interactions for realistic ball and flipper mechanics.
 
-The novel approach will involve implementing a curiosity-driven exploration mechanism combined with a meta-learning framework that allows agents to adapt their strategies based on the opponent's playing style. This will help prevent the agents from settling into predictable patterns and enable them to develop more robust strategies.
+To visualize the training progress, every 5th game will be rendered to the screen using Pygame. No sound effects or documentation will be included.
 
-# File Tree
+Key design decisions:
+- We'll use the PPO (Proximal Policy Optimization) algorithm for the RL agents due to its stability and performance
+- The observation space will include ball position, ball velocity, flipper positions, and flipper angles
+- The action space will include vertical movement and flipper swing control
+- Rewards will be based on successful ball returns and scoring points
+- The physics engine will be simplified but will model basic momentum and collision effects
+- Training will happen in an accelerated mode when not rendering
 
-1. `main.py`
-   - Purpose: Entry point for the application, handles command-line arguments, and orchestrates the training and visualization processes
-   - Import: Not imported by other files
+## File Tree
 
-2. `environment/game.py`
-   - Purpose: Implements the war game rules, state representation, and game mechanics
-   - Import: `from environment.game import WarGame`
+1. **main.py**
+   - Purpose: Entry point for the application, initializes the game, RL environment, and training loop
+   - Import: Not imported by other files (is the starting point)
 
-3. `environment/units.py`
-   - Purpose: Defines different unit types, their attributes, and capabilities
-   - Import: `from environment.units import Unit, Infantry, Cavalry, Artillery`
+2. **game/pong_env.py**
+   - Purpose: Defines the PongEnv class that implements the game environment and RL interface
+   - Import: `from game.pong_env import PongEnv`
 
-4. `environment/map.py`
-   - Purpose: Handles the game map, terrain types, and their effects on gameplay
-   - Import: `from environment.map import GameMap, Terrain`
+3. **game/physics.py**
+   - Purpose: Contains physics utilities for ball movement, collision detection, and flipper mechanics
+   - Import: `from game.physics import PhysicsEngine, Collision`
 
-5. `agents/agent.py`
-   - Purpose: Base class for all agents with common functionality
-   - Import: `from agents.agent import Agent`
+4. **game/objects.py**
+   - Purpose: Defines game objects (Ball, Flipper) with their properties and behaviors
+   - Import: `from game.objects import Ball, Flipper`
 
-6. `agents/rl_agent.py`
-   - Purpose: Reinforcement learning agent implementation with the novel approach
-   - Import: `from agents.rl_agent import RLAgent`
+5. **game/renderer.py**
+   - Purpose: Handles visualization of the game state using Pygame
+   - Import: `from game.renderer import GameRenderer`
 
-7. `agents/hierarchy_policy.py`
-   - Purpose: Implements hierarchical policy structure for strategic and tactical decision-making
-   - Import: `from agents.hierarchy_policy import StrategyPolicy, TacticalPolicy`
+6. **rl/agents.py**
+   - Purpose: Implements the RL agent class and training algorithms (PPO)
+   - Import: `from rl.agents import Agent, PPOAgent`
 
-8. `learning/model.py`
-   - Purpose: Neural network architecture for the RL agents
-   - Import: `from learning.model import PolicyNetwork, ValueNetwork`
+7. **rl/models.py**
+   - Purpose: Neural network architectures for the RL policy and value functions
+   - Import: `from rl.models import PolicyNetwork, ValueNetwork`
 
-9. `learning/memory.py`
-   - Purpose: Experience replay buffer with prioritized sampling
-   - Import: `from learning.memory import ReplayBuffer`
+8. **rl/memory.py**
+   - Purpose: Experience replay buffer and trajectory storage for training
+   - Import: `from rl.memory import ReplayBuffer, Trajectory`
 
-10. `learning/curiosity.py`
-    - Purpose: Implements the curiosity-driven exploration mechanism
-    - Import: `from learning.curiosity import CuriosityModule`
+9. **rl/trainer.py**
+   - Purpose: Manages the training process, including episode collection and model updates
+   - Import: `from rl.trainer import RLTrainer`
 
-11. `learning/meta_learning.py`
-    - Purpose: Meta-learning framework for strategy adaptation
-    - Import: `from learning.meta_learning import MetaLearner`
-
-12. `visualization/renderer.py`
-    - Purpose: Handles visual representation of the game state
-    - Import: `from visualization.renderer import GameRenderer`
-
-13. `visualization/metrics.py`
-    - Purpose: Tracks and visualizes learning metrics
-    - Import: `from visualization.metrics import LearningMetrics`
-
-14. `utils/config.py`
-    - Purpose: Configuration parameters for the game, agents, and training process
+10. **utils/config.py**
+    - Purpose: Contains configuration parameters for the game, physics, and RL algorithms
     - Import: `from utils.config import GameConfig, TrainingConfig`
 
-15. `utils/device.py`
-    - Purpose: Handles device detection (CPU/GPU) and tensor operations
-    - Import: `from utils.device import get_device, to_tensor`
-
-16. `assets/textures.py`
-    - Purpose: Manages game textures and visual assets
-    - Import: `from assets.textures import UnitTextures, TerrainTextures`
-
-17. `assets/images/units/`
-    - Directory containing unit image assets (Not a Python file)
-
-18. `assets/images/terrain/`
-    - Directory containing terrain image assets (Not a Python file)Start testing as soon as possible. DO NOT start making fixes or improvements until you have tested to see if it is working as is.  Your project directory is /home/myuser/apps/warlearn. You need to make sure that all files you create and work you do is done in that directory.
+11. **utils/helpers.py**
+    - Purpose: Utility functions for data processing, logging, and other helper tasks
+    - Import: `from utils.helpers import preprocess_observation, calculate_rewards`Start testing as soon as possible. DO NOT start making fixes or improvements until you have tested to see if it is working as is.  Your project directory is /home/myuser/apps/pinpong. You need to make sure that all files you create and work you do is done in that directory.

@@ -154,7 +154,7 @@ class DockerEditTool(BaseAnthropicTool):
             # Add display messages
             if self.display is not None:
                 self.display.add_message(
-                    "assistant",
+                    "user",
                     f"DockerEditTool Executing Command: {command} on path: {path}",
                 )
 

@@ -92,7 +92,7 @@ class BashTool(BaseAnthropicTool):
 
         try:
             if self.display is not None:
-                self.display.add_message("assistant", f"Executing command: {command}")
+                self.display.add_message("user", f"Executing command: {command}")
 
             if not self._docker_available:
                 error = "Docker is not available or the container is not running."
