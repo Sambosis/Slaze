@@ -200,7 +200,6 @@ class Agent:
                 "text": SYSTEM_PROMPT,
                 "cache_control": {"type": "ephemeral"}
             }]
-
         try:
 
             truncated_messages = [

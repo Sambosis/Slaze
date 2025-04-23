@@ -1,92 +1,65 @@
-# Expanded Description: Reinforcement Learning Model for a Strategy Based War Game
+# Expanded Description: Pong with Physics-Based Flippers and RL Training
 
-The task is to create a reinforcement learning model that learns to play a turn-based strategy war game by playing against itself. The war game will involve two agents, each controlling an army on a grid-based map, with the objective of defeating the enemy army. 
+This project will create a modified version of the classic Pong game where the paddles behave like pinball flippers rather than the traditional rigid paddles. The flippers will be able to:
 
-To make this more concrete, I'll define the following game mechanics:
+1. Move vertically along the edges of the screen (like traditional Pong)
+2. Rotate/swing toward the ball to hit it at different angles and speeds
+3. Influence the ball's trajectory and velocity based on the swing mechanics
 
-1. **Game Environment**: 
-   - A 2D grid map (15x15) with various terrain types (plains, forests, hills, water) that affect movement and combat.
-   - Each cell can contain units from only one player at a time.
+Two reinforcement learning (RL) agents will train against each other in this environment, learning optimal strategies for both vertical positioning and swing timing. The game will use physics-based interactions for realistic ball and flipper mechanics.
 
-2. **Units and Resources**:
-   - Each army starts with a base and a set number of resource points.
-   - Players can spend resources to create different unit types (infantry, cavalry, archers).
-   - Units have different attributes: health, attack power, range, movement points.
+To visualize the training progress, every 5th game will be rendered to the screen using Pygame. No sound effects or documentation will be included.
 
-3. **Game Flow**:
-   - Turn-based gameplay where each player takes all their actions before passing to the opponent.
-   - Actions include: creating units, moving units, attacking enemy units.
-   - Game ends when one player's base is destroyed or after a set number of turns (200 turns).
+Key design decisions:
+- We'll use the PPO (Proximal Policy Optimization) algorithm for the RL agents due to its stability and performance
+- The observation space will include ball position, ball velocity, flipper positions, and flipper angles
+- The action space will include vertical movement and flipper swing control
+- Rewards will be based on successful ball returns and scoring points
+- The physics engine will be simplified but will model basic momentum and collision effects
+- Training will happen in an accelerated mode when not rendering
 
-4. **Learning Approach**:
-   - Will implement a novel "Hierarchical Policy Gradient" approach, where the agent learns at two levels:
-     - Strategic level: resource allocation and unit production decisions
-     - Tactical level: movement and combat decisions for individual units
-   - The hierarchical approach allows the agent to learn more efficiently by structuring the problem.
-   - Will use self-play with policy gradients and experience replay to improve learning.
-
-5. **Visualization**:
-   - A simple 2D visualization using Pygame that shows the state of the game board.
-   - Different colors will represent different units, terrain, and players.
-   - Every 50 training iterations, a full game will be visualized to show learning progress.
-
-6. **Technical Implementation**:
-   - Will ensure compatibility with both CPU and GPU through PyTorch's device-agnostic code.
-   - A save/load system for the trained models.
-   - An option to exit the visualization or training at any point.
-
-# File Tree
+## File Tree
 
 1. **main.py**
-   - Purpose: Entry point for the program, handles command line arguments and starts the training or visualization process.
-   - Import: `import main`
+   - Purpose: Entry point for the application, initializes the game, RL environment, and training loop
+   - Import: Not imported by other files (is the starting point)
 
-2. **environment/game.py**
-   - Purpose: Defines the Game class that manages game state, rules, and turn progression.
-   - Import: `from environment.game import Game`
+2. **game/pong_env.py**
+   - Purpose: Defines the PongEnv class that implements the game environment and RL interface
+   - Import: `from game.pong_env import PongEnv`
 
-3. **environment/map.py**
-   - Purpose: Implements the Map class and terrain functionality.
-   - Import: `from environment.map import Map, TerrainType`
+3. **game/physics.py**
+   - Purpose: Contains physics utilities for ball movement, collision detection, and flipper mechanics
+   - Import: `from game.physics import PhysicsEngine, Collision`
 
-4. **environment/units.py**
-   - Purpose: Defines different unit types, their attributes and behaviors.
-   - Import: `from environment.units import Unit, Infantry, Cavalry, Archer, Base`
+4. **game/objects.py**
+   - Purpose: Defines game objects (Ball, Flipper) with their properties and behaviors
+   - Import: `from game.objects import Ball, Flipper`
 
-5. **agents/agent.py**
-   - Purpose: Abstract base class for different agent implementations.
-   - Import: `from agents.agent import Agent`
+5. **game/renderer.py**
+   - Purpose: Handles visualization of the game state using Pygame
+   - Import: `from game.renderer import GameRenderer`
 
-6. **agents/hierarchical_agent.py**
-   - Purpose: Implements the Hierarchical Policy Gradient agent.
-   - Import: `from agents.hierarchical_agent import HierarchicalAgent`
+6. **rl/agents.py**
+   - Purpose: Implements the RL agent class and training algorithms (PPO)
+   - Import: `from rl.agents import Agent, PPOAgent`
 
-7. **agents/random_agent.py**
-   - Purpose: Implements a randomly acting agent for baseline comparison.
-   - Import: `from agents.random_agent import RandomAgent`
+7. **rl/models.py**
+   - Purpose: Neural network architectures for the RL policy and value functions
+   - Import: `from rl.models import PolicyNetwork, ValueNetwork`
 
-8. **learning/experience_buffer.py**
-   - Purpose: Implements the experience replay buffer for storing and sampling game experiences.
-   - Import: `from learning.experience_buffer import ExperienceBuffer`
+8. **rl/memory.py**
+   - Purpose: Experience replay buffer and trajectory storage for training
+   - Import: `from rl.memory import ReplayBuffer, Trajectory`
 
-9. **learning/policy_network.py**
-   - Purpose: Defines the neural networks for the policy gradients algorithm.
-   - Import: `from learning.policy_network import StrategicNetwork, TacticalNetwork`
+9. **rl/trainer.py**
+   - Purpose: Manages the training process, including episode collection and model updates
+   - Import: `from rl.trainer import RLTrainer`
 
-10. **learning/trainer.py**
-    - Purpose: Contains the self-play training loop and learning algorithms.
-    - Import: `from learning.trainer import Trainer`
-
-11. **visualization/renderer.py**
-    - Purpose: Handles the visualization of the game state using Pygame.
-    - Import: `from visualization.renderer import GameRenderer`
-
-12. **utils/save_load.py**
-    - Purpose: Utility functions for saving and loading models and game states.
-    - Import: `from utils.save_load import save_model, load_model, save_game_state, load_game_state`
-
-13. **utils/config.py**
-    - Purpose: Contains configuration parameters for the game, agents, and learning process.
+10. **utils/config.py**
+    - Purpose: Contains configuration parameters for the game, physics, and RL algorithms
     - Import: `from utils.config import GameConfig, TrainingConfig`
 
-This structure aims for simplicity while maintaining clear separation of concerns between different parts of the system.Start testing as soon as possible. DO NOT start making fixes or improvements until you have tested to see if it is working as is.  Your project directory is /home/myuser/apps/warlearn. You need to make sure that all files you create and work you do is done in that directory.
+11. **utils/helpers.py**
+    - Purpose: Utility functions for data processing, logging, and other helper tasks
+    - Import: `from utils.helpers import preprocess_observation, calculate_rewards`Start testing as soon as possible. DO NOT start making fixes or improvements until you have tested to see if it is working as is.  Your project directory is /home/myuser/apps/pinpong. You need to make sure that all files you create and work you do is done in that directory.

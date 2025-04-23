@@ -1,4 +1,5 @@
 from config import get_constant 
+from typing import List, Dict, Optional
 
 
 PROMPT_FOR_CODE="""I need you to break down a python file in a structured way that concisely describes how to interact with the code.  
@@ -110,61 +111,65 @@ def code_skeleton_prompt(code_description, existing_structure=None):
     return messages
 
 
-def code_prompt_generate(current_code_base, code_description, code_skeleton, agent_task):
-    # read task.tx to agent_task
-    with open("task.txt", "r") as f:
-        agent_task = f.read()
+def code_prompt_generate(
+    current_code_base: str,
+    code_description: str,
+    research_string: str,
+    agent_task: str,
+    skeletons: Optional[str] = None,
+    external_imports: Optional[List[str]] = None,
+    internal_imports: Optional[List[str]] = None,
+    target_file: Optional[str] = None
+) -> list:
+    """
+    Generates the prompt messages for code generation, incorporating skeletons and file-specific import lists.
+    """
+    system_prompt = f"""You are an expert software developer tasked with writing code for a specific file within a larger project.
+Your goal is to generate clean, efficient, and correct code based on the provided description, context, and overall project goal.
 
+Overall Project Goal: {agent_task}
 
-    messages = [
-        {
-            "role": "user",
-            "content": [
-                {
-                    "type": "text",
-                    "text": f"""At the bottom is a detailed description of code that you need to write, followed by a code skeleton that provides the structure.
-                    
-        Active Task: {agent_task}
+You will be given:
+1.  A detailed description of the code required for the *target file* ({target_file or 'unknown'}).
+2.  Code skeletons for *all* files in the project (if available). These provide the basic structure (classes, functions, imports).
+3.  A list of required *external* libraries/packages *specifically for the target file*.
+4.  A list of required *internal* modules/files within the project *imported specifically by the target file*.
+5.  (Optional) Existing code from the project for context.
+6.  (Optional) Research notes related to the task.
 
-        Your task is to implement the full code based on the description and skeleton. Make sure you provide your response in the requested programming language. Your response should include the code for the entire file including proper import lines, but do not actually include the code from other files.
+Instructions:
+- Focus *only* on generating the complete code for the specified *target file*: **{target_file or 'unknown'}**.
+- Use the provided skeletons as a starting point and fill in the implementation details.
+- Ensure all necessary imports (both external and internal, as provided in the lists *for this file*) are included in the generated code for the target file.
+- Adhere strictly to the requirements outlined in the code description for the target file.
+- Write production-quality code: include comments, docstrings, error handling, and follow best practices for the language.
+- If the language is not specified, infer it from the filename or description, defaulting to Python if unsure.
+- Output *only* the raw code for the target file, enclosed in a single markdown code block (e.g., ```python ... ```). Do not include explanations or introductory text outside the code block.
+"""
 
-        You should print verbose output to the console to show the progress of the code execution. This will help the user understand what is happening at each step of the process.
-                    
-        If you are requested to make changes to an existing file, please provide the full file with the correction made as your response. Please keep your changes limited to what was requested and keep the rest of the code unchanged.
-                    
-        If you see possible errors that are outside of the scope of the request, please make a note of them using inline comments in the code. Provide additional explanation as needed in comments.
-                    
-        If you see additional improvements that could be made to the code, please make a note of them at the bottom of the code in the comments, but do not make the changes.
-                    
-        You may be occasionally asked to provide non-typical file responses, such as Markdown, Readme, ipynb, txt, etc. Please provide the file in the requested format instead of providing code that would generate the file.
+    user_prompt_parts = [f"## Target File: {target_file or 'unknown'}\n"]
+    user_prompt_parts.append(f"## Code Description for Target File:\n{code_description}\n")
 
-        All of the code that you provide needs to be enclosed in a single markdown style code block with the language specified.
-        Here is an example of what your response should look like:
-        ```python
-        # Your code goes here
-        ```
-        If it was javascript it would look like this:
-        ```javascript
-        // Your code goes here
-        ```
-                    
-        Here is all of the code that has been created for the project so far:
-        Code:
-        {current_code_base}
-                    
-        Here is the description of the code:
-        {code_description}
-                    
-        Here is the code skeleton to implement:
-        {code_skeleton}
-        """
-                },
-            ],
-        }
+    if skeletons:
+        user_prompt_parts.append(f"## Code Skeletons for Project Files (Context):\n{skeletons}\n") # Clarified context purpose
+
+    if external_imports:
+        user_prompt_parts.append(f"## Required External Imports (for {target_file or 'Target File'}):\n- " + "\n- ".join(external_imports) + "\n") # Clarified scope
+
+    if internal_imports:
+        user_prompt_parts.append(f"## Required Internal Imports (for {target_file or 'Target File'}):\n- " + "\n- ".join(internal_imports) + "\n") # Clarified scope
+
+    if current_code_base:
+        user_prompt_parts.append(f"## Existing Codebase Context:\n```\n{current_code_base}\n```\n")
+
+    if research_string:
+        user_prompt_parts.append(f"## Research Notes:\n{research_string}\n")
+
+    user_prompt_parts.append(f"Please generate the complete code for the target file '{target_file or 'unknown'}' based on its description and the specific imports listed above, using the provided skeletons and context.") # Updated final instruction
+
+    user_prompt = "\n".join(user_prompt_parts)
+
+    return [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user_prompt},
     ]
-
-    # write the content of messages to a file nice and formatted
-    with open("code_prompt_generate.txt", "w") as f:
-        output_messages = messages[0]["content"][0]["text"]
-        f.write(output_messages)
-    return messages

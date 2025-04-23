@@ -117,16 +117,7 @@ async def run_python_app(project_path: str, entry_filename: str) -> ToolResult:
 
 
 # -----------------------------------------------------------------------------
-# Main Function for Testing
-# -----------------------------------------------------------------------------
-
-
-async def lmin_agent():
-    # Example 1: Create Python virtual environment in Docker
-    venv_result = await create_python_venv(
-        project_path="/home/myuser/apps/nogame", packages=["numpy", "pandas"]
-    )
-    rr(venv_result)
+# Main Functi\sult)
 
     # Example 2: Write a single code file using the write_code tool
     single_file_description = (

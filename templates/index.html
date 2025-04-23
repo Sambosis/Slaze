@@ -9,6 +9,7 @@
     <title>Agent Display</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.6.1/socket.io.min.js" crossorigin="anonymous"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" rel="stylesheet">
     <link rel="icon" href="https://cdn.simulationtheory.ai/gasset/?asset=img&prompt=chat agent icon&w=32&h=32&transparent=true">
@@ -216,6 +217,13 @@
 
     <script>
         var socket = io({ transports: ['polling'] });
+        
+        // Track the last message index we've processed for each type
+        var lastMessageIndex = {
+            'user': 0,
+            'assistant': 0,
+            'tool': 0
+        };
 
         socket.on('connect', function() {
             console.log("Connected to server");
@@ -229,7 +237,13 @@
                 'bg-green-50 border-l-4 border-green-500'
             }`;
             
-            if (typeof message === 'object' && message.html) {
+            // Detect markdown code fence
+            if (typeof message === 'string' && message.startsWith('```markdown') && message.trim().endsWith('```')) {
+                // Extract markdown content
+                const md = message.replace(/^```markdown/, '').replace(/```$/, '').trim();
+                // Render markdown to HTML
+                msgElement.innerHTML = marked.parse(md);
+            } else if (typeof message === 'object' && message.html) {
                 msgElement.innerHTML = message.html;
             } else if (typeof message === 'object' && message.code && message.css) {
                 if (!document.getElementById('pygments-style')) {
@@ -282,7 +296,20 @@
                 codeContent.style.maxHeight = '0';
                 
             } else {
-                msgElement.innerHTML = message;
+                // Check if the string might be code (has backticks or looks like code)
+                if (typeof message === 'string' && (
+                    message.includes('```') || 
+                    message.includes('import ') ||
+                    message.includes('function ') ||
+                    message.includes('class ') ||
+                    /^\s*[{}\[\]();]/.test(message)
+                )) {
+                    // Looks like code - use innerHTML directly
+                    msgElement.innerHTML = message;
+                } else {
+                    // Treat as markdown for better text formatting (links, bold, etc.)
+                    msgElement.innerHTML = marked.parse(String(message));
+                }
             }
             
             return msgElement;
@@ -291,11 +318,23 @@
         socket.on('update', function(data) {
             ['user', 'assistant', 'tool'].forEach(type => {
                 var containerDiv = document.getElementById(`${type}_messages`);
-                containerDiv.innerHTML = '';
-                data[type].forEach(message => {
-                    containerDiv.appendChild(createMessageElement(message, type));
-                });
-                containerDiv.scrollTop = containerDiv.scrollHeight;
+                
+                // Only append new messages, not rebuild the entire list
+                if (data[type].length > lastMessageIndex[type]) {
+                    // Get only the new messages
+                    const newMessages = data[type].slice(lastMessageIndex[type]);
+                    
+                    // Append only the new messages
+                    newMessages.forEach(message => {
+                        containerDiv.appendChild(createMessageElement(message, type));
+                    });
+                    
+                    // Update the last index we've processed
+                    lastMessageIndex[type] = data[type].length;
+                    
+                    // Scroll to the bottom to show the newest messages
+                    containerDiv.scrollTop = containerDiv.scrollHeight;
+                }
             });
 
             // Update download links
@@ -311,6 +350,13 @@
                 });
             }
         });
+
+        // Add a function to handle message deletions or edits if needed
+        function resetMessages(type) {
+            var containerDiv = document.getElementById(`${type}_messages`);
+            containerDiv.innerHTML = '';
+            lastMessageIndex[type] = 0;
+        }
 
         document.getElementById('sendInput').addEventListener('click', function() {
             var input = document.getElementById('userInput');
@@ -350,3 +396,4 @@
     </script>
 </body>
 </html>
+`

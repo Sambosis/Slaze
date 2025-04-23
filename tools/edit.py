@@ -111,7 +111,7 @@ class EditTool(BaseAnthropicTool):
         try:
             # Add display messages
             if self.display is not None:
-                self.display.add_message("assistant", f"EditTool Executing Command: {command} on path: {path}")
+                self.display.add_message("user", f"EditTool Executing Command: {command} on path: {path}")
 
             # Normalize the path first
             _path = path
