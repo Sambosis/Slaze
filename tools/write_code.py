@@ -41,7 +41,8 @@ from rich import print as rr
 from lmnr import observe
 googlepro = "google/gemini-2.5-pro-preview-03-25"
 oa4omini = "openai/o4-mini-high"
-MODEL_STRING = googlepro  # Default model string, can be overridden in config
+gflash = "google/gemini-2.5-flash-preview"
+MODEL_STRING = gflash  # Default model string, can be overridden in config
 
 
 class CodeCommand(str, Enum):
@@ -429,6 +430,8 @@ class WriteCodeTool(BaseAnthropicTool):
                                 "filename": str(docker_path_display),
                                 "status": "success",
                                 "operation": operation,
+                                # Add the generated code here
+                                "code": fixed_code,
                             }
                         )
                         success_count += 1
@@ -534,7 +537,11 @@ class WriteCodeTool(BaseAnthropicTool):
             )
 
         agent_task = get_constant("TASK") or "No overall task description provided."
-
+        # Get task from task.txt if available
+        if os.path.exists("task.txt"):
+            with open("task.txt", "r") as task_file:
+                task_description = task_file.read().strip()
+            agent_task = task_description or agent_task
         messages = code_prompt_generate(
             current_code_base="",  # Consider if current codebase context is needed differently now
             code_description=code_description,
@@ -635,7 +642,7 @@ class WriteCodeTool(BaseAnthropicTool):
         file_detail: FileDetail,  # Pass the whole detail object
         file_path: Path,
         all_file_details: List[FileDetail],  # Pass the list of all file details
-    ) -> str:  # file_path is the intended final host path
+        ) -> str:  # file_path is the intended final host path
         """Call LLM to generate code skeleton based on the code description"""
         target_file_name = file_path.name  # Get relative name for prompt
 
@@ -659,7 +666,11 @@ class WriteCodeTool(BaseAnthropicTool):
             rr(f"Using model {model} for skeleton generation for {target_file_name}.")
 
             # --- Get additional context ---
-            agent_task = get_constant("TASK") or "No overall task description provided."
+
+            # get the task from reading task.txt
+            with open("task.txt", "r") as task_file:
+                task_description = task_file.read().strip()
+            agent_task = task_description or "No overall task description provided."
             external_imports = file_detail.external_imports  # Get from FileDetail
             internal_imports = file_detail.internal_imports  # Get from FileDetail
 

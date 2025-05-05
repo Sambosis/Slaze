@@ -84,6 +84,9 @@ async def summarize_recent_messages(short_messages: List[BetaMessageParam], disp
     """ 
     Summarize the most recent messages. 
     """
+    googlepro = "google/gemini-2.5-pro-preview-03-25"
+    oa4omini = "openai/o4-mini-high"
+    gflash = "google/gemini-2.5-flash-preview"
     try:
         OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
         sum_client = OpenAI(
@@ -91,7 +94,7 @@ async def summarize_recent_messages(short_messages: List[BetaMessageParam], disp
             api_key=OPENROUTER_API_KEY,
             )
         all_summaries = get_all_summaries()
-        model = "openai/gpt-4o-mini"
+        model = gflash
         conversation_text = ""
         for msg in short_messages:
             role = msg['role'].upper()
@@ -119,15 +122,9 @@ async def summarize_recent_messages(short_messages: List[BetaMessageParam], disp
         summary_prompt = f"""Please provide your response in a concise markdown format with short statements that document what happened. Structure your response as a list with clear labels for each step, such as:
 
             - **Action:** [brief description of what was done]
-            - **Tool:** [specific tool or method used]
             - **Result:** [outcome of the action]
-            - **Note:** [any important observations or considerations]
 
-            For example:
-            - **Action:** Created configuration file
-            - **Tool:** Text editor
-            - **Result:** Successfully generated config.json
-            - **Note:** Default parameters were applied
+            
             - Here are the actions that have been logged so far.  You should not repeat these, they are only to give you context to what is going on. 
             Previous Actions:
             {all_summaries}

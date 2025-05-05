@@ -18,6 +18,7 @@ from anthropic.types.beta import (
 )
 from dotenv import load_dotenv
 from icecream import ic, install
+from lmnr import observe
 
 from tools import (
     BashTool,
@@ -28,7 +29,7 @@ from tools import (
     ToolCollection,
     ToolResult
 )
-
+from lmnr import observe
 from utils.agent_display_web_with_prompt import AgentDisplayWebWithPrompt
 from utils.file_logger import *
 from utils.context_helpers import *
@@ -223,6 +224,7 @@ def _maybe_filter_to_n_most_recent_images(messages: List[BetaMessageParam], imag
             tool_result["content"] = new_content
 
 # ----------------  The main Agent Loop ----------------
+@observe()
 async def sampling_loop(
     *,
     agent: Agent,

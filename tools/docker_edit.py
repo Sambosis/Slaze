@@ -19,6 +19,7 @@ from config import get_constant, set_constant, REPO_DIR, PROJECT_DIR, LOGS_DIR
 from utils.file_logger import log_file_operation
 from utils.docker_service import DockerService
 from loguru import logger as ll
+from lmnr import observe
 
 # # Configure logging to a file
 # #ll.add(
@@ -135,7 +136,7 @@ class DockerEditTool(BaseAnthropicTool):
         if len(output) > 12000:
             output = f"{output[:5000]} ... (truncated) ... {output[-5000:]}"
         return output
-
+    @observe()
     async def __call__(
         self,
         *,

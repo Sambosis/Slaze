@@ -11,6 +11,7 @@ from .base import BaseAnthropicTool, ToolError, ToolResult
 from utils.agent_display_web_with_prompt import AgentDisplayWebWithPrompt
 from load_constants import write_to_file
 from icecream import ic
+from lmnr import observe
 
 load_dotenv()
 ic.configureOutput(includeContext=True, outputFunction=write_to_file)
@@ -53,11 +54,11 @@ class BashTool(BaseAnthropicTool):
 
     name: ClassVar[Literal["bash"]] = "bash"
     api_type: ClassVar[Literal["bash_20250124"]] = "bash_20250124"
-
+    @observe()
     async def __call__(self, command: str | None = None, **kwargs):
         if command is not None:
             # Modify commands to exclude hidden files/paths
-            modified_command = self._modify_command_if_needed(command)
+            modified_command     = self._modify_command_if_needed(command)
             return await self._run_command(modified_command)
         raise ToolError("no command provided.")
 

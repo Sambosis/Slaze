@@ -1,47 +1,56 @@
-# Expanded Description: Battleship RL Models Training Visualization
+# Maze Navigation App in Pygame
 
-In this project, we will develop a system to train two reinforcement learning models to play the game of Battleship against each other. The two models will use different RL methods: one will use Deep Q-Learning (DQL) and the other will use Advantage Actor-Critic (A2C). These distinct approaches will allow for an interesting comparison of performance.
+## Expanded Description
 
-Each model will need to learn both ship placement strategy and attack strategy. Ships will be placed randomly at the beginning of each game to provide varied training scenarios. The standard Battleship rules will apply with a 10x10 grid and 5 ships of different lengths (Carrier: 5, Battleship: 4, Cruiser: 3, Submarine: 3, Destroyer: 2).
+I'll create a maze generation and navigation application using Pygame. The app will dynamically generate a new maze each time the computer-controlled character successfully navigates from start to finish. The maze will be visually appealing with clear graphics and smooth animations.
 
-The game will be visualized using Pygame with the window split into two sections:
-1. The top section will display the actual game boards showing both models' ship placements and attack histories.
-2. The bottom section will display training metrics (loss, reward over time) and win/loss statistics comparing the two models.
+For the maze generation, I'll implement a depth-first search algorithm with recursive backtracking, which creates perfect mazes (mazes with exactly one path between any two points). The maze will be represented as a grid of cells with walls between them.
 
-The training will proceed in batches of 100 games. While most games will run at maximum speed for efficient training, every 100th game will be displayed in real-time with animated moves so a user can observe the gameplay and strategy development. The animation will show each model's turns and hits/misses with appropriate visual feedback.
+The computer-controlled character will navigate through the maze using the A* pathfinding algorithm, which is efficient for finding the shortest path in a maze. Once the character reaches the end of the maze, a new maze will be automatically generated with different dimensions to add variety.
 
-No human player interface, sound effects, or extensive documentation will be included, focusing instead on the RL training and visualization aspects.
+Visual aspects will include:
+- Smooth animations for the character movement
+- Distinct colors for walls, paths, start, and end points
+- Visual feedback when a maze is completed
+- A simple transition effect between mazes
 
-# File Tree
+The user can quit the application by pressing the ESC key, and there will be no other user inputs required.
 
-1. `main.py`
-   - Purpose: Entry point for the application, initializes and runs the main game loop
-   - Import: N/A (This is the root file)
+## File Tree
 
-2. `battleship_game.py`
-   - Purpose: Contains the core Battleship game logic, board representation, and rules
-   - Import: `from battleship_game import BattleshipGame, Ship, Board`
+1. **maze_app.py**
+   - Purpose: Main entry point for the application, initializes Pygame, handles the game loop and events
+   - Import: Not imported by other files
 
-3. `pygame_renderer.py`
-   - Purpose: Handles all visualization using Pygame including game boards and metrics display
-   - Import: `from pygame_renderer import GameRenderer`
+2. **maze_generator.py**
+   - Purpose: Contains algorithms for generating random mazes using depth-first search with recursive backtracking
+   - Import: `from maze_generator import MazeGenerator`
 
-4. `rl_models/dql_agent.py`
-   - Purpose: Implements the Deep Q-Learning model for the first AI player
-   - Import: `from rl_models.dql_agent import DQLAgent`
+3. **pathfinder.py**
+   - Purpose: Implements the A* pathfinding algorithm for the computer-controlled character
+   - Import: `from pathfinder import AStarPathfinder`
 
-5. `rl_models/a2c_agent.py`
-   - Purpose: Implements the Advantage Actor-Critic model for the second AI player
-   - Import: `from rl_models.a2c_agent import A2CAgent`
+4. **renderer.py**
+   - Purpose: Handles all visual aspects including drawing the maze, character, and transition effects
+   - Import: `from renderer import MazeRenderer`
 
-6. `rl_models/base_agent.py`
-   - Purpose: Common base class and utilities for both RL agent implementations
-   - Import: `from rl_models.base_agent import RLAgent`
+5. **character.py**
+   - Purpose: Defines the computer-controlled character, its properties, and movement logic
+   - Import: `from character import Character`
 
-7. `utils.py`
-   - Purpose: Contains utility functions for data processing, metrics tracking, and visualization helpers
-   - Import: `from utils import track_metrics, calculate_statistics`
+6. **assets/sprites/**
+   - Purpose: Directory to store character and maze element sprites
+   - Contains:
+     - **character.png** - sprite for the navigating character
+     - **wall.png** - texture for maze walls
+     - **floor.png** - texture for walkable paths
+     - **start.png** - marker for the maze entrance
+     - **end.png** - marker for the maze exit
 
-8. `training_manager.py`
-   - Purpose: Orchestrates the training process, batch execution, and metrics collection
-   - Import: `from training_manager import TrainingManager`Start testing as soon as possible. DO NOT start making fixes or improvements until you have tested to see if it is working as is.  Your project directory is /home/myuser/apps/battleshiprl. You need to make sure that all files you create and work you do is done in that directory.
+7. **constants.py**
+   - Purpose: Contains game constants, colors, configuration settings
+   - Import: `from constants import *`
+
+8. **utils.py**
+   - Purpose: Utility functions for calculations, conversions, and helper methods
+   - Import: `from utils import *`Start testing as soon as possible. DO NOT start making fixes or improvements until you have tested to see if it is working as is.  Your project directory is /home/myuser/apps/maze. You need to make sure that all files you create and work you do is done in that directory.
