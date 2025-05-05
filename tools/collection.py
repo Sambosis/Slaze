@@ -36,7 +36,7 @@ class ToolCollection:
         self.display = display
 
         # Configure logging to a file
-        self.t_log.add("tool.log", rotation="500 KB", level="DEBUG", format="{time:YYYY-MM-DD HH:mm} | {level: <8} | {module}.{function}:{line} - {message}")
+        self.t_log.add("tool.log", rotation="500 KB", level="CRITICAL", format="{time:YYYY-MM-DD HH:mm} | {level: <8} | {module}.{function}:{line} - {message}")
 
         # Add each tool to the collection
         for tool in tools:

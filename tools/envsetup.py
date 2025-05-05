@@ -1,6 +1,8 @@
 from enum import Enum
 from typing import Literal, List
 from pathlib import Path
+
+from lmnr import observe
 from .base import ToolResult, BaseAnthropicTool
 import os
 from icecream import ic
@@ -9,6 +11,7 @@ from config import get_constant
 from utils.file_logger import convert_to_docker_path
 from loguru import logger as ll
 from rich import print as rr
+from lmnr import observe
 # Configure logging to a file
 ll.add("my_log_file.log", rotation="500 KB", level="DEBUG", format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {module}.{function}:{line} - {message}")
 
@@ -190,7 +193,7 @@ class ProjectSetupTool(BaseAnthropicTool):
                 docker_path = f'/home/myuser/apps/{project_name}'
 
         return docker_path
-
+    @observe()
     async def setup_project(self, project_path: Path, packages: List[str]) -> dict:
         """Sets up a Python project inside the Docker container."""
         if not self._docker_available:
@@ -329,7 +332,7 @@ class ProjectSetupTool(BaseAnthropicTool):
                 "project_path": str(project_path),
                 "docker_path": docker_path if 'docker_path' in locals() else None
             }
-
+    @observe()
     async def add_dependencies(self, project_path: Path, packages: List[str]) -> dict:
         """Adds additional Python dependencies to an existing project."""
         if not self._docker_available:
@@ -412,7 +415,7 @@ class ProjectSetupTool(BaseAnthropicTool):
                     installed_packages if "installed_packages" in locals() else []
                 ),
             }
-
+    @observe()
     async def run_app(self, project_path: Path, filename: str) -> dict:
         """Runs a Python application inside the Docker container with X11 forwarding."""
         if not self._docker_available:
@@ -755,7 +758,7 @@ class ProjectSetupTool(BaseAnthropicTool):
                 "docker_path": docker_path,
                 "errors": f"Failed to run Node.js app in Docker: {str(e)}",
             }
-
+    @observe()
     async def run_project(self, project_path: Path, entry_filename: str = "app.py") -> dict:
         """Runs a Python project inside the Docker container."""
         if not self._docker_available:

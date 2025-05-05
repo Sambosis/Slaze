@@ -5,6 +5,7 @@ import asyncio
 import json
 import os
 from typing import List, Dict
+from pkg_resources import working_set
 from rich import print as rr
 from anthropic import Anthropic
 from anthropic.types.beta import (
@@ -28,6 +29,14 @@ from utils.context_helpers import *
 from utils.output_manager import *
 from config import *
 from token_tracker import TokenTracker
+
+from lmnr import Laminar, observe
+from dotenv import load_dotenv
+
+load_dotenv()
+
+Laminar.initialize(project_api_key=os.getenv("LAMINAR_API_KEY"))
+
 
 class Agent:
     def __init__(self, task: str, display: AgentDisplayWebWithPrompt):
@@ -53,6 +62,7 @@ class Agent:
         self.betas = [COMPUTER_USE_BETA_FLAG, PROMPT_CACHING_BETA_FLAG]
         self.image_truncation_threshold = 1
         self.only_n_most_recent_images = 2
+        self.step_count = 0
         # Add detailed logging of tool params
         self.tool_params = self.tool_collection.to_params()
 
@@ -87,6 +97,7 @@ class Agent:
                 f.write("-"*50 + "\n")
             f.write("="*80 + "\n\n")
 
+    @observe()
     async def run_tool(self, content_block):
         result = ToolResult(output="Tool execution not started", tool_name=content_block["name"])
         # SET THE CONSTANT TASK to self.task
@@ -188,8 +199,11 @@ class Agent:
         if len(sanitized) > 64:
             sanitized = sanitized[:64]
         return sanitized
-
+    @observe()
     async def step(self):
+        """Main sampling loop for the agent."""
+        self.step_count += 1
+        Laminar.set_session(session_id=f"step_{self.step_count}")
         messages = self.messages
         task = self.task
         if self.enable_prompt_caching:
@@ -323,6 +337,7 @@ class Agent:
                 self.token_tracker.update(response)
             else:
                 self.display.add_message("assistant", "No valid LLM response for token usage update.")
+            Laminar.clear_session()
             return True
 
         except Exception as e:

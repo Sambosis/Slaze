@@ -9,6 +9,7 @@ from pathlib import Path
 from openai import OpenAI, AsyncOpenAI
 import os
 import ftfy
+
 def start_sampling_loop(task, display):
     """
     Simple wrapper function that spins up a fresh event loop
@@ -19,7 +20,6 @@ def start_sampling_loop(task, display):
     asyncio.set_event_loop(loop)
     display.loop = loop  # Set the loop for the display
     loop.run_until_complete(run_sampling_loop(task, display))
-
 class AgentDisplayWebWithPrompt(AgentDisplayWeb):
     def __init__(self):
         super().__init__()

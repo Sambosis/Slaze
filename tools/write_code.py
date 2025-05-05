@@ -37,56 +37,19 @@ import ftfy
 from pygments.lexers import get_lexer_by_name, guess_lexer
 from loguru import logger as ll
 import traceback
-
-# Configure logging to a file
-ll.add(
-    "my_log_file.log",
-    rotation="1500 KB",
-    level="DEBUG",
-    format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {module}.{function}:{line} - {message}",
-)
-
-
-def html_format_code(code, extension):
-    """Format code with syntax highlighting for HTML display."""
-    try:
-        # Try to get a lexer based on the file extension
-        try:
-            lexer = get_lexer_by_name(extension.lower().lstrip("."))
-        except:
-            # If that fails, try to guess the lexer from the code content
-            lexer = guess_lexer(code)
-
-        # Use a nice style for the highlighting
-        formatter = HtmlFormatter(style="monokai", linenos=True, cssclass="source")
-
-        # Highlight the code
-        highlighted = highlight(code, lexer, formatter)
-
-        # Add some CSS for better display
-        css = formatter.get_style_defs(".source")
-        html = f"""
-        <style>
-        {css}
-        .source {{ background-color: #272822; padding: 10px; border-radius: 5px; }}
-        </style>
-        {highlighted}
-        """
-        return html
-    except Exception as e:
-        # If highlighting fails, return plain code in a pre tag
-        # ll.warning(f"HTML code formatting failed: {e}")
-        return f"<pre>{code}</pre>"
+from rich import print as rr
+from lmnr import observe
 googlepro = "google/gemini-2.5-pro-preview-03-25"
-oa4omini = "openai/o4-mini-high" 
+oa4omini = "openai/o4-mini-high"
 MODEL_STRING = googlepro  # Default model string, can be overridden in config
+
+
 class CodeCommand(str, Enum):
     """
     An enumeration of possible commands for the WriteCodeTool.
     """
 
     WRITE_CODEBASE = "write_codebase"
-
 
 class FileDetail(BaseModel):
     """Model for specifying file details for code generation."""
@@ -95,7 +58,6 @@ class FileDetail(BaseModel):
     code_description: str
     external_imports: Optional[List[str]] = None
     internal_imports: Optional[List[str]] = None
-
 
 class WriteCodeTool(BaseAnthropicTool):
     """
@@ -118,7 +80,7 @@ class WriteCodeTool(BaseAnthropicTool):
             self.docker = DockerService()
             self._docker_available = self.docker.is_available()
         except Exception as docker_init_err:
-            # ll.warning(f"Failed to initialize DockerService: {docker_init_err}")
+            # rr(f"Failed to initialize DockerService: {docker_init_err}")
             self.docker = None
             self._docker_available = False
         ic("Initializing WriteCodeTool")
@@ -186,7 +148,7 @@ class WriteCodeTool(BaseAnthropicTool):
         files: List[Dict[str, Any]],
         project_path: str,  # This might be a docker-style path or just a project name
         **kwargs,
-    ) -> ToolResult:
+        ) -> ToolResult:
         """
         Execute the write_codebase command.
 
@@ -218,7 +180,7 @@ class WriteCodeTool(BaseAnthropicTool):
                 )
             host_repo_path = Path(host_repo_dir)
             if not host_repo_path.is_dir():
-                ll.warning(
+                rr(
                     f"Configured REPO_DIR '{host_repo_dir}' does not exist or is not a directory."
                 )
                 # Decide if you want to raise an error or attempt to create it
@@ -236,18 +198,18 @@ class WriteCodeTool(BaseAnthropicTool):
             host_project_path_obj = (
                 host_repo_path / project_name
             ).resolve()  # Resolve to absolute path early
-            ll.info(f"Resolved HOST project path for writing: {host_project_path_obj}")
+            rr(f"Resolved HOST project path for writing: {host_project_path_obj}")
 
             # Ensure the HOST directory exists
             host_project_path_obj.mkdir(parents=True, exist_ok=True)
-            ll.debug(f"Ensured host project directory exists: {host_project_path_obj}")
+            rr(f"Ensured host project directory exists: {host_project_path_obj}")
             # --- END: Path Correction Logic ---
 
             # Validate files input
             try:
                 file_details = [FileDetail(**f) for f in files]
             except Exception as pydantic_error:
-                ll.error(f"Pydantic validation error for 'files': {pydantic_error}")
+                rr(f"Pydantic validation error for 'files': {pydantic_error}")
                 return ToolResult(
                     error=f"Invalid format for 'files' parameter: {pydantic_error}",
                     tool_name=self.name,
@@ -268,12 +230,14 @@ class WriteCodeTool(BaseAnthropicTool):
                     f"Generating skeletons for {len(file_details)} files...",
                 )
 
+            # CHANGE: Update the call to pass file_detail and all file_details
             skeleton_tasks = [
-                # Pass the intended final host path to the skeleton generator for context
                 self._call_llm_for_code_skeleton(
-                    file.code_description, host_project_path_obj / file.filename
+                    file, # Pass the FileDetail object for the current file
+                    host_project_path_obj / file.filename, # Pass the intended final host path
+                    file_details # Pass the list of ALL FileDetail objects
                 )
-                for file in file_details
+                for file in file_details # Iterate through the validated FileDetail objects
             ]
             skeleton_results = await asyncio.gather(
                 *skeleton_tasks, return_exceptions=True
@@ -282,13 +246,12 @@ class WriteCodeTool(BaseAnthropicTool):
             skeletons: Dict[str, str] = {}
             errors_skeleton = []
             for i, result in enumerate(skeleton_results):
-                # Use the relative filename as the key for the skeletons dictionary
-                filename_key = file_details[i].filename
+                filename_key = file_details[i].filename # Use the relative filename
                 if isinstance(result, Exception):
                     error_msg = (
                         f"Error generating skeleton for {filename_key}: {result}"
                     )
-                    ll.error(error_msg)
+                    rr(error_msg)
                     errors_skeleton.append(error_msg)
                     skeletons[filename_key] = (
                         f"# Error generating skeleton: {result}"  # Placeholder
@@ -326,7 +289,7 @@ class WriteCodeTool(BaseAnthropicTool):
             errors_write = []
             success_count = 0
 
-            ll.info(
+            rr(
                 f"Starting file writing phase for {len(code_results)} results to HOST path: {host_project_path_obj}"
             )
 
@@ -337,20 +300,20 @@ class WriteCodeTool(BaseAnthropicTool):
                 absolute_path = (
                     host_project_path_obj / filename
                 ).resolve()  # Ensure absolute path
-                ll.debug(
+                rr(
                     f"Processing result for: {filename} (Host Path: {absolute_path})"
                 )
 
                 if isinstance(result, Exception):
                     error_msg = f"Error generating code for {filename}: {result}"
-                    ll.error(error_msg)
+                    rr(error_msg)
                     errors_code_gen.append(error_msg)
                     write_results.append(
                         {"filename": filename, "status": "error", "message": error_msg}
                     )
                     # Attempt to write error file to the resolved host path
                     try:
-                        ll.warning(
+                        rr(
                             f"Attempting to write error file for {filename} to {absolute_path}"
                         )
                         absolute_path.parent.mkdir(parents=True, exist_ok=True)
@@ -358,22 +321,22 @@ class WriteCodeTool(BaseAnthropicTool):
                         absolute_path.write_text(
                             error_content, encoding="utf-8", errors="replace"
                         )
-                        ll.info(
+                        rr(
                             f"Successfully wrote error file for {filename} to {absolute_path}"
                         )
                     except Exception as write_err:
-                        ll.error(
+                        rr(
                             f"Failed to write error file for {filename} to {absolute_path}: {write_err}"
                         )
 
                 else:  # Code generation successful
                     code_content = result
-                    ll.info(
+                    rr(
                         f"Code generation successful for {filename}. Attempting to write to absolute host path: {absolute_path}"
                     )
 
                     if not code_content or not code_content.strip():
-                        ll.warning(
+                        rr(
                             f"Generated code content for {filename} is empty or whitespace only. Skipping write."
                         )
                         write_results.append(
@@ -386,43 +349,43 @@ class WriteCodeTool(BaseAnthropicTool):
                         continue  # Skip to next file
 
                     try:
-                        ll.debug(f"Ensuring directory exists: {absolute_path.parent}")
+                        rr(f"Ensuring directory exists: {absolute_path.parent}")
                         absolute_path.parent.mkdir(parents=True, exist_ok=True)
                         operation = "modify" if absolute_path.exists() else "create"
-                        ll.debug(f"Operation type for {filename}: {operation}")
+                        rr(f"Operation type for {filename}: {operation}")
 
                         fixed_code = ftfy.fix_text(code_content)
-                        ll.debug(
+                        rr(
                             f"Code content length for {filename} (after ftfy): {len(fixed_code)}"
                         )
 
                         # >>> THE WRITE CALL to the HOST path <<<
-                        ll.info(f"Executing write_text for: {absolute_path}")
+                        rr(f"Executing write_text for: {absolute_path}")
                         absolute_path.write_text(
                             fixed_code, encoding="utf-8", errors="replace"
                         )
-                        ll.info(
+                        rr(
                             f"Successfully executed write_text for: {absolute_path}"
                         )
 
                         # File existence and size check
                         if absolute_path.exists():
-                            ll.info(
+                            rr(
                                 f"CONFIRMED: File exists at {absolute_path} after write."
                             )
                             try:
                                 size = absolute_path.stat().st_size
-                                ll.info(f"CONFIRMED: File size is {size} bytes.")
+                                rr(f"CONFIRMED: File size is {size} bytes.")
                                 if size == 0 and len(fixed_code) > 0:
-                                    ll.warning(
+                                    rr(
                                         f"File size is 0 despite non-empty content being written!"
                                     )
                             except Exception as stat_err:
-                                ll.warning(
+                                rr(
                                     f"Could not get file stats for {absolute_path}: {stat_err}"
                                 )
                         else:
-                            ll.error(
+                            rr(
                                 f"FAILED: File DOES NOT exist at {absolute_path} immediately after write_text call!"
                             )
 
@@ -433,11 +396,11 @@ class WriteCodeTool(BaseAnthropicTool):
                         try:
                             # Ensure convert_to_docker_path can handle the absolute host path
                             docker_path_display = convert_to_docker_path(absolute_path)
-                            ll.debug(
+                            rr(
                                 f"Converted host path {absolute_path} to display path {docker_path_display}"
                             )
                         except Exception as conv_err:
-                            ll.warning(
+                            rr(
                                 f"Could not convert host path {absolute_path} to docker path for display: {conv_err}. Using host path for display."
                             )
 
@@ -454,9 +417,9 @@ class WriteCodeTool(BaseAnthropicTool):
                                     ),  # Use relative filename key
                                 },
                             )
-                            ll.debug(f"Logged file operation for {absolute_path}")
+                            rr(f"Logged file operation for {absolute_path}")
                         except Exception as log_error:
-                            ll.warning(
+                            rr(
                                 f"Failed to log code writing for {filename} ({absolute_path}): {log_error}"
                             )
 
@@ -469,7 +432,7 @@ class WriteCodeTool(BaseAnthropicTool):
                             }
                         )
                         success_count += 1
-                        ll.info(
+                        rr(
                             f"Successfully processed and wrote {filename} to {absolute_path}"
                         )
 
@@ -485,7 +448,7 @@ class WriteCodeTool(BaseAnthropicTool):
                             self.display.add_message("tool", {"html": formatted_code})
 
                     except Exception as write_error:
-                        ll.exception(
+                        rr(
                             f"Caught exception during write operation for {filename} at path {absolute_path}"
                         )
                         errors_write.append(
@@ -533,76 +496,19 @@ class WriteCodeTool(BaseAnthropicTool):
 
         except ValueError as ve:  # Catch specific config/path errors
             error_message = f"Configuration Error in WriteCodeTool __call__: {str(ve)}\n{traceback.format_exc()}"
-            ll.error(error_message)
+            rr(error_message)
             return ToolResult(error=error_message, tool_name=self.name, command=command)
         except Exception as e:
             error_message = f"Critical Error in WriteCodeTool __call__: {str(e)}\n{traceback.format_exc()}"
-            ll.exception("Critical error during codebase generation")
+            rr("Critical error during codebase generation")
             # Optionally include host_project_path_obj if it was set
             if host_project_path_obj:
                 error_message += f"\nAttempted Host Path: {host_project_path_obj}"
             print(error_message)
             return ToolResult(error=error_message, tool_name=self.name, command=command)
 
-    def extract_code_block(
-        self, text: str, file_path: Optional[Path] = None
-    ) -> tuple[str, str]:
-        """
-        Extracts code based on file type. Special handling for Markdown files.
-        Improved language guessing.
-        Returns tuple of (content, language).
-        """
-        if file_path is not None and str(file_path).lower().endswith(
-            (".md", ".markdown")
-        ):
-            return text, "markdown"
-
-        if not text or not text.strip():
-            return "No Code Found", "unknown"  # Consistent 'unknown'
-
-        start_marker = text.find("```")
-        if start_marker == -1:
-            # No backticks, try guessing language from content
-            try:
-                language = guess_lexer(text).aliases[0]
-                # Return the whole text as the code block
-                return text.strip(), language
-            except Exception:  # pygments.util.ClassNotFound or others
-                ll.warning("Could not guess language for code without backticks.")
-                return text.strip(), "unknown"  # Return unknown if guess fails
-
-        # Found opening backticks ```
-        language_line_end = text.find("\n", start_marker)
-        if language_line_end == -1:  # Handle case where ``` is at the very end
-            language_line_end = len(text)
-
-        language = text[start_marker + 3 : language_line_end].strip().lower()
-
-        code_start = language_line_end + 1
-        end_marker = text.find("```", code_start)
-
-        if end_marker == -1:
-            # No closing backticks found, assume rest of text is code
-            code_block = text[code_start:].strip()
-        else:
-            code_block = text[code_start:end_marker].strip()
-
-        # If language wasn't specified after ```, try guessing from the extracted block
-        if not language and code_block:
-            try:
-                language = guess_lexer(code_block).aliases[0]
-            except Exception:
-                ll.warning(
-                    f"Could not guess language for extracted code block (File: {file_path})."
-                )
-                language = "unknown"  # Fallback if guess fails
-
-        # If language is still empty, default to 'unknown'
-        if not language:
-            language = "unknown"
-
-        return code_block if code_block else "No Code Found", language
-
+    
+    @observe()
     @retry(stop=stop_after_attempt(3), wait=wait_fixed(8))
     async def _call_llm_to_generate_code(
         self,
@@ -655,7 +561,7 @@ class WriteCodeTool(BaseAnthropicTool):
                 )
             # Consider making model configurable
             model = get_constant("CODE_GEN_MODEL") or MODEL_STRING
-            ll.debug(f"Using model {model} for code generation.")
+            rr(f"Using model {model} for code generation.")
 
             completion = await client.chat.completions.create(
                 model=model,
@@ -674,32 +580,32 @@ class WriteCodeTool(BaseAnthropicTool):
                 code_string, detected_language = self.extract_code_block(
                     raw_code_string, file_path
                 )
-                ll.debug(
+                rr(
                     f"Extracted code block for {file_path.name}. Detected language: {detected_language}"
                 )
                 if code_string == "No Code Found":
                     # If extraction fails but content exists, use the raw response
                     if raw_code_string.strip():
                         code_string = raw_code_string
-                        ll.warning(
+                        rr(
                             f"Could not extract code block for {file_path.name}, using raw response."
                         )
                     else:
-                        ll.error(
+                        rr(
                             f"LLM response for {file_path.name} was effectively empty."
                         )
                         code_string = f"# Failed to generate code for {file_path.name}\n# LLM response was empty."
 
             else:
                 ic(f"No valid completion received for {file_path.name}")
-                ll.error(
+                rr(
                     f"Invalid or empty completion received from LLM for {file_path.name}"
                 )
                 code_string = f"# Failed to generate code for {file_path.name}\n# LLM response was empty or invalid."
 
         except Exception as e:
             ic(f"Error in _call_llm_to_generate_code for {file_path.name}: {e}")
-            ll.exception(f"LLM call failed for {file_path.name}")
+            rr(f"LLM call failed for {file_path.name}")
             code_string = f"# Error generating code for {file_path.name}: {str(e)}"
 
         # Log the generated code (or error message) to a central file if configured
@@ -717,7 +623,7 @@ class WriteCodeTool(BaseAnthropicTool):
                     f.write(f"{code_string}\n")
                     f.write(f"--- End Code for: {str(file_path)} ---\n")
         except Exception as file_error:
-            ll.warning(
+            rr(
                 f"Failed to log generated code for {file_path.name} to {get_constant('CODE_FILE')}: {file_error}"
             )
 
@@ -725,15 +631,20 @@ class WriteCodeTool(BaseAnthropicTool):
 
     @retry(stop=stop_after_attempt(3), wait=wait_fixed(8))
     async def _call_llm_for_code_skeleton(
-        self, code_description: str, file_path: Path
-        ) -> str:  # file_path is the intended final host path
+        self,
+        file_detail: FileDetail,  # Pass the whole detail object
+        file_path: Path,
+        all_file_details: List[FileDetail],  # Pass the list of all file details
+    ) -> str:  # file_path is the intended final host path
         """Call LLM to generate code skeleton based on the code description"""
+        target_file_name = file_path.name  # Get relative name for prompt
+
         if self.display:
             self.display.add_message(
-                "assistant", f"Generating skeleton for {file_path.name}"
-            )  # Display relative name
+                "assistant", f"Generating skeleton for {target_file_name}"
+            )
 
-        skeleton_string = f"# Error: Skeleton generation failed for {file_path.name}"
+        skeleton_string = f"# Error: Skeleton generation failed for {target_file_name}"
 
         try:
             OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
@@ -744,17 +655,29 @@ class WriteCodeTool(BaseAnthropicTool):
                 base_url="https://openrouter.ai/api/v1",
                 api_key=OPENROUTER_API_KEY,
             )
-            # Consider making model configurable
-            model = (
-                get_constant("SKELETON_GEN_MODEL") or MODEL_STRING
-                )  # Maybe use a faster model?
-            ll.debug(f"Using model {model} for skeleton generation.")
+            model = get_constant("SKELETON_GEN_MODEL") or MODEL_STRING
+            rr(f"Using model {model} for skeleton generation for {target_file_name}.")
 
+            # --- Get additional context ---
+            agent_task = get_constant("TASK") or "No overall task description provided."
+            external_imports = file_detail.external_imports  # Get from FileDetail
+            internal_imports = file_detail.internal_imports  # Get from FileDetail
+
+            # Convert FileDetail objects to simple dicts for the prompt function if needed
+            all_files_dict_list = [f.model_dump() for f in all_file_details]
+            # --- End Get additional context ---
+
+            # CHANGE: Call updated prompt function with more args
             messages = code_skeleton_prompt(
-                code_description, str(file_path.name)
-            )  # Pass relative filename
+                code_description=file_detail.code_description,  # From FileDetail
+                target_file=target_file_name,  # Pass relative filename
+                agent_task=agent_task,
+                external_imports=external_imports,
+                internal_imports=internal_imports,
+                all_file_details=all_files_dict_list,  # Pass context of all files
+            )
             ic(
-                f"Messages for Skeleton ({file_path.name}):\n +++++ \n{messages}\n +++++"
+                f"Messages for Skeleton ({target_file_name}):\n +++++ \n{messages}\n +++++"
             )
 
             completion = await client.chat.completions.create(
@@ -773,39 +696,98 @@ class WriteCodeTool(BaseAnthropicTool):
                 skeleton_string, detected_language = self.extract_code_block(
                     raw_skeleton, file_path
                 )
-                ll.debug(
-                    f"Extracted skeleton block for {file_path.name}. Detected language: {detected_language}"
+                rr(
+                    f"Extracted skeleton block for {target_file_name}. Detected language: {detected_language}"
                 )
 
                 if skeleton_string == "No Code Found":
                     if raw_skeleton.strip():
                         skeleton_string = raw_skeleton  # Use raw if extraction fails but content exists
-                        ll.warning(
-                            f"Could not extract skeleton block for {file_path.name}, using raw response."
+                        rr(
+                            f"Could not extract skeleton block for {target_file_name}, using raw response."
                         )
                     else:
-                        ll.error(
-                            f"LLM response for skeleton {file_path.name} was effectively empty."
+                        rr(
+                            f"LLM response for skeleton {target_file_name} was effectively empty."
                         )
-                        skeleton_string = f"# Failed to generate skeleton for {file_path.name}\n# LLM response was empty."
+                        skeleton_string = f"# Failed to generate skeleton for {target_file_name}\n# LLM response was empty."
 
                 skeleton_string = ftfy.fix_text(skeleton_string)
             else:
-                ic(f"No valid skeleton completion received for {file_path.name}")
-                ll.error(
-                    f"Invalid or empty completion received from LLM for skeleton {file_path.name}"
+                ic(f"No valid skeleton completion received for {target_file_name}")
+                rr(
+                    f"Invalid or empty completion received from LLM for skeleton {target_file_name}"
                 )
-                skeleton_string = f"# Failed to generate skeleton for {file_path.name}\n# LLM response was empty or invalid."
+                skeleton_string = f"# Failed to generate skeleton for {target_file_name}\n# LLM response was empty or invalid."
 
         except Exception as e:
-            ic(f"Error in _call_llm_for_code_skeleton for {file_path.name}: {e}")
-            ll.exception(f"LLM skeleton call failed for {file_path.name}")
+            ic(f"Error in _call_llm_for_code_skeleton for {target_file_name}: {e}")
+            rr(f"LLM skeleton call failed for {target_file_name}")
             skeleton_string = (
-                f"# Error generating skeleton for {file_path.name}: {str(e)}"
+                f"# Error generating skeleton for {target_file_name}: {str(e)}"
             )
 
-        ic(f"Skeleton for {file_path.name}:\n{skeleton_string}")
+        ic(f"Skeleton for {target_file_name}:\n{skeleton_string}")
         return skeleton_string
+
+    def extract_code_block(
+        self, text: str, file_path: Optional[Path] = None
+        ) -> tuple[str, str]:
+        """
+        Extracts code based on file type. Special handling for Markdown files.
+        Improved language guessing.
+        Returns tuple of (content, language).
+        """
+        if file_path is not None and str(file_path).lower().endswith(
+            (".md", ".markdown")
+        ):
+            return text, "markdown"
+
+        if not text or not text.strip():
+            return "No Code Found", "unknown"  # Consistent 'unknown'
+
+        start_marker = text.find("```")
+        if start_marker == -1:
+            # No backticks, try guessing language from content
+            try:
+                language = guess_lexer(text).aliases[0]
+                # Return the whole text as the code block
+                return text.strip(), language
+            except Exception:  # pygments.util.ClassNotFound or others
+                rr("Could not guess language for code without backticks.")
+                return text.strip(), "unknown"  # Return unknown if guess fails
+
+        # Found opening backticks ```
+        language_line_end = text.find("\n", start_marker)
+        if language_line_end == -1:  # Handle case where ``` is at the very end
+            language_line_end = len(text)
+
+        language = text[start_marker + 3 : language_line_end].strip().lower()
+
+        code_start = language_line_end + 1
+        end_marker = text.find("```", code_start)
+
+        if end_marker == -1:
+            # No closing backticks found, assume rest of text is code
+            code_block = text[code_start:].strip()
+        else:
+            code_block = text[code_start:end_marker].strip()
+
+        # If language wasn't specified after ```, try guessing from the extracted block
+        if not language and code_block:
+            try:
+                language = guess_lexer(code_block).aliases[0]
+            except Exception:
+                rr(
+                    f"Could not guess language for extracted code block (File: {file_path})."
+                )
+                language = "unknown"  # Fallback if guess fails
+
+        # If language is still empty, default to 'unknown'
+        if not language:
+            language = "unknown"
+
+        return code_block if code_block else "No Code Found", language
 
     def format_output(self, data: dict) -> str:
         """
@@ -845,3 +827,37 @@ class WriteCodeTool(BaseAnthropicTool):
         #    output += f"\nSuccessful Files:\n" + "\n".join([f"- {f}" for f in successful_files])
 
         return output.strip()
+
+
+def html_format_code(code, extension):
+    """Format code with syntax highlighting for HTML display."""
+    try:
+        # Try to get a lexer based on the file extension
+        try:
+            lexer = get_lexer_by_name(extension.lower().lstrip("."))
+        except:
+            # If that fails, try to guess the lexer from the code content
+            lexer = guess_lexer(code)
+
+        # Use a nice style for the highlighting
+        formatter = HtmlFormatter(style="monokai", linenos=True, cssclass="source")
+
+        # Highlight the code
+        highlighted = highlight(code, lexer, formatter)
+
+        # Add some CSS for better display
+        css = formatter.get_style_defs(".source")
+        html = f"""
+            <style>
+            {css}
+            .source {{ background-color: #272822; padding: 10px; border-radius: 5px; }}
+            </style>
+            {highlighted}
+            """
+        return html
+    except Exception as e:
+
+        return f"<pre>{code}</pre>"
+    finally:
+        # Ensure any cleanup or finalization if needed
+        pass

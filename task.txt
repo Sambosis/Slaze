@@ -1,65 +1,47 @@
-# Expanded Description: Pong with Physics-Based Flippers and RL Training
+# Expanded Description: Battleship RL Models Training Visualization
 
-This project will create a modified version of the classic Pong game where the paddles behave like pinball flippers rather than the traditional rigid paddles. The flippers will be able to:
+In this project, we will develop a system to train two reinforcement learning models to play the game of Battleship against each other. The two models will use different RL methods: one will use Deep Q-Learning (DQL) and the other will use Advantage Actor-Critic (A2C). These distinct approaches will allow for an interesting comparison of performance.
 
-1. Move vertically along the edges of the screen (like traditional Pong)
-2. Rotate/swing toward the ball to hit it at different angles and speeds
-3. Influence the ball's trajectory and velocity based on the swing mechanics
+Each model will need to learn both ship placement strategy and attack strategy. Ships will be placed randomly at the beginning of each game to provide varied training scenarios. The standard Battleship rules will apply with a 10x10 grid and 5 ships of different lengths (Carrier: 5, Battleship: 4, Cruiser: 3, Submarine: 3, Destroyer: 2).
 
-Two reinforcement learning (RL) agents will train against each other in this environment, learning optimal strategies for both vertical positioning and swing timing. The game will use physics-based interactions for realistic ball and flipper mechanics.
+The game will be visualized using Pygame with the window split into two sections:
+1. The top section will display the actual game boards showing both models' ship placements and attack histories.
+2. The bottom section will display training metrics (loss, reward over time) and win/loss statistics comparing the two models.
 
-To visualize the training progress, every 5th game will be rendered to the screen using Pygame. No sound effects or documentation will be included.
+The training will proceed in batches of 100 games. While most games will run at maximum speed for efficient training, every 100th game will be displayed in real-time with animated moves so a user can observe the gameplay and strategy development. The animation will show each model's turns and hits/misses with appropriate visual feedback.
 
-Key design decisions:
-- We'll use the PPO (Proximal Policy Optimization) algorithm for the RL agents due to its stability and performance
-- The observation space will include ball position, ball velocity, flipper positions, and flipper angles
-- The action space will include vertical movement and flipper swing control
-- Rewards will be based on successful ball returns and scoring points
-- The physics engine will be simplified but will model basic momentum and collision effects
-- Training will happen in an accelerated mode when not rendering
+No human player interface, sound effects, or extensive documentation will be included, focusing instead on the RL training and visualization aspects.
 
-## File Tree
+# File Tree
 
-1. **main.py**
-   - Purpose: Entry point for the application, initializes the game, RL environment, and training loop
-   - Import: Not imported by other files (is the starting point)
+1. `main.py`
+   - Purpose: Entry point for the application, initializes and runs the main game loop
+   - Import: N/A (This is the root file)
 
-2. **game/pong_env.py**
-   - Purpose: Defines the PongEnv class that implements the game environment and RL interface
-   - Import: `from game.pong_env import PongEnv`
+2. `battleship_game.py`
+   - Purpose: Contains the core Battleship game logic, board representation, and rules
+   - Import: `from battleship_game import BattleshipGame, Ship, Board`
 
-3. **game/physics.py**
-   - Purpose: Contains physics utilities for ball movement, collision detection, and flipper mechanics
-   - Import: `from game.physics import PhysicsEngine, Collision`
+3. `pygame_renderer.py`
+   - Purpose: Handles all visualization using Pygame including game boards and metrics display
+   - Import: `from pygame_renderer import GameRenderer`
 
-4. **game/objects.py**
-   - Purpose: Defines game objects (Ball, Flipper) with their properties and behaviors
-   - Import: `from game.objects import Ball, Flipper`
+4. `rl_models/dql_agent.py`
+   - Purpose: Implements the Deep Q-Learning model for the first AI player
+   - Import: `from rl_models.dql_agent import DQLAgent`
 
-5. **game/renderer.py**
-   - Purpose: Handles visualization of the game state using Pygame
-   - Import: `from game.renderer import GameRenderer`
+5. `rl_models/a2c_agent.py`
+   - Purpose: Implements the Advantage Actor-Critic model for the second AI player
+   - Import: `from rl_models.a2c_agent import A2CAgent`
 
-6. **rl/agents.py**
-   - Purpose: Implements the RL agent class and training algorithms (PPO)
-   - Import: `from rl.agents import Agent, PPOAgent`
+6. `rl_models/base_agent.py`
+   - Purpose: Common base class and utilities for both RL agent implementations
+   - Import: `from rl_models.base_agent import RLAgent`
 
-7. **rl/models.py**
-   - Purpose: Neural network architectures for the RL policy and value functions
-   - Import: `from rl.models import PolicyNetwork, ValueNetwork`
+7. `utils.py`
+   - Purpose: Contains utility functions for data processing, metrics tracking, and visualization helpers
+   - Import: `from utils import track_metrics, calculate_statistics`
 
-8. **rl/memory.py**
-   - Purpose: Experience replay buffer and trajectory storage for training
-   - Import: `from rl.memory import ReplayBuffer, Trajectory`
-
-9. **rl/trainer.py**
-   - Purpose: Manages the training process, including episode collection and model updates
-   - Import: `from rl.trainer import RLTrainer`
-
-10. **utils/config.py**
-    - Purpose: Contains configuration parameters for the game, physics, and RL algorithms
-    - Import: `from utils.config import GameConfig, TrainingConfig`
-
-11. **utils/helpers.py**
-    - Purpose: Utility functions for data processing, logging, and other helper tasks
-    - Import: `from utils.helpers import preprocess_observation, calculate_rewards`Start testing as soon as possible. DO NOT start making fixes or improvements until you have tested to see if it is working as is.  Your project directory is /home/myuser/apps/pinpong. You need to make sure that all files you create and work you do is done in that directory.
+8. `training_manager.py`
+   - Purpose: Orchestrates the training process, batch execution, and metrics collection
+   - Import: `from training_manager import TrainingManager`Start testing as soon as possible. DO NOT start making fixes or improvements until you have tested to see if it is working as is.  Your project directory is /home/myuser/apps/battleshiprl. You need to make sure that all files you create and work you do is done in that directory.
