@@ -1,18 +1,19 @@
-
 """Utility to run shell commands asynchronously with a timeout."""
 
 import asyncio
 import re
 import shlex
-from typing import List, Tuple
-import subprocess
+
 # from config import *
 TRUNCATED_MESSAGE: str = "<response clipped><NOTE>To save on context only part of this file has been shown to you. You should retry this tool after you have searched inside the file the line numbers of what you are looking for. Remember to use you are working in Windows.</NOTE>"
 MAX_RESPONSE_LEN: int = 16000
 
+
 class CommandError(Exception):
     """Custom exception for command translation errors."""
+
     pass
+
 
 def convert_bash_to_powershell(bash_command: str) -> str:
     """
@@ -28,61 +29,61 @@ def convert_bash_to_powershell(bash_command: str) -> str:
         ValueError: If the command or flags are unsupported.
     """
     command_map = {
-        'ls': 'Get-ChildItem',
-        'pwd': 'Get-Location',
-        'cd': 'Set-Location',
-        'cp': 'Copy-Item',
-        'mv': 'Move-Item',
-        'rm': 'Remove-Item',
-        'cat': 'Get-Content',
-        'echo': 'Write-Output',
-        'mkdir': 'New-Item -ItemType Directory',
-        'touch': 'New-Item -ItemType File -Force',
-        'grep': 'Select-String',
-        'find': 'Get-ChildItem',
+        "ls": "Get-ChildItem",
+        "pwd": "Get-Location",
+        "cd": "Set-Location",
+        "cp": "Copy-Item",
+        "mv": "Move-Item",
+        "rm": "Remove-Item",
+        "cat": "Get-Content",
+        "echo": "Write-Output",
+        "mkdir": "New-Item -ItemType Directory",
+        "touch": "New-Item -ItemType File -Force",
+        "grep": "Select-String",
+        "find": "Get-ChildItem",
     }
 
     flag_map = {
-        'ls': {
-            '-l': '',
-            '-a': '-Force',
-            '-la': '-Force',
-            '-al': '-Force',
-            '-R': '-Recurse',
-            '-r': '-Recurse',
+        "ls": {
+            "-l": "",
+            "-a": "-Force",
+            "-la": "-Force",
+            "-al": "-Force",
+            "-R": "-Recurse",
+            "-r": "-Recurse",
         },
-        'rm': {
-            '-r': '-Recurse',
-            '-f': '-Force',
-            '-rf': '-Recurse -Force',
-            '-fr': '-Recurse -Force',
+        "rm": {
+            "-r": "-Recurse",
+            "-f": "-Force",
+            "-rf": "-Recurse -Force",
+            "-fr": "-Recurse -Force",
         },
-        'cp': {
-            '-r': '-Recurse',
-            '-R': '-Recurse',
-            '-f': '-Force',
+        "cp": {
+            "-r": "-Recurse",
+            "-R": "-Recurse",
+            "-f": "-Force",
         },
-        'grep': {
-            '-i': '-CaseSensitive:$false',
-            '-v': '-NotMatch',
-            '-r': '-Recurse',
-            '-n': '',
+        "grep": {
+            "-i": "-CaseSensitive:$false",
+            "-v": "-NotMatch",
+            "-r": "-Recurse",
+            "-n": "",
         },
-        'find': {
-            '-name': '-Filter',
-            '-iname': '-Filter',
-            '-type': '',
+        "find": {
+            "-name": "-Filter",
+            "-iname": "-Filter",
+            "-type": "",
         },
     }
 
     def translate_path(path: str) -> str:
         """Translate Unix-style paths to Windows-style paths."""
-        PROJECT_DIR = get_constant('PROJECT_DIR')
-        if path.startswith('~'):
-            path = path.replace('~', '$env:USERPROFILE')
-        path = re.sub(r'\$(?!env:)(\w+)', r'$env:\1', path)  # Avoid double $env:
-        path = path.replace('/', '\\')
-        if re.match(r'^\\', path):
+        PROJECT_DIR = get_constant("PROJECT_DIR")
+        if path.startswith("~"):
+            path = path.replace("~", "$env:USERPROFILE")
+        path = re.sub(r"\$(?!env:)(\w+)", r"$env:\1", path)  # Avoid double $env:
+        path = path.replace("/", "\\")
+        if re.match(r"^\\", path):
             path = PROJECT_DIR / path
         return f"'{path}'"
 
@@ -106,7 +107,7 @@ def convert_bash_to_powershell(bash_command: str) -> str:
     ps_command = command_map[command]
     ps_args = []
 
-    if command == 'grep':
+    if command == "grep":
         # Handle grep specifically
         flags = []
         search_term = None
@@ -115,11 +116,13 @@ def convert_bash_to_powershell(bash_command: str) -> str:
         i = 0
         while i < len(args):
             arg = args[i]
-            if arg.startswith('-'):
+            if arg.startswith("-"):
                 if arg in flag_map[command]:
                     flags.append(flag_map[command][arg])
                 else:
-                    raise ValueError(f"Unsupported flag '{arg}' for command '{command}'.")
+                    raise ValueError(
+                        f"Unsupported flag '{arg}' for command '{command}'."
+                    )
             elif search_term is None:
                 search_term = arg
             elif file_path is None:
@@ -137,7 +140,7 @@ def convert_bash_to_powershell(bash_command: str) -> str:
         ps_args.append(f"-Path {file_path}")
         ps_args.extend(flags)
 
-    elif command == 'find':
+    elif command == "find":
         # Handle find specifically
         base_path = None
         flags = []
@@ -145,20 +148,22 @@ def convert_bash_to_powershell(bash_command: str) -> str:
         i = 0
         while i < len(args):
             arg = args[i]
-            if arg.startswith('-'):
-                if arg == '-type':
+            if arg.startswith("-"):
+                if arg == "-type":
                     i += 1
                     if i < len(args):
                         type_arg = args[i]
-                        if type_arg == 'f':
-                            flags.append('| Where-Object { -not $_.PSIsContainer }')
-                        elif type_arg == 'd':
-                            flags.append('| Where-Object { $_.PSIsContainer }')
+                        if type_arg == "f":
+                            flags.append("| Where-Object { -not $_.PSIsContainer }")
+                        elif type_arg == "d":
+                            flags.append("| Where-Object { $_.PSIsContainer }")
                         else:
-                            raise ValueError(f"Unsupported type '{type_arg}' for '-type'.")
+                            raise ValueError(
+                                f"Unsupported type '{type_arg}' for '-type'."
+                            )
                     else:
                         raise ValueError("Expected type after '-type'.")
-                elif arg in ['-name', '-iname']:
+                elif arg in ["-name", "-iname"]:
                     i += 1
                     if i < len(args):
                         name_arg = args[i]
@@ -168,7 +173,9 @@ def convert_bash_to_powershell(bash_command: str) -> str:
                 elif arg in flag_map[command]:
                     flags.append(flag_map[command][arg])
                 else:
-                    raise ValueError(f"Unsupported flag '{arg}' for command '{command}'.")
+                    raise ValueError(
+                        f"Unsupported flag '{arg}' for command '{command}'."
+                    )
             elif base_path is None:
                 base_path = translate_path(arg)
             else:
@@ -181,19 +188,21 @@ def convert_bash_to_powershell(bash_command: str) -> str:
         ps_args.append(f"-Path {base_path}")
         ps_args.extend(flags)
 
-    elif command == 'echo':
-        ps_args.append(f"'{ ' '.join(args) }'")
+    elif command == "echo":
+        ps_args.append(f"'{' '.join(args)}'")
 
-    elif command == 'rm':
-        ps_args.append('-ErrorAction SilentlyContinue')
+    elif command == "rm":
+        ps_args.append("-ErrorAction SilentlyContinue")
         i = 0
         while i < len(args):
             arg = args[i]
-            if arg.startswith('-'):
+            if arg.startswith("-"):
                 if command in flag_map and arg in flag_map[command]:
                     ps_args.append(flag_map[command][arg])
                 else:
-                    raise ValueError(f"Unsupported flag '{arg}' for command '{command}'.")
+                    raise ValueError(
+                        f"Unsupported flag '{arg}' for command '{command}'."
+                    )
             else:
                 ps_args.append(translate_path(arg))
             i += 1
@@ -202,16 +211,19 @@ def convert_bash_to_powershell(bash_command: str) -> str:
         i = 0
         while i < len(args):
             arg = args[i]
-            if arg.startswith('-'):
+            if arg.startswith("-"):
                 if command in flag_map and arg in flag_map[command]:
                     ps_args.append(flag_map[command][arg])
                 else:
-                    raise ValueError(f"Unsupported flag '{arg}' for command '{command}'.")
+                    raise ValueError(
+                        f"Unsupported flag '{arg}' for command '{command}'."
+                    )
             else:
                 ps_args.append(translate_path(arg))
             i += 1
 
     return f"{ps_command} {' '.join(ps_args)}"
+
 
 def maybe_truncate(content: str, truncate_after: int | None = MAX_RESPONSE_LEN):
     """Truncate content and append a notice if content exceeds the specified length."""
@@ -220,6 +232,7 @@ def maybe_truncate(content: str, truncate_after: int | None = MAX_RESPONSE_LEN):
         if not truncate_after or len(content) <= truncate_after
         else content[:truncate_after] + TRUNCATED_MESSAGE
     )
+
 
 async def run(
     cmd: str,

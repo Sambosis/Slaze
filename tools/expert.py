@@ -1,10 +1,12 @@
-#expert.py
+# expert.py
 from openai import OpenAI
+
 # load the API key from the environment
 from dotenv import load_dotenv
 from icecream import ic
 from typing import Optional, Literal
 from .base import ToolError, ToolResult, BaseAnthropicTool, ToolFailure
+
 load_dotenv()
 from rich import print as rr
 
@@ -18,8 +20,6 @@ class GetExpertOpinionTool(BaseAnthropicTool):
     api_type: Literal["custom"] = "custom"
     description: str = "A tool takes a detailed description of the problem and everything that has been tried so far, and returns an expert opinion on the problem."
 
-
-
     def to_params(self) -> dict:
         return {
             "name": self.name,
@@ -31,18 +31,18 @@ class GetExpertOpinionTool(BaseAnthropicTool):
                     "command": {
                         "type": "string",
                         "enum": ["get_opinion"],
-                        "description": "The command to get an expert opinion."
+                        "description": "The command to get an expert opinion.",
                     },
                     "problem_description": {
                         "type": "string",
-                        "description": "A detailed description of the problem and everything that has been tried so far. If for programming, include the code that has been tried."
-                    }
+                        "description": "A detailed description of the problem and everything that has been tried so far. If for programming, include the code that has been tried.",
+                    },
                 },
-                "required": ["command", "problem_description"]
-            }
+                "required": ["command", "problem_description"],
+            },
         }
-        
-    async def __call__(     
+
+    async def __call__(
         self,
         *,
         command: Literal["get_opinion"],
@@ -52,15 +52,12 @@ class GetExpertOpinionTool(BaseAnthropicTool):
         """
         Executes the specified command.
         """
-       
+
         if command == "get_opinion":
-            
             return await self.get_opinion(problem_description=problem_description)
         if command == "get_plan":
-            
             return await self.get_plan(problem_description=problem_description)
         else:
-            
             raise ToolError(
                 f"Unrecognized command '{command}'. Allowed commands: 'list_reports', 'run_report'."
             )
@@ -137,7 +134,6 @@ Begin your detailed task breakdown below:
         Lists all available reports.
         """
         try:
-            
             client = OpenAI()
             ic(client)
             prompt = f"""
@@ -169,13 +165,10 @@ Begin your detailed task breakdown below:
                     {
                         "role": "user",
                         "content": [
-                            {
-                                "type": "text",
-                                "text": prompt
-                            },
+                            {"type": "text", "text": prompt},
                         ],
                     }
-                ]
+                ],
             )
             ic(response)
             ex_opinion = response.choices[0].message.content
@@ -184,10 +177,3 @@ Begin your detailed task breakdown below:
             ic(e)
             rr(f"{str(e).encode('ascii', errors='replace').decode('ascii')}")
             return ToolFailure(error="Failed to generate opinion.")
-
-
-
-
-
-
-

@@ -1,5 +1,6 @@
 # TokenTracker moved from main.py to avoid circular import
 
+
 class TokenTracker:
     def __init__(self, display):
         self.total_cache_creation = 0
@@ -23,7 +24,7 @@ class TokenTracker:
         self.total_output += self.recent_output
 
     def display(self, displayA):
-        recent_usage = [
+        [
             "Recent Token Usage 📊",
             f"Recent Cache Creation: {self.recent_cache_creation:,}",
             f"Recent Cache Retrieval: {self.recent_cache_retrieval:,}",
@@ -32,10 +33,10 @@ class TokenTracker:
             f"Recent Total: {self.recent_cache_creation + self.recent_cache_retrieval + self.recent_input + self.recent_output:,}",
         ]
         total_cost = (
-            self.total_cache_creation * 3.75 +
-            self.total_cache_retrieval * 0.30 +
-            self.total_input * 3 +
-            self.total_output * 15
+            self.total_cache_creation * 3.75
+            + self.total_cache_retrieval * 0.30
+            + self.total_input * 3
+            + self.total_output * 15
         ) / 1_000_000
         total_usage = [
             "Total Token Usage 📈",

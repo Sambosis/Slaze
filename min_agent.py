@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 import asyncio
-import os
-from pathlib import Path
-from tools.envsetup import ProjectSetupTool, ProjectCommand
+from tools.envsetup import ProjectSetupTool
 from tools.write_code import WriteCodeTool
 from tools import ToolResult
 from rich import print as rr
@@ -115,9 +113,8 @@ async def run_python_app(project_path: str, entry_filename: str) -> ToolResult:
     }
     return await tool(**tool_input)
 
-
-# -----------------------------------------------------------------------------
-# Main Functi\sult)
+    # -----------------------------------------------------------------------------
+    # Main Functi\sult)
 
     # Example 2: Write a single code file using the write_code tool
     single_file_description = (
@@ -137,7 +134,6 @@ async def run_python_app(project_path: str, entry_filename: str) -> ToolResult:
             "file_path": "src/config.py",
             "code_description": "Define game configuration constants such as screen dimensions, colors, and basic game rules.",
         },
-
         {
             "file_path": "src/utils/logger.py",
             "code_description": "Create a logging utility that supports multiple log levels (debug, info, warning, error) and outputs logs to both a file and the console.",
@@ -152,7 +148,7 @@ async def run_python_app(project_path: str, entry_filename: str) -> ToolResult:
     # Example 4: Run the main Python application using the run_app command
     run_result = await run_python_app(
         project_path="/home/myuser/apps/nogame",
-        entry_filename="src/greeter.py",  
+        entry_filename="src/greeter.py",
     )
     rr(run_result)
 

@@ -6,11 +6,12 @@ from typing import Any, Optional, Dict
 from utils.agent_display_web_with_prompt import AgentDisplayWebWithPrompt
 from icecream import ic
 
+
 @dataclass(kw_only=True, frozen=True)
 class ToolResult:
     """
     Result from executing a tool.
-    
+
     Attributes:
         output: The output of the tool execution
         error: Optional error message if the tool execution failed
@@ -20,6 +21,7 @@ class ToolResult:
         tool_name: Name of the tool that was executed
         command: Command that was executed
     """
+
     output: Optional[str] = None
     error: Optional[str] = None
     base64_image: Optional[str] = None
@@ -27,13 +29,15 @@ class ToolResult:
     message: Optional[str] = None
     tool_name: Optional[str] = None
     command: Optional[str] = None
-    
+
     def __bool__(self):
         """Returns True if the tool execution was successful."""
         return any(getattr(self, field.name) for field in fields(self))
 
     def __add__(self, other: "ToolResult"):
-        def combine_fields(field: str | None, other_field: str | None, concatenate: bool = True):
+        def combine_fields(
+            field: str | None, other_field: str | None, concatenate: bool = True
+        ):
             if field and other_field:
                 if concatenate:
                     return field + other_field
@@ -50,31 +54,37 @@ class ToolResult:
         )
 
     def replace(self, **kwargs):
-        """Returns a new ToolResult with the given fields replaced.""" 
+        """Returns a new ToolResult with the given fields replaced."""
         return replace(self, **kwargs)
+
 
 class ToolError(Exception):
     """Exception raised when a tool fails to execute."""
-    
+
     def __init__(self, message: str):
         self.message = message
         super().__init__(message)
-        
+
     def __str__(self):
         return self.message
 
+
 class BaseAnthropicTool(metaclass=ABCMeta):
     """Base class for all tools."""
-    
+
     name: str = "base_tool"
     api_type: str = "custom"
     description: str = "Base tool implementation"
 
-    def __init__(self, input_schema: Optional[Dict[str, Any]] = None, display: Optional[AgentDisplayWebWithPrompt] = None):
+    def __init__(
+        self,
+        input_schema: Optional[Dict[str, Any]] = None,
+        display: Optional[AgentDisplayWebWithPrompt] = None,
+    ):
         self.input_schema = input_schema or {
             "type": "object",
             "properties": {},
-            "required": []
+            "required": [],
         }
         self.display = display
 
@@ -107,16 +117,20 @@ class BaseAnthropicTool(metaclass=ABCMeta):
             "function": {
                 "name": self.name,
                 "description": self.description,
-                "parameters": self.input_schema
-            }
+                "parameters": self.input_schema,
+            },
         }
         ic(f"BaseAnthropicTool params for {self.name}: {params}")
         return params
 
+
 class CLIResult(ToolResult):
     """A ToolResult that can be rendered as a CLI output."""
+
     pass
+
 
 class ToolFailure(ToolResult):
     """A ToolResult that represents a failure."""
+
     pass

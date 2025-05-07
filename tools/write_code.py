@@ -1,93 +1,131 @@
 import asyncio
-from enum import Enum
-from typing import Literal, Optional, List, Dict, Any
-from pathlib import Path
-from .base import ToolResult, BaseAnthropicTool
 import os
-from icecream import ic
-from rich import print as rr
-import json
-from pydantic import BaseModel
-from load_constants import (
-    write_to_file,
-    ICECREAM_OUTPUT_FILE,
-)  # Assuming ICECREAM_OUTPUT_FILE is used elsewhere
-from tenacity import retry, stop_after_attempt, wait_fixed
-from config import *  # Ensure PROJECT_DIR and REPO_DIR are available via this import
-from openai import AsyncOpenAI
-from utils.file_logger import *  # Ensure convert_to_docker_path, log_file_operation are here
-from utils.context_helpers import *  # Ensure get_language_from_extension is here
 import time
+from enum import Enum
+from pathlib import Path
+from typing import Any, Literal, Optional, List, Dict
+
+from openai import (
+    APIConnectionError, APIError, APIStatusError, AsyncOpenAI, 
+    InternalServerError, RateLimitError
+)
+from pydantic import BaseModel
+from rich import print as rr
+from tenacity import (
+    RetryCallState,
+    retry,
+    retry_if_exception,
+    stop_after_attempt,
+    wait_exponential,
+)
+
+from tools.base import BaseAnthropicTool, ToolResult
+from config import REPO_DIR, get_constant
+from icecream import ic  # type: ignore
+from pygments import highlight  # type: ignore
+from pygments.formatters import HtmlFormatter  # type: ignore
+from pygments.lexers import get_lexer_by_name, guess_lexer  # type: ignore
+from utils.file_logger import convert_to_docker_path, log_file_operation, get_language_from_extension
 from system_prompt.code_prompts import (
     code_prompt_generate,
     code_skeleton_prompt,
 )
-import logging
 from utils.docker_service import (
     DockerService,
-    DockerResult,
-    DockerServiceError,
-)  # Assuming DockerService might be used elsewhere
+)
 from pygments import highlight
-from pygments.lexers import PythonLexer
 from pygments.formatters import HtmlFormatter
-from pygments.styles import get_style_by_name
-from dotenv import load_dotenv
 import ftfy
 from pygments.lexers import get_lexer_by_name, guess_lexer
-from loguru import logger as ll
 import traceback
-from rich import print as rr
 from lmnr import observe
-googlepro = "google/gemini-2.5-pro-preview-03-25"
+
+googlepro = "google/gemini-2.5-pro-preview"
 oa4omini = "openai/o4-mini-high"
 gflash = "google/gemini-2.5-flash-preview"
-MODEL_STRING = gflash  # Default model string, can be overridden in config
+MODEL_STRING = googlepro  # Default model string, can be overridden in config
+
+
+# --- Retry Predicate Function ---
+def should_retry_llm_call(retry_state: RetryCallState) -> bool:
+    """
+    Determines if a retry should occur based on the raised exception.
+    Accesses the exception from retry_state.outcome.exception().
+    """
+    if not retry_state.outcome: # Should not happen if called after an attempt
+        return False
+
+    exception = retry_state.outcome.exception()
+    if not exception: # No exception, successful outcome
+        return False
+
+    # Always retry on our custom LLMResponseError
+    if isinstance(exception, LLMResponseError):
+        rr(f"[bold yellow]Retry triggered by LLMResponseError: {str(exception)[:200]}[/bold yellow]")
+        return True
+
+    # Retry on specific, transient OpenAI/network errors
+    if isinstance(exception, (
+        APIConnectionError,  # Network issues
+        RateLimitError,     # Rate limits hit
+        InternalServerError # Server-side errors from OpenAI (500 class)
+    )):
+        rr(f"[bold yellow]Retry triggered by OpenAI API Error ({type(exception).__name__}): {str(exception)[:200]}[/bold yellow]")
+        return True
+
+    if isinstance(exception, APIStatusError):
+        # Retry on general server errors (5xx) and specific client errors like Gateway Timeout (504)
+        # or Request Timeout (408). 429 should ideally be RateLimitError.
+        if exception.status_code >= 500 or exception.status_code in [408, 429, 502, 503, 504]:
+            rr(f"[bold yellow]Retry triggered by OpenAI APIStatusError (status {exception.status_code}): {str(exception)[:200]}[/bold yellow]")
+            return True
+
+    # For any other Exception, you might want to log it but not retry,
+    # or add it here if known to be transient.
+    # rr(f"[bold red]Non-retryable exception encountered: {type(exception).__name__}: {exception}[/bold red]")
+    return False
+
+
+# --- LLMResponseError (already provided by you) ---
+class LLMResponseError(Exception):
+    """Custom exception for invalid or unusable responses from the LLM."""
+
+    pass
 
 
 class CodeCommand(str, Enum):
-    """
-    An enumeration of possible commands for the WriteCodeTool.
-    """
-
     WRITE_CODEBASE = "write_codebase"
 
 class FileDetail(BaseModel):
-    """Model for specifying file details for code generation."""
-
     filename: str
     code_description: str
     external_imports: Optional[List[str]] = None
     internal_imports: Optional[List[str]] = None
 
 class WriteCodeTool(BaseAnthropicTool):
-    """
-    A tool that takes a description of a codebase, including files, external and internal imports,
-    generates code skeletons, and then generates the full code for each file asynchronously,
-    writing them to the correct host path.
-    """
-
     name: Literal["write_codebase_tool"] = "write_codebase_tool"
     api_type: Literal["custom"] = "custom"
     description: str = (
-        "Generates a codebase consisting of multiple files based on descriptions, skeletons, and import lists. Creates skeletons first, then generates full code asynchronously, writing to the host filesystem."
-    )
+        "Generates a codebase consisting of multiple files based on descriptions, skeletons, and import lists. "
+        "Creates skeletons first, then generates full code asynchronously, writing to the host filesystem."
+        )
 
     def __init__(self, display=None):
-        super().__init__(input_schema=None, display=display)
+        super().__init__(input_schema=None, display=display) # Assuming BaseAnthropicTool takes these
         self.display = display
-        # DockerService might be needed for other potential features, keep initialization
         try:
             self.docker = DockerService()
             self._docker_available = self.docker.is_available()
+
         except Exception as docker_init_err:
-            # rr(f"Failed to initialize DockerService: {docker_init_err}")
+            rr(f"[bold red]Failed to initialize DockerService: {docker_init_err}[/bold red]")
             self.docker = None
             self._docker_available = False
         ic("Initializing WriteCodeTool")
         ic(f"Docker available: {self._docker_available}")
 
     def to_params(self) -> dict:
+        # ... (your existing to_params method - no changes needed here from provided snippet)
         ic(f"WriteCodeTool.to_params called with api_type: {self.api_type}")
         params = {
             "name": self.name,
@@ -142,6 +180,39 @@ class WriteCodeTool(BaseAnthropicTool):
         ic(f"WriteCodeTool params: {params}")
         return params
 
+    # --- Logging Callback for Retries ---
+    def _log_llm_retry_attempt(self, retry_state: RetryCallState):
+        """Logs information about the current retry attempt."""
+        fn_name = retry_state.fn.__name__ if retry_state.fn else "LLM_call"
+
+        file_path_for_log = "unknown_file"
+        # Try to get file_path or target_file_path from kwargs for contextual logging
+        if retry_state.kwargs:
+            fp_arg = retry_state.kwargs.get('file_path') or retry_state.kwargs.get('target_file_path')
+            if isinstance(fp_arg, Path):
+                file_path_for_log = fp_arg.name
+
+        log_prefix = f"[bold magenta]Retry Log ({file_path_for_log})[/bold magenta] | "
+
+        if retry_state.outcome and retry_state.outcome.failed:
+            exc = retry_state.outcome.exception()
+            max_attempts_str = "N/A"
+            stop_condition = retry_state.retry_object.stop
+            if hasattr(stop_condition, 'max_attempt_number'):
+                max_attempts_str = str(stop_condition.max_attempt_number)
+
+            log_msg = (
+                f"{log_prefix}Retrying [u]{fn_name}[/u] due to [bold red]{type(exc).__name__}[/bold red]: {str(exc)[:150]}. "
+                f"Attempt [bold cyan]{retry_state.attempt_number}[/bold cyan] of {max_attempts_str}. "
+                f"Waiting [bold green]{retry_state.next_action.sleep:.2f}s[/bold green]..."
+            )
+        else:
+            log_msg = (
+                 f"{log_prefix}Retrying [u]{fn_name}[/u] (no direct exception, or outcome not yet available). "
+                 f"Attempt [bold cyan]{retry_state.attempt_number}[/bold cyan]. Waiting [bold green]{retry_state.next_action.sleep:.2f}s[/bold green]..."
+            )
+        rr(log_msg)
+
     async def __call__(
         self,
         *,
@@ -149,7 +220,7 @@ class WriteCodeTool(BaseAnthropicTool):
         files: List[Dict[str, Any]],
         project_path: str,  # This might be a docker-style path or just a project name
         **kwargs,
-        ) -> ToolResult:
+    ) -> ToolResult:
         """
         Execute the write_codebase command.
 
@@ -234,11 +305,12 @@ class WriteCodeTool(BaseAnthropicTool):
             # CHANGE: Update the call to pass file_detail and all file_details
             skeleton_tasks = [
                 self._call_llm_for_code_skeleton(
-                    file, # Pass the FileDetail object for the current file
-                    host_project_path_obj / file.filename, # Pass the intended final host path
-                    file_details # Pass the list of ALL FileDetail objects
+                    file,  # Pass the FileDetail object for the current file
+                    host_project_path_obj
+                    / file.filename,  # Pass the intended final host path
+                    file_details,  # Pass the list of ALL FileDetail objects
                 )
-                for file in file_details # Iterate through the validated FileDetail objects
+                for file in file_details  # Iterate through the validated FileDetail objects
             ]
             skeleton_results = await asyncio.gather(
                 *skeleton_tasks, return_exceptions=True
@@ -247,7 +319,7 @@ class WriteCodeTool(BaseAnthropicTool):
             skeletons: Dict[str, str] = {}
             errors_skeleton = []
             for i, result in enumerate(skeleton_results):
-                filename_key = file_details[i].filename # Use the relative filename
+                filename_key = file_details[i].filename  # Use the relative filename
                 if isinstance(result, Exception):
                     error_msg = (
                         f"Error generating skeleton for {filename_key}: {result}"
@@ -301,9 +373,7 @@ class WriteCodeTool(BaseAnthropicTool):
                 absolute_path = (
                     host_project_path_obj / filename
                 ).resolve()  # Ensure absolute path
-                rr(
-                    f"Processing result for: {filename} (Host Path: {absolute_path})"
-                )
+                rr(f"Processing result for: {filename} (Host Path: {absolute_path})")
 
                 if isinstance(result, Exception):
                     error_msg = f"Error generating code for {filename}: {result}"
@@ -365,9 +435,7 @@ class WriteCodeTool(BaseAnthropicTool):
                         absolute_path.write_text(
                             fixed_code, encoding="utf-8", errors="replace"
                         )
-                        rr(
-                            f"Successfully executed write_text for: {absolute_path}"
-                        )
+                        rr(f"Successfully executed write_text for: {absolute_path}")
 
                         # File existence and size check
                         if absolute_path.exists():
@@ -379,7 +447,7 @@ class WriteCodeTool(BaseAnthropicTool):
                                 rr(f"CONFIRMED: File size is {size} bytes.")
                                 if size == 0 and len(fixed_code) > 0:
                                     rr(
-                                        f"File size is 0 despite non-empty content being written!"
+                                        "File size is 0 despite non-empty content being written!"
                                     )
                             except Exception as stat_err:
                                 rr(
@@ -510,9 +578,67 @@ class WriteCodeTool(BaseAnthropicTool):
             print(error_message)
             return ToolResult(error=error_message, tool_name=self.name, command=command)
 
-    
-    @observe()
-    @retry(stop=stop_after_attempt(3), wait=wait_fixed(8))
+    # --- Helper for logging final output ---
+    def _log_generated_output(self, content: str, file_path: Path, output_type: str):
+        """Helper to log the final generated content (code or skeleton) to CODE_FILE."""
+        try:
+            code_log_file_path_str = get_constant("CODE_FILE") 
+            if code_log_file_path_str:
+                CODE_FILE = Path(code_log_file_path_str)
+                CODE_FILE.parent.mkdir(parents=True, exist_ok=True)
+                with open(CODE_FILE, "a", encoding="utf-8") as f:
+                    f.write(f"\n--- Generated {output_type} for: {str(file_path)} ({time.strftime('%Y-%m-%d %H:%M:%S')}) ---\n")
+                    f.write(f"{content}\n")
+                    f.write(f"--- End {output_type} for: {str(file_path)} ---\n")
+        except Exception as file_error:
+            rr(f"[bold red]Failed to log generated {output_type} for {file_path.name} to {get_constant('CODE_FILE')}: {file_error}[/bold red]")
+
+    def format_output(self, data: dict) -> str:
+        """
+        Format the output of the tool for display.
+
+        Args:
+            data: The data returned by the tool
+
+        Returns:
+            A formatted string for display
+        """
+        if "error" in data:
+            return f"Error: {data['error']}"
+
+        if "output" in data:
+            return data["output"]
+
+        # Handle different commands
+        command = data.get("command", "")
+
+        if command == "write_code_to_file":
+            if data.get("status") == "success":
+                return f"Successfully wrote code to {data.get('file_path', 'unknown file')}"
+            else:
+                return f"Failed to write code: {data.get('error', 'Unknown error')}"
+
+        elif command == "write_code_multiple_files":
+            if data.get("status") in ["success", "partial_success"]:
+                return f"Wrote {data.get('files_processed', 0)} files to {data.get('project_path', 'unknown path')}\n{data.get('files_results', '')}"
+            else:
+                return f"Failed to write files: {data.get('errors', 'Unknown error')}"
+
+        elif command == "get_all_current_skeleton":
+            from utils.file_logger import get_all_current_skeleton
+
+            return get_all_current_skeleton()
+
+        elif command == "get_revised_version":
+            if data.get("status") == "success":
+                return f"Successfully revised {data.get('file_path', 'unknown file')}"
+            else:
+                return f"Failed to revise file: {data.get('error', 'Unknown error')}"
+
+        # Default case
+        return str(data)
+
+    # --- Refactored Code Generation Method ---
     async def _call_llm_to_generate_code(
         self,
         code_description: str,
@@ -520,230 +646,249 @@ class WriteCodeTool(BaseAnthropicTool):
         external_imports: List[str],
         internal_imports: List[str],
         file_path: Path,
-        ) -> str:  # file_path is the intended final host path
-        """Call LLM to generate code based on the code description, skeletons, and specific imports for this file."""
-
+    ) -> str:
         if self.display is not None:
-            self.display.add_message(
-                "assistant", f"Generating code for: {file_path.name}"
-                )  # Display relative name
+            self.display.add_message("assistant", f"Generating code for: {file_path.name}")
 
-        code_string = f"# Error: Code generation failed for {file_path.name}"
-
-        # Create context from skeletons, using relative filenames
         skeleton_context = "\n\n---\n\n".join(
-            f"### Skeleton for {fname}:\n```\n{skel}\n```"
-            for fname, skel in all_skeletons.items()  # fname is already relative key
-            )
-
+            f"### Skeleton for {fname}:\n```\n{skel}\n```" for fname, skel in all_skeletons.items()
+        )
         agent_task = get_constant("TASK") or "No overall task description provided."
-        # Get task from task.txt if available
         if os.path.exists("task.txt"):
             with open("task.txt", "r") as task_file:
-                task_description = task_file.read().strip()
-            agent_task = task_description or agent_task
-        messages = code_prompt_generate(
-            current_code_base="",  # Consider if current codebase context is needed differently now
-            code_description=code_description,
-            research_string="",  # Research step removed in this version
-            agent_task=agent_task,
-            skeletons=skeleton_context,
-            external_imports=external_imports,
-            internal_imports=internal_imports,
-            target_file=str(file_path.name),  # Pass relative filename to prompt
-            )
+                task_desc_from_file = task_file.read().strip()
+            agent_task = task_desc_from_file or agent_task
 
-        ic(
-            f"Messages for Code Generation ({file_path.name}):\n +++++ \n{messages}\n +++++"
-            )
+        prepared_messages = code_prompt_generate(
+            current_code_base="", code_description=code_description, research_string="",
+            agent_task=agent_task, skeletons=skeleton_context,
+            external_imports=external_imports, internal_imports=internal_imports,
+            target_file=str(file_path.name),
+        )
+
+        model_to_use = get_constant("CODE_GEN_MODEL") or MODEL_STRING
+        final_code_string = f"# Error: Code generation failed for {file_path.name} after all retries."
 
         try:
-            OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-            if not OPENROUTER_API_KEY:
-                raise ValueError("OPENROUTER_API_KEY environment variable not set.")
-
-            client = AsyncOpenAI(
-                base_url="https://openrouter.ai/api/v1",
-                api_key=OPENROUTER_API_KEY,
-                )
-            # Consider making model configurable
-            model = get_constant("CODE_GEN_MODEL") or MODEL_STRING
-            rr(f"Using model {model} for code generation.")
-
-            completion = await client.chat.completions.create(
-                model=model,
-                messages=messages,
-                # Consider adding temperature, max_tokens etc. if needed
+            final_code_string = await self._llm_generate_code_core_with_retry(
+                prepared_messages=prepared_messages, file_path=file_path, model_to_use=model_to_use
             )
-
-            if (
-                completion
-                and completion.choices
-                and completion.choices[0].message
-                and completion.choices[0].message.content
-            ):
-                raw_code_string = completion.choices[0].message.content
-                # Pass the host file_path to extract_code_block for context (e.g., .md handling)
-                code_string, detected_language = self.extract_code_block(
-                    raw_code_string, file_path
-                )
-                rr(
-                    f"Extracted code block for {file_path.name}. Detected language: {detected_language}"
-                )
-                if code_string == "No Code Found":
-                    # If extraction fails but content exists, use the raw response
-                    if raw_code_string.strip():
-                        code_string = raw_code_string
-                        rr(
-                            f"Could not extract code block for {file_path.name}, using raw response."
-                        )
-                    else:
-                        rr(
-                            f"LLM response for {file_path.name} was effectively empty."
-                        )
-                        code_string = f"# Failed to generate code for {file_path.name}\n# LLM response was empty."
-
-            else:
-                ic(f"No valid completion received for {file_path.name}")
-                rr(
-                    f"Invalid or empty completion received from LLM for {file_path.name}"
-                )
-                code_string = f"# Failed to generate code for {file_path.name}\n# LLM response was empty or invalid."
-
+        except LLMResponseError as e:
+            ic(f"LLMResponseError for {file_path.name} after all retries: {e}")
+            rr(f"[bold red]LLM generated invalid content for {file_path.name} after retries: {e}[/bold red]")
+            final_code_string = f"# Error generating code for {file_path.name}: LLMResponseError - {str(e)}"
+        except APIError as e: # Catch specific OpenAI errors
+            ic(f"OpenAI APIError for {file_path.name} after all retries: {type(e).__name__} - {e}")
+            rr(f"[bold red]LLM call failed due to APIError for {file_path.name} after retries: {e}[/bold red]")
+            final_code_string = f"# Error generating code for {file_path.name}: API Error - {str(e)}"
         except Exception as e:
-            ic(f"Error in _call_llm_to_generate_code for {file_path.name}: {e}")
-            rr(f"LLM call failed for {file_path.name}")
-            code_string = f"# Error generating code for {file_path.name}: {str(e)}"
+            ic(f"Unexpected error during code generation for {file_path.name} after retries: {type(e).__name__} - {e}")
+            rr(f"[bold red]LLM call ultimately failed for {file_path.name} due to unexpected error: {e}[/bold red]")
+            final_code_string = f"# Error generating code for {file_path.name} (final): {str(e)}"
 
-        # Log the generated code (or error message) to a central file if configured
-        try:
-            code_log_file_path = get_constant("CODE_FILE")
-            if code_log_file_path:
-                CODE_FILE = Path(code_log_file_path)
-                CODE_FILE.parent.mkdir(
-                    parents=True, exist_ok=True
-                )  # Ensure log dir exists
-                with open(CODE_FILE, "a", encoding="utf-8") as f:
-                    f.write(
-                        f"\n--- Generated Code for: {str(file_path)} ({time.strftime('%Y-%m-%d %H:%M:%S')}) ---\n"
-                    )
-                    f.write(f"{code_string}\n")
-                    f.write(f"--- End Code for: {str(file_path)} ---\n")
-        except Exception as file_error:
-            rr(
-                f"Failed to log generated code for {file_path.name} to {get_constant('CODE_FILE')}: {file_error}"
-            )
+        self._log_generated_output(final_code_string, file_path, "Code")
+        return final_code_string
+
+    @retry(
+        wait=wait_exponential(multiplier=1, min=4, max=60),
+        stop=stop_after_attempt(3),
+        retry=retry_if_exception(should_retry_llm_call),
+        reraise=True,
+        before_sleep=_log_llm_retry_attempt 
+    )
+    async def _llm_generate_code_core_with_retry(
+        self, prepared_messages: List[Dict[str, str]], file_path: Path, model_to_use: str
+    ) -> str:
+        OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+        if not OPENROUTER_API_KEY:
+            raise ValueError("OPENROUTER_API_KEY environment variable not set.") # Should fail fast if not retryable
+
+        client = AsyncOpenAI(base_url="https://openrouter.ai/api/v1", api_key=OPENROUTER_API_KEY)
+
+        current_attempt = getattr(self._llm_generate_code_core_with_retry.retry.statistics, 'attempt_number', 1)
+        rr(f"LLM Code Gen for [cyan]{file_path.name}[/cyan]: Model [yellow]{model_to_use}[/yellow], Attempt [bold]{current_attempt}[/bold]")
+
+        completion = await client.chat.completions.create(model=model_to_use, messages=prepared_messages)
+
+        if not (completion and completion.choices and completion.choices[0].message and completion.choices[0].message.content):
+            ic(f"No valid completion content received for {file_path.name}")
+            rr(f"[bold red]Invalid or empty completion content from LLM for {file_path.name}[/bold red]")
+            raise LLMResponseError(f"Invalid or empty completion content from LLM for {file_path.name}")
+
+        raw_code_string = completion.choices[0].message.content
+        # Assuming self.extract_code_block is defined in your class
+        code_string, detected_language = self.extract_code_block(raw_code_string, file_path) 
+
+        rr(f"Extracted code for [cyan]{file_path.name}[/cyan]. Lang: {detected_language}. Raw len: {len(raw_code_string)}, Extracted len: {len(code_string or '')}")
+
+        if code_string == "No Code Found": # Critical check
+            if raw_code_string.strip():
+                rr(f"[bold orange_red1]Could not extract code for {file_path.name}, raw response was not empty. LLM might have misunderstood.[/bold orange_red1]")
+                raise LLMResponseError(f"Extracted 'No Code Found' for {file_path.name}. Raw: '{raw_code_string[:100]}...'")
+            else:
+                rr(f"[bold red]LLM response for {file_path.name} was effectively empty (raw string).[/bold red]")
+                raise LLMResponseError(f"LLM response for {file_path.name} was effectively empty (raw string).")
+
+        if code_string.startswith(f"# Error: Code generation failed for {file_path.name}") or \
+           code_string.startswith(f"# Failed to generate code for {file_path.name}"):
+            rr(f"[bold red]LLM returned a placeholder error message for {file_path.name}: {code_string[:100]}[/bold red]")
+            raise LLMResponseError(f"LLM returned placeholder error for {file_path.name}: {code_string[:100]}")
 
         return code_string
 
-    @retry(stop=stop_after_attempt(3), wait=wait_fixed(8))
+    # --- Refactored Skeleton Generation Method ---
+    @observe(name="generate_code_skeleton")
     async def _call_llm_for_code_skeleton(
-        self,
-        file_detail: FileDetail,  # Pass the whole detail object
-        file_path: Path,
-        all_file_details: List[FileDetail],  # Pass the list of all file details
-        ) -> str:  # file_path is the intended final host path
-        """Call LLM to generate code skeleton based on the code description"""
-        target_file_name = file_path.name  # Get relative name for prompt
-
+        self, file_detail: FileDetail, file_path: Path, all_file_details: List[FileDetail]
+    ) -> str:
+        target_file_name = file_path.name
         if self.display:
-            self.display.add_message(
-                "assistant", f"Generating skeleton for {target_file_name}"
-            )
+            self.display.add_message("assistant", f"Generating skeleton for {target_file_name}")
 
-        skeleton_string = f"# Error: Skeleton generation failed for {target_file_name}"
+        try: # Add try-finally for task.txt to ensure it's handled if missing
+            with open("task.txt", "r") as task_file:
+                task_description_from_file = task_file.read().strip()
+            agent_task = task_description_from_file or "No overall task description provided."
+        except FileNotFoundError:
+            agent_task = "No overall task description provided (task.txt not found)."
+            rr("[yellow]Warning: task.txt not found. Using default task description.[/yellow]")
+
+        external_imports = file_detail.external_imports
+        internal_imports = file_detail.internal_imports
+        all_files_dict_list = [f.model_dump() for f in all_file_details]
+
+        prepared_messages = code_skeleton_prompt(
+            code_description=file_detail.code_description, target_file=target_file_name,
+            agent_task=agent_task, external_imports=external_imports,
+            internal_imports=internal_imports, all_file_details=all_files_dict_list,
+        )
+
+        model_to_use = get_constant("SKELETON_GEN_MODEL") or MODEL_STRING
+        final_skeleton_string = f"# Error: Skeleton generation failed for {target_file_name} after all retries."
 
         try:
-            OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-            if not OPENROUTER_API_KEY:
-                raise ValueError("OPENROUTER_API_KEY environment variable not set.")
-
-            client = AsyncOpenAI(
-                base_url="https://openrouter.ai/api/v1",
-                api_key=OPENROUTER_API_KEY,
+            final_skeleton_string = await self._llm_generate_skeleton_core_with_retry(
+                prepared_messages=prepared_messages, target_file_path=file_path, model_to_use=model_to_use
             )
-            model = get_constant("SKELETON_GEN_MODEL") or MODEL_STRING
-            rr(f"Using model {model} for skeleton generation for {target_file_name}.")
-
-            # --- Get additional context ---
-
-            # get the task from reading task.txt
-            with open("task.txt", "r") as task_file:
-                task_description = task_file.read().strip()
-            agent_task = task_description or "No overall task description provided."
-            external_imports = file_detail.external_imports  # Get from FileDetail
-            internal_imports = file_detail.internal_imports  # Get from FileDetail
-
-            # Convert FileDetail objects to simple dicts for the prompt function if needed
-            all_files_dict_list = [f.model_dump() for f in all_file_details]
-            # --- End Get additional context ---
-
-            # CHANGE: Call updated prompt function with more args
-            messages = code_skeleton_prompt(
-                code_description=file_detail.code_description,  # From FileDetail
-                target_file=target_file_name,  # Pass relative filename
-                agent_task=agent_task,
-                external_imports=external_imports,
-                internal_imports=internal_imports,
-                all_file_details=all_files_dict_list,  # Pass context of all files
-            )
-            ic(
-                f"Messages for Skeleton ({target_file_name}):\n +++++ \n{messages}\n +++++"
-            )
-
-            completion = await client.chat.completions.create(
-                model=model,
-                messages=messages,
-            )
-
-            if (
-                completion
-                and completion.choices
-                and completion.choices[0].message
-                and completion.choices[0].message.content
-            ):
-                raw_skeleton = completion.choices[0].message.content
-                # Pass the host file_path to extract_code_block for context
-                skeleton_string, detected_language = self.extract_code_block(
-                    raw_skeleton, file_path
-                )
-                rr(
-                    f"Extracted skeleton block for {target_file_name}. Detected language: {detected_language}"
-                )
-
-                if skeleton_string == "No Code Found":
-                    if raw_skeleton.strip():
-                        skeleton_string = raw_skeleton  # Use raw if extraction fails but content exists
-                        rr(
-                            f"Could not extract skeleton block for {target_file_name}, using raw response."
-                        )
-                    else:
-                        rr(
-                            f"LLM response for skeleton {target_file_name} was effectively empty."
-                        )
-                        skeleton_string = f"# Failed to generate skeleton for {target_file_name}\n# LLM response was empty."
-
-                skeleton_string = ftfy.fix_text(skeleton_string)
-            else:
-                ic(f"No valid skeleton completion received for {target_file_name}")
-                rr(
-                    f"Invalid or empty completion received from LLM for skeleton {target_file_name}"
-                )
-                skeleton_string = f"# Failed to generate skeleton for {target_file_name}\n# LLM response was empty or invalid."
-
+        except LLMResponseError as e:
+            ic(f"LLMResponseError for skeleton {target_file_name} after all retries: {e}")
+            rr(f"[bold red]LLM generated invalid skeleton for {target_file_name} after retries: {e}[/bold red]")
+            final_skeleton_string = f"# Error generating skeleton for {target_file_name}: LLMResponseError - {str(e)}"
+        except APIError as e: # Catch specific OpenAI errors
+            ic(f"OpenAI APIError for skeleton {target_file_name} after all retries: {type(e).__name__} - {e}")
+            rr(f"[bold red]LLM skeleton call failed due to APIError for {target_file_name} after retries: {e}[/bold red]")
+            final_skeleton_string = f"# Error generating skeleton for {target_file_name}: API Error - {str(e)}"
         except Exception as e:
-            ic(f"Error in _call_llm_for_code_skeleton for {target_file_name}: {e}")
-            rr(f"LLM skeleton call failed for {target_file_name}")
-            skeleton_string = (
-                f"# Error generating skeleton for {target_file_name}: {str(e)}"
-            )
+            ic(f"Unexpected error during skeleton generation for {target_file_name} after retries: {type(e).__name__} - {e}")
+            rr(f"[bold red]LLM skeleton call ultimately failed for {target_file_name} due to unexpected error: {e}[/bold red]")
+            final_skeleton_string = f"# Error generating skeleton for {target_file_name} (final): {str(e)}"
 
-        ic(f"Skeleton for {target_file_name}:\n{skeleton_string}")
+        self._log_generated_output(final_skeleton_string, file_path, "Skeleton")
+        ic(f"Final Skeleton for {target_file_name}:\n{final_skeleton_string[:300]}...") # Log snippet
+        return final_skeleton_string
+
+    @retry(
+        wait=wait_exponential(multiplier=1, min=4, max=60),
+        stop=stop_after_attempt(3), 
+        retry=retry_if_exception(should_retry_llm_call),
+        reraise=True,
+        before_sleep=_log_llm_retry_attempt
+        )
+    async def _llm_generate_skeleton_core_with_retry(
+        self, prepared_messages: List[Dict[str, str]], target_file_path: Path, model_to_use: str
+        ) -> str:
+        OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+        if not OPENROUTER_API_KEY:
+            raise ValueError("OPENROUTER_API_KEY environment variable not set.")
+
+        client = AsyncOpenAI(base_url="https://openrouter.ai/api/v1", api_key=OPENROUTER_API_KEY)
+
+        current_attempt = getattr(self._llm_generate_skeleton_core_with_retry.retry.statistics, 'attempt_number', 1)
+        rr(f"LLM Skeleton Gen for [cyan]{target_file_path.name}[/cyan]: Model [yellow]{model_to_use}[/yellow], Attempt [bold]{current_attempt}[/bold]")
+
+        completion = await client.chat.completions.create(model=model_to_use, messages=prepared_messages)
+
+        if not (completion and completion.choices and completion.choices[0].message and completion.choices[0].message.content):
+            ic(f"No valid skeleton completion content received for {target_file_path.name}")
+            rr(f"[bold red]Invalid or empty skeleton completion content from LLM for {target_file_path.name}[/bold red]")
+            raise LLMResponseError(f"Invalid or empty skeleton completion from LLM for {target_file_path.name}")
+
+        raw_skeleton = completion.choices[0].message.content
+        # Assuming self.extract_code_block is defined
+        skeleton_string, detected_language = self.extract_code_block(raw_skeleton, target_file_path)
+
+        rr(f"Extracted skeleton for [cyan]{target_file_path.name}[/cyan]. Lang: {detected_language}. Raw len: {len(raw_skeleton)}, Extracted len: {len(skeleton_string or '')}")
+
+        if skeleton_string == "No Code Found": # Critical check
+            if raw_skeleton.strip():
+                rr(f"[bold orange_red1]Could not extract skeleton for {target_file_path.name}, raw response was not empty.[/bold orange_red1]")
+                raise LLMResponseError(f"Extracted 'No Code Found' for skeleton {target_file_path.name}. Raw: '{raw_skeleton[:100]}...'")
+            else:
+                rr(f"[bold red]LLM response for skeleton {target_file_path.name} was effectively empty (raw string).[/bold red]")
+                raise LLMResponseError(f"LLM response for skeleton {target_file_path.name} was effectively empty (raw string).")
+
+        if skeleton_string.startswith(f"# Error: Skeleton generation failed for {target_file_path.name}") or \
+           skeleton_string.startswith(f"# Failed to generate skeleton for {target_file_path.name}"):
+            rr(f"[bold red]LLM returned a placeholder error for skeleton {target_file_path.name}: {skeleton_string[:100]}[/bold red]")
+            raise LLMResponseError(f"LLM returned placeholder error for skeleton {target_file_path.name}: {skeleton_string[:100]}")
+
+        skeleton_string = ftfy.fix_text(skeleton_string) # Apply ftfy only on success
         return skeleton_string
+
+    # You need to define extract_code_block method within this class or ensure it's accessible
+    def extract_code_block(self, raw_response: str, file_path: Path) -> tuple[str, Optional[str]]:
+        """
+        Extracts a code block from the LLM's raw response.
+        Handles different markdown formats and language detection.
+        Returns the extracted code string and the detected language.
+        If no code block is found, returns "No Code Found" and None.
+        """
+        # Simplified example, replace with your actual robust implementation
+        # Your implementation might involve regex to find ```python ... ``` or similar
+
+        # Attempt to guess language if not specified in markdown
+        language = get_language_from_extension(file_path.suffix) # from your context_helpers
+
+        # Common pattern: ```[language]\ncode\n``` or ```\ncode\n```
+        code_block_match = re.search(r"```(?:[a-zA-Z0-9_.-]*\n)?(.*?)```", raw_response, re.DOTALL)
+
+        if code_block_match:
+            extracted_code = code_block_match.group(1).strip()
+            # Try to get language from markdown if present
+            lang_in_markdown_match = re.search(r"```([a-zA-Z0-9_.-]+)\n", raw_response)
+            if lang_in_markdown_match:
+                language = lang_in_markdown_match.group(1).lower()
+
+            if not extracted_code: # Empty code block
+                # If the raw response itself is just the code without backticks, and is short.
+                if not "```" in raw_response and len(raw_response.strip()) > 0 and len(raw_response.strip()) < 300: # Heuristic
+                    return raw_response.strip(), language # Assume raw is the code
+                return "No Code Found", language
+
+            # Basic check for placeholder/refusal, although LLMResponseError should catch most
+            if "sorry" in extracted_code.lower() and "cannot generate" in extracted_code.lower():
+                return "No Code Found", language # Or raise specific error
+
+            return extracted_code, language
+
+        # If no triple backticks, check if the entire response is code (heuristic)
+        # This is risky and depends on LLM behavior.
+        # Only do this if the response is relatively clean and doesn't look like prose.
+        lines = raw_response.strip().split('\n')
+        if len(lines) > 0 and not lines[0].startswith("# Error") and not lines[0].startswith("I cannot"):
+            # Heuristic: if it doesn't look like a refusal and lacks prose markers.
+            # This part needs careful tuning or removal if it causes issues.
+            # For now, let's be more conservative and rely on backticks.
+            # If the LLM sometimes returns code without backticks, this logic needs to be robust.
+            # A simple check: if raw_response does not contain "```" at all.
+            if "```" not in raw_response and raw_response.strip(): # and not any(prose_indicator in raw_response for prose_indicator in ["sorry", "unfortunately", "understand"]):
+                return raw_response.strip(), language # Assume the whole thing is code
+
+        return "No Code Found", language
 
     def extract_code_block(
         self, text: str, file_path: Optional[Path] = None
-        ) -> tuple[str, str]:
+    ) -> tuple[str, str]:
         """
         Extracts code based on file type. Special handling for Markdown files.
         Improved language guessing.
@@ -800,44 +945,44 @@ class WriteCodeTool(BaseAnthropicTool):
 
         return code_block if code_block else "No Code Found", language
 
-    def format_output(self, data: dict) -> str:
-        """
-        Format the output of the tool for display.
+    # def format_output(self, data: dict) -> str:
+    #     """
+    #     Format the output of the tool for display.
 
-        Args:
-            data: The data returned by the tool's operation.
+    #     Args:
+    #         data: The data returned by the tool's operation.
 
-        Returns:
-            A formatted string for display.
-        """
-        status = data.get("status", "Unknown")
-        message = data.get("message", "No message provided.")
-        errors = data.get("errors", [])
-        files_processed = data.get("files_processed", 0)
-        files_successful = data.get("files_successful", 0)
+    #     Returns:
+    #         A formatted string for display.
+    #     """
+    #     status = data.get("status", "Unknown")
+    #     message = data.get("message", "No message provided.")
+    #     errors = data.get("errors", [])
+    #     files_processed = data.get("files_processed", 0)
+    #     files_successful = data.get("files_successful", 0)
 
-        output = f"Operation Status: {status.upper()}\n"
-        output += f"Message: {message}\n"
-        output += (
-            f"Files Processed: {files_processed}, Successful: {files_successful}\n"
-        )
+    #     output = f"Operation Status: {status.upper()}\n"
+    #     output += f"Message: {message}\n"
+    #     output += (
+    #         f"Files Processed: {files_processed}, Successful: {files_successful}\n"
+    #     )
 
-        if errors:
-            output += f"\nErrors Encountered ({len(errors)}):\n"
-            # Show first few errors
-            for i, err in enumerate(errors[:5]):
-                output += f"- {err}\n"
-            if len(errors) > 5:
-                output += f"... and {len(errors) - 5} more errors.\n"
-            output += "(Check logs for full details)\n"
+    #     if errors:
+    #         output += f"\nErrors Encountered ({len(errors)}):\n"
+    #         # Show first few errors
+    #         for i, err in enumerate(errors[:5]):
+    #             output += f"- {err}\n"
+    #         if len(errors) > 5:
+    #             output += f"... and {len(errors) - 5} more errors.\n"
+    #         output += "(Check logs for full details)\n"
 
-        # Optionally add details about successful files if needed
-        # results = data.get("results", [])
-        # successful_files = [r['filename'] for r in results if r.get('status') == 'success']
-        # if successful_files:
-        #    output += f"\nSuccessful Files:\n" + "\n".join([f"- {f}" for f in successful_files])
+    #     # Optionally add details about successful files if needed
+    #     # results = data.get("results", [])
+    #     # successful_files = [r['filename'] for r in results if r.get('status') == 'success']
+    #     # if successful_files:
+    #     #    output += f"\nSuccessful Files:\n" + "\n".join([f"- {f}" for f in successful_files])
 
-        return output.strip()
+    #     return output.strip()
 
 
 def html_format_code(code, extension):
@@ -866,8 +1011,7 @@ def html_format_code(code, extension):
             {highlighted}
             """
         return html
-    except Exception as e:
-
+    except Exception:
         return f"<pre>{code}</pre>"
     finally:
         # Ensure any cleanup or finalization if needed

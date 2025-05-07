@@ -1,9 +1,7 @@
-from os import mkdir
 from pathlib import Path
 import json
 from datetime import datetime
 import subprocess
-import sys
 
 from icecream import ic
 
@@ -174,10 +172,10 @@ def set_project_dir(project_name: str) -> Path:
     """
     Set up project directories for both local and Docker.
     This function also creates the project directory if it doesn't already exist.
-    
+
     Args:
         project_name: The name of the project
-        
+
     Returns:
         The Path to the project directory
     """
@@ -187,15 +185,15 @@ def set_project_dir(project_name: str) -> Path:
 
     # Create repo directory if it doesn't exist
     REPO_DIR.mkdir(parents=True, exist_ok=True)
-    
+
     # Create the project directory if it doesn't exist
     PROJECT_DIR.mkdir(parents=True, exist_ok=True)
-    
+
     # Create llm_gen_code directory if it doesn't exist
     LLM_GEN_CODE_DIR.mkdir(parents=True, exist_ok=True)
 
     # Set up Docker project directory - just use the project name, not the full path
-    DOCKER_PROJECT_DIR =f"/home/myuser/apps/{project_name}"
+    DOCKER_PROJECT_DIR = f"/home/myuser/apps/{project_name}"
 
     set_constant("PROJECT_DIR", str(PROJECT_DIR))
     set_constant("DOCKER_PROJECT_DIR", str(DOCKER_PROJECT_DIR))
@@ -215,7 +213,7 @@ def get_docker_project_dir():
 
 def write_to_file(s: str, file_path: str = ICECREAM_OUTPUT_FILE):
     """Write debug output to a file in a compact, VS Code collapsible format."""
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
+    datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
     lines = s.split("\n")
     output = []
 
@@ -225,9 +223,8 @@ def write_to_file(s: str, file_path: str = ICECREAM_OUTPUT_FILE):
     lines = lines[1:]
 
     output.append(f"# ENTRY {first_line}: ")
-    output.append(f"Details: ")
+    output.append("Details: ")
     # Join and clean multi-line strings
-    current_line = ""
     for line in lines:
         if line.strip() == "'":  # Skip standalone quote marks
             continue

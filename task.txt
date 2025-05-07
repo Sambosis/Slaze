@@ -1,56 +1,78 @@
-# Maze Navigation App in Pygame
+# Expanded Description: Pygame Maze Navigation App
 
-## Expanded Description
+This project involves creating a visually appealing maze application using Pygame. The application will dynamically generate a new random maze each time it runs or when the previous maze is solved. The key features include:
 
-I'll create a maze generation and navigation application using Pygame. The app will dynamically generate a new maze each time the computer-controlled character successfully navigates from start to finish. The maze will be visually appealing with clear graphics and smooth animations.
+1. **Dynamic Maze Generation**: A new maze will be generated using a randomized algorithm (such as depth-first search with backtracking) each time the application starts or after a maze is solved.
 
-For the maze generation, I'll implement a depth-first search algorithm with recursive backtracking, which creates perfect mazes (mazes with exactly one path between any two points). The maze will be represented as a grid of cells with walls between them.
+2. **Automated Navigation**: Instead of player input, the application will include an AI agent (using an algorithm like A* or wall-following) that automatically navigates the character through the maze.
 
-The computer-controlled character will navigate through the maze using the A* pathfinding algorithm, which is efficient for finding the shortest path in a maze. Once the character reaches the end of the maze, a new maze will be automatically generated with different dimensions to add variety.
+3. **Visual Design**: The maze will have appealing graphics with distinct colors for walls, paths, the character, and the goal. Basic animations will be included for the character's movement.
 
-Visual aspects will include:
-- Smooth animations for the character movement
-- Distinct colors for walls, paths, start, and end points
-- Visual feedback when a maze is completed
-- A simple transition effect between mazes
+4. **Restart Functionality**: When the AI agent successfully reaches the goal, a new maze will be automatically generated, and the process will start over.
 
-The user can quit the application by pressing the ESC key, and there will be no other user inputs required.
+5. **User Interaction**: The only user input will be the ability to press the ESC key to quit the application. No other user inputs will be processed.
 
-## File Tree
+6. **Window Configuration**: The application will run in a fixed-size window with appropriate dimensions for maze visibility.
 
-1. **maze_app.py**
-   - Purpose: Main entry point for the application, initializes Pygame, handles the game loop and events
-   - Import: Not imported by other files
+# File Tree
 
-2. **maze_generator.py**
-   - Purpose: Contains algorithms for generating random mazes using depth-first search with recursive backtracking
-   - Import: `from maze_generator import MazeGenerator`
+```
+maze_app/
+├── main.py                   # Entry point of the application
+├── maze/
+│   ├── __init__.py           # Makes maze directory a package
+│   ├── generator.py          # Contains the maze generation algorithm
+│   └── solver.py             # Contains the AI pathfinding algorithm
+├── game/
+│   ├── __init__.py           # Makes game directory a package
+│   ├── engine.py             # Main game loop and event handling
+│   ├── renderer.py           # Handles drawing the maze and character
+│   └── character.py          # Character class and movement logic
+└── assets/
+    ├── images/
+    │   ├── character.png     # Sprite for the navigating character
+    │   ├── wall.png          # Texture for maze walls
+    │   ├── path.png          # Texture for maze paths
+    │   └── goal.png          # Texture for the maze goal
+    └── sounds/
+        ├── move.wav          # Sound effect for character movement
+        └── success.wav       # Sound effect for reaching the goal
+```
 
-3. **pathfinder.py**
-   - Purpose: Implements the A* pathfinding algorithm for the computer-controlled character
-   - Import: `from pathfinder import AStarPathfinder`
+## File Purposes and Import Methods:
 
-4. **renderer.py**
-   - Purpose: Handles all visual aspects including drawing the maze, character, and transition effects
-   - Import: `from renderer import MazeRenderer`
+1. **main.py**
+   - Purpose: Entry point that initializes and runs the game.
+   - No imports needed for this file.
 
-5. **character.py**
-   - Purpose: Defines the computer-controlled character, its properties, and movement logic
-   - Import: `from character import Character`
+2. **maze/__init__.py**
+   - Purpose: Makes the maze directory a Python package.
+   - Import: `from maze import generator, solver`
 
-6. **assets/sprites/**
-   - Purpose: Directory to store character and maze element sprites
-   - Contains:
-     - **character.png** - sprite for the navigating character
-     - **wall.png** - texture for maze walls
-     - **floor.png** - texture for walkable paths
-     - **start.png** - marker for the maze entrance
-     - **end.png** - marker for the maze exit
+3. **maze/generator.py**
+   - Purpose: Contains algorithms to generate random mazes.
+   - Import: `from maze.generator import MazeGenerator`
 
-7. **constants.py**
-   - Purpose: Contains game constants, colors, configuration settings
-   - Import: `from constants import *`
+4. **maze/solver.py**
+   - Purpose: Contains AI algorithms (like A*) to solve the maze automatically.
+   - Import: `from maze.solver import MazeSolver`
 
-8. **utils.py**
-   - Purpose: Utility functions for calculations, conversions, and helper methods
-   - Import: `from utils import *`Start testing as soon as possible. DO NOT start making fixes or improvements until you have tested to see if it is working as is.  Your project directory is /home/myuser/apps/maze. You need to make sure that all files you create and work you do is done in that directory.
+5. **game/__init__.py**
+   - Purpose: Makes the game directory a Python package.
+   - Import: `from game import engine, renderer, character`
+
+6. **game/engine.py**
+   - Purpose: Manages the game loop, event handling, and coordinates other components.
+   - Import: `from game.engine import GameEngine`
+
+7. **game/renderer.py**
+   - Purpose: Handles drawing all game elements to the screen.
+   - Import: `from game.renderer import GameRenderer`
+
+8. **game/character.py**
+   - Purpose: Defines the character class with movement and animation logic.
+   - Import: `from game.character import Character`
+
+9. **assets/images/** and **assets/sounds/**
+   - Purpose: Contains all graphical and audio resources for the game.
+   - These files are not imported directly but loaded at runtime.Start testing as soon as possible. DO NOT start making fixes or improvements until you have tested to see if it is working as is.  Your project directory is /home/myuser/apps/maze. You need to make sure that all files you create and work you do is done in that directory.

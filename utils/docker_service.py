@@ -1,11 +1,10 @@
-import os
 import subprocess
 from pathlib import Path
-from typing import Union, Optional, Dict, Tuple, List
+from typing import Union, Optional, Dict, List
 import logging
 from dataclasses import dataclass
 from rich import print as rr
-from config import get_constant, set_constant
+from config import get_constant
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -15,43 +14,58 @@ logger = logging.getLogger("DockerService")
 # set the logger level to INFO
 logger.setLevel(logging.CRITICAL)
 
+
 @dataclass
 class DockerResult:
     """Structured result from Docker command execution"""
+
     success: bool
     stdout: str
     stderr: str
     return_code: int
     command: str
 
+
 class DockerServiceError(Exception):
     """Base exception for Docker service errors"""
+
     pass
+
 
 class ContainerNotFoundError(DockerServiceError):
     """Exception raised when container is not found"""
+
     pass
+
 
 class CommandExecutionError(DockerServiceError):
     """Exception raised when command execution fails"""
+
     pass
+
 
 class DockerNotAvailableError(DockerServiceError):
     """Exception raised when Docker is not available"""
+
     pass
+
 
 class DockerService:
     """Service class for Docker operations in the project"""
 
     def __init__(self):
         """Initialize the Docker service"""
-        self._container_name = get_constant("DOCKER_CONTAINER_NAME") or "python-dev-container"
+        self._container_name = (
+            get_constant("DOCKER_CONTAINER_NAME") or "python-dev-container"
+        )
         self._docker_available = self._check_docker_available()
         self._path_cache = {}  # Cache for path translations
 
         # Get Docker project directory from config
         raw_docker_dir = get_constant("DOCKER_PROJECT_DIR")
-        self._docker_project_dir = self._format_docker_path(raw_docker_dir) if raw_docker_dir else None
+        self._docker_project_dir = (
+            self._format_docker_path(raw_docker_dir) if raw_docker_dir else None
+        )
         self._project_dir = get_constant("PROJECT_DIR")
 
         # Default display settings
@@ -70,7 +84,7 @@ class DockerService:
             result = subprocess.run(
                 ["docker", "ps", "-q", "-f", f"name={self._container_name}"],
                 capture_output=True,
-                check=False
+                check=False,
             )
             return result.returncode == 0 and result.stdout.strip() != ""
         except Exception as e:
@@ -92,22 +106,22 @@ class DockerService:
         docker_path = str(path)
 
         # Replace backslashes with forward slashes
-        docker_path = docker_path.replace('\\', '/')
+        docker_path = docker_path.replace("\\", "/")
 
         # Ensure there are no double slashes
-        while '//' in docker_path:
-            docker_path = docker_path.replace('//', '/')
+        while "//" in docker_path:
+            docker_path = docker_path.replace("//", "/")
 
         # Ensure it starts with /
-        if not docker_path.startswith('/'):
-            docker_path = '/' + docker_path
+        if not docker_path.startswith("/"):
+            docker_path = "/" + docker_path
 
         # Split the path and filter out empty parts
-        parts = docker_path.split('/')
+        parts = docker_path.split("/")
         parts = [part for part in parts if part]
 
         # Reconstruct the path with proper slashes
-        docker_path = '/' + '/'.join(parts)
+        docker_path = "/" + "/".join(parts)
 
         return docker_path
 
@@ -168,7 +182,7 @@ class DockerService:
     def from_docker_path(self, docker_path: Union[str, Path]) -> Path:
         """Convert a Docker container path to a host path"""
         # Convert to string for consistent handling
-        docker_path_str = str(docker_path).replace('\\', '/')
+        docker_path_str = str(docker_path).replace("\\", "/")
 
         # Check cache first
         if not hasattr(self, "_reverse_path_cache"):
@@ -199,13 +213,13 @@ class DockerService:
 
             # Case 2: Docker path is within the project directory
             elif docker_path_str.startswith(f"{docker_project_path}/"):
-                rel_path_str = docker_path_str[len(docker_project_path) + 1:]
+                rel_path_str = docker_path_str[len(docker_project_path) + 1 :]
                 host_path = project_dir / rel_path_str
 
             # Case 3: Docker path is within the base directory but not the project
             elif docker_path_str.startswith(f"{docker_base}/"):
-                rel_to_base = docker_path_str[len(docker_base) + 1:]
-                parts = rel_to_base.split('/', 1)
+                rel_to_base = docker_path_str[len(docker_base) + 1 :]
+                parts = rel_to_base.split("/", 1)
 
                 if parts and parts[0] != project_name:
                     # Another project or directory in the base directory
@@ -217,7 +231,7 @@ class DockerService:
                         host_path = host_path / parts[1]
                 else:
                     # Should not happen given the previous conditions, but handle anyway
-                    host_path = project_dir / (rel_to_base if rel_to_base else '')
+                    host_path = project_dir / (rel_to_base if rel_to_base else "")
 
             # Case 4: Fallback for other Docker paths
             if not host_path:
@@ -237,10 +251,14 @@ class DockerService:
             self._reverse_path_cache[docker_path_str] = host_path
             return host_path
 
-    def execute_command(self, command: str, env_vars: Optional[Dict[str, str]] = None) -> DockerResult:
+    def execute_command(
+        self, command: str, env_vars: Optional[Dict[str, str]] = None
+    ) -> DockerResult:
         """Execute a command in the Docker container"""
         if not self.is_available():
-            raise DockerNotAvailableError("Docker is not available or container is not running")
+            raise DockerNotAvailableError(
+                "Docker is not available or container is not running"
+            )
 
         # Prepare environment variables string
         env_string = ""
@@ -262,9 +280,9 @@ class DockerService:
                 shell=True,
                 capture_output=True,
                 text=True,
-                encoding='utf-8',
-                errors='replace',
-                check=False
+                encoding="utf-8",
+                errors="replace",
+                check=False,
             )
             rr("std out:", result.stdout)
             rr("std err:", result.stderr)
@@ -273,16 +291,19 @@ class DockerService:
                 stdout=result.stdout,
                 stderr=result.stderr,
                 return_code=result.returncode,
-                command=command
+                command=command,
             )
         except Exception as e:
             logger.error(f"Error executing Docker command: {str(e)}")
             raise CommandExecutionError(f"Docker command execution failed: {str(e)}")
 
-    def run_python_script(self, script_path: Union[str, Path], 
-                         gui: bool = False, 
-                         cwd: Optional[Union[str, Path]] = None,
-                         env_vars: Optional[Dict[str, str]] = None) -> DockerResult:
+    def run_python_script(
+        self,
+        script_path: Union[str, Path],
+        gui: bool = False,
+        cwd: Optional[Union[str, Path]] = None,
+        env_vars: Optional[Dict[str, str]] = None,
+    ) -> DockerResult:
         """Run a Python script in the Docker container"""
         if isinstance(script_path, str):
             script_path = Path(script_path)
@@ -320,9 +341,12 @@ class DockerService:
         # Execute the command
         return self.execute_command(command, env_vars)
 
-    def run_bash_script(self, script_path: Union[str, Path],
-                       cwd: Optional[Union[str, Path]] = None,
-                       env_vars: Optional[Dict[str, str]] = None) -> DockerResult:
+    def run_bash_script(
+        self,
+        script_path: Union[str, Path],
+        cwd: Optional[Union[str, Path]] = None,
+        env_vars: Optional[Dict[str, str]] = None,
+    ) -> DockerResult:
         """Run a bash script in the Docker container"""
         if isinstance(script_path, str):
             script_path = Path(script_path)
@@ -348,7 +372,9 @@ class DockerService:
 
         docker_path = self.to_docker_path(file_path)
 
-        result = self.execute_command(f"[ -f {docker_path} ] && echo 'exists' || echo 'not exists'")
+        result = self.execute_command(
+            f"[ -f {docker_path} ] && echo 'exists' || echo 'not exists'"
+        )
         return result.success and "exists" in result.stdout
 
     def create_virtual_env(self, packages: Optional[List[str]] = None) -> DockerResult:
@@ -406,14 +432,14 @@ class DockerService:
                 ["docker", "ps", "-a", "-q", "-f", f"name={self._container_name}"],
                 capture_output=True,
                 text=True,
-                check=False
+                check=False,
             )
 
             running_result = subprocess.run(
                 ["docker", "ps", "-q", "-f", f"name={self._container_name}"],
                 capture_output=True,
                 text=True,
-                check=False
+                check=False,
             )
 
             if exists_result.stdout.strip() and not running_result.stdout.strip():
@@ -421,7 +447,7 @@ class DockerService:
                 start_result = subprocess.run(
                     ["docker", "start", self._container_name],
                     capture_output=True,
-                    check=False
+                    check=False,
                 )
 
                 if start_result.returncode == 0:
@@ -441,7 +467,7 @@ class DockerService:
                 ["docker", "logs", "--tail", str(lines), self._container_name],
                 capture_output=True,
                 text=True,
-                check=False
+                check=False,
             )
             return result.stdout
         except Exception as e:

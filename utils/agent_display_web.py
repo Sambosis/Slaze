@@ -5,7 +5,8 @@ import asyncio
 from queue import Queue
 from flask import Flask, render_template, jsonify
 from flask_socketio import SocketIO, disconnect
-from config import USER_LOG_FILE, ASSISTANT_LOG_FILE, TOOL_LOG_FILE, LOGS_DIR
+from config import LOGS_DIR
+
 
 def log_message(msg_type, message):
     """Log a message to a file."""
@@ -22,17 +23,19 @@ def log_message(msg_type, message):
         file.write(emojitag * 5)
         file.write(f"\n{message}\n\n")
 
+
 class AgentDisplayWeb:
     """
     A class for managing and displaying messages on a web page using Flask and SocketIO.
     """
+
     def __init__(self):
         # Assume that templates folder is at the project root.
         template_dir = os.path.join(os.getcwd(), "templates")
         self.app = Flask(__name__, template_folder=template_dir)
-        self.app.config['SECRET_KEY'] = 'secret!'
+        self.app.config["SECRET_KEY"] = "secret!"
         self.app.debug = True  # Enable debug mode for detailed errors.
-        self.socketio = SocketIO(self.app, async_mode='threading')
+        self.socketio = SocketIO(self.app, async_mode="threading")
         self.user_messages = []
         self.assistant_messages = []
         self.tool_results = []
@@ -45,23 +48,25 @@ class AgentDisplayWeb:
         self.setup_socketio_events()
 
     def setup_routes(self):
-        @self.app.route('/')
+        @self.app.route("/")
         def index():
             try:
                 return render_template("index.html")
             except Exception as e:
                 return f"Error rendering index: {e}", 500
 
-        @self.app.route('/messages')
+        @self.app.route("/messages")
         def get_messages():
-            return jsonify({
-                'user': self.user_messages,
-                'assistant': self.assistant_messages,
-                'tool': self.tool_results
-            })
+            return jsonify(
+                {
+                    "user": self.user_messages,
+                    "assistant": self.assistant_messages,
+                    "tool": self.tool_results,
+                }
+            )
 
     def setup_socketio_events(self):
-        @self.socketio.on('connect')
+        @self.socketio.on("connect")
         def handle_connect():
             print("[DEBUG] Client connected")
             # Get event loop from the running event loop if not set
@@ -71,15 +76,15 @@ class AgentDisplayWeb:
                 except RuntimeError:
                     print("[ERROR] No event loop available")
 
-        @self.socketio.on('disconnect')
+        @self.socketio.on("disconnect")
         def handle_disconnect():
             print("[DEBUG] Client disconnected")
 
-        @self.socketio.on('user_input')
+        @self.socketio.on("user_input")
         def handle_user_input(data):
             print("[DEBUG] Received user_input event with data:", data)
-            user_input = data.get('input', '')
-            
+            user_input = data.get("input", "")
+
             # Get event loop from the running event loop if not set
             if self.loop is None:
                 try:
@@ -90,7 +95,9 @@ class AgentDisplayWeb:
 
             if self.loop is not None:
                 try:
-                    self.loop.call_soon_threadsafe(self.input_queue.put_nowait, user_input)
+                    self.loop.call_soon_threadsafe(
+                        self.input_queue.put_nowait, user_input
+                    )
                     print("[DEBUG] Enqueued user input:", user_input)
                 except Exception as e:
                     print(f"[ERROR] Failed to enqueue user input: {e}")
@@ -100,12 +107,12 @@ class AgentDisplayWeb:
             return None
 
         # New interrupt event handler
-        @self.socketio.on('interrupt')
+        @self.socketio.on("interrupt")
         def handle_interrupt():
             print("[DEBUG] Received interrupt event")
             self.user_interupt = True
 
-    async def wait_for_user_input(self, user_input = None):
+    async def wait_for_user_input(self, user_input=None):
         """
         Wait for user input sent from the client via SocketIO.
         Returns:
@@ -122,11 +129,14 @@ class AgentDisplayWeb:
 
     def broadcast_update(self):
         # Emit an update event to all connected clients
-        self.socketio.emit('update', {
-            'user': self.user_messages,  # Only send the last eight messages
-            'assistant': self.assistant_messages, # Only send the last five messages
-            'tool': self.tool_results  # Simply pass the list directly
-        })
+        self.socketio.emit(
+            "update",
+            {
+                "user": self.user_messages,  # Only send the last eight messages
+                "assistant": self.assistant_messages,  # Only send the last five messages
+                "tool": self.tool_results,  # Simply pass the list directly
+            },
+        )
 
     def add_message(self, msg_type, content):
         log_message(msg_type, content)
@@ -147,13 +157,14 @@ class AgentDisplayWeb:
             self.tool_results.clear()
         self.broadcast_update()
 
-
-    def start_server(self, host='0.0.0.0', port=None): # Remove default port here
-        if port is None: # Get port from environment or default to 5001 if not set (for local dev)
-            port = int(os.environ.get('PORT', 5001))
+    def start_server(self, host="0.0.0.0", port=None):  # Remove default port here
+        if (
+            port is None
+        ):  # Get port from environment or default to 5001 if not set (for local dev)
+            port = int(os.environ.get("PORT", 5001))
         thread = threading.Thread(
             target=self.socketio.run,
             args=(self.app,),
-            kwargs={'host': host, 'port': port, 'use_reloader': False}
-            )
+            kwargs={"host": host, "port": port, "use_reloader": False},
+        )
         thread.start()

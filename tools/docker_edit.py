@@ -1,21 +1,14 @@
 ## edit.py
 import os
-import re
 from pathlib import Path
 from collections import defaultdict
 from typing import Literal, get_args, Dict
-from anthropic.types.beta import BetaToolTextEditor20241022Param
 from .base import BaseAnthropicTool, ToolError, ToolResult
 from .run import maybe_truncate
 from typing import List, Optional
 from icecream import ic
-import sys
-import ftfy
 from rich import print as rr
-import datetime
-import json
-from load_constants import write_to_file, ICECREAM_OUTPUT_FILE
-from config import get_constant, set_constant, REPO_DIR, PROJECT_DIR, LOGS_DIR
+from config import get_constant, write_to_file
 from utils.file_logger import log_file_operation
 from utils.docker_service import DockerService
 from loguru import logger as ll
@@ -63,7 +56,7 @@ class DockerEditTool(BaseAnthropicTool):
         ##ll.info(f"Docker available: {self._docker_available}")
 
     def to_params(self) -> dict:
-        #ll.debug(f"DockerEditTool.to_params called with api_type: {self.api_type}")
+        # ll.debug(f"DockerEditTool.to_params called with api_type: {self.api_type}")
         # For custom tools, provide a detailed input schema
         params = {
             "name": self.name,
@@ -75,43 +68,43 @@ class DockerEditTool(BaseAnthropicTool):
                     "command": {
                         "type": "string",
                         "enum": [cmd for cmd in get_args(Command)],
-                        "description": "Command to execute. Options: view, create, str_replace, insert, undo_edit"
+                        "description": "Command to execute. Options: view, create, str_replace, insert, undo_edit",
                     },
                     "path": {
                         "type": "string",
-                        "description": "Path to the file to operate on"
+                        "description": "Path to the file to operate on",
                     },
                     "file_text": {
                         "type": "string",
-                        "description": "Content to write to the file (required for create command)"
+                        "description": "Content to write to the file (required for create command)",
                     },
                     "view_range": {
                         "type": "array",
                         "items": {"type": "integer"},
-                        "description": "Range of lines to view [start_line, end_line] (optional for view command)"
+                        "description": "Range of lines to view [start_line, end_line] (optional for view command)",
                     },
                     "old_str": {
                         "type": "string",
-                        "description": "String to be replaced (required for str_replace command)"
+                        "description": "String to be replaced (required for str_replace command)",
                     },
                     "new_str": {
                         "type": "string",
-                        "description": "Replacement string (required for str_replace and insert commands)"
+                        "description": "Replacement string (required for str_replace and insert commands)",
                     },
                     "insert_line": {
                         "type": "integer",
-                        "description": "Line number where to insert text (required for insert command)"
-                    }
+                        "description": "Line number where to insert text (required for insert command)",
+                    },
                 },
-                "required": ["command", "path"]
-            }
+                "required": ["command", "path"],
+            },
         }
         ic(f"DockerEditTool params: {params}")
         return params
 
     def format_output(self, data: Dict) -> str:
         """Format the output data similar to ProjectSetupTool style"""
-        #ll.debug(f"Formatting output for data: {data}")
+        # ll.debug(f"Formatting output for data: {data}")
         output_lines = []
 
         # Add command type
@@ -136,7 +129,8 @@ class DockerEditTool(BaseAnthropicTool):
         if len(output) > 12000:
             output = f"{output[:5000]} ... (truncated) ... {output[-5000:]}"
         return output
-    @observe()
+
+    @observe(name="docker_edit")
     async def __call__(
         self,
         *,
@@ -148,7 +142,7 @@ class DockerEditTool(BaseAnthropicTool):
         new_str: str | None = None,
         insert_line: int | None = None,
         **kwargs,
-        ) -> ToolResult:
+    ) -> ToolResult:
         """Execute the specified command with proper error handling and formatted output."""
         ##ll.info(f"DockerEditTool executing command: {command} on path: {path}")
         try:
@@ -161,8 +155,8 @@ class DockerEditTool(BaseAnthropicTool):
 
             # Normalize the path first - keep as string until we pass to specific methods
             _path = path
-            #ll.debug(f"Normalized path: {_path}")
-            
+            # ll.debug(f"Normalized path: {_path}")
+
             if command == "create":
                 ##ll.info(f"Creating new file at: {_path}")
                 # if not file_text:
@@ -170,7 +164,7 @@ class DockerEditTool(BaseAnthropicTool):
                 #     raise ToolError(
                 #         "Parameter `file_text` is required for command: create"
                 #     )
-                #ll.debug(f"File content length: {len(file_text)} characters")
+                # ll.debug(f"File content length: {len(file_text)} characters")
                 self.write_file(_path, file_text)
                 self._file_history[_path].append(file_text)
                 log_file_operation(_path, "create")
@@ -194,9 +188,9 @@ class DockerEditTool(BaseAnthropicTool):
                 )
 
             elif command == "view":
-                #ll.info(f"Viewing file at: {_path}")
+                # ll.info(f"Viewing file at: {_path}")
                 result = await self.view(_path, view_range)
-                #ll.debug(f"View result obtained, output length: {len(result.output) if result.output else 0}")
+                # ll.debug(f"View result obtained, output length: {len(result.output) if result.output else 0}")
                 if self.display is not None:
                     self.display.add_message(
                         "assistant",
@@ -217,15 +211,17 @@ class DockerEditTool(BaseAnthropicTool):
                 )
 
             elif command == "str_replace":
-                #ll.info(f"Replacing string in file: {_path}")
+                # ll.info(f"Replacing string in file: {_path}")
                 if not old_str:
-                    ll.error(f"Missing old_str parameter for str_replace command")
+                    ll.error("Missing old_str parameter for str_replace command")
                     raise ToolError(
                         "Parameter `old_str` is required for command: str_replace"
                     )
-                ll.debug(f"Old string length: {len(old_str)}, New string length: {len(new_str) if new_str else 0}")
+                ll.debug(
+                    f"Old string length: {len(old_str)}, New string length: {len(new_str) if new_str else 0}"
+                )
                 result = self.str_replace(_path, old_str, new_str)
-                #ll.info(f"String replacement completed in file: {_path}")
+                # ll.info(f"String replacement completed in file: {_path}")
                 if self.display is not None:
                     self.display.add_message(
                         "assistant",
@@ -243,7 +239,7 @@ class DockerEditTool(BaseAnthropicTool):
                     "command": "str_replace",
                     "status": "success",
                     "file_path": str(_path),
-                    "operation_details": f"Replaced text in file",
+                    "operation_details": "Replaced text in file",
                 }
                 return ToolResult(
                     output=self.format_output(output_data),
@@ -252,14 +248,14 @@ class DockerEditTool(BaseAnthropicTool):
                 )
 
             elif command == "insert":
-                #ll.info(f"Inserting text at line {insert_line} in file: {_path}")
+                # ll.info(f"Inserting text at line {insert_line} in file: {_path}")
                 if insert_line is None:
-                    ll.error(f"Missing insert_line parameter for insert command")
+                    ll.error("Missing insert_line parameter for insert command")
                     raise ToolError(
                         "Parameter `insert_line` is required for command: insert"
                     )
                 if not new_str:
-                    ll.error(f"Missing new_str parameter for insert command")
+                    ll.error("Missing new_str parameter for insert command")
                     raise ToolError(
                         "Parameter `new_str` is required for command: insert"
                     )
@@ -279,9 +275,9 @@ class DockerEditTool(BaseAnthropicTool):
                 )
 
             elif command == "undo_edit":
-                #ll.info(f"Undoing last edit to file: {_path}")
+                # ll.info(f"Undoing last edit to file: {_path}")
                 result = self.undo_edit(_path)
-                #ll.info(f"Undo operation completed for file: {_path}")
+                # ll.info(f"Undo operation completed for file: {_path}")
                 output_data = {
                     "command": "undo_edit",
                     "status": "success",
@@ -297,7 +293,7 @@ class DockerEditTool(BaseAnthropicTool):
             else:
                 ll.error(f"Unrecognized command: {command}")
                 raise ToolError(
-                    f'Unrecognized command {command}. The allowed commands are: {", ".join(get_args(Command))}'
+                    f"Unrecognized command {command}. The allowed commands are: {', '.join(get_args(Command))}"
                 )
 
         except Exception as e:
@@ -319,72 +315,76 @@ class DockerEditTool(BaseAnthropicTool):
 
     async def view(
         self, path: Path, view_range: Optional[List[int]] = None
-        ) -> ToolResult:
+    ) -> ToolResult:
         """Implement the view command using cross-platform methods."""
-        #ll.info(f"View operation on path: {path}, range: {view_range}")
+        # ll.info(f"View operation on path: {path}, range: {view_range}")
         ic(path)
 
         try:
             # Make sure we're working with a string path for Docker commands
             path_str = str(path)
-            
+
             # Format the path for Docker command execution
-            if not path_str.startswith('/'):
-                path_str = '/' + path_str
-            
+            if not path_str.startswith("/"):
+                path_str = "/" + path_str
+
             # Replace backslashes with forward slashes
-            path_str = path_str.replace('\\', '/')
-            
+            path_str = path_str.replace("\\", "/")
+
             # Ensure there are no double slashes
-            while '//' in path_str:
-                path_str = path_str.replace('//', '/')
-                
-            #ll.debug(f"Formatted path for Docker: {path_str}")
-                
+            while "//" in path_str:
+                path_str = path_str.replace("//", "/")
+
+            # ll.debug(f"Formatted path for Docker: {path_str}")
+
             # First check if path is a directory or file
             is_dir_cmd = f"[ -d \"{path_str}\" ] && echo 'dir' || echo 'not dir'"
             is_file_cmd = f"[ -f \"{path_str}\" ] && echo 'file' || echo 'not file'"
-            
+
             is_dir_result = self.docker.execute_command(is_dir_cmd)
             is_file_result = self.docker.execute_command(is_file_cmd)
-            
+
             is_dir = "dir" in is_dir_result.stdout
             is_file = "file" in is_file_result.stdout
-            
-            #ll.debug(f"Path check: is_dir={is_dir}, is_file={is_file}")
-            
+
+            # ll.debug(f"Path check: is_dir={is_dir}, is_file={is_file}")
+
             # Prioritize file over directory when both are true
             # This handles cases where a path may be both a file and directory in Docker
             if is_file:
                 # Handle file viewing using cat command
-                #ll.debug(f"Reading file content from: {path_str}")
+                # ll.debug(f"Reading file content from: {path_str}")
                 cat_cmd = f"cat {path_str}"
                 cat_result = self.docker.execute_command(cat_cmd)
-                
+
                 if not cat_result.success:
                     ll.error(f"Failed to read file: {cat_result.stderr}")
-                    return ToolResult(output="", error=f"Failed to read file: {cat_result.stderr}")
-                
+                    return ToolResult(
+                        output="", error=f"Failed to read file: {cat_result.stderr}"
+                    )
+
                 file_content = cat_result.stdout
-                
+
                 if not file_content:
                     ll.warning(f"File seems to be empty: {path_str}")
                     return ToolResult(output=f"File {path_str} appears to be empty.")
-                
+
                 # Handle view range if specified
                 init_line = 1
                 if view_range:
                     ll.debug(f"Processing view range: {view_range}")
-                    if len(view_range) != 2 or not all(isinstance(i, int) for i in view_range):
+                    if len(view_range) != 2 or not all(
+                        isinstance(i, int) for i in view_range
+                    ):
                         ll.error(f"Invalid view range format: {view_range}")
                         raise ToolError(
                             "Invalid `view_range`. It should be a list of two integers."
                         )
-                        
+
                     file_lines = file_content.split("\n")
                     n_lines_file = len(file_lines)
                     init_line, final_line = view_range
-                    
+
                     # Validate view range
                     if init_line < 1 or init_line > n_lines_file:
                         raise ToolError(
@@ -401,72 +401,77 @@ class DockerEditTool(BaseAnthropicTool):
 
                     # Apply the view range
                     if final_line == -1:
-                        file_content = "\n".join(file_lines[init_line - 1:])
+                        file_content = "\n".join(file_lines[init_line - 1 :])
                     else:
-                        file_content = "\n".join(file_lines[init_line - 1:final_line])
-                        
-                    #ll.debug(f"View range processed successfully")
-                
+                        file_content = "\n".join(file_lines[init_line - 1 : final_line])
+
+                    # ll.debug(f"View range processed successfully")
+
                 # Format the output for display
-                #ll.info(f"Returning file content from line {init_line}")
+                # ll.info(f"Returning file content from line {init_line}")
                 return ToolResult(
-                    output=self._make_output(file_content, path_str, init_line=init_line)
+                    output=self._make_output(
+                        file_content, path_str, init_line=init_line
+                    )
                 )
             elif is_dir:
                 # Handle directory listing using ls command
-                #ll.debug(f"Listing directory contents for: {path_str}")
+                # ll.debug(f"Listing directory contents for: {path_str}")
                 ls_cmd = f"ls -la {path_str}"
                 ls_result = self.docker.execute_command(ls_cmd)
-                
+
                 if not ls_result.success:
-                    #ll.error(f"Failed to list directory: {ls_result.stderr}")
-                    return ToolResult(output="", error=f"Failed to list directory: {ls_result.stderr}")
-                
+                    # ll.error(f"Failed to list directory: {ls_result.stderr}")
+                    return ToolResult(
+                        output="", error=f"Failed to list directory: {ls_result.stderr}"
+                    )
+
                 output = f"Directory listing for {path_str}:\n{ls_result.stdout}"
-                #ll.debug(f"Directory listing completed successfully")
+                # ll.debug(f"Directory listing completed successfully")
                 return ToolResult(output=output)
             else:
                 # Path doesn't exist
                 ll.error(f"Path doesn't exist in Docker container: {path_str}")
                 return ToolResult(
-                    output="", 
-                    error=f"Path {path_str} doesn't exist in Docker container."
+                    output="",
+                    error=f"Path {path_str} doesn't exist in Docker container.",
                 )
-                
+
         except Exception as e:
             ll.error(f"Error in view operation: {str(e)}")
-            return ToolResult(
-                output="",
-                error=f"Error viewing path {path}: {str(e)}"
-            )
+            return ToolResult(output="", error=f"Error viewing path {path}: {str(e)}")
 
     def str_replace(
         self, path: Path, old_str: str, new_str: Optional[str]
-        ) -> ToolResult:
+    ) -> ToolResult:
         """Implement the str_replace command, which replaces old_str with new_str in the file content."""
         try:
             # Read the file content - ensure we're working with consistent line endings
             ll.info(f"Starting string replacement in file: {path}")
-            
+
             file_content = self.read_file(path)
             # Normalize line endings and expand tabs for both strings
-            file_content = file_content.expandtabs().replace('\r\n', '\n')
-            old_str = old_str.expandtabs().replace('\r\n', '\n')
-            new_str = new_str.expandtabs().replace('\r\n', '\n') if new_str is not None else ""
-            
+            file_content = file_content.expandtabs().replace("\r\n", "\n")
+            old_str = old_str.expandtabs().replace("\r\n", "\n")
+            new_str = (
+                new_str.expandtabs().replace("\r\n", "\n")
+                if new_str is not None
+                else ""
+            )
+
             # Check if the string exists in the file at all
             if old_str not in file_content:
                 ll.warning(f"String not found in file: {path}")
                 raise ToolError(
                     f"No replacement was performed, old_str did not appear verbatim in {path}."
                 )
-            
+
             # Count occurrences more reliably
             # Use a non-overlapping search to find all occurrences
             count = 0
             positions = []
             start_idx = 0
-            
+
             # Find all occurrences and their positions
             while True:
                 idx = file_content.find(old_str, start_idx)
@@ -475,7 +480,7 @@ class DockerEditTool(BaseAnthropicTool):
                 count += 1
                 positions.append(idx)
                 start_idx = idx + len(old_str)
-            
+
             if count == 0:
                 ll.warning(f"String not found in file (after counting): {path}")
                 raise ToolError(
@@ -485,40 +490,44 @@ class DockerEditTool(BaseAnthropicTool):
                 # For multiple occurrences, find the line numbers
                 lines = []
                 for pos in positions:
-                    line_num = file_content[:pos].count('\n') + 1
+                    line_num = file_content[:pos].count("\n") + 1
                     lines.append(line_num)
-                
-                ll.warning(f"Multiple ({count}) occurrences of old_str found in file at lines {lines}")
+
+                ll.warning(
+                    f"Multiple ({count}) occurrences of old_str found in file at lines {lines}"
+                )
                 raise ToolError(
                     f"No replacement was performed. Multiple occurrences of old_str found at lines {lines}. Please ensure it is unique."
                 )
-            
+
             # Perform the replacement
-            new_file_content = file_content.replace(old_str, new_str, 1)  # Replace just once to be safe
-            
+            new_file_content = file_content.replace(
+                old_str, new_str, 1
+            )  # Replace just once to be safe
+
             # Verify the replacement was made
             if new_file_content == file_content:
                 ll.warning("Replacement had no effect on file content")
                 raise ToolError(
-                    f"No changes were made to the file content. The replacement had no effect."
+                    "No changes were made to the file content. The replacement had no effect."
                 )
-            
+
             # Save original content to history before writing new content
             self._file_history[path].append(file_content)
             rr(path)
             # Write the new content to the file
             self.write_file(path, new_file_content)
-            
+
             # Create a snippet showing the edited section
             pos = positions[0]  # We know there's exactly one occurrence
-            lines_before = file_content[:pos].count('\n')
+            lines_before = file_content[:pos].count("\n")
             replacement_line = lines_before + 1
-            
+
             start_line = max(0, replacement_line - SNIPPET_LINES)
-            end_line = replacement_line + SNIPPET_LINES + new_str.count('\n')
-            
-            snippet = "\n".join(new_file_content.split("\n")[start_line:end_line + 1])
-            
+            end_line = replacement_line + SNIPPET_LINES + new_str.count("\n")
+
+            snippet = "\n".join(new_file_content.split("\n")[start_line : end_line + 1])
+
             # Return success
             success_msg = f"The file {path} has been edited. "
             success_msg += self._make_output(
@@ -532,21 +541,21 @@ class DockerEditTool(BaseAnthropicTool):
 
     def insert(self, path: Path, insert_line: int, new_str: str) -> ToolResult:
         """Implement the insert command, which inserts new_str at the specified line in the file content."""
-        #ll.info(f"Starting insert operation at line {insert_line} in file: {path}")
+        # ll.info(f"Starting insert operation at line {insert_line} in file: {path}")
         ll.debug(f"New string length: {len(new_str)}")
         file_text = self.read_file(path).expandtabs()
-        #ll.debug(f"File content read, length: {len(file_text)}")
+        # ll.debug(f"File content read, length: {len(file_text)}")
         new_str = new_str.expandtabs()
         file_text_lines = file_text.split("\n")
         n_lines_file = len(file_text_lines)
-        #ll.debug(f"File has {n_lines_file} lines")
+        # ll.debug(f"File has {n_lines_file} lines")
         if insert_line < 0 or insert_line > n_lines_file:
-            #ll.error(f"Invalid insert line: {insert_line}, valid range is 0 to {n_lines_file}")
+            # ll.error(f"Invalid insert line: {insert_line}, valid range is 0 to {n_lines_file}")
             raise ToolError(
                 f"Invalid `insert_line` parameter: {insert_line}. It should be within the range of lines of the file: {[0, n_lines_file]}"
             )
         new_str_lines = new_str.split("\n")
-        #ll.debug(f"New content has {len(new_str_lines)} lines")
+        # ll.debug(f"New content has {len(new_str_lines)} lines")
         new_file_text_lines = (
             file_text_lines[:insert_line]
             + new_str_lines
@@ -563,7 +572,7 @@ class DockerEditTool(BaseAnthropicTool):
         self.write_file(path, new_file_text)
         ll.debug(f"Saving original content to history for: {path}")
         self._file_history[path].append(file_text)
-        #ll.info(f"Insert operation completed successfully at line {insert_line} in file: {path}")
+        # ll.info(f"Insert operation completed successfully at line {insert_line} in file: {path}")
         success_msg = f"The file {path} has been edited. "
         success_msg += self._make_output(
             snippet,
@@ -575,17 +584,17 @@ class DockerEditTool(BaseAnthropicTool):
 
     def undo_edit(self, path: Path) -> ToolResult:
         """Implement the undo_edit command."""
-        #ll.info(f"Starting undo operation for file: {path}")
+        # ll.info(f"Starting undo operation for file: {path}")
         if not self._file_history[path]:
             ll.warning(f"No edit history found for file: {path}")
             raise ToolError(f"No edit history found for {path}.")
-        ll.debug(f"Retrieving previous version from history")
+        ll.debug("Retrieving previous version from history")
         old_text = self._file_history[path].pop()
         ll.debug(f"Previous version retrieved, length: {len(old_text)}")
-        ll.debug(f"Writing previous version back to file")
+        ll.debug("Writing previous version back to file")
         self.write_file(path, old_text)
 
-        #ll.info(f"Undo operation completed successfully for file: {path}")
+        # ll.info(f"Undo operation completed successfully for file: {path}")
         return ToolResult(
             output=f"Last edit to {path} undone successfully. {self._make_output(old_text, str(path))}"
         )
@@ -604,27 +613,29 @@ class DockerEditTool(BaseAnthropicTool):
 
     def write_file(self, path: Path, file: str):
         """Write file content to Docker container."""
-        #ll.info(f"Writing file to Docker: {path}, content length: {len(file)}")
+        # ll.info(f"Writing file to Docker: {path}, content length: {len(file)}")
         # Use DockerService to write the file by copying it into the container
         docker_file = self.docker.to_docker_path(path).as_posix()  # CHANGED
-        #ll.debug(f"Converted to Docker path: {docker_file}")
-        
+        # ll.debug(f"Converted to Docker path: {docker_file}")
+
         # Create parent directory in Docker container
         # #ll.debug(f"Creating parent directory in Docker: {parent_dir}")
         # mkdir_result = self.docker.execute_command(f"mkdir -p {parent_dir}")
         # if not mkdir_result.success:
         #     #ll.error(f"Failed to create parent directory: {mkdir_result.stderr}")
-        
+
         # Write the file content to a temporary file and copy it to the Docker
-        import tempfile, os, subprocess
+        import tempfile
+        import subprocess
+
         fd, temp_path = tempfile.mkstemp(text=True)
-        #ll.debug(f"Created temporary file: {temp_path}")
+        # ll.debug(f"Created temporary file: {temp_path}")
         try:
-            #ll.debug("Writing content to temporary file")
+            # ll.debug("Writing content to temporary file")
             with os.fdopen(fd, "w", encoding="utf-8") as temp_file:
                 temp_file.write(file)
-            
-            #ll.debug(f"Copying temporary file to Docker container: {docker_file}")
+
+            # ll.debug(f"Copying temporary file to Docker container: {docker_file}")
             docker_cmd = f'docker cp "{temp_path}" {self.docker._container_name}:"{docker_file}"'  # CHANGED
             ll.debug(f"Docker command: {docker_cmd}")
             subprocess.run(
@@ -632,16 +643,16 @@ class DockerEditTool(BaseAnthropicTool):
                 shell=True,
                 check=True,
             )
-            
+
         except Exception as docker_e:
-            #ll.error(f"Docker write operation failed: {str(docker_e)}")
+            # ll.error(f"Docker write operation failed: {str(docker_e)}")
             raise ToolError(f"Docker write failed: {str(docker_e)}")
         finally:
             ll.debug(f"Removing temporary file: {temp_path}")
             os.unlink(temp_path)
 
         try:
-            #ll.debug(f"Logging file operation: {path}")
+            # ll.debug(f"Logging file operation: {path}")
             log_file_operation(path, "modify")
         except Exception as log_e:
             ll.warning(f"Failed to log file operation: {str(log_e)}")
@@ -652,9 +663,9 @@ class DockerEditTool(BaseAnthropicTool):
         file_descriptor: str,
         init_line: int = 1,
         expand_tabs: bool = True,
-        ) -> str:
+    ) -> str:
         """Generate output for the CLI based on the content of a file."""
-        #ll.debug(f"Formatting output for {file_descriptor}, starting at line {init_line}")
+        # ll.debug(f"Formatting output for {file_descriptor}, starting at line {init_line}")
         file_content = maybe_truncate(file_content)
         if expand_tabs:
             file_content = file_content.expandtabs()
@@ -664,7 +675,7 @@ class DockerEditTool(BaseAnthropicTool):
                 for i, line in enumerate(file_content.split("\n"))
             ]
         )
-        #ll.debug(f"Output formatting completed, length: {len(file_content)}")
+        # ll.debug(f"Output formatting completed, length: {len(file_content)}")
         return (
             f"Here's the result of running ` -n` on {file_descriptor}:\n"
             + file_content

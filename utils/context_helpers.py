@@ -1,22 +1,20 @@
-from typing import Any, Callable, Dict, List, Optional, cast
-from anthropic import Anthropic, APIResponse
+from typing import Any, Dict, List
 from anthropic.types.beta import (
-    BetaCacheControlEphemeralParam,
-    BetaContentBlock,
     BetaMessageParam,
-    BetaTextBlockParam,
-    BetaToolResultBlockParam,
 )
 import os
 from utils.agent_display_web_with_prompt import AgentDisplayWebWithPrompt
 from load_constants import *
+from config import write_to_file
 from utils.file_logger import aggregate_file_states
 from openai import OpenAI
-from icecream import ic, install
+from icecream import ic
 from rich import print as rr
+
 ic.configureOutput(includeContext=True, outputFunction=write_to_file)
 
 QUICK_SUMMARIES = []
+
 
 def format_messages_to_restart(messages):
     """
@@ -30,9 +28,7 @@ def format_messages_to_restart(messages):
                 for content_block in msg["content"]:
                     if isinstance(content_block, dict):
                         if content_block.get("type") == "tool_result":
-                            output_pieces.append(
-                                f"\nResult:"  
-                            )
+                            output_pieces.append("\nResult:")
                             for item in content_block.get("content", []):
                                 if item.get("type") == "text":
                                     output_pieces.append(f"\n{item.get('text')}")
@@ -48,6 +44,7 @@ def format_messages_to_restart(messages):
     except Exception as e:
         return f"Error during formatting: {str(e)}"
 
+
 def format_messages_to_string(messages):
     """
     Format a list of messages into a formatted string.
@@ -61,13 +58,15 @@ def format_messages_to_string(messages):
                     if isinstance(content_block, dict):
                         if content_block.get("type") == "tool_result":
                             output_pieces.append(
-                                f"\nTool Result [ID: {content_block.get('name', 'unknown')}]:"  
+                                f"\nTool Result [ID: {content_block.get('name', 'unknown')}]:"
                             )
                             for item in content_block.get("content", []):
                                 if item.get("type") == "text":
                                     output_pieces.append(f"\nText: {item.get('text')}")
                                 elif item.get("type") == "image":
-                                    output_pieces.append("\nImage Source: base64 source too big")
+                                    output_pieces.append(
+                                        "\nImage Source: base64 source too big"
+                                    )
                         else:
                             for key, value in content_block.items():
                                 output_pieces.append(f"\n{key}: {value}")
@@ -80,43 +79,56 @@ def format_messages_to_string(messages):
     except Exception as e:
         return f"Error during formatting: {str(e)}"
 
-async def summarize_recent_messages(short_messages: List[BetaMessageParam], display: AgentDisplayWebWithPrompt) -> str:   
-    """ 
-    Summarize the most recent messages. 
+
+async def summarize_recent_messages(
+    short_messages: List[BetaMessageParam], display: AgentDisplayWebWithPrompt
+) -> str:
     """
-    googlepro = "google/gemini-2.5-pro-preview-03-25"
-    oa4omini = "openai/o4-mini-high"
+    Summarize the most recent messages.
+    """
     gflash = "google/gemini-2.5-flash-preview"
     try:
         OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
         sum_client = OpenAI(
             base_url="https://openrouter.ai/api/v1",
             api_key=OPENROUTER_API_KEY,
-            )
+        )
         all_summaries = get_all_summaries()
         model = gflash
         conversation_text = ""
         for msg in short_messages:
-            role = msg['role'].upper()
-            if isinstance(msg['content'], list):
-                for block in msg['content']:
+            role = msg["role"].upper()
+            if isinstance(msg["content"], list):
+                for block in msg["content"]:
                     if isinstance(block, dict):
-                        if block.get('type') == 'text':
-                            content = block.get('text', '')
+                        if block.get("type") == "text":
+                            content = block.get("text", "")
                             if len(content) > 150000:
-                                content = content[:70000] + " ... [TRUNCATED] ... " + content[-70000:]
+                                content = (
+                                    content[:70000]
+                                    + " ... [TRUNCATED] ... "
+                                    + content[-70000:]
+                                )
                             conversation_text += f"\n{role}: {content}"
-                        elif block.get('type') == 'tool_result':
-                            for item in block.get('content', []):
-                                if item.get('type') == 'text':
-                                    content = item.get('text', '')
+                        elif block.get("type") == "tool_result":
+                            for item in block.get("content", []):
+                                if item.get("type") == "text":
+                                    content = item.get("text", "")
                                     if len(content) > 150000:
-                                        content = content[:70000] + " ... [TRUNCATED] ... " + content[-70000:]
-                                    conversation_text += f"\n{role} (Tool Result): {content}"
+                                        content = (
+                                            content[:70000]
+                                            + " ... [TRUNCATED] ... "
+                                            + content[-70000:]
+                                        )
+                                    conversation_text += (
+                                        f"\n{role} (Tool Result): {content}"
+                                    )
             else:
-                content = msg['content']
+                content = msg["content"]
                 if len(content) > 150000:
-                    content = content[:70000] + " ... [TRUNCATED] ... " + content[-70000:]
+                    content = (
+                        content[:70000] + " ... [TRUNCATED] ... " + content[-70000:]
+                    )
                 conversation_text += f"\n{role}: {content}"
         ic(f"conversation_text: {conversation_text}")
         summary_prompt = f"""Please provide your response in a concise markdown format with short statements that document what happened. Structure your response as a list with clear labels for each step, such as:
@@ -131,26 +143,8 @@ async def summarize_recent_messages(short_messages: List[BetaMessageParam], disp
             Please be specific but concise, focusing on documenting the sequence of events in this structured format.
             Messages to summarize:
             {conversation_text}"""
-        messages_prompt = [
-            {
-                "role": "user",
-                "content": 
-                    [
-                        {
-                            "type": "text",
-                            "text": summary_prompt
-                        },
-                    ]
-            }
-                ]
         response = sum_client.chat.completions.create(
-            model=model,
-            messages=[
-                {
-                    "role": "user",
-                    "content": summary_prompt
-                }
-            ]
+            model=model, messages=[{"role": "user", "content": summary_prompt}]
         )
         ic(f"response: {response}")
 
@@ -176,10 +170,11 @@ async def summarize_recent_messages(short_messages: List[BetaMessageParam], disp
         ic(error_msg)
         return error_msg
 
+
 def filter_messages(messages: List[Dict]) -> List[Dict]:
-    """    
-        Keep only messages with role 'user' or 'assistant'.
-        Also keep any tool_result messages that contain errors.
+    """
+    Keep only messages with role 'user' or 'assistant'.
+    Also keep any tool_result messages that contain errors.
     """
     keep_roles = {"user", "assistant"}
     filtered = []
@@ -199,6 +194,7 @@ def filter_messages(messages: List[Dict]) -> List[Dict]:
                         break
     return filtered
 
+
 def extract_text_from_content(content: Any) -> str:
     if isinstance(content, str):
         return content
@@ -215,6 +211,7 @@ def extract_text_from_content(content: Any) -> str:
         return " ".join(text_parts)
     return ""
 
+
 def truncate_message_content(content: Any, max_length: int = 150_000) -> Any:
     if isinstance(content, str):
         if len(content) > max_length:
@@ -223,54 +220,72 @@ def truncate_message_content(content: Any, max_length: int = 150_000) -> Any:
     elif isinstance(content, list):
         return [truncate_message_content(item, max_length) for item in content]
     elif isinstance(content, dict):
-        return {k: truncate_message_content(v, max_length) if k != 'source' else v
-                for k, v in content.items()}
+        return {
+            k: truncate_message_content(v, max_length) if k != "source" else v
+            for k, v in content.items()
+        }
     return content
+
 
 def add_summary(summary: str) -> None:
     """Add a new summary to the global list with timestamp."""
     QUICK_SUMMARIES.append(summary.strip())
 
+
 def get_all_summaries() -> str:
     """Combine all summaries into a chronological narrative."""
     if not QUICK_SUMMARIES:
         return "No summaries available yet."
-    
+
     combined = "\n"
     for entry in QUICK_SUMMARIES:
         combined += f"{entry}\n"
     return combined
 
+
 async def reorganize_context(messages: List[BetaMessageParam], summary: str) -> str:
-    """ Reorganize the context by filtering and summarizing messages. """
+    """Reorganize the context by filtering and summarizing messages."""
     conversation_text = ""
 
     # Look for tool results related to image generation
     image_generation_results = []
 
     for msg in messages:
-        role = msg['role'].upper()
-        if isinstance(msg['content'], list):
-            for block in msg['content']:
+        role = msg["role"].upper()
+        if isinstance(msg["content"], list):
+            for block in msg["content"]:
                 if isinstance(block, dict):
-                    if block.get('type') == 'text':
+                    if block.get("type") == "text":
                         conversation_text += f"\n{role}: {block.get('text', '')}"
-                    elif block.get('type') == 'tool_result':
+                    elif block.get("type") == "tool_result":
                         # Track image generation results
-                        if any("picture_generation" in str(item) for item in block.get('content', [])):
-                            for item in block.get('content', []):
-                                if item.get('type') == 'text' and 'Generated image' in item.get('text', ''):
-                                    image_generation_results.append(item.get('text', ''))
+                        if any(
+                            "picture_generation" in str(item)
+                            for item in block.get("content", [])
+                        ):
+                            for item in block.get("content", []):
+                                if item.get(
+                                    "type"
+                                ) == "text" and "Generated image" in item.get(
+                                    "text", ""
+                                ):
+                                    image_generation_results.append(
+                                        item.get("text", "")
+                                    )
 
-                        for item in block.get('content', []):
-                            if item.get('type') == 'text':
-                                conversation_text += f"\n{role} (Tool Result): {item.get('text', '')}"
+                        for item in block.get("content", []):
+                            if item.get("type") == "text":
+                                conversation_text += (
+                                    f"\n{role} (Tool Result): {item.get('text', '')}"
+                                )
         else:
             conversation_text += f"\n{role}: {msg['content']}"
 
     # Add special section for image generation if we found any
     if image_generation_results:
-        conversation_text += "\n\nIMAGE GENERATION RESULTS:\n" + "\n".join(image_generation_results)
+        conversation_text += "\n\nIMAGE GENERATION RESULTS:\n" + "\n".join(
+            image_generation_results
+        )
     ic(f"conversation_text: {conversation_text}")
     summary_prompt = f"""I need a summary of completed steps and next steps for a project that is ALREADY IN PROGRESS. 
     This is NOT a new project - you are continuing work on an existing codebase.
@@ -321,11 +336,7 @@ async def reorganize_context(messages: List[BetaMessageParam], summary: str) -> 
         )
         model = "meta-llama/llama-3.3-70b-instruct:nitro"
         response = sum_client.chat.completions.create(
-            model=model,
-            messages=[{
-                "role": "user",
-                "content": summary_prompt
-            }]
+            model=model, messages=[{"role": "user", "content": summary_prompt}]
         )
         ic(f"response: {response}")
         if not response or not response.choices:
@@ -339,14 +350,18 @@ async def reorganize_context(messages: List[BetaMessageParam], summary: str) -> 
         start_tag = "<COMPLETED>"
         end_tag = "</COMPLETED>"
         if start_tag in summary and end_tag in summary:
-            completed_items = summary[summary.find(start_tag)+len(start_tag):summary.find(end_tag)]
+            completed_items = summary[
+                summary.find(start_tag) + len(start_tag) : summary.find(end_tag)
+            ]
         else:
             completed_items = "No completed items found."
 
         start_tag = "<NEXT_STEPS>"
         end_tag = "</NEXT_STEPS>"
         if start_tag in summary and end_tag in summary:
-            steps = summary[summary.find(start_tag)+len(start_tag):summary.find(end_tag)]
+            steps = summary[
+                summary.find(start_tag) + len(start_tag) : summary.find(end_tag)
+            ]
         else:
             steps = "No steps found."
 
@@ -355,9 +370,15 @@ async def reorganize_context(messages: List[BetaMessageParam], summary: str) -> 
     except Exception as e:
         ic(f"Error in reorganize_context: {str(e)}")
         # Return default values in case of error
-        return "Error processing context. Please try again.", "Error processing steps. Please try again."
+        return (
+            "Error processing context. Please try again.",
+            "Error processing steps. Please try again.",
+        )
 
-async def refresh_context_async(task: str, messages: List[Dict], display: AgentDisplayWebWithPrompt,client) -> str:
+
+async def refresh_context_async(
+    task: str, messages: List[Dict], display: AgentDisplayWebWithPrompt, client
+) -> str:
     """
     Create a combined context string by filtering and (if needed) summarizing messages
     and appending current file contents.
@@ -368,10 +389,13 @@ async def refresh_context_async(task: str, messages: List[Dict], display: AgentD
 
     file_contents = aggregate_file_states()
     if len(file_contents) > 200000:
-        file_contents = file_contents[:70000] + " ... [TRUNCATED] ... " + file_contents[-70000:]
+        file_contents = (
+            file_contents[:70000] + " ... [TRUNCATED] ... " + file_contents[-70000:]
+        )
 
     # Get code skeletons
     from utils.file_logger import get_all_current_skeleton
+
     code_skeletons = get_all_current_skeleton()
     if not code_skeletons or code_skeletons == "No Python files have been tracked yet.":
         code_skeletons = "No code skeletons available."
@@ -406,7 +430,6 @@ async def refresh_context_async(task: str, messages: List[Dict], display: AgentD
         max_tokens=MAX_SUMMARY_TOKENS,
     )
     new_task = response.content[0].text
-
 
     combined_content = f"""Original request: 
     {task}

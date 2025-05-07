@@ -9,64 +9,62 @@ windows_navigate_function = {
             "action": {
                 "type": "string",
                 "enum": list(shortcuts.keys()),
-                "description": "The Windows action to perform."
+                "description": "The Windows action to perform.",
             },
             "modifier": {
                 "type": ["string", "null"],
                 "enum": ["ctrl", "alt", "shift", "win"],
-                "description": "Optional modifier key."
+                "description": "Optional modifier key.",
             },
             "target": {
                 "type": ["string", "null"],
-                "description": "Optional target for the action (e.g., window title)."
-            }
+                "description": "Optional target for the action (e.g., window title).",
+            },
         },
         "required": ["action"],
     },
 }
-edit_file_function =  {
-        "name": "edit_file",
-        "description": "Custom editing tool for viewing, creating and editing files. State is persistent across command calls and discussions with the user.",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "command": {
-                    "type": "string",
-                    "enum": ["view", "create", "str_replace", "insert", "undo_edit"],
-                    "description": "The command to run."
-                },
-                "path": {
-                    "type": "string",
-                    "description": "Absolute path to file or directory, e.g. '/repo/file.py' or '/repo'."
-                },
-                "file_text": {
-                    "type": "string",
-                    "description": "Required parameter of 'create' command, with the content of the file to be created."
-                },
-                "view_range": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    },
-                    "minItems": 2,
-                    "maxItems": 2,
-                    "description": "Optional parameter of 'view' command when 'path' points to a file. If none is given, the full file is shown. If provided, the file will be shown in the indicated line number range, e.g. [11, 12] will show lines 11 and 12. Indexing at 1 to start. Setting [start_line, -1] shows all lines from start_line to the end of the file."
-                },
-                "old_str": {
-                    "type": "string",
-                    "description": "Required parameter of 'str_replace' command containing the string in 'path' to replace."
-                },
-                "new_str": {
-                    "type": "string",
-                    "description": "Optional parameter of 'str_replace' command containing the new string (if not given, no string will be added). Required parameter of 'insert' command containing the string to insert."
-                },
-                "insert_line": {
-                    "type": "integer",
-                    "description": "Required parameter of 'insert' command. The 'new_str' will be inserted AFTER the line 'insert_line' of 'path'."
-                }
+edit_file_function = {
+    "name": "edit_file",
+    "description": "Custom editing tool for viewing, creating and editing files. State is persistent across command calls and discussions with the user.",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "command": {
+                "type": "string",
+                "enum": ["view", "create", "str_replace", "insert", "undo_edit"],
+                "description": "The command to run.",
             },
-            "required": ["command", "path"]
-        }
+            "path": {
+                "type": "string",
+                "description": "Absolute path to file or directory, e.g. '/repo/file.py' or '/repo'.",
+            },
+            "file_text": {
+                "type": "string",
+                "description": "Required parameter of 'create' command, with the content of the file to be created.",
+            },
+            "view_range": {
+                "type": "array",
+                "items": {"type": "integer"},
+                "minItems": 2,
+                "maxItems": 2,
+                "description": "Optional parameter of 'view' command when 'path' points to a file. If none is given, the full file is shown. If provided, the file will be shown in the indicated line number range, e.g. [11, 12] will show lines 11 and 12. Indexing at 1 to start. Setting [start_line, -1] shows all lines from start_line to the end of the file.",
+            },
+            "old_str": {
+                "type": "string",
+                "description": "Required parameter of 'str_replace' command containing the string in 'path' to replace.",
+            },
+            "new_str": {
+                "type": "string",
+                "description": "Optional parameter of 'str_replace' command containing the new string (if not given, no string will be added). Required parameter of 'insert' command containing the string to insert.",
+            },
+            "insert_line": {
+                "type": "integer",
+                "description": "Required parameter of 'insert' command. The 'new_str' will be inserted AFTER the line 'insert_line' of 'path'.",
+            },
+        },
+        "required": ["command", "path"],
+    },
 }
 bash_command_function = {
     "name": "bash_command",
@@ -76,9 +74,9 @@ bash_command_function = {
         "properties": {
             "command": {
                 "type": "string",
-                "description": "The bash command to be executed."
+                "description": "The bash command to be executed.",
             }
         },
-        "required": ["command"]
-    }
+        "required": ["command"],
+    },
 }

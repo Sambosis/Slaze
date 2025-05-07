@@ -1,19 +1,23 @@
 import openai
 import json
 import os
-from windows_navigation import WindowsNavigationTool
 from edit import edit_file, edit_file_function
-from bash import bash_command,bash_command_function
+from bash import bash_command, bash_command_function
+
 # from function_schema import windows_navigate_function, edit_file_function, bash_command_function
 from dotenv import load_dotenv
 from rich import print as rr
+
 # Load environment variables from .env file
 load_dotenv()
 from tenacity import retry, stop_after_attempt, wait_fixed
+
 # Set your OpenAI API key securely
-openai.api_key = os.getenv('OPENAI_API_KEY')
+openai.api_key = os.getenv("OPENAI_API_KEY")
 
 model = "gpt-4o"
+
+
 def process_tool_calls(tool_calls):
     """Process all tool calls in parallel and return their results."""
     results = []
@@ -34,12 +38,16 @@ def process_tool_calls(tool_calls):
         else:
             result = f"Function '{function_name}' is not supported."
 
-        results.append({
-            "role": "tool",
-            "content": json.dumps(result),  # Ensure the result is JSON-serializable
-            "tool_call_id": tool_call.id
-        })
+        results.append(
+            {
+                "role": "tool",
+                "content": json.dumps(result),  # Ensure the result is JSON-serializable
+                "tool_call_id": tool_call.id,
+            }
+        )
     return results
+
+
 @retry(stop=stop_after_attempt(3), wait=wait_fixed(2))
 def dodo(messages, tools):
     rr("messages:", messages)
@@ -50,32 +58,29 @@ def dodo(messages, tools):
     )
     return response
 
+
 def main():
     tools = [
-        {
-            "type": "function",
-            "function": windows_navigate_function
-        },
-        {
-            "type": "function",
-            "function": edit_file_function
-        },
-        {
-            "type": "function",
-            "function": bash_command_function
-        }
+        {"type": "function", "function": windows_navigate_function},
+        {"type": "function", "function": edit_file_function},
+        {"type": "function", "function": bash_command_function},
     ]
 
     # Initialize conversation with a system message
     messages = [
-        {"role": "system", "content": "You are an assistant that can perform call functions to operate a computer."}
+        {
+            "role": "system",
+            "content": "You are an assistant that can perform call functions to operate a computer.",
+        }
     ]
     first = True
-    i=0
+    i = 0
     while True:
         i += 1
         if first:
-            with open(r"C:\mygit\compuse\computer_use_demo\prompts\prompt copy.md", "r") as file:
+            with open(
+                r"C:\mygit\compuse\computer_use_demo\prompts\prompt copy.md", "r"
+            ) as file:
                 prompt = file.read()
             user_input = prompt
             # Add user input to the conversation
@@ -91,7 +96,9 @@ def main():
                 break
         else:
             # Add user input to the conversation
-            messages.append({"role": "user", "content": "Continue working towards your goal."})
+            messages.append(
+                {"role": "user", "content": "Continue working towards your goal."}
+            )
         try:
             # Make the first API call
             response = dodo(messages, tools)
@@ -109,8 +116,7 @@ def main():
                 # rr("messages", messages)
                 # After processing all tool calls, make a follow-up API call
                 follow_up_response = openai.chat.completions.create(
-                    model=model,
-                    messages=messages
+                    model=model, messages=messages
                 )
 
                 # Extract and display the assistant's follow-up response

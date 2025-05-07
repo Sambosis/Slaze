@@ -1,25 +1,33 @@
 import difflib
 import pandas as pd
 from typing import Optional, Literal, TypedDict
+
 # from tools import ToolResult, , BaseAnthropicTool  # Adjust the import path as necessary
 from enum import StrEnum
 from .base import ToolError, ToolResult, BaseAnthropicTool
 from icecream import ic
 from playwright.async_api import async_playwright
 import os
+
+
 class Resolution(TypedDict):
     width: int
     height: int
+
+
 from rich import print as rr
+
 
 class ScalingSource(StrEnum):
     COMPUTER = "computer"
     API = "api"
 
+
 class Options(TypedDict):
     display_height_px: int
     display_width_px: int
     display_number: Optional[int]
+
 
 class GoToURLReportsTool(BaseAnthropicTool):
     """
@@ -55,18 +63,18 @@ class GoToURLReportsTool(BaseAnthropicTool):
                     "command": {
                         "type": "string",
                         "enum": ["list_reports", "run_report"],
-                        "description": "The command to execute. Either 'list_reports' to list all reports or 'run_report' to execute a specific report."
+                        "description": "The command to execute. Either 'list_reports' to list all reports or 'run_report' to execute a specific report.",
                     },
                     "report_name": {
                         "type": "string",
-                        "description": "The name of the report to run. Required if command is 'run_report'."
-                    }
+                        "description": "The name of the report to run. Required if command is 'run_report'.",
+                    },
                 },
                 "required": ["command"],
-            }
+            },
         }
-        
-    async def __call__(     
+
+    async def __call__(
         self,
         *,
         command: Literal["list_reports", "run_report"],
@@ -80,7 +88,9 @@ class GoToURLReportsTool(BaseAnthropicTool):
             return await self.list_reports()
         elif command == "run_report":
             if not report_name:
-                raise ToolError("Parameter `report_name` is required for command: run_report")
+                raise ToolError(
+                    "Parameter `report_name` is required for command: run_report"
+                )
             return await self.run_report(report_name)
         else:
             raise ToolError(
@@ -93,8 +103,10 @@ class GoToURLReportsTool(BaseAnthropicTool):
         """
         try:
             # Example: Replace with your actual data source
-            df = pd.read_csv(r"C:\Users\Machine81\code\anthropic-quickstarts\computer-use-demo\computer_use_demo\filtered_links.csv")  # Ensure this path is correct
-            report_list = "\n".join(f"- {name}" for name in df['display_name'])
+            df = pd.read_csv(
+                r"C:\Users\Machine81\code\anthropic-quickstarts\computer-use-demo\computer_use_demo\filtered_links.csv"
+            )  # Ensure this path is correct
+            report_list = "\n".join(f"- {name}" for name in df["display_name"])
             # ic(report_list)
             return ToolResult(output=f"Available Reports:\n{report_list}")
         except Exception as e:
@@ -106,25 +118,34 @@ class GoToURLReportsTool(BaseAnthropicTool):
         """
         try:
             # Example: Replace with your actual data source
-            df = pd.read_csv(r"C:\Users\Machine81\code\anthropic-quickstarts\computer-use-demo\computer_use_demo\filtered_links.csv")  # Ensure this path is correct
+            df = pd.read_csv(
+                r"C:\Users\Machine81\code\anthropic-quickstarts\computer-use-demo\computer_use_demo\filtered_links.csv"
+            )  # Ensure this path is correct
             ic(df.head())
             # replace _ with space in report_name
             report_name = report_name.replace("_", " ")
             rr(report_name)
-            matches = difflib.get_close_matches(report_name, df['display_name'], n=1, cutoff=0.1,)
+            matches = difflib.get_close_matches(
+                report_name,
+                df["display_name"],
+                n=1,
+                cutoff=0.1,
+            )
             ic(matches)
             if not matches:
                 raise ToolError(f"No matching report found for '{report_name}'.")
 
             best_match = matches[0]
 
-            url_suffix = df.loc[df['display_name'] == best_match, 'url'].iloc[0]
+            url_suffix = df.loc[df["display_name"] == best_match, "url"].iloc[0]
             full_url = f"https://www.autochlor.net/wps/{url_suffix}"
             ic(f"Full URL: {full_url}")
             async with async_playwright() as p:
                 browser = await p.chromium.launch(headless=False)
                 ic
-                context = await browser.new_context(storage_state=r"C:\mygit\compuse\computer_use_demo\state.json")
+                context = await browser.new_context(
+                    storage_state=r"C:\mygit\compuse\computer_use_demo\state.json"
+                )
                 ic(context)
                 page = await context.new_page()
                 ic(page)
@@ -135,26 +156,24 @@ class GoToURLReportsTool(BaseAnthropicTool):
             return ToolResult(output="That report is available ")
         except Exception as e:
             raise ToolError(f"Failed to run report '{report_name}': {str(e)}")
-        
-
 
     async def download_file(self, url: str):
-
         # Initialize Playwright
         async with async_playwright() as p:
             # Launch Chromium with specified user data directory
             browser = await p.chromium.launch(channel="chrome", headless=False)
-            context = browser.new_context(storage_state=r"C:\mygit\compuse\computer_use_demo\state.json")
+            context = browser.new_context(
+                storage_state=r"C:\mygit\compuse\computer_use_demo\state.json"
+            )
             # Navigate to page (state will be preserved)
-            page.goto('https://www.autochlor.net/wps')
-            
+            page.goto("https://www.autochlor.net/wps")
+
             # Verify state is loaded
-            cookies = context.cookies()
-            local_storage = page.evaluate("""() => {
+            context.cookies()
+            page.evaluate("""() => {
                 return Object.entries(localStorage);
             }""")
-            
- 
+
             # Open a new page
             page = await browser.new_page()
 
@@ -165,8 +184,8 @@ class GoToURLReportsTool(BaseAnthropicTool):
             os.makedirs(download_path, exist_ok=True)
 
             for index, row in df.iterrows():
-                if row['url_type'] == 'File':
-                    file_url = base_url + row['url']
+                if row["url_type"] == "File":
+                    file_url = base_url + row["url"]
                     rr(f"Downloading from URL: {file_url}")
 
                     try:
@@ -174,9 +193,11 @@ class GoToURLReportsTool(BaseAnthropicTool):
                         async with page.expect_download() as download_info:
                             await page.goto(file_url)
                         download = await download_info.value
-                        
+
                         # Save the downloaded file to the specified path
-                        await download.save_as(os.path.join(download_path, download.suggested_filename))
+                        await download.save_as(
+                            os.path.join(download_path, download.suggested_filename)
+                        )
                         rr(f"Downloaded: {download.suggested_filename}")
 
                     except Exception as e:
@@ -184,4 +205,4 @@ class GoToURLReportsTool(BaseAnthropicTool):
                         rr(e)
 
             # Close the browser after all downloads
-            await browser.close()   
+            await browser.close()

@@ -42,7 +42,7 @@ def build_docker_container():
     """Build the Docker container if it doesn't exist"""
     print("Building Docker container for Python development environment...")
     # Get the path to the Dockerfile
-    docker_dir = Path(__file__).parent 
+    docker_dir = Path(__file__).parent
     dockerfile_path = docker_dir / "Dockerfile"
 
     if not dockerfile_path.exists():

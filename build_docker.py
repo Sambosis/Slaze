@@ -15,7 +15,7 @@ def build_and_run():
 
     try:
         print("Building Docker image...")
-        build_result = subprocess.run(
+        subprocess.run(
             ["docker", "build", "-t", image_name, "-f", dockerfile_path, context_path],
             capture_output=False,
             check=True,

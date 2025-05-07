@@ -6,12 +6,12 @@ from typing import Literal, Optional, Dict, Any
 from pathlib import Path
 import json
 import logging
-from .base import BaseAnthropicTool, ToolResult, ToolError
-from rich import print as rr
+from .base import ToolResult
 
 # Configure logging
 logging.basicConfig(level=logging.CRITICAL)
 logger = logging.getLogger(__name__)
+
 
 class WindowsNavigationTool:
     """
@@ -31,13 +31,16 @@ class WindowsNavigationTool:
         self.shortcuts_file = Path(__file__).parent / "windows_shortcuts.json"
         self.shortcuts = self._load_shortcuts()
         self.session_history = []  # Track navigation actions
-        logging.info("WindowsNavigationTool initialized with shortcuts from '%s'", self.shortcuts_file)
+        logging.info(
+            "WindowsNavigationTool initialized with shortcuts from '%s'",
+            self.shortcuts_file,
+        )
 
     def _load_shortcuts(self) -> Dict[str, Any]:
         """Load keyboard shortcuts from JSON file."""
         try:
             if self.shortcuts_file.exists():
-                with open(self.shortcuts_file, 'r') as f:
+                with open(self.shortcuts_file, "r") as f:
                     return json.load(f)
             else:
                 logger.warning(f"Shortcuts file not found at {self.shortcuts_file}")
@@ -59,57 +62,66 @@ class WindowsNavigationTool:
                         "type": "string",
                         "enum": [
                             # Window Management
-                            "switch_window", "open_start_menu", "minimize_window", 
-                            "maximize_window", "restore_window", "close_window", 
-                            "take_screenshot", "go_to_desktop",
-                            "switch_virtual_desktop_left", "switch_virtual_desktop_right",
-                            
+                            "switch_window",
+                            "open_start_menu",
+                            "minimize_window",
+                            "maximize_window",
+                            "restore_window",
+                            "close_window",
+                            "take_screenshot",
+                            "go_to_desktop",
+                            "switch_virtual_desktop_left",
+                            "switch_virtual_desktop_right",
                             # File Explorer
-                            "open_file_explorer", "refresh_explorer",
-                            
+                            "open_file_explorer",
+                            "refresh_explorer",
                             # Taskbar
-                            "open_task_manager", "lock_workstation", "sign_out", 
-                            "hibernate", "sleep",
-                            
+                            "open_task_manager",
+                            "lock_workstation",
+                            "sign_out",
+                            "hibernate",
+                            "sleep",
                             # Clipboard Operations
-                            "copy", "paste", "cut", "select_all",
-                            
+                            "copy",
+                            "paste",
+                            "cut",
+                            "select_all",
                             # System Controls
-                            "open_run_dialog", "open_settings", "open_search",
-                            
+                            "open_run_dialog",
+                            "open_settings",
+                            "open_search",
                             # Accessibility
-                            "toggle_high_contrast", "toggle_narrator", "toggle_magnifier"
+                            "toggle_high_contrast",
+                            "toggle_narrator",
+                            "toggle_magnifier",
                         ],
-                        "description": "The Windows action to perform"
+                        "description": "The Windows action to perform",
                     },
                     "modifier": {
                         "type": "string",
                         "enum": ["ctrl", "alt", "shift", "win"],
-                        "description": "Optional modifier key(s)"
+                        "description": "Optional modifier key(s)",
                     },
                     "target": {
                         "type": "string",
-                        "description": "Optional target for the action (e.g., window title)"
-                    }
+                        "description": "Optional target for the action (e.g., window title)",
+                    },
                 },
-                "required": ["action"]
-            }
+                "required": ["action"],
+            },
         }
 
     async def __call__(
-        self,
-        action: str,
-        modifier: Optional[str] = None,
-        target: Optional[str] = None
+        self, action: str, modifier: Optional[str] = None, target: Optional[str] = None
     ) -> ToolResult:
         """
         Execute the requested Windows action.
-        
+
         Args:
             action (str): The action to perform (must be one of the defined actions)
             modifier (Optional[str]): Optional modifier key(s)
             target (Optional[str]): Optional target for the action
-            
+
         Returns:
             ToolResult: Contains either the success output or error message
         """
@@ -126,10 +138,12 @@ class WindowsNavigationTool:
 
             # Execute the shortcut
             result = await self._execute_action(action, keys, target)
-            
+
             # Log the action
-            self.session_history.append(f"{action}: {result.output if result.output else result.error}")
-            
+            self.session_history.append(
+                f"{action}: {result.output if result.output else result.error}"
+            )
+
             return result
 
         except Exception as e:
@@ -137,7 +151,9 @@ class WindowsNavigationTool:
             logger.error(error_msg)
             return ToolResult(error=error_msg)
 
-    async def _execute_action(self, action: str, keys: list, target: Optional[str] = None) -> ToolResult:
+    async def _execute_action(
+        self, action: str, keys: list, target: Optional[str] = None
+    ) -> ToolResult:
         """Execute a Windows action with the given keys and target."""
         try:
             # Activate window if needed
@@ -154,13 +170,13 @@ class WindowsNavigationTool:
 
             # Handle any follow-up input
             # if target and self.shortcuts.get(action, {}).get("requires_target", False):
-                # pyautogui.typewrite(target)
-                # pyautogui.press('enter')
+            # pyautogui.typewrite(target)
+            # pyautogui.press('enter')
 
             success_msg = f"Successfully executed '{action}'"
             if target:
                 success_msg += f" with target '{target}'"
-            
+
             logger.info(success_msg)
             return ToolResult(output=success_msg)
 

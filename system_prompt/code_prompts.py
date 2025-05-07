@@ -1,4 +1,3 @@
-from config import get_constant 
 from typing import List, Dict, Optional, Any
 
 
@@ -11,7 +10,7 @@ def code_skeleton_prompt(
     all_file_details: Optional[
         List[Dict[str, Any]]
     ] = None,  # Add context of other files
-    ) -> list:
+) -> list:
     """
     Creates a prompt that asks the LLM to generate code skeleton/structure
     based on a description, considering the broader project context.
@@ -118,8 +117,8 @@ def code_prompt_generate(
     skeletons: Optional[str] = None,
     external_imports: Optional[List[str]] = None,
     internal_imports: Optional[List[str]] = None,
-    target_file: Optional[str] = None
-    )-> list:
+    target_file: Optional[str] = None,
+) -> list:
     """
     Generates the prompt messages for code generation, incorporating skeletons and file-specific import lists.
     """
@@ -131,7 +130,7 @@ def code_prompt_generate(
     Overall Project Goal: {agent_task}
 
     You will be given:
-    1.  A detailed description of the code required for the *target file* ({target_file or 'unknown'}).
+    1.  A detailed description of the code required for the *target file* ({target_file or "unknown"}).
     2.  Code skeletons for *all* files in the project (if available). These provide the basic structure (classes, functions, imports).
     3.  A list of required *external* libraries/packages *specifically for the target file*.
     4.  A list of required *internal* modules/files within the project *imported specifically by the target file*.
@@ -139,7 +138,7 @@ def code_prompt_generate(
     6.  (Optional) Research notes related to the task.
 
     Instructions:
-    - Focus *only* on generating the complete code for the specified *target file*: **{target_file or 'unknown'}**.
+    - Focus *only* on generating the complete code for the specified *target file*: **{target_file or "unknown"}**.
     - Use the provided skeletons as a starting point and fill in the implementation details.
     - Ensure all necessary imports (both external and internal, as provided in the lists *for this file*) are included in the generated code for the target file.
     - Adhere strictly to the requirements outlined in the code description for the target file.
@@ -149,33 +148,59 @@ def code_prompt_generate(
     """
 
     user_prompt_parts = [f"## Target File: {target_file or 'unknown'}\n"]
-    user_prompt_parts.append(f"## Code Description for Target File:\n{code_description}\n")
+    user_prompt_parts.append(
+        f"## Code Description for Target File:\n{code_description}\n"
+    )
 
     if skeletons:
-        user_prompt_parts.append(f"## Code Skeletons for Project Files (Context):\n{skeletons}\n") # Clarified context purpose
+        user_prompt_parts.append(
+            f"## Code Skeletons for Project Files (Context):\n{skeletons}\n"
+        )  # Clarified context purpose
     else:
-        user_prompt_parts.append("## No Code Skeletons Currently Available\n")  # Added handling for no skeletons
+        user_prompt_parts.append(
+            "## No Code Skeletons Currently Available\n"
+        )  # Added handling for no skeletons
 
     if external_imports:
-        user_prompt_parts.append(f"## Required External Imports (for {target_file or 'Target File'}):\n- " + "\n- ".join(external_imports) + "\n") # Clarified scope
+        user_prompt_parts.append(
+            f"## Required External Imports (for {target_file or 'Target File'}):\n- "
+            + "\n- ".join(external_imports)
+            + "\n"
+        )  # Clarified scope
     else:
-        user_prompt_parts.append("## No External Imports Currently Available\n")  # Added handling for no external imports
+        user_prompt_parts.append(
+            "## No External Imports Currently Available\n"
+        )  # Added handling for no external imports
     if internal_imports:
-        user_prompt_parts.append(f"## Required Internal Imports (for {target_file or 'Target File'}):\n- " + "\n- ".join(internal_imports) + "\n") # Clarified scope
+        user_prompt_parts.append(
+            f"## Required Internal Imports (for {target_file or 'Target File'}):\n- "
+            + "\n- ".join(internal_imports)
+            + "\n"
+        )  # Clarified scope
     else:
-        user_prompt_parts.append("## No Internal Imports Currently Available\n")  # Added handling for no internal imports
+        user_prompt_parts.append(
+            "## No Internal Imports Currently Available\n"
+        )  # Added handling for no internal imports
 
     if current_code_base:
-        user_prompt_parts.append(f"## Existing Codebase Context:\n```\n{current_code_base}\n```\n")
+        user_prompt_parts.append(
+            f"## Existing Codebase Context:\n```\n{current_code_base}\n```\n"
+        )
     else:
-        user_prompt_parts.append("## No Existing Codebase Context Available\n")  # Added handling for no existing codebase
+        user_prompt_parts.append(
+            "## No Existing Codebase Context Available\n"
+        )  # Added handling for no existing codebase
 
     if research_string:
         user_prompt_parts.append(f"## Research Notes:\n{research_string}\n")
     else:
-        user_prompt_parts.append("## No Research Notes Currently Available\n")  # Added handling for no research notes
+        user_prompt_parts.append(
+            "## No Research Notes Currently Available\n"
+        )  # Added handling for no research notes
 
-    user_prompt_parts.append(f"Please generate the complete code for the target file '{target_file or 'unknown'}' based on its description and the specific imports listed above, using the provided skeletons and context.") # Updated final instruction
+    user_prompt_parts.append(
+        f"Please generate the complete code for the target file '{target_file or 'unknown'}' based on its description and the specific imports listed above, using the provided skeletons and context."
+    )  # Updated final instruction
 
     user_prompt = "\n".join(user_prompt_parts)
 
@@ -216,6 +241,8 @@ PROMPT_FOR_CODE = """I need you to break down a python file in a structured way 
     It should give someone everything they need to know to use the function without needing to read the implementation details.
     Ensure your response is neatly organized in markdown format.
     """
+
+
 def code_prompt_research(current_code_base, code_description):
     messages = [
         {

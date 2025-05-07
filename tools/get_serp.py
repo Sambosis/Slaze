@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+
 class GoogleSearchTool(BaseAnthropicTool):
     """
     A tool that performs Google searches using the SerpAPI service and returns structured results.
@@ -27,19 +28,19 @@ class GoogleSearchTool(BaseAnthropicTool):
                 "properties": {
                     "query": {
                         "type": "string",
-                        "description": "The search query to execute"
+                        "description": "The search query to execute",
                     },
                     "location": {
                         "type": "string",
-                        "description": "Optional location to geo-target results (e.g. 'Baltimore, Maryland, United States')"
+                        "description": "Optional location to geo-target results (e.g. 'Baltimore, Maryland, United States')",
                     },
                     "language": {
                         "type": "string",
-                        "description": "Optional language code (e.g. 'en')"
-                    }
+                        "description": "Optional language code (e.g. 'en')",
+                    },
                 },
-                "required": ["query"]
-            }
+                "required": ["query"],
+            },
         }
 
     async def __call__(
@@ -67,7 +68,7 @@ class GoogleSearchTool(BaseAnthropicTool):
                 "google_domain": "google.com",
                 "gl": "us",
                 "hl": language,
-                "device": "desktop"
+                "device": "desktop",
             }
 
             # Add optional location if provided
