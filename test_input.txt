@@ -1,0 +1,6 @@
+1
+test_console_final
+This is the ultimate test task for the console agent.
+This is line 2.
+
+Hello agent, this is the final test.
