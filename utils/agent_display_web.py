@@ -39,6 +39,14 @@ class AgentDisplayWeb:
         self.user_messages = []
         self.assistant_messages = []
         self.tool_results = []
+        # ---- ADD SAMPLE DATA HERE ----
+        self.add_message('tool', {'type': 'call', 'data': 'ls()'})
+        self.add_message('tool', {'type': 'result', 'data': 'file1.txt\nfile2.py\nREADME.md'})
+        self.add_message('tool', {'type': 'call', 'data': 'read_files(["file1.txt"])'})
+        self.add_message('tool', {'type': 'result', 'data': 'This is the content of file1.txt. It is a text file with multiple lines.\nLine 2 here.\nAnd a third line.'})
+        self.add_message('tool', {'type': 'call', 'data': 'bash_command("grep -r \'TODO\' ./src")'})
+        self.add_message('tool', {'type': 'result', 'data': '# No output or command finished successfully'})
+        # ---- END OF SAMPLE DATA ----
         self.message_queue = Queue()
         # We'll use an asyncio.Queue to deliver user input.
         self.input_queue = asyncio.Queue()
@@ -139,13 +147,26 @@ class AgentDisplayWeb:
         )
 
     def add_message(self, msg_type, content):
-        log_message(msg_type, content)
-        if msg_type == "user":
-            self.user_messages.append(content)
-        elif msg_type == "assistant":
-            self.assistant_messages.append(content)
-        elif msg_type == "tool":
-            self.tool_results.append(content)
+        if msg_type == "tool":
+            if isinstance(content, dict) and 'type' in content:
+                # Content is already structured
+                log_message(msg_type, content.get('data', str(content)))
+                self.tool_results.append(content)
+            elif isinstance(content, str):
+                # Legacy string content, wrap it
+                log_message(msg_type, content)
+                self.tool_results.append({'type': 'result', 'data': content})
+            else:
+                # Fallback for unexpected content types
+                log_message(msg_type, str(content))
+                self.tool_results.append({'type': 'result', 'data': str(content)})
+        else:
+            log_message(msg_type, content)
+            if msg_type == "user":
+                self.user_messages.append(content)
+            elif msg_type == "assistant":
+                self.assistant_messages.append(content)
+        
         self.broadcast_update()
 
     def clear_messages(self, panel):

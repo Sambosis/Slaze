@@ -143,6 +143,35 @@
         max-width: 200px;
         display: inline-block;
     }
+
+    /* New Tool Message Bubble Styles */
+    .tool-call-bubble {
+        background-color: #e0f7fa; /* Light cyan/blue */
+        color: #004d40; /* Dark teal */
+        padding: 10px 15px; /* Overrides p-3 */
+        border-radius: 15px; /* Overrides rounded-lg for a more bubbly look */
+        margin-bottom: 8px;
+        max-width: 75%;
+        margin-right: auto; /* Aligns to the left */
+        border: 1px solid #b2ebf2; /* Light border for definition */
+        word-wrap: break-word; /* Ensure long words break */
+        /* The 'message-enter' class from JS will still apply for animation */
+        /* Base p-3 and rounded-lg from JS are overridden by padding and border-radius here */
+    }
+
+    .tool-result-bubble {
+        background-color: #e8f5e9; /* Light green */
+        color: #1b5e20; /* Dark green */
+        padding: 10px 15px; /* Overrides p-3 */
+        border-radius: 15px; /* Overrides rounded-lg for a more bubbly look */
+        margin-bottom: 8px;
+        max-width: 75%;
+        margin-left: auto; /* Aligns to the right */
+        border: 1px solid #c8e6c9; /* Light border for definition */
+        word-wrap: break-word; /* Ensure long words break */
+        /* The 'message-enter' class from JS will still apply for animation */
+        /* Base p-3 and rounded-lg from JS are overridden by padding and border-radius here */
+    }
 </style>
 </head>
 <body class="bg-gray-100 min-h-screen">
@@ -175,7 +204,7 @@
                 <div class="bg-white rounded-lg panel-shadow p-4 h-full">
                     <div class="flex items-center mb-4 text-purple-600">
                         <i class="fas fa-tools mr-2"></i>
-                        <h2 class="text-xl font-semibold">Tool Results</h2>
+                        <h2 class="text-xl font-semibold">Tool Conversation</h2>
                     </div>
                     <div id="tool_messages" class="messages-container h-[580px] overflow-y-auto space-y-3"></div>
                 </div>
@@ -229,86 +258,100 @@
             console.log("Connected to server");
         });
 
-        function createMessageElement(message, type) {
+        function createMessageElement(message, type) { // Parameter name is 'message' as per original
             var msgElement = document.createElement('div');
-            msgElement.className = `p-3 rounded-lg message-enter ${
-                type === 'assistant' ? 'bg-blue-50 border-l-4 border-blue-500 text-xl' :
-                type === 'tool' ? 'bg-purple-50 border-l-4 border-purple-500' :
-                'bg-green-50 border-l-4 border-green-500'
-            }`;
+            let actualMessageData = message; // This will hold the data to be rendered
+            let baseClasses = 'p-3 rounded-lg message-enter';
+
+            if (type === 'tool') {
+                // Check if message is an object and has 'data' and 'type' properties
+                if (message && typeof message === 'object' && message.data !== undefined && message.type !== undefined) {
+                    actualMessageData = message.data; // Use the 'data' field for content
+                    if (message.type === 'call') {
+                        msgElement.className = `${baseClasses} tool-call-bubble`;
+                    } else if (message.type === 'result') {
+                        msgElement.className = `${baseClasses} tool-result-bubble`;
+                    } else {
+                        // Fallback for unknown tool message.type
+                        msgElement.className = `${baseClasses} bg-yellow-50 border-l-4 border-yellow-500`; 
+                    }
+                } else {
+                     // Fallback for tool message not matching new structure (e.g. if it's just a string)
+                    msgElement.className = `${baseClasses} bg-gray-50 border-l-4 border-gray-500`;
+                    actualMessageData = String(message); // Treat as simple string
+                }
+            } else if (type === 'assistant') {
+                msgElement.className = `${baseClasses} bg-blue-50 border-l-4 border-blue-500 text-xl`;
+            } else { // User messages or any other type
+                msgElement.className = `${baseClasses} bg-green-50 border-l-4 border-green-500`;
+            }
             
-            // Detect markdown code fence
-            if (typeof message === 'string' && message.startsWith('```markdown') && message.trim().endsWith('```')) {
-                // Extract markdown content
-                const md = message.replace(/^```markdown/, '').replace(/```$/, '').trim();
-                // Render markdown to HTML
+            // Now, 'actualMessageData' holds the content to be rendered.
+            // All subsequent logic for parsing markdown, code, html should use 'actualMessageData'.
+
+            if (typeof actualMessageData === 'string' && actualMessageData.startsWith('```markdown') && actualMessageData.trim().endsWith('```')) {
+                const md = actualMessageData.replace(/^```markdown/, '').replace(/```$/, '').trim();
                 msgElement.innerHTML = marked.parse(md);
-            } else if (typeof message === 'object' && message.html) {
-                msgElement.innerHTML = message.html;
-            } else if (typeof message === 'object' && message.code && message.css) {
+            } else if (typeof actualMessageData === 'object' && actualMessageData !== null && actualMessageData.html) {
+                msgElement.innerHTML = actualMessageData.html;
+            } else if (typeof actualMessageData === 'object' && actualMessageData !== null && actualMessageData.code && actualMessageData.css) {
+                // This section handles objects with 'code' and 'css' properties (e.g., Pygments output)
                 if (!document.getElementById('pygments-style')) {
                     var styleElement = document.createElement('style');
                     styleElement.id = 'pygments-style';
-                    styleElement.innerHTML = message.css;
+                    styleElement.innerHTML = actualMessageData.css; // Use actualMessageData.css
                     document.head.appendChild(styleElement);
                 }
                 
-                // Create a temporary div to parse the HTML content
                 const tempDiv = document.createElement('div');
-                tempDiv.innerHTML = message.code;
+                tempDiv.innerHTML = actualMessageData.code; // Use actualMessageData.code
                 
-                // Get all the content from the first row's second column
                 const firstRow = tempDiv.querySelector('.highlight table tr:first-child');
                 const firstLineSecondCol = firstRow ? firstRow.querySelector('td:nth-child(2)') : null;
                 const fullContent = firstLineSecondCol ? firstLineSecondCol.textContent : 'Unknown File';
                 
-                // Truncate to first 70 characters for the collapsed view
                 const truncatedContent = fullContent.substring(0, 70) + (fullContent.length > 70 ? '...' : '');
                 
-                // Create collapsible container with truncated content
                 const collapsibleBtn = document.createElement('button');
                 collapsibleBtn.className = 'collapsible';
                 collapsibleBtn.innerHTML = `<span>${truncatedContent}</span><span>+</span>`;
                 
-                // Create container for the code content
-                const codeContent = document.createElement('div');
-                codeContent.className = 'code-content';
-                codeContent.innerHTML = message.code;
+                const codeContentDiv = document.createElement('div'); 
+                codeContentDiv.className = 'code-content';
+                codeContentDiv.innerHTML = actualMessageData.code; // Use actualMessageData.code for the full content
                 
                 msgElement.appendChild(collapsibleBtn);
-                msgElement.appendChild(codeContent);
+                msgElement.appendChild(codeContentDiv);
                 
-                // Add click event listener
                 collapsibleBtn.addEventListener('click', function() {
                     this.classList.toggle('active');
-                    const content = this.nextElementSibling;
+                    const contentElement = this.nextElementSibling; // Use a different var name
                     
-                    if (content.classList.contains('expanded')) {
-                        content.classList.remove('expanded');
-                        content.style.maxHeight = '0';
+                    if (contentElement.classList.contains('expanded')) {
+                        contentElement.classList.remove('expanded');
+                        contentElement.style.maxHeight = '0';
                     } else {
-                        content.classList.add('expanded');
-                        content.style.maxHeight = content.scrollHeight + 'px';
+                        contentElement.classList.add('expanded');
+                        contentElement.style.maxHeight = contentElement.scrollHeight + 'px';
                     }
                 });
                 
-                // Initial state - collapsed
-                codeContent.style.maxHeight = '0';
+                codeContentDiv.style.maxHeight = '0'; // Initial state - collapsed
                 
             } else {
-                // Check if the string might be code (has backticks or looks like code)
-                if (typeof message === 'string' && (
-                    message.includes('```') || 
-                    message.includes('import ') ||
-                    message.includes('function ') ||
-                    message.includes('class ') ||
-                    /^\s*[{}\[\]();]/.test(message)
+                // Fallback for other types or simple strings
+                if (typeof actualMessageData === 'string' && (
+                    actualMessageData.includes('```') || 
+                    actualMessageData.includes('import ') ||
+                    actualMessageData.includes('function ') ||
+                    actualMessageData.includes('class ') ||
+                    /^\s*[{}\[\]();]/.test(actualMessageData)
                 )) {
-                    // Looks like code - use innerHTML directly
-                    msgElement.innerHTML = message;
+                    // If it looks like code but isn't the structured code object, display as preformatted text
+                    msgElement.innerHTML = `<pre>${actualMessageData.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</pre>`;
                 } else {
-                    // Treat as markdown for better text formatting (links, bold, etc.)
-                    msgElement.innerHTML = marked.parse(String(message));
+                    // Otherwise, parse as markdown
+                    msgElement.innerHTML = marked.parse(String(actualMessageData));
                 }
             }
             
