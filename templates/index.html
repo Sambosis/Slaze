@@ -246,6 +246,7 @@
 
     <script>
         var socket = io({ transports: ['polling'] });
+        var toolChatWindowOpened = false; // Flag to track if the tool chat window has been opened
         
         // Track the last message index we've processed for each type
         var lastMessageIndex = {
@@ -359,6 +360,28 @@
         }
 
         socket.on('update', function(data) {
+            // --- Logic to open tool chat window ---
+            if (!toolChatWindowOpened && data.tool && data.tool.length > 0) {
+                // Check if there are any tool messages and if the window hasn't been opened yet
+                var toolChatWindow = window.open('/tool_chat', 'ToolChatWindow', 'width=800,height=700,resizable=yes,scrollbars=yes');
+                if (toolChatWindow) {
+                    toolChatWindowOpened = true;
+                } else {
+                    // Handle popup blocker
+                    console.warn("Tool chat popup was blocked. Please allow popups for this site.");
+                    // Optionally, display a message to the user in the main UI
+                    var userMessagesDiv = document.getElementById('user_messages');
+                    if (userMessagesDiv) {
+                        var popupMsg = document.createElement('div');
+                        popupMsg.className = 'p-3 rounded-lg bg-yellow-50 border-l-4 border-yellow-500 text-sm';
+                        popupMsg.innerHTML = "<b>Action Required:</b> The Tool Conversation window was blocked by your browser. Please allow popups for this site to see live tool interactions in a separate window.";
+                        userMessagesDiv.appendChild(popupMsg);
+                        userMessagesDiv.scrollTop = userMessagesDiv.scrollHeight;
+                    }
+                }
+            }
+            // --- End of logic to open tool chat window ---
+            
             ['user', 'assistant', 'tool'].forEach(type => {
                 var containerDiv = document.getElementById(`${type}_messages`);
                 
