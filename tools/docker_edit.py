@@ -12,7 +12,7 @@ from config import get_constant, write_to_file
 from utils.file_logger import log_file_operation
 from utils.docker_service import DockerService
 from loguru import logger as ll
-from lmnr import observe
+#from lmnr import observe
 
 # # Configure logging to a file
 # #ll.add(
@@ -130,7 +130,7 @@ class DockerEditTool(BaseAnthropicTool):
             output = f"{output[:5000]} ... (truncated) ... {output[-5000:]}"
         return output
 
-    @observe(name="docker_edit")
+    #observe(name="docker_edit")
     async def __call__(
         self,
         *,

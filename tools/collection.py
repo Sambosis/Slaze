@@ -8,7 +8,7 @@ from .base import (
     BaseAnthropicTool,
     ToolResult,
 )
-from lmnr import observe
+#from lmnr import observe
 class ToolCollection:
     """Collection of tools for the agent to use."""
 
@@ -64,7 +64,6 @@ class ToolCollection:
         ic(f"Total tools collected: {len(tool_params)}")
         ic("---- END COLLECTING TOOL PARAMS ----")
         return tool_params
-    observe()
     async def run(self, name: str, tool_input: Dict[str, Any]) -> ToolResult:
         """
         Run a tool with the given name and input.

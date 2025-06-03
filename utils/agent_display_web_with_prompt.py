@@ -2,14 +2,14 @@
 import asyncio
 from flask import render_template, request, redirect, url_for, send_from_directory
 from dotenv import load_dotenv
-
+from icecream import ic
 load_dotenv()
 from utils.agent_display_web import AgentDisplayWeb
-from config import PROMPTS_DIR, LOGS_DIR, get_docker_project_dir
+from config import LOGS_DIR, get_docker_project_dir, PROMPTS_DIR # Moved import to top
 from openai import OpenAI
 import os
 import ftfy
-
+from rich import print as rr
 
 def start_sampling_loop(task, display):
     """
@@ -27,8 +27,9 @@ def start_sampling_loop(task, display):
 class AgentDisplayWebWithPrompt(AgentDisplayWeb):
     def __init__(self):
         super().__init__()
+        self.prompts_dir = PROMPTS_DIR  # Added initialization
         self.setup_prompt_routes()
-
+    ##observe()
     def setup_prompt_routes(self):
         @self.app.route("/select_prompt", methods=["GET", "POST"])
         def select_prompt():
@@ -39,14 +40,14 @@ class AgentDisplayWebWithPrompt(AgentDisplayWeb):
                     prompt_text = request.form.get("prompt_text")
 
                     if choice == "new":
-                        new_prompt_path = PROMPTS_DIR / f"{filename}.md"
+                        new_prompt_path = self.prompts_dir / f"{filename}.md"
                         print(f"Creating new prompt at {new_prompt_path}")
                         with open(new_prompt_path, "w", encoding="utf-8") as f:
                             f.write(prompt_text)
                         task = prompt_text
                     else:
                         # Handle editing existing prompt
-                        prompt_path = PROMPTS_DIR / choice
+                        prompt_path = self.prompts_dir / choice
                         print(f"Using/updating prompt at {prompt_path}")
                         prompt_text = ftfy.fix_text(prompt_text)  # Fix any text issues
                         # If we have prompt text, it means the user edited the prompt
@@ -96,7 +97,8 @@ class AgentDisplayWebWithPrompt(AgentDisplayWeb):
                     return f"Error processing prompt selection: {e}", 500
             else:
                 try:
-                    prompt_files = list(PROMPTS_DIR.glob("*.md"))
+                    # Use self.prompts_dir from the class instance
+                    prompt_files = list(self.prompts_dir.glob("*.md"))
                     options = [file.name for file in prompt_files]
                     return render_template("select_prompt.html", options=options)
                 except Exception as e:
@@ -105,7 +107,8 @@ class AgentDisplayWebWithPrompt(AgentDisplayWeb):
         @self.app.route("/api/prompts/<filename>")
         def get_prompt_content(filename):
             try:
-                prompt_path = PROMPTS_DIR / filename
+                prompt_path = self.prompts_dir / filename
+                print(prompt_path)
                 if not prompt_path.exists():
                     return "Prompt file not found", 404
 
@@ -187,11 +190,17 @@ class AgentDisplayWebWithPrompt(AgentDisplayWeb):
 
                 traceback.print_exc()
                 return Response(f"Error creating zip file: {str(e)}", status=500)
-
-
+##observe()
 def create_app(loop=None):
     """Create and configure the application with an event loop"""
+    rr("Loop")
+    ic()
+    rr(loop)
     display = AgentDisplayWebWithPrompt()
+    rr("Display")
+    rr(display)
     if loop:
         display.loop = loop
+    rr(display.loop)
+    rr("Display loop set")
     return display.app

@@ -7,7 +7,7 @@ from config import get_constant, check_docker_available, write_to_file
 from .base import BaseAnthropicTool, ToolError, ToolResult
 from utils.agent_display_web_with_prompt import AgentDisplayWebWithPrompt
 from icecream import ic
-from lmnr import observe
+#from lmnr import observe
 
 load_dotenv()
 ic.configureOutput(includeContext=True, outputFunction=write_to_file)
@@ -51,7 +51,7 @@ class BashTool(BaseAnthropicTool):
     name: ClassVar[Literal["bash"]] = "bash"
     api_type: ClassVar[Literal["bash_20250124"]] = "bash_20250124"
 
-    @observe(name="bash_tool")
+    #observe(name="bash_tool")
     async def __call__(self, command: str | None = None, **kwargs):
         if command is not None:
             # Modify commands to exclude hidden files/paths

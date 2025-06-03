@@ -38,7 +38,7 @@ from pygments.formatters import HtmlFormatter
 import ftfy
 from pygments.lexers import get_lexer_by_name, guess_lexer
 import traceback
-from lmnr import observe
+#from lmnr import observe
 
 googlepro = "google/gemini-2.5-pro-preview"
 oa4omini = "openai/o4-mini-high"
@@ -737,7 +737,7 @@ class WriteCodeTool(BaseAnthropicTool):
         return code_string
 
     # --- Refactored Skeleton Generation Method ---
-    @observe(name="generate_code_skeleton")
+    #observe(name="generate_code_skeleton")
     async def _call_llm_for_code_skeleton(
         self, file_detail: FileDetail, file_path: Path, all_file_details: List[FileDetail]
     ) -> str:

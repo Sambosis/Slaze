@@ -26,12 +26,9 @@ from utils.output_manager import *
 from config import *
 from token_tracker import TokenTracker
 
-from lmnr import Laminar, observe
 from dotenv import load_dotenv
 
 load_dotenv()
-
-Laminar.initialize(project_api_key=os.getenv("LAMINAR_API_KEY"))
 
 
 class Agent:
@@ -95,7 +92,7 @@ class Agent:
                 f.write("-" * 50 + "\n")
             f.write("=" * 80 + "\n\n")
 
-    @observe()
+    #observe()
     async def run_tool(self, content_block):
         result = ToolResult(
             output="Tool execution not started", tool_name=content_block["name"]
@@ -213,7 +210,7 @@ class Agent:
     async def step(self):
         """Main sampling loop for the agent."""
         self.step_count += 1
-        Laminar.set_session(session_id=f"step_{self.step_count}")
+        #laminar.set_session(session_id=f"step_{self.step_count}")
         messages = self.messages
         task = self.task
         if self.enable_prompt_caching:

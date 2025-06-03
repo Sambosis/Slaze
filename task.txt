@@ -1,78 +1,45 @@
-# Expanded Description: Pygame Maze Navigation App
+# Deno Demo Application
 
-This project involves creating a visually appealing maze application using Pygame. The application will dynamically generate a new random maze each time it runs or when the previous maze is solved. The key features include:
+I'll create a Deno application that demonstrates various features of the Deno runtime. This will be a single-page web application that showcases Deno's capabilities including:
 
-1. **Dynamic Maze Generation**: A new maze will be generated using a randomized algorithm (such as depth-first search with backtracking) each time the application starts or after a maze is solved.
+1. HTTP server functionality
+2. File system operations
+3. API fetching and JSON handling
+4. TypeScript integration
+5. Third-party module usage
+6. Environment variables
+7. Web standards support
 
-2. **Automated Navigation**: Instead of player input, the application will include an AI agent (using an algorithm like A* or wall-following) that automatically navigates the character through the maze.
+The application will feature a simple UI that allows users to interact with these different features through a web browser, with real-time results display.
 
-3. **Visual Design**: The maze will have appealing graphics with distinct colors for walls, paths, the character, and the goal. Basic animations will be included for the character's movement.
-
-4. **Restart Functionality**: When the AI agent successfully reaches the goal, a new maze will be automatically generated, and the process will start over.
-
-5. **User Interaction**: The only user input will be the ability to press the ESC key to quit the application. No other user inputs will be processed.
-
-6. **Window Configuration**: The application will run in a fixed-size window with appropriate dimensions for maze visibility.
-
-# File Tree
+## File Tree
 
 ```
-maze_app/
-├── main.py                   # Entry point of the application
-├── maze/
-│   ├── __init__.py           # Makes maze directory a package
-│   ├── generator.py          # Contains the maze generation algorithm
-│   └── solver.py             # Contains the AI pathfinding algorithm
-├── game/
-│   ├── __init__.py           # Makes game directory a package
-│   ├── engine.py             # Main game loop and event handling
-│   ├── renderer.py           # Handles drawing the maze and character
-│   └── character.py          # Character class and movement logic
-└── assets/
-    ├── images/
-    │   ├── character.png     # Sprite for the navigating character
-    │   ├── wall.png          # Texture for maze walls
-    │   ├── path.png          # Texture for maze paths
-    │   └── goal.png          # Texture for the maze goal
-    └── sounds/
-        ├── move.wav          # Sound effect for character movement
-        └── success.wav       # Sound effect for reaching the goal
+/deno-demo/
+├── main.ts                 # Entry point for the application, sets up HTTP server
+│                           # Import: import { startServer } from "./server.ts";
+│
+├── server.ts               # HTTP server implementation
+│                           # Import: import { router } from "./routes.ts";
+│
+├── routes.ts               # API route definitions and handlers
+│                           # Import: import { fileOps } from "./features/fileOps.ts";
+│                           # Import: import { apiExample } from "./features/apiExample.ts";
+│
+├── static/                 # Static assets directory
+│   ├── styles.css          # CSS styling for the demo app
+│   ├── app.js              # Client-side JavaScript
+│   └── index.html          # Main HTML page structure
+│
+└── features/               # Feature demonstrations
+    ├── fileOps.ts          # File system operations demo
+    │                       # Import: import * as path from "https://deno.land/std/path/mod.ts";
+    │
+    ├── apiExample.ts       # External API interaction demo
+    │                       # Import: import { delay } from "https://deno.land/std/async/delay.ts";
+    │
+    └── envVars.ts          # Environment variables demo
+                            # No imports needed
 ```
 
-## File Purposes and Import Methods:
-
-1. **main.py**
-   - Purpose: Entry point that initializes and runs the game.
-   - No imports needed for this file.
-
-2. **maze/__init__.py**
-   - Purpose: Makes the maze directory a Python package.
-   - Import: `from maze import generator, solver`
-
-3. **maze/generator.py**
-   - Purpose: Contains algorithms to generate random mazes.
-   - Import: `from maze.generator import MazeGenerator`
-
-4. **maze/solver.py**
-   - Purpose: Contains AI algorithms (like A*) to solve the maze automatically.
-   - Import: `from maze.solver import MazeSolver`
-
-5. **game/__init__.py**
-   - Purpose: Makes the game directory a Python package.
-   - Import: `from game import engine, renderer, character`
-
-6. **game/engine.py**
-   - Purpose: Manages the game loop, event handling, and coordinates other components.
-   - Import: `from game.engine import GameEngine`
-
-7. **game/renderer.py**
-   - Purpose: Handles drawing all game elements to the screen.
-   - Import: `from game.renderer import GameRenderer`
-
-8. **game/character.py**
-   - Purpose: Defines the character class with movement and animation logic.
-   - Import: `from game.character import Character`
-
-9. **assets/images/** and **assets/sounds/**
-   - Purpose: Contains all graphical and audio resources for the game.
-   - These files are not imported directly but loaded at runtime.Start testing as soon as possible. DO NOT start making fixes or improvements until you have tested to see if it is working as is.  Your project directory is /home/myuser/apps/maze. You need to make sure that all files you create and work you do is done in that directory.
+This structure keeps things simple with minimal nesting while providing a clear organization for the different components of the demo application. The application can be run locally using the `deno run --allow-net --allow-read --allow-env main.ts` command, which will start a server that you can access through your web browser at http://localhost:8000.Start testing as soon as possible. DO NOT start making fixes or improvements until you have tested to see if it is working as is.  Your project directory is /home/myuser/apps/deno. You need to make sure that all files you create and work you do is done in that directory.

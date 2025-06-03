@@ -14,7 +14,7 @@ from anthropic.types.beta import (
 )
 from dotenv import load_dotenv
 from icecream import ic, install
-from lmnr import observe
+#from lmnr import observe
 # from traceloop.sdk import Traceloop
 
 from tools import ToolResult
@@ -233,7 +233,7 @@ def _maybe_filter_to_n_most_recent_images(
 
 
 # ----------------  The main Agent Loop ----------------
-@observe()
+#observe()
 async def sampling_loop(
     *,
     agent: Agent,
