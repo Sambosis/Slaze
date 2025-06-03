@@ -1,0 +1,54 @@
+[project]
+name = "slazy"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11,<3.13"
+dependencies = [
+    "anthropic>=0.45.2",
+    "bandit>=1.8.2",
+    "bs4>=0.0.2",
+    "flask-socketio>=5.5.1",
+    "flask>=3.1.0",
+    "ftfy>=6.3.1",
+    "icecream>=2.1.4",
+    "langchain>=0.3.24",
+    "langchain-ai>=0.1.1",
+    "langchain-community>=0.3.17",
+    "loguru>=0.7.3",
+    "mypy>=1.15.0",
+    "openai>=1.61.1",
+    "pandas>=2.2.3",
+    "playwright>=1.50.0",
+    "pyautogui>=0.9.54",
+    "pydeps>=3.0.1",
+    "pysnooper>=1.2.1",
+    "python-dotenv>=0.17.0",
+    "replicate>=1.0.4",
+    "restrictedpython>=8.0",
+    "rich>=13.9.4",
+    "ruff>=0.9.5",
+    "sendgrid>=6.11.0",
+    "tenacity>=9.0.0",
+    "traceloop-sdk>=0.40.2",
+    "ttkbootstrap>=1.12.0",
+    "types-beautifulsoup4>=4.12.0.20250204",
+    "types-pyautogui>=0.9.3.20241230",
+    "unimport>=1.2.1",
+    "waitress>=3.0.2",
+    "langchain-openai>=0.3.14",
+    "pygithub>=2.6.1",
+    "matplotlib>=3.4.0",
+    "gitpython>=3.1.0",
+    "requests>=2.25.0",
+    "lmnr[all]>=0.5.2",
+    "pygame>=2.6.1",
+    "torch>=2.7.0",
+    "gymnasium>=1.1.1",
+    "gym>=0.26.2",
+    "stable-baselines3>=2.6.0",
+]
+
+[tool.uv.workspace]
+
+
