@@ -6,6 +6,7 @@ from pathlib import Path
 from utils.file_logger import convert_to_docker_path
 from config import get_constant, set_project_dir
 
+import os
 
 def test_path_translations():
     """Test various path translation scenarios"""
@@ -24,7 +25,8 @@ def test_path_translations():
     print(f"Project name: {test_project_name}")
     print(f"Repo directory: {repo_dir}")
     print(f"Project directory: {project_dir}")
-    print(f"Docker project directory: {get_constant('DOCKER_PROJECT_DIR')}")
+    dpd = get_constant("DOCKER_PROJECT_DIR")
+    print(f"Docker project directory: {dpd}")
 
     print("\n=== Path Conversion Tests ===\n")
 
@@ -36,7 +38,7 @@ def test_path_translations():
         f"C:\\Users\\Machine81\\Slazy\\repo\\{test_project_name}\\test_file.py",
         f"/c/Users/Machine81/Slazy/repo/{test_project_name}/test_file.py",
         f"{project_dir}\\test_file.py",
-        f" {get_constant('DOCKER_PROJECT_DIR')}\\test_file.py",
+        f" {dpd}\\test_file.py",
         "test_file.py",  # Relative path
     ]
 
@@ -49,7 +51,9 @@ def test_path_translations():
     print("\n=== Path Writing Tests ===\n")
 
     # Create a test directory structure
-    test_dir = project_dir / "test_subdir"
+    # test_dir = project_dir / "test_subdir"
+    # test_dir = repo_dir / "test_subdir_repo"
+    test_dir = dpd / "test_subdir_docker"
     test_dir.mkdir(parents=True, exist_ok=True)
 
     # Create a test file
@@ -62,7 +66,13 @@ def test_path_translations():
     # Read the file back to verify
     content = test_file.read_text(encoding="utf-8")
     print(f"File content: {content}")
+    # Open the file in notepad (uncomment if needed)
+    os.system(f"notepad {test_file}")
+    os.system(f"notepad {convert_to_docker_path(test_file)}")
+    
 
+
+    
     print("\nTests completed!")
 
 

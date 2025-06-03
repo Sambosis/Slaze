@@ -380,6 +380,7 @@ class DockerService:
     def create_virtual_env(self, packages: Optional[List[str]] = None) -> DockerResult:
         """Create a Python virtual environment in the Docker container"""
         # Ensure docker_project_dir is properly formatted with slashes
+        rr("Creating virtual environment in Docker container")
         docker_dir = self._format_docker_path(self._docker_project_dir)
 
         # Log the directory we're using
@@ -387,7 +388,7 @@ class DockerService:
 
         commands = [
             f"cd {docker_dir}",
-            "python3 -m venv .venv",
+            "uv venv .venv",
             # ".venv/bin/pip install --upgrade pip"
         ]
 

@@ -47,17 +47,11 @@ MODEL_STRING = googlepro  # Default model string, can be overridden in config
 
 
 # --- Retry Predicate Function ---
-def should_retry_llm_call(retry_state: RetryCallState) -> bool:
+def should_retry_llm_call(exception: Exception) -> bool:  # Changed signature
     """
     Determines if a retry should occur based on the raised exception.
-    Accesses the exception from retry_state.outcome.exception().
     """
-    if not retry_state.outcome: # Should not happen if called after an attempt
-        return False
-
-    exception = retry_state.outcome.exception()
-    if not exception: # No exception, successful outcome
-        return False
+    # The 'exception' parameter is the actual exception instance.
 
     # Always retry on our custom LLMResponseError
     if isinstance(exception, LLMResponseError):
