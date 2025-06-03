@@ -7,6 +7,7 @@ import os
 from typing import Dict
 from openai import OpenAI
 from icecream import ic
+from rich import print as rr
 
 from tools import (
     BashTool,
@@ -23,12 +24,12 @@ from utils.output_manager import *
 from config import *
 from token_tracker import TokenTracker
 
-from lmnr import Laminar, observe
+# from lmnr import Laminar, observe
 from dotenv import load_dotenv
 
 load_dotenv()
 
-Laminar.initialize(project_api_key=os.getenv("LAMINAR_API_KEY"))
+# Laminar.initialize(project_api_key=os.getenv("LAMINAR_API_KEY"))
 
 
 class Agent:
@@ -95,7 +96,7 @@ class Agent:
                 f.write("-" * 50 + "\n")
             f.write("=" * 80 + "\n\n")
 
-    @observe()
+    ###@observe()
     async def run_tool(self, content_block):
         result = ToolResult(
             output="Tool execution not started", tool_name=content_block["name"]
@@ -109,14 +110,25 @@ class Agent:
                 tool_input=content_block["input"],
             )
             if result is None:
-                result = ToolResult(output="Tool execution failed with no result", tool_name=content_block["name"])
+                result = ToolResult(
+                    output="Tool execution failed with no result",
+                    tool_name=content_block["name"],
+                )
         except Exception as e:
-            result = ToolResult(output=f"Tool execution failed: {str(e)}", tool_name=content_block["name"], error=str(e))
+            result = ToolResult(
+                output=f"Tool execution failed: {str(e)}",
+                tool_name=content_block["name"],
+                error=str(e),
+            )
         finally:
             tool_result = self._make_api_tool_result(result, content_block["id"])
             # ic(tool_result)
-            tool_output = result.output if hasattr(result, 'output') and result.output else str(result)
-            tool_name = content_block['name']
+            tool_output = (
+                result.output
+                if hasattr(result, "output") and result.output
+                else str(result)
+            )
+            tool_name = content_block["name"]
             if len(tool_name) > 64:
                 tool_name = tool_name[:61] + "..."  # Truncate to 61 and add ellipsis
             combined_content = [
@@ -211,8 +223,13 @@ class Agent:
     async def step(self):
         """Run one step of the agent using OpenAI."""
         self.step_count += 1
-        Laminar.set_session(session_id=f"step_{self.step_count}")
+        # Laminar.set_session(session_id=f"step_{self.step_count}")
         messages = self.messages
+        rr(messages)
+        rr(MAIN_MODEL)
+        rr("Tools:")
+        rr(self.tool_params)
+        rr(f"Max Summ Tokens {MAX_SUMMARY_TOKENS}")
         try:
             response = self.client.chat.completions.create(
                 model=MAIN_MODEL,
@@ -241,10 +258,16 @@ class Agent:
 
         if msg.tool_calls:
             for tc in msg.tool_calls:
-                args = json.loads(tc.function.arguments) if tc.function.arguments else {}
-                tool_result = await self.run_tool({"name": tc.function.name, "id": tc.id, "input": args})
+                args = (
+                    json.loads(tc.function.arguments) if tc.function.arguments else {}
+                )
+                tool_result = await self.run_tool(
+                    {"name": tc.function.name, "id": tc.id, "input": args}
+                )
                 result_text = tool_result.output or tool_result.error or ""
-                self.messages.append({"role": "tool", "tool_call_id": tc.id, "content": result_text})
+                self.messages.append(
+                    {"role": "tool", "tool_call_id": tc.id, "content": result_text}
+                )
 
         if hasattr(response, "usage"):
             self.token_tracker.update(response)

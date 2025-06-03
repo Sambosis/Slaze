@@ -10,8 +10,6 @@ import webbrowser
 
 from dotenv import load_dotenv
 from icecream import ic, install
-from lmnr import observe
-# from traceloop.sdk import Traceloop
 
 from tools import ToolResult
 from utils.agent_display_web_with_prompt import AgentDisplayWebWithPrompt
@@ -227,7 +225,6 @@ def _maybe_filter_to_n_most_recent_images(
 
 
 # ----------------  The main Agent Loop ----------------
-@observe()
 async def sampling_loop(
     *,
     agent: Agent,
@@ -238,8 +235,7 @@ async def sampling_loop(
     while running:
         try:
             running = await agent.step()
-            # response = await lmin_agent()
-            # response = await lmin_agent(agent)
+
         except UnicodeEncodeError as ue:
             ic(f"UnicodeEncodeError: {ue}")
             rr(f"Unicode encoding error: {ue}")

@@ -15,7 +15,7 @@ from dotenv import load_dotenv
 
 # Import configuration constants from config module
 # Note: These imports are used to prevent circular dependencies
-from config import TOP_LEVEL_DIR, REPO_DIR, SYSTEM_PROMPT_FILE, LOGS_DIR
+from config import TOP_LEVEL_DIR, REPO_DIR, SYSTEM_PROMPT_FILE, LOGS_DIR, MAIN_MODEL
 
 # Get the directory where this script is located
 
@@ -36,8 +36,8 @@ COMPUTER_USE_BETA_FLAG = "computer-use-2024-10-22"
 PROMPT_CACHING_BETA_FLAG = "prompt-caching-2024-07-31"
 
 # Model configuration constants
-SUMMARY_MODEL = "claude-3-7-sonnet-latest"  # Model used for generating summaries
-MAIN_MODEL = "claude-3-7-sonnet-latest"
+SUMMARY_MODEL = MAIN_MODEL  # Model used for generating summaries
+MAIN_MODEL = MAIN_MODEL
 # Primary model for main operations
 # Add near the top with other Path definitions
 # PROJECT_DIR = TOP_LEVEL_DIR  # Default value
