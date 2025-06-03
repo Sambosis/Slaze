@@ -1,7 +1,5 @@
 from typing import Any, Dict, List
-from anthropic.types.beta import (
-    BetaMessageParam,
-)
+
 import os
 from utils.agent_display_web_with_prompt import AgentDisplayWebWithPrompt
 from load_constants import *
@@ -81,7 +79,7 @@ def format_messages_to_string(messages):
 
 
 async def summarize_recent_messages(
-    short_messages: List[BetaMessageParam], display: AgentDisplayWebWithPrompt
+    short_messages: List[Dict[str, Any]], display: AgentDisplayWebWithPrompt
 ) -> str:
     """
     Summarize the most recent messages.
@@ -243,7 +241,7 @@ def get_all_summaries() -> str:
     return combined
 
 
-async def reorganize_context(messages: List[BetaMessageParam], summary: str) -> str:
+async def reorganize_context(messages: List[Dict[str, Any]], summary: str) -> str:
     """Reorganize the context by filtering and summarizing messages."""
     conversation_text = ""
 
@@ -424,12 +422,12 @@ async def refresh_context_async(
     """
 
     messages = [{"role": "user", "content": prompt}]
-    response = client.beta.messages.create(
+    response = client.chat.completions.create(
         model=MAIN_MODEL,
         messages=messages,
         max_tokens=MAX_SUMMARY_TOKENS,
     )
-    new_task = response.content[0].text
+    new_task = response.choices[0].message.content
 
     combined_content = f"""Original request: 
     {task}

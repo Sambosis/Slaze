@@ -69,7 +69,7 @@ class ToolError(Exception):
         return self.message
 
 
-class BaseAnthropicTool(metaclass=ABCMeta):
+class BaseTool(metaclass=ABCMeta):
     """Base class for all tools."""
 
     name: str = "base_tool"
@@ -111,7 +111,7 @@ class BaseAnthropicTool(metaclass=ABCMeta):
 
     def to_params(self) -> Dict[str, Any]:
         """Convert the tool to xAI API parameters."""
-        ic(f"BaseAnthropicTool.to_params called for {self.name}")
+        ic(f"BaseTool.to_params called for {self.name}")
         params = {
             "type": "function",
             "function": {
@@ -120,7 +120,7 @@ class BaseAnthropicTool(metaclass=ABCMeta):
                 "parameters": self.input_schema,
             },
         }
-        ic(f"BaseAnthropicTool params for {self.name}: {params}")
+        ic(f"BaseTool params for {self.name}: {params}")
         return params
 
 
@@ -134,3 +134,6 @@ class ToolFailure(ToolResult):
     """A ToolResult that represents a failure."""
 
     pass
+
+# Backwards compatibility alias
+BaseAnthropicTool = BaseTool
