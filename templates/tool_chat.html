@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tool Chat</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.6.1/socket.io.min.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" rel="stylesheet">
+    <link rel="icon" href="https://cdn.simulationtheory.ai/gasset/?asset=img&prompt=chat bubbles icon&w=32&h=32&transparent=true">
+
+<style>
+    @keyframes gentleFadeIn {
+        from { opacity: 0.5; transform: translateY(5px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    .message-enter { animation: gentleFadeIn 0.3s cubic-bezier(0.4, 0, 0.9, 1); }
+    .panel-shadow { box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); }
+    .messages-container {
+        scrollbar-width: thin;
+        scrollbar-color: #CBD5E0 #EDF2F7;
+        padding: 10px;
+    }
+    .messages-container::-webkit-scrollbar { width: 8px; }
+    .messages-container::-webkit-scrollbar-track { background: #EDF2F7; }
+    .messages-container::-webkit-scrollbar-thumb { background-color: #CBD5E0; border-radius: 4px; }
+
+    .tool-call-bubble {
+        background-color: #e0f7fa; /* Light cyan/blue */
+        color: #004d40; /* Dark teal */
+        padding: 10px 15px;
+        border-radius: 15px;
+        margin-bottom: 8px;
+        max-width: 75%;
+        margin-right: auto; /* Aligns to the left */
+        border: 1px solid #b2ebf2; /* Light border */
+        word-wrap: break-word;
+    }
+
+    .tool-result-bubble {
+        background-color: #e8f5e9; /* Light green */
+        color: #1b5e20; /* Dark green */
+        padding: 10px 15px;
+        border-radius: 15px;
+        margin-bottom: 8px;
+        max-width: 75%;
+        margin-left: auto; /* Aligns to the right */
+        border: 1px solid #c8e6c9; /* Light border */
+        word-wrap: break-word;
+    }
+    
+    /* Styles for collapsible code blocks, adapted from index.html */
+    .collapsible {
+        cursor: pointer;
+        padding: 8px;
+        width: 100%;
+        border: none;
+        text-align: left;
+        outline: none;
+        font-size: 0.9rem; /* Slightly smaller for chat */
+        background-color: rgba(0,0,0,0.03); /* Subtle background for the button */
+        border-radius: 4px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 5px;
+    }
+    .collapsible:hover { background-color: rgba(0,0,0,0.06); }
+    .collapsible:after { content: '\002B'; font-weight: bold; } /* Plus icon */
+    .active.collapsible:after { content: "\2212"; } /* Minus icon */
+    .code-content { max-height: 0; overflow: hidden; transition: max-height 0.2s ease-out; }
+    .expanded { max-height: none; /* Will be set by JS */ }
+
+</style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="w-[95%] mx-auto p-4">
+        <!-- Tool Conversation Panel -->
+        <div class="bg-white rounded-lg panel-shadow h-[calc(100vh-3rem)] flex flex-col">
+            <div class="flex items-center p-4 border-b text-purple-600">
+                <i class="fas fa-comments mr-2"></i>
+                <h2 class="text-xl font-semibold">Tool Conversation</h2>
+            </div>
+            <div id="tool_messages_chat_page" class="messages-container flex-grow overflow-y-auto space-y-3">
+                <!-- Messages will be appended here -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        var socket = io({ transports: ['polling'] });
+        var lastMessageIndex = 0; // Simplified for this page, only tracking tool messages
+
+        socket.on('connect', function() {
+            console.log("Tool Chat connected to server");
+        });
+
+        // Adapted createMessageElement function
+        // It will primarily deal with messages that are already structured as {'type': 'call', 'data': ...} or {'type': 'result', 'data': ...}
+        function createMessageElement(message) { // type is implicitly 'tool' here
+            var msgElement = document.createElement('div');
+            let actualMessageData = message.data; // Data to be rendered
+
+            let toolMessageBaseClasses = 'message-enter'; // Basic animation class
+            if (message.type === 'call') {
+                msgElement.className = `${toolMessageBaseClasses} tool-call-bubble`;
+            } else if (message.type === 'result') {
+                msgElement.className = `${toolMessageBaseClasses} tool-result-bubble`;
+            } else {
+                // Fallback for unknown tool message.type - should not happen if server sends correctly
+                msgElement.className = `${toolMessageBaseClasses} bg-yellow-50 border-l-4 border-yellow-500 p-3 rounded-lg`; 
+            }
+            
+            // Content rendering logic (markdown, code, html)
+            if (typeof actualMessageData === 'string' && actualMessageData.startsWith('```markdown') && actualMessageData.trim().endsWith('```')) {
+                const md = actualMessageData.replace(/^```markdown/, '').replace(/```$/, '').trim();
+                msgElement.innerHTML = marked.parse(md);
+            } else if (typeof actualMessageData === 'object' && actualMessageData.html) {
+                msgElement.innerHTML = actualMessageData.html;
+            } else if (typeof actualMessageData === 'object' && actualMessageData.code && actualMessageData.css) {
+                // Pygments (collapsible code) handling
+                if (!document.getElementById('pygments-style')) {
+                    var styleElement = document.createElement('style');
+                    styleElement.id = 'pygments-style';
+                    styleElement.innerHTML = actualMessageData.css;
+                    document.head.appendChild(styleElement);
+                }
+                
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = actualMessageData.code;
+                
+                const firstRow = tempDiv.querySelector('.highlight table tr:first-child');
+                const firstLineSecondCol = firstRow ? firstRow.querySelector('td:nth-child(2)') : null;
+                const fullContent = firstLineSecondCol ? firstLineSecondCol.textContent : 'Code Block';
+                const truncatedContent = fullContent.substring(0, 70) + (fullContent.length > 70 ? '...' : '');
+                
+                const collapsibleBtn = document.createElement('button');
+                collapsibleBtn.className = 'collapsible';
+                collapsibleBtn.innerHTML = `<span>${truncatedContent}</span>`; // Icon added by CSS
+                
+                const codeContent = document.createElement('div');
+                codeContent.className = 'code-content';
+                codeContent.innerHTML = actualMessageData.code;
+                
+                msgElement.appendChild(collapsibleBtn);
+                msgElement.appendChild(codeContent);
+                
+                collapsibleBtn.addEventListener('click', function() {
+                    this.classList.toggle('active');
+                    const content = this.nextElementSibling;
+                    if (content.classList.contains('expanded')) {
+                        content.classList.remove('expanded');
+                        content.style.maxHeight = '0';
+                    } else {
+                        content.classList.add('expanded');
+                        content.style.maxHeight = content.scrollHeight + 'px';
+                    }
+                });
+                codeContent.style.maxHeight = '0'; // Start collapsed
+            } else {
+                // Default to markdown for text, handle preformatted for code-like strings
+                 if (typeof actualMessageData === 'string' && (
+                    actualMessageData.includes('```') ||
+                    actualMessageData.trim().startsWith('def ') || actualMessageData.trim().startsWith('class ') ||
+                    actualMessageData.trim().startsWith('function ') || actualMessageData.trim().startsWith('import ') ||
+                    /\n\s*{/.test(actualMessageData) || /\n\s*</.test(actualMessageData)
+                )) {
+                    const pre = document.createElement('pre');
+                    pre.style.whiteSpace = 'pre-wrap'; // Ensure wrapping
+                    pre.style.wordBreak = 'break-all'; // Break long words/tokens
+                    pre.textContent = actualMessageData;
+                    msgElement.appendChild(pre);
+                } else {
+                    msgElement.innerHTML = marked.parse(String(actualMessageData));
+                }
+            }
+            return msgElement;
+        }
+
+        socket.on('update', function(data) { // Assuming this page still listens to the generic 'update'
+            var containerDiv = document.getElementById('tool_messages_chat_page');
+            
+            if (data.tool && data.tool.length > lastMessageIndex) {
+                const newMessages = data.tool.slice(lastMessageIndex);
+                newMessages.forEach(message => {
+                    // Ensure message is in the new format before passing to createMessageElement
+                    if (typeof message === 'object' && message.type && message.data !== undefined) {
+                        containerDiv.appendChild(createMessageElement(message));
+                    } else {
+                        // Handle legacy string message if necessary (though server should send new format)
+                        // This page expects new format, so ideally this branch isn't hit.
+                        console.warn("Received tool message in unexpected format:", message);
+                        // containerDiv.appendChild(createMessageElement({type: 'result', data: String(message)}));
+                    }
+                });
+                lastMessageIndex = data.tool.length;
+                containerDiv.scrollTop = containerDiv.scrollHeight;
+            }
+        });
+
+        // Optional: Request full history on connect? Or assume it comes with first 'update'
+        // socket.emit('request_initial_tool_messages'); // If we need to define such an event
+
+    </script>
+</body>
+</html>

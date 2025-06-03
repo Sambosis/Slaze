@@ -39,14 +39,6 @@ class AgentDisplayWeb:
         self.user_messages = []
         self.assistant_messages = []
         self.tool_results = []
-        # ---- ADD SAMPLE DATA HERE ----
-        self.add_message('tool', {'type': 'call', 'data': 'ls()'})
-        self.add_message('tool', {'type': 'result', 'data': 'file1.txt\nfile2.py\nREADME.md'})
-        self.add_message('tool', {'type': 'call', 'data': 'read_files(["file1.txt"])'})
-        self.add_message('tool', {'type': 'result', 'data': 'This is the content of file1.txt. It is a text file with multiple lines.\nLine 2 here.\nAnd a third line.'})
-        self.add_message('tool', {'type': 'call', 'data': 'bash_command("grep -r \'TODO\' ./src")'})
-        self.add_message('tool', {'type': 'result', 'data': '# No output or command finished successfully'})
-        # ---- END OF SAMPLE DATA ----
         self.message_queue = Queue()
         # We'll use an asyncio.Queue to deliver user input.
         self.input_queue = asyncio.Queue()
@@ -62,6 +54,13 @@ class AgentDisplayWeb:
                 return render_template("index.html")
             except Exception as e:
                 return f"Error rendering index: {e}", 500
+
+        @self.app.route("/tool_chat")
+        def tool_chat_page():
+            try:
+                return render_template("tool_chat.html")
+            except Exception as e:
+                return f"Error rendering tool_chat.html: {e}", 500
 
         @self.app.route("/messages")
         def get_messages():
