@@ -8,10 +8,6 @@ from pathlib import Path
 from typing import List
 import webbrowser
 
-from anthropic.types.beta import (
-    BetaCacheControlEphemeralParam,
-    BetaMessageParam,
-)
 from dotenv import load_dotenv
 from icecream import ic, install
 from lmnr import observe
@@ -180,7 +176,7 @@ class TokenTracker:
         self.displayA.add_message("user", token_display)
 
 
-def _inject_prompt_caching(messages: List[BetaMessageParam]):
+def _inject_prompt_caching(messages: List[Dict[str, Any]]):
     breakpoints_remaining = 2
     for message in reversed(messages):
         if message["role"] == "user" and isinstance(
@@ -188,16 +184,14 @@ def _inject_prompt_caching(messages: List[BetaMessageParam]):
         ):
             if breakpoints_remaining:
                 breakpoints_remaining -= 1
-                content[-1]["cache_control"] = BetaCacheControlEphemeralParam(
-                    {"type": "ephemeral"}
-                )
+                content[-1]["cache_control"] = {"type": "ephemeral"}
             else:
                 content[-1].pop("cache_control", None)
                 break
 
 
 def _maybe_filter_to_n_most_recent_images(
-    messages: List[BetaMessageParam], images_to_keep: int, min_removal_threshold: int
+    messages: List[Dict[str, Any]], images_to_keep: int, min_removal_threshold: int
 ):
     if images_to_keep is None:
         return messages
@@ -238,7 +232,7 @@ async def sampling_loop(
     *,
     agent: Agent,
     max_tokens: int = 180000,
-) -> List[BetaMessageParam]:
+) -> List[Dict[str, Any]]:
     """Main loop for agentic sampling."""
     running = True
     while running:
@@ -266,12 +260,12 @@ async def sampling_loop(
 
 async def run_sampling_loop(
     task: str, display: AgentDisplayWebWithPrompt
-) -> List[BetaMessageParam]:
+) -> List[Dict[str, Any]]:
     """Run the sampling loop with clean output handling."""
-    api_key = os.getenv("ANTHROPIC_API_KEY")
+    api_key = os.getenv("OPENROUTER_API_KEY") or os.getenv("OPENAI_API_KEY")
     if not api_key:
         raise ValueError(
-            "API key not found. Please set the ANTHROPIC_API_KEY environment variable."
+            "API key not found. Please set the OPENROUTER_API_KEY or OPENAI_API_KEY environment variable."
         )
     # set the task as a constant in config
     agent = Agent(task=task, display=display)

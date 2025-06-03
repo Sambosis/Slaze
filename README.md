@@ -138,6 +138,6 @@ slazy/
 This project is licensed under the MIT License - see the `LICENSE` file for details.
 
 ## 🙏 Acknowledgments
-- Uses Anthropic's Claude for AI capabilities 🤖
+- Uses OpenAI models for AI capabilities 🤖
 - Built with Flask and Socket.IO 💡
 - Styled with TailwindCSS 🎨

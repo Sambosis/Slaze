@@ -5,8 +5,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, List, Optional, TYPE_CHECKING
 
-from anthropic import APIResponse
-from anthropic.types.beta import BetaContentBlock, BetaMessageParam
+from typing import Dict
 from icecream import ic
 
 from .agent_display_web_with_prompt import (
@@ -74,7 +73,7 @@ class OutputManager:
 
         # self.display., output_text)
 
-    def format_api_response(self, response: APIResponse):
+    def format_api_response(self, response: Dict[str, Any]):
         """Format and display API response."""
         if response is None or not hasattr(response, "content") or not response.content:
             ic("Error: Invalid API response in format_api_response")
@@ -83,7 +82,7 @@ class OutputManager:
         if response.content and hasattr(response.content[0], "text"):
             self._truncate_string(response.content[0].text)
 
-    def format_content_block(self, block: BetaContentBlock) -> None:
+    def format_content_block(self, block: Dict[str, Any]) -> None:
         """Format and display content block."""
         if block is None:
             ic("Error: None block provided to format_content_block")
@@ -98,7 +97,7 @@ class OutputManager:
             json.dumps(safe_input) if isinstance(safe_input, dict) else str(safe_input)
 
     def format_recent_conversation(
-        self, messages: List[BetaMessageParam], num_recent: int = 10
+        self, messages: List[Dict[str, Any]], num_recent: int = 10
     ):
         """Format and display recent conversation."""
         if messages is None or not messages:

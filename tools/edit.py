@@ -3,8 +3,7 @@ import os
 from pathlib import Path
 from collections import defaultdict
 from typing import Literal, get_args, Dict
-from anthropic.types.beta import BetaToolTextEditor20241022Param
-from .base import BaseAnthropicTool, ToolError, ToolResult
+from .base import BaseTool, ToolError, ToolResult
 from .run import maybe_truncate
 from typing import List, Optional
 from icecream import ic
@@ -34,10 +33,10 @@ Command = Literal[
 SNIPPET_LINES: int = 4
 
 
-class EditTool(BaseAnthropicTool):
+class EditTool(BaseTool):
     description = """
     A cross-platform filesystem editor tool that allows the agent to view, create, and edit files.
-    The tool parameters are defined by Anthropic and are not editable.
+    The tool parameters follow the OpenAI function calling format.
     """
 
     api_type: Literal["text_editor_20250124"] = "text_editor_20250124"
@@ -53,12 +52,39 @@ class EditTool(BaseAnthropicTool):
         self.docker = DockerService()
         self._docker_available = self.docker.is_available()
 
-    def to_params(self) -> BetaToolTextEditor20241022Param:
+    def to_params(self) -> dict:
         ic(f"EditTool.to_params called with api_type: {self.api_type}")
-        # For specialized tools, use 'type' not 'api_type'
         params = {
-            "name": self.name,
-            "type": self.api_type,
+            "type": "function",
+            "function": {
+                "name": self.name,
+                "description": self.description,
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "command": {
+                            "type": "string",
+                            "enum": list(get_args(Command)),
+                            "description": "The command to execute",
+                        },
+                        "path": {
+                            "type": "string",
+                            "description": "Absolute path to file or directory",
+                        },
+                        "file_text": {"type": "string"},
+                        "view_range": {
+                            "type": "array",
+                            "items": {"type": "integer"},
+                            "minItems": 2,
+                            "maxItems": 2,
+                        },
+                        "old_str": {"type": "string"},
+                        "new_str": {"type": "string"},
+                        "insert_line": {"type": "integer"},
+                    },
+                    "required": ["command", "path"],
+                },
+            },
         }
         ic(f"EditTool params: {params}")
         return params

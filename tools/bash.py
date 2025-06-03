@@ -1,10 +1,9 @@
 from typing import ClassVar, Literal
-from anthropic.types.beta import BetaToolBash20241022Param
 import subprocess
 import re
 from dotenv import load_dotenv
 from config import get_constant, check_docker_available, write_to_file
-from .base import BaseAnthropicTool, ToolError, ToolResult
+from .base import BaseTool, ToolError, ToolResult
 from utils.agent_display_web_with_prompt import AgentDisplayWebWithPrompt
 from icecream import ic
 from lmnr import observe
@@ -37,7 +36,7 @@ def run_docker_command(command: str, container_name=DOCKER_CONTAINER_NAME):
         raise RuntimeError(f"Docker command execution failed: {str(e)}")
 
 
-class BashTool(BaseAnthropicTool):
+class BashTool(BaseTool):
     def __init__(self, display: AgentDisplayWebWithPrompt = None):
         self.display = display
         self._docker_available = check_docker_available()
@@ -45,7 +44,7 @@ class BashTool(BaseAnthropicTool):
 
     description = """
         A tool that allows the agent to run bash commands in a Docker container.
-        The tool parameters are defined by Anthropic and are not editable.
+        The tool parameters follow the OpenAI function calling format.
         """
 
     name: ClassVar[Literal["bash"]] = "bash"
@@ -136,12 +135,24 @@ class BashTool(BaseAnthropicTool):
                     ic(f"Error displaying message: {display_error}")
             return ToolResult(error=error, tool_name=self.name, command=command)
 
-    def to_params(self) -> BetaToolBash20241022Param:
+    def to_params(self) -> dict:
         ic(f"BashTool.to_params called with api_type: {self.api_type}")
-        # For specialized tools, use 'type' not 'api_type'
         params = {
-            "type": self.api_type,
-            "name": self.name,
+            "type": "function",
+            "function": {
+                "name": self.name,
+                "description": self.description,
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "command": {
+                            "type": "string",
+                            "description": "The bash command to be executed.",
+                        }
+                    },
+                    "required": ["command"],
+                },
+            },
         }
         ic(f"BashTool params: {params}")
         return params
