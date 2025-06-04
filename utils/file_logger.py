@@ -20,105 +20,22 @@ try:
         def convert_to_docker_path(path: Union[str, Path]) -> str:
             """
             Convert a local Windows path to a Docker container path.
-
+            No longer converts to Docker path, returns original path.
             Args:
                 path: The local path to convert
 
             Returns:
-                The Docker container path
+                The original path as a string
             """
-            if path is None:
-                return ""
-
-            # Ensure path is a string
             if isinstance(path, Path):
-                path = str(path)
-
-            # Replace Windows-style paths with Linux-style for comparison
-            norm_path = path.replace("\\", "/")
-
-            try:
-                # Get project directory constants
-                project_dir = get_constant("PROJECT_DIR")
-                repo_dir = get_constant("REPO_DIR")
-
-                # Skip conversion if already in Docker format
-                if norm_path.startswith("/home/myuser/apps/"):
-                    return norm_path
-
-                # Ensure project_dir is normalized
-                if isinstance(project_dir, Path):
-                    project_dir = str(project_dir).replace("\\", "/")
-
-                # First check if path is directly in the repo directory
-                if isinstance(repo_dir, Path):
-                    repo_dir = str(repo_dir).replace("\\", "/")
-
-                # The correct conversion logic for mapping to Docker paths
-                if project_dir and norm_path.startswith(project_dir):
-                    # Extract just the prompt name (project name) from the project directory
-                    project_name = Path(project_dir).name
-
-                    # Get the path relative to the project directory
-                    rel_path = os.path.relpath(norm_path, project_dir)
-                    rel_path = rel_path.replace("\\", "/")
-
-                    # Build the Docker path
-                    if rel_path == ".":
-                        return f"/home/myuser/apps/{project_name}"
-                    else:
-                        return f"/home/myuser/apps/{project_name}/{rel_path}"
-
-                # For files directly in the repo directory
-                elif repo_dir and norm_path.startswith(repo_dir):
-                    # Get path relative to repo dir
-                    rel_path = os.path.relpath(norm_path, repo_dir)
-                    rel_path = rel_path.replace("\\", "/")
-
-                    # Extract the prompt name if it's directly under repo
-                    parts = rel_path.split("/", 1)
-                    if len(parts) > 1:
-                        project_name = parts[0]
-                        sub_path = parts[1]
-                        return f"/home/myuser/apps/{project_name}/{sub_path}"
-                    else:
-                        return f"/home/myuser/apps/{rel_path}"
-            except Exception as e:
-                # Log the error but continue
-                print(f"Error in convert_to_docker_path: {e}")
-
-            # Fallback to simple conversion if the above fails
-            norm_path = path.replace("\\", "/")
-
-            # Remove Windows drive letter if present
-            if ":" in norm_path:
-                norm_path = norm_path.split(":", 1)[1]
-
-            # Ensure the path starts with a forward slash
-            if not norm_path.startswith("/"):
-                norm_path = "/" + norm_path
-
-            # Default docker path prefix - if all else fails
-            if not norm_path.startswith("/home/myuser/apps/"):
-                # Extract the last directory as project name
-                path_parts = norm_path.strip("/").split("/")
-                if len(path_parts) >= 2:
-                    project_name = path_parts[
-                        -2
-                    ]  # Use second-to-last part as project name
-                    file_name = path_parts[-1]  # Use last part as file name
-                    return f"/home/myuser/apps/{project_name}/{file_name}"
-                else:
-                    return f"/home/myuser/apps/{norm_path.strip('/')}"
-
-            return norm_path
+                return str(path)
+            return path if path is not None else ""
 except ImportError:
     # Fallback if config module is not available
     def get_constant(name):
         # Default values for essential constants
         defaults = {
             "PROJECT_DIR": os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-            "DOCKER_PROJECT_DIR": "/home/myuser/apps",
             "LOG_FILE": os.path.join(
                 os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                 "logs",
@@ -130,96 +47,16 @@ except ImportError:
     def convert_to_docker_path(path: Union[str, Path]) -> str:
         """
         Convert a local Windows path to a Docker container path.
-
+        No longer converts to Docker path, returns original path.
         Args:
             path: The local path to convert
 
         Returns:
-            The Docker container path
+            The original path as a string
         """
-        if path is None:
-            return ""
-
-        # Ensure path is a string
         if isinstance(path, Path):
-            path = str(path)
-
-        # Replace Windows-style paths with Linux-style for comparison
-        norm_path = path.replace("\\", "/")
-
-        try:
-            # Get project directory constants
-            project_dir = get_constant("PROJECT_DIR")
-            repo_dir = get_constant("REPO_DIR")
-
-            # Skip conversion if already in Docker format
-            if norm_path.startswith("/home/myuser/apps/"):
-                return norm_path
-
-            # Ensure project_dir is normalized
-            if isinstance(project_dir, Path):
-                project_dir = str(project_dir).replace("\\", "/")
-
-            # First check if path is directly in the repo directory
-            if isinstance(repo_dir, Path):
-                repo_dir = str(repo_dir).replace("\\", "/")
-
-            # The correct conversion logic for mapping to Docker paths
-            if project_dir and norm_path.startswith(project_dir):
-                # Extract just the prompt name (project name) from the project directory
-                project_name = Path(project_dir).name
-
-                # Get the path relative to the project directory
-                rel_path = os.path.relpath(norm_path, project_dir)
-                rel_path = rel_path.replace("\\", "/")
-
-                # Build the Docker path
-                if rel_path == ".":
-                    return f"/home/myuser/apps/{project_name}"
-                else:
-                    return f"/home/myuser/apps/{project_name}/{rel_path}"
-
-            # For files directly in the repo directory
-            elif repo_dir and norm_path.startswith(repo_dir):
-                # Get path relative to repo dir
-                rel_path = os.path.relpath(norm_path, repo_dir)
-                rel_path = rel_path.replace("\\", "/")
-
-                # Extract the prompt name if it's directly under repo
-                parts = rel_path.split("/", 1)
-                if len(parts) > 1:
-                    project_name = parts[0]
-                    sub_path = parts[1]
-                    return f"/home/myuser/apps/{project_name}/{sub_path}"
-                else:
-                    return f"/home/myuser/apps/{rel_path}"
-        except Exception as e:
-            # Log the error but continue
-            print(f"Error in convert_to_docker_path: {e}")
-
-        # Fallback to simple conversion if the above fails
-        norm_path = path.replace("\\", "/")
-
-        # Remove Windows drive letter if present
-        if ":" in norm_path:
-            norm_path = norm_path.split(":", 1)[1]
-
-        # Ensure the path starts with a forward slash
-        if not norm_path.startswith("/"):
-            norm_path = "/" + norm_path
-
-        # Default docker path prefix - if all else fails
-        if not norm_path.startswith("/home/myuser/apps/"):
-            # Extract the last directory as project name
-            path_parts = norm_path.strip("/").split("/")
-            if len(path_parts) >= 2:
-                project_name = path_parts[-2]  # Use second-to-last part as project name
-                file_name = path_parts[-1]  # Use last part as file name
-                return f"/home/myuser/apps/{project_name}/{file_name}"
-            else:
-                return f"/home/myuser/apps/{norm_path.strip('/')}"
-
-        return norm_path
+            return str(path)
+        return path if path is not None else ""
 
 
 # File for logging operations

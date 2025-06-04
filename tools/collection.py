@@ -103,7 +103,7 @@ class ToolCollection:
             # - tool_input is:
             #   {
             #     "command": "write_code_to_file",
-            #     "project_path": "/home/myuser/apps/bogame",
+            #     "project_path": "/app/repo/example_project",
             #     "python_filename": "settings.py",
             #     "code_description": "Create a settings.py file that contains all game constants..."
             #   }
@@ -111,7 +111,7 @@ class ToolCollection:
             # This becomes equivalent to:
             # result = await write_code_tool.__call__(
             #     command="write_code_to_file",
-            #     project_path="/home/myuser/apps/bogame",
+            #     project_path="/app/repo/example_project",
             #     python_filename="settings.py",
             #     code_description="Create a settings.py file that contains all game constants..."
             # )

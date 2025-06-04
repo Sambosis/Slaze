@@ -5,7 +5,7 @@ from enum import Enum
 from dotenv import load_dotenv
 
 load_dotenv()
-from utils.docker_service import DockerService
+# DockerService import removed
 
 
 class PictureCommand(str, Enum):
@@ -83,8 +83,10 @@ class PictureGenerationTool(BaseAnthropicTool):
             import base64
             from PIL import Image
 
-            docker_service = DockerService()
-            output_path_obj = docker_service.from_docker_path(output_path)
+            # DockerService instantiation removed
+            # Assuming output_path is a direct host path now
+            from pathlib import Path
+            output_path_obj = Path(output_path)
             # Create input data for the model
             input_data = {
                 "prompt": prompt,

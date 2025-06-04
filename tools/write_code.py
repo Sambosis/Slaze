@@ -30,9 +30,7 @@ from system_prompt.code_prompts import (
     code_prompt_generate,
     code_skeleton_prompt,
 )
-from utils.docker_service import (
-    DockerService,
-)
+# DockerService import removed
 from pygments import highlight
 from pygments.formatters import HtmlFormatter
 import ftfy
@@ -113,16 +111,10 @@ class WriteCodeTool(BaseAnthropicTool):
     def __init__(self, display=None):
         super().__init__(input_schema=None, display=display) # Assuming BaseAnthropicTool takes these
         self.display = display
-        try:
-            self.docker = DockerService()
-            self._docker_available = self.docker.is_available()
-
-        except Exception as docker_init_err:
-            rr(f"[bold red]Failed to initialize DockerService: {docker_init_err}[/bold red]")
-            self.docker = None
-            self._docker_available = False
+        # DockerService related initialization removed
+        # self.docker = None
+        # self._docker_available = False
         ic("Initializing WriteCodeTool")
-        ic(f"Docker available: {self._docker_available}")
 
     def to_params(self) -> dict:
         ic(f"WriteCodeTool.to_params called with api_type: {self.api_type}")

@@ -5,12 +5,8 @@ import subprocess
 
 from icecream import ic
 
-global PROJECT_DIR, DOCKER_PROJECT_DIR
+global PROJECT_DIR
 PROJECT_DIR = None
-DOCKER_PROJECT_DIR = None
-
-# Define Docker container name
-DOCKER_CONTAINER_NAME = "python-dev-container"
 
 # Define the top-level directory
 TOP_LEVEL_DIR = Path.cwd()
@@ -50,38 +46,6 @@ CACHE_DIR.mkdir(parents=True, exist_ok=True)
 LOGS_DIR.mkdir(parents=True, exist_ok=True)
 
 
-# Check if Docker is available and the container is running
-def check_docker_available(container_name=DOCKER_CONTAINER_NAME):
-    try:
-        result = subprocess.run(
-            ["docker", "ps", "-q", "-f", f"name={container_name}"],
-            capture_output=True,
-            check=False,
-        )
-        return result.returncode == 0 and result.stdout.strip() != ""
-    except Exception:
-        return False
-
-
-# Convert a local Windows path to a Docker container path
-def to_docker_path(windows_path):
-    """Convert a local Windows path to a Docker container path"""
-    if isinstance(windows_path, str):
-        windows_path = Path(windows_path)
-
-    if not PROJECT_DIR:
-        return None
-
-    try:
-        # Get the path relative to the project directory
-        rel_path = windows_path.relative_to(PROJECT_DIR)
-        # Convert to Docker path
-        return Path(f"/home/myuser/app/{rel_path}")
-    except ValueError:
-        # If not under project dir, just return the filename
-        return Path(f"/home/myuser/app/{windows_path.name}")
-
-
 # Function to write the constants to a file
 def write_constants_to_file():
     constants = {
@@ -103,8 +67,6 @@ def write_constants_to_file():
         "MAX_SUMMARY_TOKENS": MAX_SUMMARY_TOKENS,
         "LOGS_DIR": str(LOGS_DIR),
         "PROJECT_DIR": str(PROJECT_DIR) if PROJECT_DIR else "",
-        "DOCKER_PROJECT_DIR": str(DOCKER_PROJECT_DIR) if DOCKER_PROJECT_DIR else "",
-        "DOCKER_CONTAINER_NAME": DOCKER_CONTAINER_NAME,
         "PROMPTS_DIR": str(PROMPTS_DIR),
         "LOG_FILE": str(LOG_FILE),
         "MESSAGES_FILE": str(MESSAGES_FILE),
@@ -179,7 +141,7 @@ def set_project_dir(project_name: str) -> Path:
     Returns:
         The Path to the project directory
     """
-    global PROJECT_DIR, DOCKER_PROJECT_DIR, LLM_GEN_CODE_DIR
+    global PROJECT_DIR, LLM_GEN_CODE_DIR
     PROJECT_DIR = REPO_DIR / project_name
     LLM_GEN_CODE_DIR = TOP_LEVEL_DIR / "llm_gen_code"
 
@@ -192,11 +154,7 @@ def set_project_dir(project_name: str) -> Path:
     # Create llm_gen_code directory if it doesn't exist
     LLM_GEN_CODE_DIR.mkdir(parents=True, exist_ok=True)
 
-    # Set up Docker project directory - just use the project name, not the full path
-    DOCKER_PROJECT_DIR = f"/home/myuser/apps/{project_name}"
-
     set_constant("PROJECT_DIR", str(PROJECT_DIR))
-    set_constant("DOCKER_PROJECT_DIR", str(DOCKER_PROJECT_DIR))
     set_constant("LLM_GEN_CODE_DIR", str(LLM_GEN_CODE_DIR))
     return PROJECT_DIR
 
@@ -204,11 +162,6 @@ def set_project_dir(project_name: str) -> Path:
 # Function to get the project directory
 def get_project_dir():
     return PROJECT_DIR
-
-
-# Function to get Docker project directory
-def get_docker_project_dir():
-    return DOCKER_PROJECT_DIR
 
 
 def write_to_file(s: str, file_path: str = ICECREAM_OUTPUT_FILE):

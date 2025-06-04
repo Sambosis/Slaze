@@ -9,7 +9,6 @@ from typing import List, Optional
 from icecream import ic
 from config import get_constant, write_to_file
 from utils.file_logger import log_file_operation
-from utils.docker_service import DockerService
 from loguru import logger as ll
 
 # Configure logging to a file
@@ -48,9 +47,6 @@ class EditTool(BaseTool):
         super().__init__(input_schema=None, display=display)
         self.display = display  # Explicitly set self.display
         self._file_history = defaultdict(list)
-        # Initialize Docker service
-        self.docker = DockerService()
-        self._docker_available = self.docker.is_available()
 
     def to_params(self) -> dict:
         ic(f"EditTool.to_params called with api_type: {self.api_type}")
@@ -464,39 +460,6 @@ class EditTool(BaseTool):
             full_path.write_text(file, encoding="utf-8")
             # Log the file operation
             log_file_operation(full_path, "modify")
-
-            # Try to also write to Docker if available
-            if self._docker_available:
-                try:
-                    docker_path = self.docker.to_docker_path(full_path)
-                    docker_path_str = str(docker_path).replace("\\", "/")
-
-                    # Create parent directory in Docker
-                    parent_dir = str(Path(docker_path_str).parent).replace("\\", "/")
-                    self.docker.execute_command(f"mkdir -p {parent_dir}")
-
-                    # Create a temporary file and use docker cp to copy it
-                    import tempfile
-
-                    fd, temp_path = tempfile.mkstemp(text=True)
-                    try:
-                        with os.fdopen(fd, "w", encoding="utf-8") as temp_file:
-                            temp_file.write(file)
-
-                        # Copy to Docker
-                        import subprocess
-
-                        subprocess.run(
-                            f'docker cp "{temp_path}" {self.docker._container_name}:"{docker_path_str}"',
-                            shell=True,
-                            check=True,
-                        )
-                    finally:
-                        os.unlink(temp_path)
-
-                except Exception as docker_e:
-                    ic(f"Docker write failed (continuing anyway): {docker_e}")
-                    # Do not raise, just log the error
 
         except Exception as e:
             raise ToolError(f"Error writing to {path}: {str(e)}")
