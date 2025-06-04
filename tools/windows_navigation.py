@@ -52,14 +52,15 @@ class WindowsNavigationTool:
     def to_params(self) -> dict:
         """Define the parameters for the tool."""
         return {
-            "name": self.name,
-            "description": self.description,
-            "type": self.api_type,
-            "input_schema": {
-                "type": "object",
-                "properties": {
-                    "action": {
-                        "type": "string",
+            "type": "function",
+            "function": {
+                "name": self.name,
+                "description": self.description,
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "action": {
+                            "type": "string",
                         "enum": [
                             # Window Management
                             "switch_window",
@@ -96,18 +97,19 @@ class WindowsNavigationTool:
                             "toggle_magnifier",
                         ],
                         "description": "The Windows action to perform",
+                        },
+                        "modifier": {
+                            "type": "string",
+                            "enum": ["ctrl", "alt", "shift", "win"],
+                            "description": "Optional modifier key(s)",
+                        },
+                        "target": {
+                            "type": "string",
+                            "description": "Optional target for the action (e.g., window title)",
+                        },
                     },
-                    "modifier": {
-                        "type": "string",
-                        "enum": ["ctrl", "alt", "shift", "win"],
-                        "description": "Optional modifier key(s)",
-                    },
-                    "target": {
-                        "type": "string",
-                        "description": "Optional target for the action (e.g., window title)",
-                    },
+                    "required": ["action"],
                 },
-                "required": ["action"],
             },
         }
 

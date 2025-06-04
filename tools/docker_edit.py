@@ -56,47 +56,47 @@ class DockerEditTool(BaseAnthropicTool):
         ##ll.info(f"Docker available: {self._docker_available}")
 
     def to_params(self) -> dict:
-        # ll.debug(f"DockerEditTool.to_params called with api_type: {self.api_type}")
-        # For custom tools, provide a detailed input schema
         params = {
-            "name": self.name,
-            "description": self.description,
-            "type": self.api_type,
-            "input_schema": {
-                "type": "object",
-                "properties": {
-                    "command": {
-                        "type": "string",
-                        "enum": [cmd for cmd in get_args(Command)],
-                        "description": "Command to execute. Options: view, create, str_replace, insert, undo_edit",
+            "type": "function",
+            "function": {
+                "name": self.name,
+                "description": self.description,
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "command": {
+                            "type": "string",
+                            "enum": [cmd for cmd in get_args(Command)],
+                            "description": "Command to execute. Options: view, create, str_replace, insert, undo_edit",
+                        },
+                        "path": {
+                            "type": "string",
+                            "description": "Path to the file to operate on",
+                        },
+                        "file_text": {
+                            "type": "string",
+                            "description": "Content to write to the file (required for create command)",
+                        },
+                        "view_range": {
+                            "type": "array",
+                            "items": {"type": "integer"},
+                            "description": "Range of lines to view [start_line, end_line] (optional for view command)",
+                        },
+                        "old_str": {
+                            "type": "string",
+                            "description": "String to be replaced (required for str_replace command)",
+                        },
+                        "new_str": {
+                            "type": "string",
+                            "description": "Replacement string (required for str_replace and insert commands)",
+                        },
+                        "insert_line": {
+                            "type": "integer",
+                            "description": "Line number where to insert text (required for insert command)",
+                        },
                     },
-                    "path": {
-                        "type": "string",
-                        "description": "Path to the file to operate on",
-                    },
-                    "file_text": {
-                        "type": "string",
-                        "description": "Content to write to the file (required for create command)",
-                    },
-                    "view_range": {
-                        "type": "array",
-                        "items": {"type": "integer"},
-                        "description": "Range of lines to view [start_line, end_line] (optional for view command)",
-                    },
-                    "old_str": {
-                        "type": "string",
-                        "description": "String to be replaced (required for str_replace command)",
-                    },
-                    "new_str": {
-                        "type": "string",
-                        "description": "Replacement string (required for str_replace and insert commands)",
-                    },
-                    "insert_line": {
-                        "type": "integer",
-                        "description": "Line number where to insert text (required for insert command)",
-                    },
+                    "required": ["command", "path"],
                 },
-                "required": ["command", "path"],
             },
         }
         ic(f"DockerEditTool params: {params}")

@@ -22,23 +22,25 @@ class GetExpertOpinionTool(BaseAnthropicTool):
 
     def to_params(self) -> dict:
         return {
-            "name": self.name,
-            "description": self.description,
-            "type": self.api_type,
-            "input_schema": {
-                "type": "object",
-                "properties": {
-                    "command": {
-                        "type": "string",
-                        "enum": ["get_opinion"],
-                        "description": "The command to get an expert opinion.",
+            "type": "function",
+            "function": {
+                "name": self.name,
+                "description": self.description,
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "command": {
+                            "type": "string",
+                            "enum": ["get_opinion"],
+                            "description": "The command to get an expert opinion.",
+                        },
+                        "problem_description": {
+                            "type": "string",
+                            "description": "A detailed description of the problem and everything that has been tried so far. If for programming, include the code that has been tried.",
+                        },
                     },
-                    "problem_description": {
-                        "type": "string",
-                        "description": "A detailed description of the problem and everything that has been tried so far. If for programming, include the code that has been tried.",
-                    },
+                    "required": ["command", "problem_description"],
                 },
-                "required": ["command", "problem_description"],
             },
         }
 

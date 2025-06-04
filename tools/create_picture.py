@@ -25,37 +25,38 @@ class PictureGenerationTool(BaseAnthropicTool):
 
     def to_params(self) -> dict:
         ic(f"PictureGenerationTool.to_params called with api_type: {self.api_type}")
-        # Use the format that has worked in the past
         params = {
-            "name": self.name,
-            "description": self.description,
-            "type": self.api_type,
-            "input_schema": {
-                "type": "object",
-                "properties": {
-                    "command": {
-                        "type": "string",
-                        "enum": [cmd.value for cmd in PictureCommand],
-                        "description": "Command to execute: create",
+            "type": "function",
+            "function": {
+                "name": self.name,
+                "description": self.description,
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "command": {
+                            "type": "string",
+                            "enum": [cmd.value for cmd in PictureCommand],
+                            "description": "Command to execute: create",
+                        },
+                        "prompt": {
+                            "type": "string",
+                            "description": "Text description of the image to generate",
+                        },
+                        "output_path": {
+                            "type": "string",
+                            "description": "Path where the generated image will be saved",
+                        },
+                        "width": {
+                            "type": "integer",
+                            "description": "Width to resize the image (required)",
+                        },
+                        "height": {
+                            "type": "integer",
+                            "description": "Height to resize the image (required)",
+                        },
                     },
-                    "prompt": {
-                        "type": "string",
-                        "description": "Text description of the image to generate",
-                    },
-                    "output_path": {
-                        "type": "string",
-                        "description": "Path where the generated image will be saved",
-                    },
-                    "width": {
-                        "type": "integer",
-                        "description": "Width to resize the image (required)",
-                    },
-                    "height": {
-                        "type": "integer",
-                        "description": "Height to resize the image (required)",
-                    },
+                    "required": ["command", "prompt", "width", "height"],
                 },
-                "required": ["command", "prompt", "width", "height"],
             },
         }
         ic(f"PictureGenerationTool params: {params}")
