@@ -2,7 +2,7 @@ from .base import BaseAnthropicTool, ToolError, ToolResult
 from .bash import BashTool
 from .edit import EditTool
 from .collection import ToolCollection
-from .expert import GetExpertOpinionTool
+# from .expert import GetExpertOpinionTool
 from .playwright import WebNavigatorTool
 from .envsetup import ProjectSetupTool
 
@@ -22,7 +22,7 @@ __all__ = [
     "BashTool",
     "EditTool",
     "ToolCollection",
-    "GetExpertOpinionTool",
+    # "GetExpertOpinionTool",
     "WebNavigatorTool",
     "ProjectSetupTool",
     # "GoToURLReportsTool",
