@@ -3,9 +3,7 @@ from typing import Literal, List
 from pathlib import Path
 
 from config import PROJECT_DIR
-from lmnr import observe
 from .base import ToolResult, BaseAnthropicTool
-from icecream import ic
 import subprocess
 from loguru import logger as ll
 from rich import print as rr
