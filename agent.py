@@ -142,7 +142,14 @@ class Agent:
                     "text": f"Tool '{tool_name}' was called with input: {json.dumps(content_block['input'])}.\nResult: {extract_text_from_content(tool_output)}",
                 }
             )
-            self.messages.append({"role": "user", "content": combined_content})
+
+            # Only tool messages should follow assistant tool calls. Appending a
+            # user message here violates the expected OpenAI API sequence and
+            # leads to errors like:
+            #   "An assistant message with 'tool_calls' must be followed by tool
+            #   messages responding to each 'tool_call_id'."
+            # The tool results are instead logged and a proper tool message is
+            # added by ``Agent.step`` after ``run_tool`` returns.
 
             # Use the dedicated logging function instead of inline logging
             self.log_tool_results(combined_content, tool_name, content_block["input"])
