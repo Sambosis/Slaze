@@ -14,19 +14,20 @@ from tools import (
     ProjectSetupTool,
     WriteCodeTool,
     PictureGenerationTool,
-    EditTool,
+    DockerEditTool,
     ToolCollection,
     ToolResult,
 )
 from utils.agent_display_web_with_prompt import AgentDisplayWebWithPrompt
 from utils.context_helpers import *
-# from utils.output_manager import *
+from utils.output_manager import *
 from config import *
 # from token_tracker import TokenTracker
 
 from dotenv import load_dotenv
 
 load_dotenv()
+
 
 
 class Agent:
@@ -42,7 +43,7 @@ class Agent:
             ProjectSetupTool(display=self.display),
             BashTool(display=self.display),
             PictureGenerationTool(display=self.display),
-            EditTool(display=self.display),  # Uncommented and enabled for testing
+            DockerEditTool(display=self.display),  # Uncommented and enabled for testing
             display=self.display,
         )
         self.output_manager = OutputManager(self.display)
@@ -254,6 +255,9 @@ class Agent:
                 "tool_calls": [tc.to_dict() for tc in (msg.tool_calls or [])],
             }
         )
+        for tc in msg.tool_calls:
+            rr(tc)
+
 
         if msg.tool_calls:
             for tc in msg.tool_calls:
@@ -286,5 +290,6 @@ class Agent:
                 self.messages.append(
                     {"role": "tool", "tool_call_id": tc.id, "content": result_text}
                 )
+
 
         return True

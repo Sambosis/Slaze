@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 from utils.agent_display_web import AgentDisplayWeb
-from config import PROMPTS_DIR, LOGS_DIR, get_docker_project_dir
+from config import PROMPTS_DIR, LOGS_DIR # get_docker_project_dir removed
 from openai import OpenAI
 import os
 import ftfy
@@ -76,14 +76,14 @@ class AgentDisplayWebWithPrompt(AgentDisplayWeb):
                     task = completion.choices[0].message.content
                     # WRITE THE TASK TO TASK.TXT
                     task = ftfy.fix_text(task)  # Fix any text issues
-                    from config import set_project_dir, set_constant
+                    from config import set_project_dir, set_constant, get_constant
 
                     project_dir = set_project_dir(filename)
                     set_constant("PROJECT_DIR", str(project_dir))
                     set_constant("TASK", task)
-                    docker_project_dir = get_docker_project_dir()
+                    project_dir_for_task = get_constant("PROJECT_DIR")
                     task += (
-                        f"Start testing as soon as possible. DO NOT start making fixes or improvements until you have tested to see if it is working as is.  Your project directory is {docker_project_dir}. "
+                        f"Start testing as soon as possible. DO NOT start making fixes or improvements until you have tested to see if it is working as is.  Your project directory is {project_dir_for_task}. "
                         "You need to make sure that all files you create and work you do is done in that directory.\n"
                     )
                     with open("task.txt", "w", encoding="utf-8") as f:
