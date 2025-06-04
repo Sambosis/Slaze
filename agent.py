@@ -24,12 +24,10 @@ from utils.output_manager import *
 from config import *
 # from token_tracker import TokenTracker
 
-# from lmnr import Laminar, observe
 from dotenv import load_dotenv
 
 load_dotenv()
 
-# Laminar.initialize(project_api_key=os.getenv("LAMINAR_API_KEY"))
 
 
 class Agent:
@@ -49,7 +47,6 @@ class Agent:
             display=self.display,
         )
         self.output_manager = OutputManager(self.display)
-        # self.token_tracker = TokenTracker(self.display)
         self.messages = []
         self.client = OpenAI(
             api_key=os.getenv("OPENROUTER_API_KEY") or os.getenv("OPENAI_API_KEY"),

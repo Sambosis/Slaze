@@ -196,7 +196,7 @@ class ProjectSetupTool(BaseAnthropicTool):
 
         return docker_path
 
-    @observe(name="setup_project")
+
     async def setup_project(self, project_path: Path, packages: List[str]) -> dict:
         """Sets up a Python project inside the Docker container."""
         if not self._docker_available:
@@ -336,7 +336,6 @@ class ProjectSetupTool(BaseAnthropicTool):
                 "docker_path": docker_path if "docker_path" in locals() else None,
             }
 
-    @observe(name="add_dependencies")
     async def add_dependencies(self, project_path: Path, packages: List[str]) -> dict:
         """Adds additional Python dependencies to an existing project."""
         if not self._docker_available:
@@ -421,7 +420,7 @@ class ProjectSetupTool(BaseAnthropicTool):
                 ),
             }
 
-    @observe(name="run_app")
+
     async def run_app(self, project_path: Path, filename: str) -> dict:
         """Runs a Python application inside the Docker container with X11 forwarding."""
         if not self._docker_available:
@@ -598,7 +597,7 @@ class ProjectSetupTool(BaseAnthropicTool):
 
     async def add_dependencies_node(
         self, project_path: Path, packages: List[str]
-    ) -> dict:
+        ) -> dict:
         """Adds additional Node.js dependencies to an existing project."""
         if not self._docker_available:
             return {
@@ -779,10 +778,9 @@ class ProjectSetupTool(BaseAnthropicTool):
                 "errors": f"Failed to run Node.js app in Docker: {str(e)}",
             }
 
-    @observe()
     async def run_project(
         self, project_path: Path, entry_filename: str = "app.py"
-    ) -> dict:
+        ) -> dict:
         """Runs a Python project inside the Docker container."""
         if not self._docker_available:
             return {
@@ -868,7 +866,7 @@ class ProjectSetupTool(BaseAnthropicTool):
         packages: List[str] = None,
         entry_filename: str = "app.py",
         **kwargs,
-    ) -> ToolResult:
+        ) -> ToolResult:
         """Executes the specified command for project management."""
         try:
             # Handle both string and Enum types for command
