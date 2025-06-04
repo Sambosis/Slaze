@@ -4,7 +4,7 @@ from pathlib import Path
 import ftfy # type: ignore
 from openai import OpenAI # type: ignore
 # Assuming config.py is at the root and contains PROMPTS_DIR, LOGS_DIR, etc.
-from config import PROMPTS_DIR, LOGS_DIR, get_docker_project_dir, set_project_dir, set_constant
+from config import PROMPTS_DIR, LOGS_DIR, set_project_dir, set_constant, get_constant # get_docker_project_dir removed
 # Assuming agent_display_web.py is in utils and contains AgentDisplayWeb, log_message
 from utils.agent_display_web import AgentDisplayWeb, log_message
 
@@ -204,11 +204,11 @@ Task: {task}"""
         project_dir = set_project_dir(filename_stem)
         set_constant("PROJECT_DIR", str(project_dir))
         set_constant("TASK", task) # Set task before potentially appending suffix
-        docker_project_dir = get_docker_project_dir()
+        project_dir_for_task = get_constant("PROJECT_DIR")
 
         # Finalize task string
         task_final_suffix = f"""
-Start testing as soon as possible. DO NOT start making fixes or improvements until you have tested to see if it is working as is. Your project directory is {docker_project_dir}. You need to make sure that all files you create and work you do is done in that directory.
+Start testing as soon as possible. DO NOT start making fixes or improvements until you have tested to see if it is working as is. Your project directory is {project_dir_for_task}. You need to make sure that all files you create and work you do is done in that directory.
 """
         if task:
             task += "\n" + task_final_suffix.strip() # Use strip to remove leading/trailing newlines from suffix
