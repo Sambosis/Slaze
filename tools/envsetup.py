@@ -55,45 +55,44 @@ class ProjectSetupTool(BaseAnthropicTool):
 
     def to_params(self) -> dict:
         """Convert the tool to a parameters dictionary for the API."""
-        # ic(f"ProjectSetupTool.to_params called with api_type: {self.api_type}")
-        # Use the format that has worked in the past
         params = {
-            "name": self.name,
-            "description": self.description,
-            "type": self.api_type,
-            "input_schema": {
-                "type": "object",
-                "properties": {
-                    "command": {
-                        "type": "string",
-                        "enum": [cmd.value for cmd in ProjectCommand],
-                        "description": "Command to execute",
+            "type": "function",
+            "function": {
+                "name": self.name,
+                "description": self.description,
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "command": {
+                            "type": "string",
+                            "enum": [cmd.value for cmd in ProjectCommand],
+                            "description": "Command to execute",
+                        },
+                        "project_path": {
+                            "type": "string",
+                            "description": "Path to the project directory",
+                        },
+                        "environment": {
+                            "type": "string",
+                            "enum": ["python", "node"],
+                            "description": "Environment type (python or node)",
+                            "default": "python",
+                        },
+                        "packages": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "List of packages to install, This can be used during the setup_project command or the add_dependencies command. this should be a list of strings with each package in quotes and separated by commas, with the list enclosed in square brackets. Example: ['package1', 'package2', 'package3']",
+                        },
+                        "entry_filename": {
+                            "type": "string",
+                            "description": "Name of the entry point file to run",
+                            "default": "app.py",
+                        },
                     },
-                    "project_path": {
-                        "type": "string",
-                        "description": "Path to the project directory",
-                    },
-                    "environment": {
-                        "type": "string",
-                        "enum": ["python", "node"],
-                        "description": "Environment type (python or node)",
-                        "default": "python",
-                    },
-                    "packages": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "List of packages to install, This can be used during the setup_project command or the add_dependencies command. this should be a list of strings with each package in quotes and separated by commas, with the list enclosed in square brackets. Example: ['package1', 'package2', 'package3']",
-                    },
-                    "entry_filename": {
-                        "type": "string",
-                        "description": "Name of the entry point file to run",
-                        "default": "app.py",
-                    },
+                    "required": ["command", "project_path"],
                 },
-                "required": ["command", "project_path"],
             },
         }
-        # ic(f"ProjectSetupTool params: {params}")
         return params
 
     def get_docker_path(self, project_path: Path) -> str:

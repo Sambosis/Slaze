@@ -20,26 +20,28 @@ class GoogleSearchTool(BaseAnthropicTool):
 
     def to_params(self) -> dict:
         return {
-            "name": self.name,
-            "description": self.description,
-            "type": self.api_type,
-            "input_schema": {
-                "type": "object",
-                "properties": {
-                    "query": {
-                        "type": "string",
-                        "description": "The search query to execute",
+            "type": "function",
+            "function": {
+                "name": self.name,
+                "description": self.description,
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "query": {
+                            "type": "string",
+                            "description": "The search query to execute",
+                        },
+                        "location": {
+                            "type": "string",
+                            "description": "Optional location to geo-target results (e.g. 'Baltimore, Maryland, United States')",
+                        },
+                        "language": {
+                            "type": "string",
+                            "description": "Optional language code (e.g. 'en')",
+                        },
                     },
-                    "location": {
-                        "type": "string",
-                        "description": "Optional location to geo-target results (e.g. 'Baltimore, Maryland, United States')",
-                    },
-                    "language": {
-                        "type": "string",
-                        "description": "Optional language code (e.g. 'en')",
-                    },
+                    "required": ["query"],
                 },
-                "required": ["query"],
             },
         }
 

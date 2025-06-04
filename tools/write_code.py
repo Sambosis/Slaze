@@ -125,56 +125,57 @@ class WriteCodeTool(BaseAnthropicTool):
         ic(f"Docker available: {self._docker_available}")
 
     def to_params(self) -> dict:
-        # ... (your existing to_params method - no changes needed here from provided snippet)
         ic(f"WriteCodeTool.to_params called with api_type: {self.api_type}")
         params = {
-            "name": self.name,
-            "description": self.description,
-            "type": self.api_type,
-            "input_schema": {
-                "type": "object",
-                "properties": {
-                    "command": {
-                        "type": "string",
-                        "enum": [CodeCommand.WRITE_CODEBASE.value],
-                        "description": "Command to perform. Only 'write_codebase' is supported.",
-                    },
-                    "files": {
-                        "type": "array",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "filename": {
-                                    "type": "string",
-                                    "description": "Name/path of the file relative to the project path.",
-                                },
-                                "code_description": {
-                                    "type": "string",
-                                    "description": "Detailed description of the code for this file.",
-                                },
-                                "external_imports": {
-                                    "type": "array",
-                                    "items": {"type": "string"},
-                                    "description": "List of external libraries/packages required specifically for this file.",
-                                    "default": [],
-                                },
-                                "internal_imports": {
-                                    "type": "array",
-                                    "items": {"type": "string"},
-                                    "description": "List of internal modules/files within the codebase imported specifically by this file.",
-                                    "default": [],
-                                },
-                            },
-                            "required": ["filename", "code_description"],
+            "type": "function",
+            "function": {
+                "name": self.name,
+                "description": self.description,
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "command": {
+                            "type": "string",
+                            "enum": [CodeCommand.WRITE_CODEBASE.value],
+                            "description": "Command to perform. Only 'write_codebase' is supported.",
                         },
-                        "description": "List of files to generate, each with a filename, description, and optional specific imports.",
+                        "files": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "filename": {
+                                        "type": "string",
+                                        "description": "Name/path of the file relative to the project path.",
+                                    },
+                                    "code_description": {
+                                        "type": "string",
+                                        "description": "Detailed description of the code for this file.",
+                                    },
+                                    "external_imports": {
+                                        "type": "array",
+                                        "items": {"type": "string"},
+                                        "description": "List of external libraries/packages required specifically for this file.",
+                                        "default": [],
+                                    },
+                                    "internal_imports": {
+                                        "type": "array",
+                                        "items": {"type": "string"},
+                                        "description": "List of internal modules/files within the codebase imported specifically by this file.",
+                                        "default": [],
+                                    },
+                                },
+                                "required": ["filename", "code_description"],
+                            },
+                            "description": "List of files to generate, each with a filename, description, and optional specific imports.",
+                        },
+                        "project_path": {
+                            "type": "string",
+                            "description": "Path to the project directory (can be Docker-style or just project name). The actual write path will be resolved relative to the configured REPO_DIR on the host.",
+                        },
                     },
-                    "project_path": {
-                        "type": "string",
-                        "description": "Path to the project directory (can be Docker-style or just project name). The actual write path will be resolved relative to the configured REPO_DIR on the host.",
-                    },
+                    "required": ["command", "files", "project_path"],
                 },
-                "required": ["command", "files", "project_path"],
             },
         }
         ic(f"WriteCodeTool params: {params}")

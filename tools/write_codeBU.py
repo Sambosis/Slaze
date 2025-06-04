@@ -193,33 +193,34 @@ class WriteCodeTool(BaseAnthropicTool):
 
     def to_params(self) -> dict:
         ic(f"WriteCodeTool.to_params called with api_type: {self.api_type}")
-        # Use the format that has worked in the past
         params = {
-            "name": self.name,
-            "description": self.description,
-            "type": self.api_type,
-            "input_schema": {
-                "type": "object",
-                "properties": {
-                    "command": {
-                        "type": "string",
-                        "enum": [cmd.value for cmd in CodeCommand],
-                        "description": "Command to perform. Options: write_code_to_file, write_and_exec, write_code_multiple_files, get_all_current_code, get_revised_version",
+            "type": "function",
+            "function": {
+                "name": self.name,
+                "description": self.description,
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "command": {
+                            "type": "string",
+                            "enum": [cmd.value for cmd in CodeCommand],
+                            "description": "Command to perform. Options: write_code_to_file, write_and_exec, write_code_multiple_files, get_all_current_code, get_revised_version",
+                        },
+                        "code_description": {
+                            "type": "string",
+                            "description": "Description for single file code generation. This should be a very detailed description of the code to be created. Include any assumption and specific details including necessary imports and how to interact with other aspects of the code.",
+                        },
+                        "project_path": {
+                            "type": "string",
+                            "description": "Path to the project directory.",
+                        },
+                        "python_filename": {
+                            "type": "string",
+                            "description": "Filename for write_code_to_file command.",
+                        },
                     },
-                    "code_description": {
-                        "type": "string",
-                        "description": "Description for single file code generation. This should be a very detailed description of the code to be created. Include any assumption and specific details including necessary imports and how to interact with other aspects of the code.",
-                    },
-                    "project_path": {
-                        "type": "string",
-                        "description": "Path to the project directory.",
-                    },
-                    "python_filename": {
-                        "type": "string",
-                        "description": "Filename for write_code_to_file command.",
-                    },
+                    "required": ["command"],
                 },
-                "required": ["command"],
             },
         }
         ic(f"WriteCodeTool params: {params}")

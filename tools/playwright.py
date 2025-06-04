@@ -78,61 +78,61 @@ class WebNavigatorTool:
             self.page = None
 
     def to_params(self) -> dict:
-        """
-        Defines the parameters for the tool, specifying the input schema.
-        """
+        """Defines the parameters for the tool, specifying the input schema."""
         return {
-            "name": self.name,
-            "description": self.description,
-            "type": self.api_type,
-            "input_schema": {
-                "type": "object",
-                "properties": {
-                    "url": {
-                        "type": "string",
-                        "description": "The URL to perform the action on.",
-                    },
-                    "action": {
-                        "type": "string",
-                        "enum": [
-                            "read",
-                            "navigate",
-                            "download",
-                            "fill_form",
-                            "extract_data",
-                            "click_element",
-                        ],
-                        "description": "The action to perform.",
-                    },
-                    "params": {
-                        "type": "object",
-                        "description": "Additional parameters required for the action.",
-                        "properties": {
-                            "file_path": {
-                                "type": "string",
-                                "description": "Path to save the downloaded file (required for 'download' action).",
-                            },
-                            "form_selector": {
-                                "type": "string",
-                                "description": "CSS selector for the form to fill (required for 'fill_form' action).",
-                            },
-                            "form_data": {
-                                "type": "object",
-                                "additionalProperties": {"type": "string"},
-                                "description": "Data to fill into the form fields.",
-                            },
-                            "data_selector": {
-                                "type": "string",
-                                "description": "CSS selector for data extraction (required for 'extract_data' action).",
-                            },
-                            "element_selector": {
-                                "type": "string",
-                                "description": "CSS selector of the element to click (required for 'click_element' action).",
+            "type": "function",
+            "function": {
+                "name": self.name,
+                "description": self.description,
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "url": {
+                            "type": "string",
+                            "description": "The URL to perform the action on.",
+                        },
+                        "action": {
+                            "type": "string",
+                            "enum": [
+                                "read",
+                                "navigate",
+                                "download",
+                                "fill_form",
+                                "extract_data",
+                                "click_element",
+                            ],
+                            "description": "The action to perform.",
+                        },
+                        "params": {
+                            "type": "object",
+                            "description": "Additional parameters required for the action.",
+                            "properties": {
+                                "file_path": {
+                                    "type": "string",
+                                    "description": "Path to save the downloaded file (required for 'download' action).",
+                                },
+                                "form_selector": {
+                                    "type": "string",
+                                    "description": "CSS selector for the form to fill (required for 'fill_form' action).",
+                                },
+                                "form_data": {
+                                    "type": "object",
+                                    "additionalProperties": {"type": "string"},
+                                    "description": "Data to fill into the form fields.",
+                                },
+                                "data_selector": {
+                                    "type": "string",
+                                    "description": "CSS selector for data extraction (required for 'extract_data' action).",
+                                },
+                                "element_selector": {
+                                    "type": "string",
+                                    "description": "CSS selector of the element to click (required for 'click_element' action).",
+                                },
                             },
                         },
                     },
+                    "required": ["url", "action"],
                 },
-                "required": ["url", "action"],
             },
         }
 

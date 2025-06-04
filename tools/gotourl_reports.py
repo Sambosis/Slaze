@@ -54,23 +54,25 @@ class GoToURLReportsTool(BaseAnthropicTool):
 
     def to_params(self) -> dict:
         return {
-            "name": self.name,
-            "description": self.description,
-            "type": self.api_type,
-            "input_schema": {  # Use parameters instead of custom.input_schema
-                "type": "object",
-                "properties": {
-                    "command": {
-                        "type": "string",
-                        "enum": ["list_reports", "run_report"],
-                        "description": "The command to execute. Either 'list_reports' to list all reports or 'run_report' to execute a specific report.",
+            "type": "function",
+            "function": {
+                "name": self.name,
+                "description": self.description,
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "command": {
+                            "type": "string",
+                            "enum": ["list_reports", "run_report"],
+                            "description": "The command to execute. Either 'list_reports' to list all reports or 'run_report' to execute a specific report.",
+                        },
+                        "report_name": {
+                            "type": "string",
+                            "description": "The name of the report to run. Required if command is 'run_report'.",
+                        },
                     },
-                    "report_name": {
-                        "type": "string",
-                        "description": "The name of the report to run. Required if command is 'run_report'.",
-                    },
+                    "required": ["command"],
                 },
-                "required": ["command"],
             },
         }
 
