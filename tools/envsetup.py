@@ -2,6 +2,7 @@ from enum import Enum
 from typing import Literal, List
 from pathlib import Path
 
+from config import PROJECT_DIR
 from lmnr import observe
 from .base import ToolResult, BaseAnthropicTool
 from icecream import ic
@@ -48,7 +49,6 @@ class ProjectSetupTool(BaseAnthropicTool):
         """Initialize the ProjectSetupTool instance."""
         super().__init__(display=display)
         self.display = display  # Explicitly set self.display
-        self._docker_available = True
 
     def to_params(self) -> dict:
         """Convert the tool to a parameters dictionary for the API."""
@@ -92,12 +92,6 @@ class ProjectSetupTool(BaseAnthropicTool):
         }
         return params
 
-    def get_docker_path(self, project_path: Path) -> str:
-        """Return a normalized project path."""
-        if not isinstance(project_path, Path):
-            project_path = Path(project_path)
-        return str(project_path.resolve())
-
     def format_output(self, data: dict) -> str:
         """Format the output data as a readable string."""
         output_lines = []
@@ -120,12 +114,6 @@ class ProjectSetupTool(BaseAnthropicTool):
             output_lines.append(data["run_output"])
 
         return "\n".join(output_lines)
-
-    def validate_docker_path(self, docker_path: str) -> str:
-        """Normalize and return the given path."""
-        if not isinstance(docker_path, str):
-            docker_path = str(docker_path)
-        return str(Path(docker_path).resolve())
 
 
     async def setup_project(self, project_path: Path, packages: List[str]) -> dict:

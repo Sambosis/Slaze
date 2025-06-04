@@ -2,7 +2,7 @@ from typing import ClassVar, Literal
 import subprocess
 import re
 from dotenv import load_dotenv
-from config import get_constant, check_docker_available, write_to_file
+from config import get_constant, write_to_file # check_docker_available removed
 from .base import BaseTool, ToolError, ToolResult
 from utils.agent_display_web_with_prompt import AgentDisplayWebWithPrompt
 from icecream import ic
@@ -39,7 +39,7 @@ def run_docker_command(command: str, container_name=DOCKER_CONTAINER_NAME):
 class BashTool(BaseTool):
     def __init__(self, display: AgentDisplayWebWithPrompt = None):
         self.display = display
-        self._docker_available = check_docker_available()
+        self._docker_available = False # Set to False as check_docker_available is removed
         super().__init__(input_schema=None, display=display)
 
     description = """

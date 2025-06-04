@@ -18,14 +18,13 @@ Command = Literal["view", "create", "str_replace", "insert", "undo_edit"]
 SNIPPET_LINES = 4
 
 
-class DockerEditTool(BaseAnthropicTool):
-    """Filesystem editor that now operates directly on the host system."""
+class FileEditorTool(BaseAnthropicTool):
+    """A cross-platform filesystem editor tool. All operations run locally."""
 
     api_type: Literal["custom"] = "custom"
-    name: Literal["docker_edit"] = "docker_edit"
+    name: Literal["file_editor"] = "file_editor"
     description = (
-        "A cross-platform filesystem editor tool. Docker is no longer used;"
-        " all operations run locally."
+        "A cross-platform filesystem editor tool. All operations run locally."
     )
     LOG_FILE = Path(get_constant("LOG_FILE"))
 
@@ -96,14 +95,14 @@ class DockerEditTool(BaseAnthropicTool):
                 },
             },
         }
-        ic(f"DockerEditTool params: {params}")
+        ic(f"FileEditorTool params: {params}")
         return params
 
     def format_output(self, data: Dict) -> str:
         output_lines = [f"Command: {data['command']}"]
         if self.display is not None:
             self.display.add_message(
-                "assistant", f"DockerEditTool Command: {data['command']}"
+                "assistant", f"FileEditorTool Command: {data['command']}"
             )
         output_lines.append(f"Status: {data['status']}")
         if "file_path" in data:
@@ -131,7 +130,7 @@ class DockerEditTool(BaseAnthropicTool):
         try:
             if self.display is not None:
                 self.display.add_message(
-                    "user", f"DockerEditTool Executing Command: {command} on path: {path}"
+                    "user", f"FileEditorTool Executing Command: {command} on path: {path}"
                 )
 
             _path = Path(path)
@@ -145,7 +144,7 @@ class DockerEditTool(BaseAnthropicTool):
                 if self.display is not None:
                     self.display.add_message(
                         "assistant",
-                        f"DockerEditTool Command: {command} successfully created file {_path} !",
+                        f"FileEditorTool Command: {command} successfully created file {_path} !",
                     )
                     self.display.add_message("tool", file_text)
                 output_data = {
@@ -164,7 +163,7 @@ class DockerEditTool(BaseAnthropicTool):
                 if self.display is not None:
                     self.display.add_message(
                         "assistant",
-                        f"DockerEditTool Command: {command} successfully viewed file\n {str(result.output[:100])} !",
+                        f"FileEditorTool Command: {command} successfully viewed file\n {str(result.output[:100])} !",
                     )
                 output_data = {
                     "command": "view",
@@ -184,7 +183,7 @@ class DockerEditTool(BaseAnthropicTool):
                 if self.display is not None:
                     self.display.add_message(
                         "assistant",
-                        f"DockerEditTool Command: {command} successfully replaced text in file {str(_path)} !",
+                        f"FileEditorTool Command: {command} successfully replaced text in file {str(_path)} !",
                     )
                     self.display.add_message(
                         "assistant",
@@ -241,7 +240,7 @@ class DockerEditTool(BaseAnthropicTool):
                 )
         except Exception as e:
             if self.display is not None:
-                self.display.add_message("assistant", f"DockerEditTool error: {str(e)}")
+                self.display.add_message("assistant", f"FileEditorTool error: {str(e)}")
             error_data = {
                 "command": command,
                 "status": "error",

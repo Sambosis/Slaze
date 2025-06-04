@@ -13,7 +13,7 @@ from .windows_navigation import WindowsNavigationTool
 # from .test_navigation_tool import windows_navigate
 from .write_code import WriteCodeTool
 from .create_picture import PictureGenerationTool
-from .docker_edit import DockerEditTool
+from .file_editor import FileEditorTool
 
 __all__ = [
     "BaseAnthropicTool",
@@ -31,5 +31,5 @@ __all__ = [
     "WriteCodeTool",
     "PictureGenerationTool",
     # "windows_navigate",
-    "DockerEditTool",
+    "FileEditorTool",
 ]
