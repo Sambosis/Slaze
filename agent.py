@@ -22,7 +22,7 @@ from utils.agent_display_web_with_prompt import AgentDisplayWebWithPrompt
 from utils.context_helpers import *
 from utils.output_manager import *
 from config import *
-from token_tracker import TokenTracker
+# from token_tracker import TokenTracker
 
 # from lmnr import Laminar, observe
 from dotenv import load_dotenv
@@ -49,7 +49,7 @@ class Agent:
             display=self.display,
         )
         self.output_manager = OutputManager(self.display)
-        self.token_tracker = TokenTracker(self.display)
+        # self.token_tracker = TokenTracker(self.display)
         self.messages = []
         self.client = OpenAI(
             api_key=os.getenv("OPENROUTER_API_KEY") or os.getenv("OPENAI_API_KEY"),
@@ -103,8 +103,8 @@ class Agent:
         )
         # SET THE CONSTANT TASK to self.task
         try:
-            # ic(content_block['name'])
-            # ic(content_block["input"])
+            ic(content_block['name'])
+            ic(content_block["input"])
             result = await self.tool_collection.run(
                 name=content_block["name"],
                 tool_input=content_block["input"],
@@ -225,11 +225,7 @@ class Agent:
         self.step_count += 1
         # Laminar.set_session(session_id=f"step_{self.step_count}")
         messages = self.messages
-        rr(messages)
-        rr(MAIN_MODEL)
-        rr("Tools:")
-        rr(self.tool_params)
-        rr(f"Max Summ Tokens {MAX_SUMMARY_TOKENS}")
+
         try:
             response = self.client.chat.completions.create(
                 model=MAIN_MODEL,
@@ -255,6 +251,9 @@ class Agent:
                 "tool_calls": [tc.to_dict() for tc in (msg.tool_calls or [])],
             }
         )
+        for tc in msg.tool_calls:
+            rr(tc)
+
 
         if msg.tool_calls:
             for tc in msg.tool_calls:
@@ -264,12 +263,29 @@ class Agent:
                 tool_result = await self.run_tool(
                     {"name": tc.function.name, "id": tc.id, "input": args}
                 )
-                result_text = tool_result.output or tool_result.error or ""
+                # result_text = tool_result.output or tool_result.error or ""
+                # tool_result_dict is the dictionary returned by run_tool (aliased as tool_result in traceback)
+                # Original problematic line (around 266 in user's file):
+                # result_text = tool_result.output or tool_result.error or ""
+
+                # Corrected way to get result_text:
+                result_text_parts = []
+                if isinstance(tool_result.get('content'), list):
+                    for content_item in tool_result['content']:
+                        if isinstance(content_item, dict) and content_item.get('type') == 'text' and 'text' in content_item:
+                            result_text_parts.append(str(content_item['text']))
+                result_text = " ".join(result_text_parts)
+                
+                # Assuming result_text is then used, for example, to create a message for the LLM:
+                # tool_responses_for_next_llm_call.append({
+                #     "tool_call_id": tc_openai_obj.id, # or relevant id from tc
+                #     "role": "tool",
+                #     "name": tc_openai_obj.function.name, # or relevant name from tc
+                #     "content": result_text,
+                # })
                 self.messages.append(
                     {"role": "tool", "tool_call_id": tc.id, "content": result_text}
                 )
 
-        if hasattr(response, "usage"):
-            self.token_tracker.update(response)
 
         return True

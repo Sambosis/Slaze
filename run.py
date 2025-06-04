@@ -3,7 +3,8 @@ import asyncio
 from typing import List, Dict, Any
 import os  # Keep os if needed, e.g. by loaded modules, or for future use
 from dotenv import load_dotenv  # Optional: Uncomment if you use .env files for API keys
-
+from icecream import ic, install
+install()  # Initialize icecream for debug logging
 from utils.agent_display_console import AgentDisplayConsole
 from agent import Agent
 
