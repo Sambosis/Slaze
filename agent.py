@@ -14,7 +14,7 @@ from tools import (
     ProjectSetupTool,
     WriteCodeTool,
     PictureGenerationTool,
-    DockerEditTool,
+    EditTool,
     ToolCollection,
     ToolResult,
 )
@@ -43,7 +43,7 @@ class Agent:
             ProjectSetupTool(display=self.display),
             BashTool(display=self.display),
             PictureGenerationTool(display=self.display),
-            DockerEditTool(display=self.display),  # Uncommented and enabled for testing
+            EditTool(display=self.display),  # Uncommented and enabled for testing
             display=self.display,
         )
         self.output_manager = OutputManager(self.display)
@@ -255,11 +255,11 @@ class Agent:
                 "tool_calls": [tc.to_dict() for tc in (msg.tool_calls or [])],
             }
         )
-        for tc in msg.tool_calls:
-            rr(tc)
 
 
         if msg.tool_calls:
+            for tc in msg.tool_calls:
+                rr(tc)
             for tc in msg.tool_calls:
                 args = (
                     json.loads(tc.function.arguments) if tc.function.arguments else {}

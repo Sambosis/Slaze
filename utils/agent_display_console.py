@@ -208,8 +208,8 @@ Task: {task}"""
 
         # Finalize task string
         task_final_suffix = f"""
-Start testing as soon as possible. DO NOT start making fixes or improvements until you have tested to see if it is working as is. Your project directory is {project_dir_for_task}. You need to make sure that all files you create and work you do is done in that directory.
-"""
+        Start testing as soon as possible. DO NOT start making fixes or improvements until you have tested to see if it is working as is. Your project directory is {project_dir_for_task}. You need to make sure that all files you create and work you do is done in that directory.
+        """
         if task:
             task += "\n" + task_final_suffix.strip() # Use strip to remove leading/trailing newlines from suffix
         else: # If task is empty (e.g. new prompt with no input and no AI processing)
