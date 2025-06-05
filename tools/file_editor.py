@@ -127,17 +127,26 @@ class FileEditorTool(BaseAnthropicTool):
         insert_line: int | None = None,
         **kwargs,
     ) -> ToolResult:
+        _path: Optional[Path] = None # Ensure _path is defined in outer scope for error reporting
         try:
+            if not path or not isinstance(path, str):
+                raise ToolError("Invalid or missing 'path' parameter. It must be a non-empty string.")
+            try:
+                _path = Path(path)
+            except Exception as e:
+                raise ToolError(f"Failed to convert path string '{path}' to Path object: {e}")
+
             if self.display is not None:
                 self.display.add_message(
-                    "user", f"FileEditorTool Executing Command: {command} on path: {path}"
+                    "user", f"FileEditorTool Executing Command: {command} on path: {str(_path)}"
                 )
 
-            _path = Path(path)
+            # _path is now guaranteed to be a Path object if we proceed
 
             if command == "create":
                 if file_text is None:
                     raise ToolError("Parameter `file_text` is required for command: create")
+                # _path is already a Path object here
                 self.write_file(_path, file_text)
                 self._file_history[_path].append(file_text)
                 log_file_operation(_path, "create")
@@ -382,12 +391,20 @@ class FileEditorTool(BaseAnthropicTool):
 
     def write_file(self, path: Path, file: str):
         try:
-            full_path = path
-            full_path.parent.mkdir(parents=True, exist_ok=True)
-            full_path.write_text(file, encoding="utf-8")
-            log_file_operation(full_path, "modify")
+            if not isinstance(path, Path):
+                ic(f"Warning: FileEditorTool.write_file received a non-Path object for path: {type(path)}. Converting.")
+                try:
+                    path = Path(path)
+                except Exception as e:
+                    raise ToolError(f"Failed to convert path '{str(path)}' to Path object in write_file: {e}")
+
+            # path is now guaranteed to be a Path object
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(file, encoding="utf-8")
+            log_file_operation(path, "modify") # path is Path object
         except Exception as e:
-            raise ToolError(f"Error writing to {path}: {str(e)}")
+            # Use str(path) in error message as path could be None if conversion failed early
+            raise ToolError(f"Error writing to {str(path)}: {str(e)}")
 
     def _make_output(
         self,

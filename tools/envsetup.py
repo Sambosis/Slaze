@@ -477,13 +477,17 @@ class ProjectSetupTool(BaseAnthropicTool):
                 }
 
             venv_dir = project_path / ".venv"
-            python_executable = self._get_venv_executable(venv_dir, "python3") if venv_dir.exists() else "python3"
 
             if venv_dir.exists():
-                cmd = [str(python_executable), str(entry_file)]
+                # Use python from venv
+                python_executable_in_venv = self._get_venv_executable(venv_dir, "python") # Using "python" as it's more universal for venv
+                cmd = [str(python_executable_in_venv), str(entry_file)]
             else: # Fallback to system python if no venv
-                cmd = ["python3", str(entry_file)]
-                rr(f"Warning: venv not found at {venv_dir}, attempting to run {entry_filename} with system python3.")
+                rr(f"Warning: venv not found at {venv_dir}, attempting to run {entry_file.name} with system Python.")
+                if os.name == 'nt': # Windows
+                    cmd = ["python", str(entry_file)]
+                else: # POSIX
+                    cmd = ["python3", str(entry_file)]
 
             result = subprocess.run(cmd, capture_output=True, text=True)
             run_output = f"stdout: {result.stdout}\nstderr: {result.stderr}"
