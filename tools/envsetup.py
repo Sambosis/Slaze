@@ -1,6 +1,7 @@
 from enum import Enum
 from typing import Literal, List
 from pathlib import Path
+import os # Added os import
 
 from config import PROJECT_DIR
 from .base import ToolResult, BaseAnthropicTool
@@ -114,6 +115,13 @@ class ProjectSetupTool(BaseAnthropicTool):
         return "\n".join(output_lines)
 
 
+    def _get_venv_executable(self, venv_dir_path: Path, executable_name: str) -> Path:
+        """Gets the path to an executable in the venv's scripts/bin directory."""
+        if os.name == 'nt':  # Windows
+            return venv_dir_path / "Scripts" / f"{executable_name}.exe"
+        else:  # POSIX (Linux, macOS)
+            return venv_dir_path / "bin" / executable_name
+
     async def setup_project(self, project_path: Path, packages: List[str]) -> dict:
         """Set up a local Python project."""
         project_path.mkdir(parents=True, exist_ok=True)
@@ -123,25 +131,56 @@ class ProjectSetupTool(BaseAnthropicTool):
             if self.display is not None:
                 self.display.add_message("user", f"Creating virtual environment in {project_path}")
 
+            python_executable = "python3" # Default system python
             if not venv_dir.exists():
-                subprocess.run(["python3", "-m", "venv", str(venv_dir)], check=True)
+                # For creating venv, we might use system python or a specific one if defined
+                subprocess.run([python_executable, "-m", "venv", str(venv_dir)], check=True)
 
+            pip_executable = self._get_venv_executable(venv_dir, "pip")
             installed_packages = []
 
             if packages:
                 if isinstance(packages, str):
-                    packages = packages.split()
-                for package in packages:
-                    clean_pkg = package.strip("[],'\" ")
-                    result = subprocess.run(
-                        [str(venv_dir / "bin" / "pip"), "install", clean_pkg],
-                        capture_output=True,
-                        text=True,
-                    )
-                    if result.returncode == 0:
-                        installed_packages.append(clean_pkg)
-                    else:
-                        raise RuntimeError(result.stderr)
+                    # Attempt to handle simple string list if accidentally passed
+                    packages = [p.strip() for p in packages.split(',') if p.strip()]
+
+                for package_group in packages: # packages could be a list of strings, where each string is a list of packages
+                    actual_packages_to_install = []
+                    if isinstance(package_group, str):
+                        # Further split if a single string in the list contains multiple packages
+                        # e.g. "packageA packageB" or "['packageA', 'packageB']"
+                        if '[' in package_group and ']' in package_group: # Looks like a stringified list
+                            try:
+                                # This is a basic attempt, for more complex strings, json.loads might be better
+                                # but pip install can often handle multiple package names in one command.
+                                # For simplicity, we'll assume packages are space-separated if not proper list items.
+                                cleaned_str = package_group.strip("[]'\" ")
+                                actual_packages_to_install.extend([p.strip(" '\"") for p in cleaned_str.split(',') if p.strip(" '\"")])
+                            except Exception:
+                                # If parsing fails, treat the whole string as one package (or rely on pip to split)
+                                actual_packages_to_install.append(package_group.strip())
+                        else: # Space separated or single package
+                             actual_packages_to_install.extend(package_group.split())
+                    elif isinstance(package_group, list): # if it's already a list of packages
+                        actual_packages_to_install.extend(package_group)
+                    else: # Assuming it's a single package name
+                        actual_packages_to_install.append(str(package_group))
+
+                    for clean_pkg in actual_packages_to_install:
+                        if not clean_pkg: continue # Skip empty strings
+                        rr(f"Attempting to install package: {clean_pkg} using {pip_executable}")
+                        result = subprocess.run(
+                            [str(pip_executable), "install", clean_pkg],
+                            capture_output=True,
+                            text=True,
+                        )
+                        if result.returncode == 0:
+                            installed_packages.append(clean_pkg)
+                            rr(f"Successfully installed {clean_pkg}")
+                        else:
+                            rr(f"Failed to install {clean_pkg}: {result.stderr}")
+                            raise RuntimeError(f"pip install {clean_pkg} failed: {result.stderr}")
+
 
             if self.display is not None:
                 self.display.add_message("user", f"Project setup complete in {project_path}")
@@ -166,29 +205,49 @@ class ProjectSetupTool(BaseAnthropicTool):
     async def add_dependencies(self, project_path: Path, packages: List[str]) -> dict:
         """Adds additional Python dependencies to an existing project."""
         venv_dir = project_path / ".venv"
+        pip_executable = self._get_venv_executable(venv_dir, "pip")
         installed_packages = []
 
         try:
-            for i, package in enumerate(packages, 1):
-                if self.display is not None:
-                    self.display.add_message(
-                        "user", f"Installing package {i}/{len(packages)}: {package}"
-                    )
+            for i, package_item in enumerate(packages, 1):
+                # Handle if package_item is a string that needs splitting (e.g. "pkg1 pkg2" or "['pkg1','pkg2']")
+                # or if it's already a clean package name.
+                pkgs_to_install_this_round = []
+                if isinstance(package_item, str):
+                    if '[' in package_item and ']' in package_item: # Looks like a stringified list
+                        try:
+                            cleaned_str = package_item.strip("[]'\" ")
+                            pkgs_to_install_this_round.extend([p.strip(" '\"") for p in cleaned_str.split(',') if p.strip(" '\"")])
+                        except Exception:
+                             pkgs_to_install_this_round.append(package_item.strip()) # Treat as one
+                    else: # Space separated or single package
+                        pkgs_to_install_this_round.extend(package_item.split())
+                elif isinstance(package_item, list):
+                     pkgs_to_install_this_round.extend(package_item) # Should not happen based on schema but good practice
+                else: # Assuming single package name
+                     pkgs_to_install_this_round.append(str(package_item))
 
-                result = subprocess.run(
-                    [str(venv_dir / "bin" / "pip"), "install", package],
-                    capture_output=True,
-                    text=True,
-                )
-                if result.returncode == 0:
-                    installed_packages.append(package)
+                for package in pkgs_to_install_this_round:
+                    if not package: continue # Skip empty strings
                     if self.display is not None:
                         self.display.add_message(
-                            "user", f"Successfully installed {package}"
+                            "user", f"Installing package {i}/{len(packages)}: {package} using {pip_executable}"
                         )
-                else:
-                    return {
-                        "command": "add_additional_depends",
+
+                    result = subprocess.run(
+                        [str(pip_executable), "install", package],
+                        capture_output=True,
+                        text=True,
+                    )
+                    if result.returncode == 0:
+                        installed_packages.append(package)
+                        if self.display is not None:
+                            self.display.add_message(
+                                "user", f"Successfully installed {package}"
+                            )
+                    else:
+                        return {
+                            "command": "add_additional_depends",
                         "status": "error",
                         "error": result.stderr,
                         "project_path": str(project_path),
@@ -220,10 +279,13 @@ class ProjectSetupTool(BaseAnthropicTool):
         try:
             file_path = project_path / filename
             venv_dir = project_path / ".venv"
+            python_executable = self._get_venv_executable(venv_dir, "python3") if venv_dir.exists() else "python3"
+
             if venv_dir.exists():
-                cmd = [str(venv_dir / "bin" / "python3"), str(file_path)]
-            else:
+                cmd = [str(python_executable), str(file_path)]
+            else: # Fallback to system python if no venv
                 cmd = ["python3", str(file_path)]
+                rr(f"Warning: venv not found at {venv_dir}, attempting to run {filename} with system python3.")
 
             result = subprocess.run(cmd, capture_output=True, text=True)
 
@@ -415,10 +477,17 @@ class ProjectSetupTool(BaseAnthropicTool):
                 }
 
             venv_dir = project_path / ".venv"
+
             if venv_dir.exists():
-                cmd = [str(venv_dir / "bin" / "python3"), str(entry_file)]
-            else:
-                cmd = ["python3", str(entry_file)]
+                # Use python from venv
+                python_executable_in_venv = self._get_venv_executable(venv_dir, "python") # Using "python" as it's more universal for venv
+                cmd = [str(python_executable_in_venv), str(entry_file)]
+            else: # Fallback to system python if no venv
+                rr(f"Warning: venv not found at {venv_dir}, attempting to run {entry_file.name} with system Python.")
+                if os.name == 'nt': # Windows
+                    cmd = ["python", str(entry_file)]
+                else: # POSIX
+                    cmd = ["python3", str(entry_file)]
 
             result = subprocess.run(cmd, capture_output=True, text=True)
             run_output = f"stdout: {result.stdout}\nstderr: {result.stderr}"
@@ -494,14 +563,34 @@ class ProjectSetupTool(BaseAnthropicTool):
 
             else:
                 return ToolResult(
-                    error=f"Unknown command: {command}", tool_name=self.name
+                    error=f"Unknown command: {command_value}", tool_name=self.name # Use command_value
                 )
 
+            # Fix for 'ToolResult' object is not subscriptable error
+            if isinstance(result, ToolResult):
+                if result.error:
+                    return result # Return error ToolResult directly
+                # If it's a success ToolResult, extract output if possible, or create a default dict
+                # This path is less likely given current internal methods return dicts for success.
+                if result.output: # Assuming output is a string that format_output can handle or a dict
+                    if isinstance(result.output, str): # If format_output expects dict, this needs adjustment
+                         # This case means a ToolResult has string output. format_output might need to handle this.
+                         # For now, let's assume if result.output is a string, it's pre-formatted.
+                         return result
+                    # If result.output is dict, it's fine for format_output
+                    return ToolResult(output=self.format_output(result.output)) # format_output expects dict
+                else: # ToolResult without error and without output, unlikely for this tool
+                    return ToolResult(output=self.format_output({"status": "success", "message": "Operation completed.", "command": command_value}))
+
+
+            # If result is a dictionary (expected case for successful operations from internal methods)
             return ToolResult(output=self.format_output(result))
 
         except Exception as e:
+            ll.exception(f"Exception in ProjectSetupTool __call__ for command {command if 'command' in locals() else 'unknown'}")
+            err_msg = f"Failed to execute {command.value if hasattr(command, 'value') else command}: {str(e)}"
             if self.display is not None:
                 self.display.add_message(
-                    "assistant", f"ProjectSetupTool error: {str(e)}"
+                    "assistant", f"ProjectSetupTool error: {err_msg}"
                 )
-            return ToolResult(error=f"Failed to execute {command}: {str(e)}")
+            return ToolResult(error=err_msg, tool_name=self.name)

@@ -655,6 +655,35 @@ class WriteCodeTool(BaseAnthropicTool):
         # Default case
         return str(data)
 
+    # --- Helper function to get task description ---
+    def _get_task_description(self) -> str:
+        """
+        Tries to read the task description from various locations.
+        Returns the task description or a default message if not found.
+        """
+        repo_dir = get_constant("REPO_DIR")
+        possible_paths = []
+        if repo_dir and isinstance(repo_dir, str): # Ensure repo_dir is a string
+            possible_paths.append(os.path.join(repo_dir, "logs", "task.txt"))
+        possible_paths.extend([
+            os.path.join("logs", "task.txt"),
+            "task.txt"
+        ])
+
+        for path in possible_paths:
+            try:
+                if os.path.exists(path):
+                    with open(path, "r", encoding="utf-8") as task_file:
+                        task_desc = task_file.read().strip()
+                        if task_desc:
+                            rr(f"[green]Read task description from: {path}[/green]")
+                            return task_desc
+            except Exception as e:
+                rr(f"[yellow]Warning: Error reading task file {path}: {e}[/yellow]")
+
+        rr("[yellow]Warning: task.txt not found in any specified location. Using default task description.[/yellow]")
+        return "No overall task description provided (task.txt not found)."
+
     # --- Refactored Code Generation Method ---
     async def _call_llm_to_generate_code(
         self,
@@ -674,11 +703,7 @@ class WriteCodeTool(BaseAnthropicTool):
             f"### Skeleton for {fname}:\n```\n{skel}\n```"
             for fname, skel in all_skeletons.items()
         )
-        agent_task = get_constant("TASK") or "No overall task description provided."
-        if os.path.exists("task.txt"):
-            with open("task.txt", "r") as task_file:
-                task_desc_from_file = task_file.read().strip()
-            agent_task = task_desc_from_file or agent_task
+        agent_task = self._get_task_description()
 
         prepared_messages = code_prompt_generate(
             current_code_base="",
@@ -835,17 +860,7 @@ class WriteCodeTool(BaseAnthropicTool):
                 "assistant", f"Generating skeleton for {target_file_name}"
             )
 
-        try:  # Add try-finally for task.txt to ensure it's handled if missing
-            with open("task.txt", "r") as task_file:
-                task_description_from_file = task_file.read().strip()
-            agent_task = (
-                task_description_from_file or "No overall task description provided."
-            )
-        except FileNotFoundError:
-            agent_task = "No overall task description provided (task.txt not found)."
-            rr(
-                "[yellow]Warning: task.txt not found. Using default task description.[/yellow]"
-            )
+        agent_task = self._get_task_description()
 
         external_imports = file_detail.external_imports
         internal_imports = file_detail.internal_imports
