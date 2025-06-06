@@ -1,10 +1,12 @@
+"""Utility tool for generating codebases via LLM calls."""
+
 import asyncio
 import os
 import time
 from enum import Enum
 from pathlib import Path
 from typing import Any, Literal, Optional, List, Dict
-import re
+
 from openai import (
     APIConnectionError,
     APIError,
@@ -24,7 +26,7 @@ from tenacity import (
 )
 
 from tools.base import BaseAnthropicTool, ToolResult
-from config import REPO_DIR, get_constant
+from config import get_constant
 from icecream import ic  # type: ignore
 from pygments import highlight  # type: ignore
 from pygments.formatters import HtmlFormatter  # type: ignore
@@ -34,22 +36,12 @@ from utils.file_logger import (
     log_file_operation,
     get_language_from_extension,
 )
-from system_prompt.code_prompts import (
-    code_prompt_generate,
-    code_skeleton_prompt,
-)
+from system_prompt.code_prompts import code_prompt_generate, code_skeleton_prompt
 
-# DockerService import removed
-from pygments import highlight
-from pygments.formatters import HtmlFormatter
 import ftfy
-from pygments.lexers import get_lexer_by_name, guess_lexer
 import traceback
-from lmnr import observe
 
 googlepro = "google/gemini-2.5-pro-preview"
-oa4omini = "openai/o4-mini-high"
-gflash = "google/gemini-2.5-flash-preview"
 MODEL_STRING = googlepro  # Default model string, can be overridden in config
 
 
@@ -139,9 +131,6 @@ class WriteCodeTool(BaseAnthropicTool):
             input_schema=None, display=display
         )  # Assuming BaseAnthropicTool takes these
         self.display = display
-        # DockerService related initialization removed
-        # self.docker = None
-        # self._docker_available = False
         ic("Initializing WriteCodeTool")
 
     def to_params(self) -> dict:
@@ -674,7 +663,8 @@ class WriteCodeTool(BaseAnthropicTool):
         external_imports: List[str],
         internal_imports: List[str],
         file_path: Path,
-        ) -> str:
+    ) -> str:
+        """Generate full file content using provided skeletons."""
         if self.display is not None:
             self.display.add_message(
                 "assistant", f"Generating code for: {file_path.name}"
@@ -754,7 +744,8 @@ class WriteCodeTool(BaseAnthropicTool):
         prepared_messages: List[Dict[str, str]],
         file_path: Path,
         model_to_use: str,
-        ) -> str:
+    ) -> str:
+        """Call the LLM to produce final code with retry logic."""
         OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
         if not OPENROUTER_API_KEY:
             raise ValueError(
@@ -836,7 +827,8 @@ class WriteCodeTool(BaseAnthropicTool):
         file_detail: FileDetail,
         file_path: Path,
         all_file_details: List[FileDetail],
-        ) -> str:
+    ) -> str:
+        """Request a skeleton from the LLM for the target file."""
         target_file_name = file_path.name
         if self.display:
             self.display.add_message(
@@ -922,7 +914,8 @@ class WriteCodeTool(BaseAnthropicTool):
         prepared_messages: List[Dict[str, str]],
         target_file_path: Path,
         model_to_use: str,
-        ) -> str:
+    ) -> str:
+        """Generate a file skeleton with retry logic."""
         OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
         if not OPENROUTER_API_KEY:
             raise ValueError("OPENROUTER_API_KEY environment variable not set.")
@@ -1090,76 +1083,3 @@ def html_format_code(code, extension):
         return html
     except Exception:
         return f"<pre>{code}</pre>"
-    finally:
-        # Ensure any cleanup or finalization if needed
-        pass
-
-    # # You need to define extract_code_block method within this class or ensure it's accessible
-    # def extract_code_block(
-    #     self, raw_response: str, file_path: Path
-    # ) -> tuple[str, Optional[str]]:
-    #     """
-    #     Extracts a code block from the LLM's raw response.
-    #     Handles different markdown formats and language detection.
-    #     Returns the extracted code string and the detected language.
-    #     If no code block is found, returns "No Code Found" and None.
-    #     """
-    #     # Simplified example, replace with your actual robust implementation
-    #     # Your implementation might involve regex to find ```python ... ``` or similar
-
-    #     # Attempt to guess language if not specified in markdown
-    #     language = get_language_from_extension(
-    #         file_path.suffix
-    #     )  # from your context_helpers
-
-    #     # Common pattern: ```[language]\ncode\n``` or ```\ncode\n```
-    #     code_block_match = re.search(
-    #         r"```(?:[a-zA-Z0-9_.-]*\n)?(.*?)```", raw_response, re.DOTALL
-    #     )
-
-    #     if code_block_match:
-    #         extracted_code = code_block_match.group(1).strip()
-    #         # Try to get language from markdown if present
-    #         lang_in_markdown_match = re.search(r"```([a-zA-Z0-9_.-]+)\n", raw_response)
-    #         if lang_in_markdown_match:
-    #             language = lang_in_markdown_match.group(1).lower()
-
-    #         if not extracted_code:  # Empty code block
-    #             # If the raw response itself is just the code without backticks, and is short.
-    #             if (
-    #                 not "```" in raw_response
-    #                 and len(raw_response.strip()) > 0
-    #                 and len(raw_response.strip()) < 300
-    #             ):  # Heuristic
-    #                 return raw_response.strip(), language  # Assume raw is the code
-    #             return "No Code Found", language
-
-    #         # Basic check for placeholder/refusal, although LLMResponseError should catch most
-    #         if (
-    #             "sorry" in extracted_code.lower()
-    #             and "cannot generate" in extracted_code.lower()
-    #         ):
-    #             return "No Code Found", language  # Or raise specific error
-
-    #         return extracted_code, language
-
-    #     # If no triple backticks, check if the entire response is code (heuristic)
-    #     # This is risky and depends on LLM behavior.
-    #     # Only do this if the response is relatively clean and doesn't look like prose.
-    #     lines = raw_response.strip().split("\n")
-    #     if (
-    #         len(lines) > 0
-    #         and not lines[0].startswith("# Error")
-    #         and not lines[0].startswith("I cannot")
-    #     ):
-    #         # Heuristic: if it doesn't look like a refusal and lacks prose markers.
-    #         # This part needs careful tuning or removal if it causes issues.
-    #         # For now, let's be more conservative and rely on backticks.
-    #         # If the LLM sometimes returns code without backticks, this logic needs to be robust.
-    #         # A simple check: if raw_response does not contain "```" at all.
-    #         if (
-    #             "```" not in raw_response and raw_response.strip()
-    #         ):  # and not any(prose_indicator in raw_response for prose_indicator in ["sorry", "unfortunately", "understand"]):
-    #             return raw_response.strip(), language  # Assume the whole thing is code
-
-    #     return "No Code Found", language
