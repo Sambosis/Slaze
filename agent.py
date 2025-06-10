@@ -248,14 +248,13 @@ class Agent:
             return True
 
         msg = response.choices[0].message
-        self.messages.append(
-            {
-                "role": "assistant",
-                "content": msg.content or "",
-                "tool_calls": [tc.to_dict() for tc in (msg.tool_calls or [])],
-            }
-        )
-
+        assistant_message = {
+            "role": "assistant",
+            "content": msg.content or "",
+        }
+        if msg.tool_calls:
+            assistant_message["tool_calls"] = [tc.to_dict() for tc in msg.tool_calls]
+        self.messages.append(assistant_message)
 
         if msg.tool_calls:
             for tc in msg.tool_calls:
