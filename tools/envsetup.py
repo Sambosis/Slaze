@@ -29,19 +29,17 @@ class ProjectCommand(str, Enum):
 
 class ProjectSetupTool(BaseAnthropicTool):
     """
-    A tool that sets up project environments and manages script execution locally.
-    Provides utilities for both Python and Node.js projects without Docker.
+    A tool that sets up Python project environments using uv and manages script execution on Windows or Linux.
     """
 
     name: Literal["project_setup"] = "project_setup"
     api_type: Literal["custom"] = "custom"
     description: str = (
-        "A tool for project management: setup projects, add dependencies, and run applications. "
-        ": Sets up a Python or Node.js project with virtual environment. Optionally, you can provide a list of dependencies to be installed. "
-        "add_dependencies: Adds additional dependencies to an existing project. "
-        "run_app: This is the only command that needs to be used any time you want to run a python file."
-        "run_project: Runs the entire project, including setup and dependencies. "
-        "Supports Python and Node.js environments locally."
+        "A tool for Python project management. "
+        "setup_project: create a uv virtual environment and install packages. "
+        "add_dependencies: install additional packages. "
+        "run_app: execute a Python file using uv. "
+        "run_project: run the project entry file."
     )
 
     def __init__(self, display=None):
@@ -70,8 +68,8 @@ class ProjectSetupTool(BaseAnthropicTool):
                         },
                         "environment": {
                             "type": "string",
-                            "enum": ["python", "node"],
-                            "description": "Environment type (python or node)",
+                            "enum": ["python"],
+                            "description": "Environment type (python)",
                             "default": "python",
                         },
                         "packages": {
@@ -131,12 +129,10 @@ class ProjectSetupTool(BaseAnthropicTool):
             if self.display is not None:
                 self.display.add_message("user", f"Creating virtual environment in {project_path}")
 
-            python_executable = "python3" # Default system python
             if not venv_dir.exists():
-                # For creating venv, we might use system python or a specific one if defined
-                subprocess.run([python_executable, "-m", "venv", str(venv_dir)], check=True)
+                subprocess.run(["uv", "venv", str(venv_dir)], check=True)
 
-            pip_executable = self._get_venv_executable(venv_dir, "pip")
+            python_executable = self._get_venv_executable(venv_dir, "python")
             installed_packages = []
 
             if packages:
@@ -167,22 +163,16 @@ class ProjectSetupTool(BaseAnthropicTool):
                         actual_packages_to_install.append(str(package_group))
 
                     for clean_pkg in actual_packages_to_install:
-                        if not clean_pkg: continue # Skip empty strings
-                        rr(f"Attempting to install package: {clean_pkg} using {pip_executable}")
-                        result = subprocess.run(
-                            [str(pip_executable), "install", clean_pkg],
-                            capture_output=True,
-                            text=True,
-                        )
+                        if not clean_pkg:
+                            continue
+                        rr(f"Attempting to install package: {clean_pkg} using uv")
+                        result = subprocess.run(["uv", "pip", "install", "-p", str(python_executable), clean_pkg], capture_output=True, text=True)
                         if result.returncode == 0:
                             installed_packages.append(clean_pkg)
                             rr(f"Successfully installed {clean_pkg}")
                         else:
                             rr(f"Failed to install {clean_pkg}: {result.stderr}")
-                            raise RuntimeError(f"pip install {clean_pkg} failed: {result.stderr}")
-
-
-            if self.display is not None:
+                            raise RuntimeError(f"uv pip install {clean_pkg} failed: {result.stderr}")
                 self.display.add_message("user", f"Project setup complete in {project_path}")
 
             return {
@@ -193,8 +183,6 @@ class ProjectSetupTool(BaseAnthropicTool):
             }
         except Exception as e:
             error_message = str(e)
-            if self.display is not None:
-                self.display.add_message("user", f"Error setting up project: {error_message}")
             return {
                 "command": "setup_project",
                 "status": "error",
@@ -203,58 +191,54 @@ class ProjectSetupTool(BaseAnthropicTool):
             }
 
     async def add_dependencies(self, project_path: Path, packages: List[str]) -> dict:
-        """Adds additional Python dependencies to an existing project."""
-        venv_dir = project_path / ".venv"
-        pip_executable = self._get_venv_executable(venv_dir, "pip")
         installed_packages = []
 
         try:
             for i, package_item in enumerate(packages, 1):
-                # Handle if package_item is a string that needs splitting (e.g. "pkg1 pkg2" or "['pkg1','pkg2']")
-                # or if it's already a clean package name.
                 pkgs_to_install_this_round = []
                 if isinstance(package_item, str):
-                    if '[' in package_item and ']' in package_item: # Looks like a stringified list
+                    if '[' in package_item and ']' in package_item:
                         try:
                             cleaned_str = package_item.strip("[]'\" ")
                             pkgs_to_install_this_round.extend([p.strip(" '\"") for p in cleaned_str.split(',') if p.strip(" '\"")])
                         except Exception:
-                             pkgs_to_install_this_round.append(package_item.strip()) # Treat as one
-                    else: # Space separated or single package
+                            pkgs_to_install_this_round.append(package_item.strip())
+                    else:
                         pkgs_to_install_this_round.extend(package_item.split())
                 elif isinstance(package_item, list):
-                     pkgs_to_install_this_round.extend(package_item) # Should not happen based on schema but good practice
-                else: # Assuming single package name
-                     pkgs_to_install_this_round.append(str(package_item))
+                    pkgs_to_install_this_round.extend(package_item)
+                else:
+                    pkgs_to_install_this_round.append(str(package_item))
 
                 for package in pkgs_to_install_this_round:
-                    if not package: continue # Skip empty strings
+                    if not package:
+                        continue
                     if self.display is not None:
                         self.display.add_message(
-                            "user", f"Installing package {i}/{len(packages)}: {package} using {pip_executable}"
+                            "user", f"Installing package {i}/{len(packages)}: {package} using uv"
                         )
-
-                    result = subprocess.run(
-                        [str(pip_executable), "install", package],
-                        capture_output=True,
-                        text=True,
-                    )
+                    result = subprocess.run([
+                        "uv",
+                        "pip",
+                        "install",
+                        "-p",
+                        str(python_executable),
+                        package,
+                    ], capture_output=True, text=True)
                     if result.returncode == 0:
                         installed_packages.append(package)
                         if self.display is not None:
-                            self.display.add_message(
-                                "user", f"Successfully installed {package}"
-                            )
+                            self.display.add_message("user", f"Successfully installed {package}")
                     else:
                         return {
                             "command": "add_additional_depends",
-                        "status": "error",
-                        "error": result.stderr,
-                        "project_path": str(project_path),
-                        "packages_installed": installed_packages,
-                        "packages_failed": packages[i - 1 :],
-                        "failed_at": package,
-                    }
+                            "status": "error",
+                            "error": result.stderr,
+                            "project_path": str(project_path),
+                            "packages_installed": installed_packages,
+                            "packages_failed": packages[i - 1 :],
+                            "failed_at": package,
+                        }
 
             return {
                 "command": "add_additional_depends",
@@ -273,20 +257,18 @@ class ProjectSetupTool(BaseAnthropicTool):
                 "packages_installed": installed_packages,
             }
 
-
     async def run_app(self, project_path: Path, filename: str) -> dict:
         """Runs a Python application locally."""
         try:
             file_path = project_path / filename
             venv_dir = project_path / ".venv"
-            python_executable = self._get_venv_executable(venv_dir, "python3") if venv_dir.exists() else "python3"
-
             if venv_dir.exists():
-                cmd = [str(python_executable), str(file_path)]
-            else: # Fallback to system python if no venv
-                cmd = ["python3", str(file_path)]
-                rr(f"Warning: venv not found at {venv_dir}, attempting to run {filename} with system python3.")
+                python_executable = self._get_venv_executable(venv_dir, "python")
+            else:
+                python_executable = "python" if os.name == "nt" else "python3"
+                rr(f"Warning: venv not found at {venv_dir}, attempting to run {filename} with system Python.")
 
+            cmd = ["uv", "run", "-p", str(python_executable), str(file_path)]
             result = subprocess.run(cmd, capture_output=True, text=True)
 
             run_output = f"stdout: {result.stdout}\nstderr: {result.stderr}"
@@ -305,162 +287,6 @@ class ProjectSetupTool(BaseAnthropicTool):
                 "errors": str(e),
             }
 
-    # === Node.js Environment Methods ===
-    async def setup_project_node(self, project_path: Path, packages: List[str]) -> dict:
-        """Sets up a local Node.js project."""
-        project_path.mkdir(parents=True, exist_ok=True)
-
-        try:
-            if self.display is not None:
-                self.display.add_message("user", f"Initializing Node.js project in {project_path}")
-
-            subprocess.run(["npm", "init", "-y"], cwd=project_path, check=True)
-
-            installed_packages = []
-            base_packages = ["jest", "eslint"]
-
-            for package in base_packages:
-                try:
-                    subprocess.run(["npm", "install", "--save-dev", package], cwd=project_path, check=True)
-                    installed_packages.append(package)
-                except Exception:
-                    if self.display is not None:
-                        self.display.add_message("user", f"Warning: Failed to install {package}, continuing anyway")
-
-            if packages:
-                for package in packages:
-                    try:
-                        subprocess.run(["npm", "install", package], cwd=project_path, check=True)
-                        installed_packages.append(package)
-                    except Exception as e:
-                        return {
-                            "command": "setup_project",
-                            "status": "error",
-                            "error": f"Failed to install {package}: {str(e)}",
-                            "project_path": str(project_path),
-                            "packages_installed": installed_packages,
-                        }
-
-            return {
-                "command": "setup_project",
-                "status": "success",
-                "project_path": str(project_path),
-                "packages_installed": installed_packages,
-            }
-
-        except Exception as e:
-            return {
-                "command": "setup_project",
-                "status": "error",
-                "error": str(e),
-                "project_path": str(project_path),
-            }
-
-    async def add_dependencies_node(
-        self, project_path: Path, packages: List[str]
-        ) -> dict:
-        """Adds additional Node.js dependencies to an existing project."""
-        installed_packages = []
-
-        try:
-            package_json = project_path / "package.json"
-            if not package_json.exists():
-                return {
-                    "command": "add_additional_depends",
-                    "status": "error",
-                    "error": "package.json not found. Please run setup_project first.",
-                    "project_path": str(project_path),
-                }
-
-            for i, package in enumerate(packages, 1):
-                if self.display is not None:
-                    self.display.add_message(
-                        "user", f"Installing package {i}/{len(packages)}: {package}"
-                    )
-
-                is_dev = any(
-                    kw in package.lower() for kw in [
-                        "test",
-                        "jest",
-                        "mocha",
-                        "chai",
-                        "eslint",
-                        "prettier",
-                        "babel",
-                        "webpack",
-                        "typescript",
-                    ]
-                )
-
-                cmd = ["npm", "install"]
-                if is_dev:
-                    cmd.append("--save-dev")
-                cmd.append(package)
-
-                result = subprocess.run(cmd, cwd=project_path, capture_output=True, text=True)
-                if result.returncode == 0:
-                    installed_packages.append(package)
-                else:
-                    return {
-                        "command": "add_additional_depends",
-                        "status": "error",
-                        "error": result.stderr,
-                        "project_path": str(project_path),
-                        "packages_installed": installed_packages,
-                        "packages_failed": packages[i - 1 :],
-                        "failed_at": package,
-                    }
-
-            return {
-                "command": "add_additional_depends",
-                "status": "success",
-                "project_path": str(project_path),
-                "packages_installed": installed_packages,
-            }
-
-        except Exception as e:
-            return {
-                "command": "add_additional_depends",
-                "status": "error",
-                "error": str(e),
-                "project_path": str(project_path),
-                "packages_attempted": packages,
-                "packages_installed": installed_packages,
-            }
-
-    async def run_app_node(self, project_path: Path, filename: str) -> dict:
-        """Runs a Node.js application locally."""
-        try:
-            package_json = project_path / "package.json"
-            if not package_json.exists():
-                return {
-                    "command": "run_app",
-                    "status": "error",
-                    "error": "package.json not found. Please run setup_project first.",
-                    "project_path": str(project_path),
-                }
-
-            result = subprocess.run(
-                ["node", filename],
-                cwd=project_path,
-                capture_output=True,
-                text=True,
-            )
-
-            return {
-                "command": "run_app",
-                "status": "success" if result.returncode == 0 else "error",
-                "project_path": str(project_path),
-                "run_output": result.stdout,
-                "errors": result.stderr,
-            }
-        except Exception as e:
-            return {
-                "command": "run_app",
-                "status": "error",
-                "project_path": str(project_path),
-                "errors": str(e),
-            }
 
     async def run_project(
         self, project_path: Path, entry_filename: str = "app.py"
@@ -479,16 +305,12 @@ class ProjectSetupTool(BaseAnthropicTool):
             venv_dir = project_path / ".venv"
 
             if venv_dir.exists():
-                # Use python from venv
-                python_executable_in_venv = self._get_venv_executable(venv_dir, "python") # Using "python" as it's more universal for venv
-                cmd = [str(python_executable_in_venv), str(entry_file)]
-            else: # Fallback to system python if no venv
+                python_executable = self._get_venv_executable(venv_dir, "python")
+            else:
+                python_executable = "python" if os.name == "nt" else "python3"
                 rr(f"Warning: venv not found at {venv_dir}, attempting to run {entry_file.name} with system Python.")
-                if os.name == 'nt': # Windows
-                    cmd = ["python", str(entry_file)]
-                else: # POSIX
-                    cmd = ["python3", str(entry_file)]
 
+            cmd = ["uv", "run", "-p", str(python_executable), str(entry_file)]
             result = subprocess.run(cmd, capture_output=True, text=True)
             run_output = f"stdout: {result.stdout}\nstderr: {result.stderr}"
             return {
@@ -540,31 +362,24 @@ class ProjectSetupTool(BaseAnthropicTool):
             # Convert string path to Path object
             project_path = Path(project_path)
 
+            if environment != "python":
+                return ToolResult(error="Only python environment is supported", tool_name=self.name)
+
             if command == ProjectCommand.SETUP_PROJECT:
-                if environment == "python":
-                    result = await self.setup_project(project_path, packages)
-                else:
-                    result = await self.setup_project_node(project_path, packages)
+                result = await self.setup_project(project_path, packages)
 
             elif command == ProjectCommand.ADD_DEPENDENCIES:
-                if environment == "python":
-                    result = await self.add_dependencies(project_path, packages)
-                else:
-                    result = await self.add_dependencies_node(project_path, packages)
+                result = await self.add_dependencies(project_path, packages)
 
             elif command == ProjectCommand.RUN_APP:
-                if environment == "python":
-                    result = await self.run_project(project_path, entry_filename)
-                else:
-                    result = await self.run_app_node(project_path, entry_filename)
+                result = await self.run_project(project_path, entry_filename)
 
             elif command == ProjectCommand.RUN_PROJECT:
                 result = await self.run_project(project_path, entry_filename)
 
             else:
-                return ToolResult(
-                    error=f"Unknown command: {command_value}", tool_name=self.name # Use command_value
-                )
+                return ToolResult(error=f"Unknown command: {command_value}", tool_name=self.name)
+
 
             # Fix for 'ToolResult' object is not subscriptable error
             if isinstance(result, ToolResult):
