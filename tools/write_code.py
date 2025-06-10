@@ -6,6 +6,8 @@ import time
 from enum import Enum
 from pathlib import Path
 from typing import Any, Literal, Optional, List, Dict
+import json # Added
+from datetime import datetime, timezone # Added
 
 from openai import (
     APIConnectionError,
@@ -26,7 +28,7 @@ from tenacity import (
 )
 
 from tools.base import BaseAnthropicTool, ToolResult
-from config import get_constant
+from config import get_constant # Ensured
 from icecream import ic  # type: ignore
 from pygments import highlight  # type: ignore
 from pygments.formatters import HtmlFormatter  # type: ignore
@@ -44,6 +46,27 @@ import traceback
 googlepro = "google/gemini-2.5-pro-preview"
 googleflash = "google/gemini-2.5-flash-preview"
 MODEL_STRING = googlepro  # Default model string, can be overridden in config
+
+
+# --- Helper function to log LLM context ---
+def _log_llm_context(target_filename: str, prepared_messages: List[Dict[str, str]], context_type: str, llm_context_log_path: Path):
+    """Logs the prepared LLM context to a JSONL file."""
+    if not llm_context_log_path:
+        rr(f"[bold red]LLM_CONTEXT_LOG_FILE not configured. Cannot log context for {target_filename}.[/bold red]")
+        return
+
+    try:
+        llm_context_log_path.parent.mkdir(parents=True, exist_ok=True)
+        log_entry = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "target_file": target_filename,
+            "type": context_type,
+            "context": prepared_messages,
+        }
+        with open(llm_context_log_path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(log_entry) + "\n")
+    except Exception as e:
+        rr(f"[bold red]Failed to log LLM context for {target_filename} to {llm_context_log_path}: {e}[/bold red]")
 
 
 # --- Retry Predicate Function ---
@@ -782,6 +805,18 @@ class WriteCodeTool(BaseAnthropicTool):
             base_url="https://openrouter.ai/api/v1", api_key=OPENROUTER_API_KEY
         )
 
+        # Log LLM context before API call
+        llm_context_log_file_path_str = get_constant("LLM_CONTEXT_LOG_FILE")
+        if llm_context_log_file_path_str: # Check if the constant is defined
+            _log_llm_context(
+                target_filename=file_path.name,
+                prepared_messages=prepared_messages,
+                context_type="code_generation",
+                llm_context_log_path=Path(llm_context_log_file_path_str)
+            )
+        else:
+            rr("[bold yellow]Warning: LLM_CONTEXT_LOG_FILE not set. Skipping context logging.[/bold yellow]")
+
         current_attempt = getattr(
             self._llm_generate_code_core_with_retry.retry.statistics,
             "attempt_number",
@@ -939,6 +974,18 @@ class WriteCodeTool(BaseAnthropicTool):
         client = AsyncOpenAI(
             base_url="https://openrouter.ai/api/v1", api_key=OPENROUTER_API_KEY
         )
+
+        # Log LLM context before API call
+        llm_context_log_file_path_str = get_constant("LLM_CONTEXT_LOG_FILE")
+        if llm_context_log_file_path_str: # Check if the constant is defined
+            _log_llm_context(
+                target_filename=target_file_path.name,
+                prepared_messages=prepared_messages,
+                context_type="skeleton_generation",
+                llm_context_log_path=Path(llm_context_log_file_path_str)
+            )
+        else:
+            rr("[bold yellow]Warning: LLM_CONTEXT_LOG_FILE not set. Skipping context logging.[/bold yellow]")
 
         current_attempt = getattr(
             self._llm_generate_skeleton_core_with_retry.retry.statistics,

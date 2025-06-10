@@ -73,6 +73,7 @@ def write_constants_to_file():
         "MESSAGES_FILE": str(MESSAGES_FILE),
         "ICECREAM_OUTPUT_FILE": str(ICECREAM_OUTPUT_FILE),
         "CODE_FILE": str(CODE_FILE),
+        "LLM_CONTEXT_LOG_FILE": str(LOGS_DIR / "llm_context_log.jsonl"),
         "TASK": "NOT YET CREATED",
     }
     with open(CACHE_DIR / "constants.json", "w") as f:
