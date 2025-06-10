@@ -43,7 +43,7 @@ import traceback
 
 googlepro = "google/gemini-2.5-pro-preview"
 googleflash = "google/gemini-2.5-flash-preview"
-MODEL_STRING = googleflash  # Default model string, can be overridden in config
+MODEL_STRING = googlepro  # Default model string, can be overridden in config
 
 
 # --- Retry Predicate Function ---
@@ -693,12 +693,12 @@ class WriteCodeTool(BaseAnthropicTool):
         external_imports: List[str],
         internal_imports: List[str],
         file_path: Path,
-    ) -> str:
+        ) -> str:
         """Generate full file content using provided skeletons."""
-        if self.display is not None:
-            self.display.add_message(
-                "assistant", f"Generating code for: {file_path.name}"
-            )
+        # if self.display is not None:
+            # self.display.add_message(
+            #     "assistant", f"Generating code for: {file_path.name}"
+            # )
 
         skeleton_context = "\n\n---\n\n".join(
             f"### Skeleton for {fname}:\n```\n{skel}\n```"
@@ -770,7 +770,7 @@ class WriteCodeTool(BaseAnthropicTool):
         prepared_messages: List[Dict[str, str]],
         file_path: Path,
         model_to_use: str,
-    ) -> str:
+        ) -> str:
         """Call the LLM to produce final code with retry logic."""
         OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
         if not OPENROUTER_API_KEY:
@@ -853,13 +853,13 @@ class WriteCodeTool(BaseAnthropicTool):
         file_detail: FileDetail,
         file_path: Path,
         all_file_details: List[FileDetail],
-    ) -> str:
+        ) -> str:
         """Request a skeleton from the LLM for the target file."""
         target_file_name = file_path.name
-        if self.display:
-            self.display.add_message(
-                "assistant", f"Generating skeleton for {target_file_name}"
-            )
+        # if self.display:
+        #     self.display.add_message(
+        #         "assistant", f"Generating skeleton for {target_file_name}"
+        #     )
 
         agent_task = self._get_task_description()
 
@@ -930,7 +930,7 @@ class WriteCodeTool(BaseAnthropicTool):
         prepared_messages: List[Dict[str, str]],
         target_file_path: Path,
         model_to_use: str,
-    ) -> str:
+        ) -> str:
         """Generate a file skeleton with retry logic."""
         OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
         if not OPENROUTER_API_KEY:

@@ -4,6 +4,7 @@
 import asyncio
 import json
 import os
+from re import M
 from typing import Dict
 from openai import OpenAI
 from icecream import ic
@@ -27,7 +28,6 @@ from config import *
 from dotenv import load_dotenv
 
 load_dotenv()
-
 
 
 class Agent:
@@ -93,7 +93,6 @@ class Agent:
                 f.write("-" * 50 + "\n")
             f.write("=" * 80 + "\n\n")
 
-    ###@observe()
     async def run_tool(self, content_block):
         result = ToolResult(
             output="Tool execution not started", tool_name=content_block["name"]
@@ -227,9 +226,8 @@ class Agent:
     async def step(self):
         """Run one step of the agent using OpenAI."""
         self.step_count += 1
-        # Laminar.set_session(session_id=f"step_{self.step_count}")
         messages = self.messages
-
+        rr(MAIN_MODEL)
         try:
             response = self.client.chat.completions.create(
                 model=MAIN_MODEL,

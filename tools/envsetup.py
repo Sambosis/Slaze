@@ -166,7 +166,7 @@ class ProjectSetupTool(BaseAnthropicTool):
                         if not clean_pkg:
                             continue
                         rr(f"Attempting to install package: {clean_pkg} using uv")
-                        result = subprocess.run(["uv", "pip", "install", "-p", str(python_executable), clean_pkg], capture_output=True, text=True)
+                        result = subprocess.run(["uv", "pip", "install", clean_pkg], capture_output=True, text=True)
                         if result.returncode == 0:
                             installed_packages.append(clean_pkg)
                             rr(f"Successfully installed {clean_pkg}")
@@ -268,7 +268,7 @@ class ProjectSetupTool(BaseAnthropicTool):
                 python_executable = "python" if os.name == "nt" else "python3"
                 rr(f"Warning: venv not found at {venv_dir}, attempting to run {filename} with system Python.")
 
-            cmd = ["uv", "run", "-p", str(python_executable), str(file_path)]
+            cmd = ["uv", "run", str(file_path)]
             result = subprocess.run(cmd, capture_output=True, text=True)
 
             run_output = f"stdout: {result.stdout}\nstderr: {result.stderr}"
@@ -310,7 +310,7 @@ class ProjectSetupTool(BaseAnthropicTool):
                 python_executable = "python" if os.name == "nt" else "python3"
                 rr(f"Warning: venv not found at {venv_dir}, attempting to run {entry_file.name} with system Python.")
 
-            cmd = ["uv", "run", "-p", str(python_executable), str(entry_file)]
+            cmd = ["uv", "run",  str(entry_file)]
             result = subprocess.run(cmd, capture_output=True, text=True)
             run_output = f"stdout: {result.stdout}\nstderr: {result.stderr}"
             return {

@@ -10,7 +10,8 @@ PROJECT_DIR = None
 
 # Define the top-level directory
 TOP_LEVEL_DIR = Path.cwd()
-
+googlepro = "google/gemini-2.5-pro-preview"
+googleflash = "google/gemini-2.5-flash-preview"
 # Define the repository directory based on PROJECT_DIR
 REPO_DIR = TOP_LEVEL_DIR / "repo"
 
@@ -29,8 +30,8 @@ ICECREAM_OUTPUT_FILE = LOGS_DIR / "debug_log.md"
 LOGS_DIR.mkdir(parents=True, exist_ok=True)
 LOG_FILE = LOGS_DIR / "file_creation_log.json"
 MESSAGES_FILE = LOGS_DIR / "messages.md"
-SUMMARY_MODEL = "openai/gpt-4o"
-MAIN_MODEL = "openai/gpt-4o"
+SUMMARY_MODEL = googlepro
+MAIN_MODEL = googlepro
 COMPUTER_USE_BETA_FLAG = "computer-use-2024-10-22"
 PROMPT_CACHING_BETA_FLAG = "prompt-caching-2024-07-31"
 CODE_FILE = LOGS_DIR / "code_messages.py"
