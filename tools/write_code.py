@@ -3,6 +3,7 @@
 import asyncio
 import os
 import time
+import json
 from enum import Enum
 from pathlib import Path
 from typing import Any, Literal, Optional, List, Dict
@@ -611,6 +612,26 @@ class WriteCodeTool(BaseAnthropicTool):
                 f"[bold red]Failed to log generated {output_type} for {file_path.name} to {get_constant('CODE_FILE')}: {file_error}[/bold red]"
             )
 
+    def _log_llm_context(self, messages: List[Dict[str, Any]], file_path: Path, context_type: str) -> None:
+        """Log the LLM request context to a file for later inspection."""
+        try:
+            context_log_path_str = get_constant("CODE_CONTEXT_FILE")
+            if context_log_path_str:
+                context_file = Path(context_log_path_str)
+                context_file.parent.mkdir(parents=True, exist_ok=True)
+                with open(context_file, "a", encoding="utf-8") as f:
+                    f.write(
+                        f"\n--- {context_type} for: {file_path} ({time.strftime('%Y-%m-%d %H:%M:%S')}) ---\n"
+                    )
+                    json.dump(messages, f, indent=2)
+                    f.write(
+                        f"\n--- End {context_type} for: {file_path} ---\n"
+                    )
+        except Exception as file_error:
+            rr(
+                f"[bold red]Failed to log context for {file_path.name} to {get_constant('CODE_CONTEXT_FILE')}: {file_error}[/bold red]"
+            )
+
     def format_output(self, data: dict) -> str:
         """
         Format the output of the tool for display.
@@ -791,6 +812,9 @@ class WriteCodeTool(BaseAnthropicTool):
             f"LLM Code Gen for [cyan]{file_path.name}[/cyan]: Model [yellow]{model_to_use}[/yellow], Attempt [bold]{current_attempt}[/bold]"
         )
 
+        # Log the full message context being sent to the LLM
+        self._log_llm_context(prepared_messages, file_path, "Code Generation Context")
+
         completion = await client.chat.completions.create(
             model=model_to_use, messages=prepared_messages
         )
@@ -948,6 +972,9 @@ class WriteCodeTool(BaseAnthropicTool):
         rr(
             f"LLM Skeleton Gen for [cyan]{target_file_path.name}[/cyan]: Model [yellow]{model_to_use}[/yellow], Attempt [bold]{current_attempt}[/bold]"
         )
+
+        # Log the message context for the skeleton request
+        self._log_llm_context(prepared_messages, target_file_path, "Skeleton Generation Context")
 
         completion = await client.chat.completions.create(
             model=model_to_use, messages=prepared_messages

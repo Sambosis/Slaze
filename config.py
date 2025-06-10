@@ -35,6 +35,7 @@ MAIN_MODEL = googlepro
 COMPUTER_USE_BETA_FLAG = "computer-use-2024-10-22"
 PROMPT_CACHING_BETA_FLAG = "prompt-caching-2024-07-31"
 CODE_FILE = LOGS_DIR / "code_messages.py"
+CODE_CONTEXT_FILE = LOGS_DIR / "code_context.log"
 USER_LOG_FILE = LOGS_DIR / "user_messages.log"
 ASSISTANT_LOG_FILE = LOGS_DIR / "assistant_messages.log"
 TOOL_LOG_FILE = LOGS_DIR / "tool_messages.log"
@@ -73,6 +74,7 @@ def write_constants_to_file():
         "MESSAGES_FILE": str(MESSAGES_FILE),
         "ICECREAM_OUTPUT_FILE": str(ICECREAM_OUTPUT_FILE),
         "CODE_FILE": str(CODE_FILE),
+        "CODE_CONTEXT_FILE": str(CODE_CONTEXT_FILE),
         "TASK": "NOT YET CREATED",
     }
     with open(CACHE_DIR / "constants.json", "w") as f:
