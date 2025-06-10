@@ -42,7 +42,8 @@ import ftfy
 import traceback
 
 googlepro = "google/gemini-2.5-pro-preview"
-MODEL_STRING = googlepro  # Default model string, can be overridden in config
+googleflash = "google/gemini-2.5-flash-preview"
+MODEL_STRING = googleflash  # Default model string, can be overridden in config
 
 
 # --- Retry Predicate Function ---
