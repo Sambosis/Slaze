@@ -160,7 +160,7 @@ class WriteCodeTool(BaseAnthropicTool):
                                     },
                                     "code_description": {
                                         "type": "string",
-                                        "description": "Detailed description of the code for this file.",
+                                        "description": "Detailed description of the code for this file.  This should be a comprehensive overview of the file's purpose, functionality, and any important details. It should include a general overview of the files implementation as well as how it interacts with the rest of the codebase.",
                                     },
                                     "external_imports": {
                                         "type": "array",
