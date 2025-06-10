@@ -132,8 +132,8 @@ class EditTool(BaseTool):
                     "user", f"EditTool Executing Command: {command} on path: {path}"
                 )
 
-            # Normalize the path first
-            _path = path
+            # Normalize the path first by converting to a Path object
+            _path = Path(path)
             if command == "create":
                 if not file_text:
                     raise ToolError(
