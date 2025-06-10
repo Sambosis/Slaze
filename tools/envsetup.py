@@ -170,7 +170,7 @@ class ProjectSetupTool(BaseAnthropicTool):
                         if not clean_pkg: continue # Skip empty strings
                         rr(f"Attempting to install package: {clean_pkg} using {python_in_venv} -m pip")
                         result = subprocess.run(
-                            [str(python_in_venv), "-m", "pip", "install", clean_pkg],
+                            ["uv", "pip", "install", clean_pkg],
                             capture_output=True,
                             text=True,
                         )
