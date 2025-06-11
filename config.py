@@ -4,7 +4,7 @@ from datetime import datetime
 import subprocess
 
 from cycler import V
-from icecream import ic
+from utils.logger import logger
 
 global PROJECT_DIR
 PROJECT_DIR = None
@@ -222,5 +222,3 @@ def write_to_file(s: str, file_path: str = ICECREAM_OUTPUT_FILE):
 
 with open(SYSTEM_PROMPT_DIR / "system_prompt.md", "r", encoding="utf-8") as f:
     SYSTEM_PROMPT = f.read()
-
-ic.configureOutput(includeContext=True, outputFunction=write_to_file)

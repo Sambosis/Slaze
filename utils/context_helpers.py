@@ -6,10 +6,8 @@ from load_constants import *
 from config import write_to_file
 from utils.file_logger import aggregate_file_states
 from openai import OpenAI
-from icecream import ic
-from rich import print as rr
+from utils.logger import logger, log_debug as ic, log_info as rr
 
-ic.configureOutput(includeContext=True, outputFunction=write_to_file)
 
 QUICK_SUMMARIES = []
 
@@ -149,7 +147,7 @@ async def summarize_recent_messages(
         # Add error handling for response
         if not response or not response.choices or len(response.choices) == 0:
             error_msg = "Error: No valid response received from API"
-            print(response)
+            logger.debug(response)
             ic(error_msg)
             return "Error generating summary: No valid response received from API"
 

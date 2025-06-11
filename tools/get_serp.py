@@ -2,8 +2,9 @@ from serpapi import GoogleSearch
 from typing import Literal, Optional
 from .base import ToolResult, BaseAnthropicTool
 import os
-from icecream import ic
-from rich import print as rr
+from utils.logger import logger, log_debug as ic
+from utils.logger import logger
+rr = logger.info
 from dotenv import load_dotenv
 
 load_dotenv()

@@ -16,7 +16,8 @@ from openai import (
     RateLimitError,
 )
 from pydantic import BaseModel
-from rich import print as rr
+from utils.logger import logger
+rr = logger.info
 from tenacity import (
     RetryCallState,
     retry,
@@ -27,7 +28,7 @@ from tenacity import (
 
 from tools.base import BaseAnthropicTool, ToolResult
 from config import get_constant
-from icecream import ic  # type: ignore
+from utils.logger import logger, log_debug as ic  # type: ignore
 from pygments import highlight  # type: ignore
 from pygments.formatters import HtmlFormatter  # type: ignore
 from pygments.lexers import get_lexer_by_name, guess_lexer  # type: ignore
@@ -589,7 +590,7 @@ class WriteCodeTool(BaseAnthropicTool):
             # Optionally include host_project_path_obj if it was set
             if host_project_path_obj:
                 error_message += f"\nAttempted Host Path: {host_project_path_obj}"
-            print(error_message)
+            logger.error(error_message)
             return ToolResult(error=error_message, tool_name=self.name, command=command)
 
     # --- Helper for logging final output ---

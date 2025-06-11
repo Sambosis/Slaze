@@ -6,7 +6,7 @@ from typing import Literal, get_args, Dict
 from .base import BaseTool, ToolError, ToolResult
 from .run import maybe_truncate
 from typing import List, Optional
-from icecream import ic
+from utils.logger import logger, log_debug as ic
 from config import get_constant, write_to_file
 from utils.file_logger import log_file_operation
 from loguru import logger as ll

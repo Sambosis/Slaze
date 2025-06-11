@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 from config import get_constant, write_to_file # check_docker_available removed
 from .base import BaseTool, ToolError, ToolResult
 from utils.agent_display_web_with_prompt import AgentDisplayWebWithPrompt
-from icecream import ic
+from utils.logger import logger, log_debug as ic
 from lmnr import observe
 
 load_dotenv()

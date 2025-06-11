@@ -7,7 +7,8 @@ from config import PROJECT_DIR
 from .base import ToolResult, BaseAnthropicTool
 import subprocess
 from loguru import logger as ll
-from rich import print as rr
+from utils.logger import logger
+rr = logger.info
 
 # Configure logging to a file
 ll.add(

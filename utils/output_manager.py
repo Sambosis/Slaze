@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any, List, Optional, TYPE_CHECKING
 
 from typing import Dict
-from icecream import ic
+from utils.logger import logger, log_debug as ic
 
 from .agent_display_web_with_prompt import (
     AgentDisplayWebWithPrompt,

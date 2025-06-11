@@ -2,6 +2,7 @@ import json
 import datetime
 from pathlib import Path
 from config import get_constant
+from utils.logger import logger
 
 import ast
 from typing import Union
@@ -214,7 +215,7 @@ def log_file_operation(
                         )
 
             except Exception as read_error:
-                print(f"Error reading file content: {read_error}")
+                logger.error(f"Error reading file content: {read_error}")
                 # Don't fail the entire operation, just log the error
                 if "metadata" not in log_data["files"][file_path_str]:
                     log_data["files"][file_path_str]["metadata"] = {}
@@ -227,7 +228,7 @@ def log_file_operation(
             log_data["files"][file_path_str]["content"] = file_content
 
     except Exception as e:
-        print(f"Error processing file content: {e}")
+        logger.error(f"Error processing file content: {e}")
         # Don't fail the entire operation, just log the error
         if "metadata" not in log_data["files"][file_path_str]:
             log_data["files"][file_path_str]["metadata"] = {}
@@ -241,7 +242,7 @@ def log_file_operation(
         with open(LOG_FILE, "w") as f:
             json.dump(log_data, f, indent=2)
     except Exception as write_error:
-        print(f"Error writing to log file: {write_error}")
+        logger.error(f"Error writing to log file: {write_error}")
 
 
 def aggregate_file_states() -> str:
@@ -670,7 +671,7 @@ def get_all_current_code() -> str:
     try:
         # Ensure log file exists
         if not os.path.exists(LOG_FILE):
-            print(f"Log file not found: {LOG_FILE}")
+            logger.warning(f"Log file not found: {LOG_FILE}")
             # Initialize a new log file so future operations work
             with open(LOG_FILE, "w") as f:
                 json.dump({"files": {}}, f)
@@ -681,18 +682,18 @@ def get_all_current_code() -> str:
             with open(LOG_FILE, "r", encoding="utf-8") as f:
                 log_data = json.load(f)
         except json.JSONDecodeError:
-            print(f"Log file exists but contains invalid JSON: {LOG_FILE}")
+            logger.error(f"Log file exists but contains invalid JSON: {LOG_FILE}")
             # Reset the log file with valid JSON
             with open(LOG_FILE, "w") as f:
                 json.dump({"files": {}}, f)
             return "Error reading log file. Log file has been reset."
         except Exception as e:
-            print(f"Unexpected error reading log file: {e}")
+            logger.error(f"Unexpected error reading log file: {e}")
             return f"Error reading log file: {str(e)}"
 
         # Validate log structure
         if not isinstance(log_data, dict) or "files" not in log_data:
-            print("Log file has invalid format (missing 'files' key)")
+            logger.error("Log file has invalid format (missing 'files' key)")
             # Fix the format
             log_data = {"files": {}}
             with open(LOG_FILE, "w") as f:
@@ -742,7 +743,7 @@ def get_all_current_code() -> str:
                         {"path": file_path, "content": content, "extension": extension}
                     )
             except Exception as file_error:
-                print(f"Error processing file {file_path}: {file_error}")
+                logger.error(f"Error processing file {file_path}: {file_error}")
                 # Continue processing other files
 
         # Sort files by path for consistent output
@@ -760,7 +761,7 @@ def get_all_current_code() -> str:
                     output.append(code["content"])
                     output.append("```\n")
                 except Exception as format_error:
-                    print(
+                    logger.error(
                         f"Error formatting code file {code.get('path')}: {format_error}"
                     )
                     # Add a simpler version without failing
@@ -775,7 +776,7 @@ def get_all_current_code() -> str:
         return "\n".join(output)
 
     except Exception as e:
-        print(f"Critical error in get_all_current_code: {e}")
+        logger.error(f"Critical error in get_all_current_code: {e}")
         return "Error reading code files. Please check application logs for details."
 
 
@@ -824,7 +825,7 @@ def get_all_current_skeleton() -> str:
             try:
                 skeleton = extract_code_skeleton(file_info.get("content", ""))
             except Exception as e:
-                print(f"Error extracting skeleton from {file_path}: {e}")
+                logger.error(f"Error extracting skeleton from {file_path}: {e}")
                 skeleton = "# Failed to extract skeleton"
 
         if skeleton:

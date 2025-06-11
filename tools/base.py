@@ -4,7 +4,7 @@ from dataclasses import dataclass, fields, replace
 from typing import Any, Optional, Dict
 
 from utils.agent_display_web_with_prompt import AgentDisplayWebWithPrompt
-from icecream import ic
+from utils.logger import logger, log_debug as ic
 
 
 @dataclass(kw_only=True, frozen=True)
