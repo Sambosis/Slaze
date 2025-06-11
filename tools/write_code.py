@@ -27,7 +27,7 @@ from tenacity import (
 )
 
 from tools.base import BaseAnthropicTool, ToolResult
-from config import MAIN_MODEL, get_constant
+from config import CODE_MODEL, get_constant
 # from icecream import ic  # type: ignore # Removed
 from pygments import highlight  # type: ignore
 from pygments.formatters import HtmlFormatter  # type: ignore
@@ -43,7 +43,7 @@ import ftfy
 import traceback
 
 
-MODEL_STRING = MAIN_MODEL  # Default model string, can be overridden in config
+MODEL_STRING = CODE_MODEL  # Default model string, can be overridden in config
 
 logger = logging.getLogger(__name__)
 
