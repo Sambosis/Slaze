@@ -11,7 +11,20 @@ from agent import Agent
 
 # Docker and web server related functions have been removed.
 
-logger = logging.getLogger(__name__)
+import sys # Add this import
+
+# Configure root logger for UTF-8
+root_logger = logging.getLogger()
+handler = logging.StreamHandler(sys.stdout)
+handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+# Explicitly set encoding to UTF-8 for the handler
+handler.stream.reconfigure(encoding='utf-8') # type: ignore
+root_logger.addHandler(handler)
+root_logger.setLevel(logging.INFO)
+
+# Test logger with a unicode character
+logger = logging.getLogger(__name__) # This line should remain to keep the local logger
+logger.info("Logging configured. Testing with Unicode: │")
 
 # ----------------  The main Agent Loop ----------------
 async def sampling_loop(
