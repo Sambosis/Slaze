@@ -50,7 +50,11 @@ logger = logging.getLogger(__name__)
 
 # --- Retry Predicate Function ---
 def should_retry_llm_call(exception: Exception) -> bool:
-    """Return True if the exception warrants a retry."""
+    """
+    Determines whether an exception should trigger a retry of an LLM call.
+    
+    Returns True for exceptions that are likely transient or recoverable, such as custom LLM response errors, network issues, rate limits, server-side errors, and specific HTTP status codes. Returns False for all other exceptions.
+    """
 
     # Always retry on our custom LLMResponseError
     if isinstance(exception, LLMResponseError):
