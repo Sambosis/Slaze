@@ -262,29 +262,28 @@ class Agent:
                 tool_result = await self.run_tool(
                     {"name": tc.function.name, "id": tc.id, "input": args}
                 )
-                # result_text = tool_result.output or tool_result.error or ""
-                # tool_result_dict is the dictionary returned by run_tool (aliased as tool_result in traceback)
-                # Original problematic line (around 266 in user's file):
-                # result_text = tool_result.output or tool_result.error or ""
-
-                # Corrected way to get result_text:
                 result_text_parts = []
-                if isinstance(tool_result.get('content'), list):
-                    for content_item in tool_result['content']:
-                        if isinstance(content_item, dict) and content_item.get('type') == 'text' and 'text' in content_item:
-                            result_text_parts.append(str(content_item['text']))
+                if isinstance(tool_result.get("content"), list):
+                    for content_item in tool_result["content"]:
+                        if (
+                            isinstance(content_item, dict)
+                            and content_item.get("type") == "text"
+                            and "text" in content_item
+                        ):
+                            result_text_parts.append(str(content_item["text"]))
                 result_text = " ".join(result_text_parts)
-
-                # Assuming result_text is then used, for example, to create a message for the LLM:
-                # tool_responses_for_next_llm_call.append({
-                #     "tool_call_id": tc_openai_obj.id, # or relevant id from tc
-                #     "role": "tool",
-                #     "name": tc_openai_obj.function.name, # or relevant name from tc
-                #     "content": result_text,
-                # })
                 self.messages.append(
                     {"role": "tool", "tool_call_id": tc.id, "content": result_text}
                 )
-
+        else:
+            # No tool calls were returned; prompt the user for guidance
+            self.display.add_message("assistant", msg.content or "")
+            user_input = await self.display.wait_for_user_input(
+                "No tool calls. Enter instructions or type 'exit' to quit: "
+            )
+            if user_input:
+                if user_input.strip().lower() in {"exit", "quit"}:
+                    return False
+                self.messages.append({"role": "user", "content": user_input})
 
         return True
