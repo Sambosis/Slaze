@@ -7,6 +7,7 @@ This script initializes and validates the log file for the system.
 import os
 import json
 import sys
+from utils.logger import logger
 
 
 def init_log_file():
@@ -25,7 +26,7 @@ def init_log_file():
     log_dir = os.path.dirname(log_file)
     os.makedirs(log_dir, exist_ok=True)
 
-    print(f"Initializing log file at: {log_file}")
+    logger.info(f"Initializing log file at: {log_file}")
 
     # Create a valid empty log file
     initial_data = {"files": {}}
@@ -38,33 +39,33 @@ def init_log_file():
 
             # Check if structure is valid
             if not isinstance(existing_data, dict) or "files" not in existing_data:
-                print("Existing log file has invalid structure. Resetting...")
+                logger.warning("Existing log file has invalid structure. Resetting...")
                 with open(log_file, "w", encoding="utf-8") as f:
                     json.dump(initial_data, f, indent=2)
             else:
-                print("Existing log file is valid.")
+                logger.info("Existing log file is valid.")
         except (json.JSONDecodeError, UnicodeDecodeError) as e:
-            print(f"Existing log file is corrupted ({e}). Resetting...")
+            logger.warning(f"Existing log file is corrupted ({e}). Resetting...")
             with open(log_file, "w", encoding="utf-8") as f:
                 json.dump(initial_data, f, indent=2)
     else:
         # Create a new log file
-        print("Creating new log file...")
+        logger.info("Creating new log file...")
         with open(log_file, "w", encoding="utf-8") as f:
             json.dump(initial_data, f, indent=2)
 
-    print("Log file initialization complete.")
+    logger.info("Log file initialization complete.")
 
     # Verify the log file is valid and readable
     try:
         with open(log_file, "r", encoding="utf-8") as f:
             data = json.load(f)
-        print(
+        logger.info(
             f"Verification successful. Log file contains {len(data.get('files', {}))} files."
         )
         return True
     except Exception as e:
-        print(f"Verification failed: {e}")
+        logger.error(f"Verification failed: {e}")
         return False
 
 

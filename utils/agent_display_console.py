@@ -7,6 +7,7 @@ from openai import OpenAI # type: ignore
 from config import PROMPTS_DIR, LOGS_DIR, set_project_dir, set_constant, get_constant # get_docker_project_dir removed
 # Assuming agent_display_web.py is in utils and contains AgentDisplayWeb, log_message
 from utils.agent_display_web import AgentDisplayWeb, log_message
+from utils.logger import logger
 
 class AgentDisplayConsole(AgentDisplayWeb):
     def __init__(self):
@@ -27,7 +28,7 @@ class AgentDisplayConsole(AgentDisplayWeb):
 
         # Explicitly do NOT call super().__init__() if it starts web services.
         # Also, do not call methods that set up web routes or socket events.
-        print("AgentDisplayConsole initialized.") # Added for verification
+        logger.info("AgentDisplayConsole initialized.")
 
     def add_message(self, msg_type, content):
         log_message(msg_type, content) # From utils.agent_display_web

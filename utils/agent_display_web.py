@@ -6,6 +6,7 @@ from queue import Queue
 from flask import Flask, render_template, jsonify
 from flask_socketio import SocketIO, disconnect
 from config import LOGS_DIR
+from utils.logger import logger
 
 
 def log_message(msg_type, message):
@@ -22,6 +23,7 @@ def log_message(msg_type, message):
     with open(log_file, "a", encoding="utf-8") as file:
         file.write(emojitag * 5)
         file.write(f"\n{message}\n\n")
+    logger.info(f"{msg_type.upper()}: {message}")
 
 
 class AgentDisplayWeb:
@@ -68,21 +70,21 @@ class AgentDisplayWeb:
     def setup_socketio_events(self):
         @self.socketio.on("connect")
         def handle_connect():
-            print("[DEBUG] Client connected")
+            logger.debug("Client connected")
             # Get event loop from the running event loop if not set
             if self.loop is None:
                 try:
                     self.loop = asyncio.get_event_loop()
                 except RuntimeError:
-                    print("[ERROR] No event loop available")
+                    logger.error("No event loop available")
 
         @self.socketio.on("disconnect")
         def handle_disconnect():
-            print("[DEBUG] Client disconnected")
+            logger.debug("Client disconnected")
 
         @self.socketio.on("user_input")
         def handle_user_input(data):
-            print("[DEBUG] Received user_input event with data:", data)
+            logger.debug(f"Received user_input event with data: {data}")
             user_input = data.get("input", "")
 
             # Get event loop from the running event loop if not set
@@ -90,7 +92,7 @@ class AgentDisplayWeb:
                 try:
                     self.loop = asyncio.get_event_loop()
                 except RuntimeError:
-                    print("[ERROR] No event loop available")
+                    logger.error("No event loop available")
                     return None
 
             if self.loop is not None:
@@ -98,18 +100,18 @@ class AgentDisplayWeb:
                     self.loop.call_soon_threadsafe(
                         self.input_queue.put_nowait, user_input
                     )
-                    print("[DEBUG] Enqueued user input:", user_input)
+                    logger.debug(f"Enqueued user input: {user_input}")
                 except Exception as e:
-                    print(f"[ERROR] Failed to enqueue user input: {e}")
+                    logger.error(f"Failed to enqueue user input: {e}")
                     disconnect()
             else:
-                print("[ERROR] No event loop available for handling input")
+                logger.error("No event loop available for handling input")
             return None
 
         # New interrupt event handler
         @self.socketio.on("interrupt")
         def handle_interrupt():
-            print("[DEBUG] Received interrupt event")
+            logger.debug("Received interrupt event")
             self.user_interupt = True
 
     async def wait_for_user_input(self, user_input=None):
@@ -120,11 +122,11 @@ class AgentDisplayWeb:
         """
         # Wait for an item to appear in the queue.
         if user_input:
-            print("[DEBUG] wait_for_user_input returning from main.py:", user_input)
+            logger.debug(f"wait_for_user_input returning from main.py: {user_input}")
             return user_input
         else:
             user_input = await self.input_queue.get()
-            print("[DEBUG] wait_for_user_input returning from index.html:", user_input)
+            logger.debug(f"wait_for_user_input returning from index.html: {user_input}")
         return user_input
 
     def broadcast_update(self):

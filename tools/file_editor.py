@@ -6,7 +6,7 @@ from collections import defaultdict
 from typing import Dict, List, Literal, Optional, get_args
 
 from loguru import logger as ll
-from icecream import ic
+from utils.logger import logger, log_debug as ic
 from lmnr import observe
 
 from config import get_constant

@@ -7,8 +7,7 @@ import os
 from re import M
 from typing import Dict
 from openai import OpenAI
-from icecream import ic
-from rich import print as rr
+from utils.logger import logger, log_debug as ic, log_info as rr
 
 from tools import (
     BashTool,

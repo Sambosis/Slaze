@@ -12,6 +12,7 @@ Dependencies:
 """
 
 from dotenv import load_dotenv
+from utils.logger import logger
 
 # Import configuration constants from config module
 # Note: These imports are used to prevent circular dependencies
@@ -23,7 +24,7 @@ from config import TOP_LEVEL_DIR, REPO_DIR, SYSTEM_PROMPT_FILE, LOGS_DIR, MAIN_M
 try:
     load_dotenv()
 except Exception as e:
-    print(f"Error loading environment variables: {e}")
+    logger.error(f"Error loading environment variables: {e}")
 
 # Application-wide constants
 MAX_SUMMARY_MESSAGES = 20  # Maximum number of messages to include in summaries
@@ -65,7 +66,7 @@ try:
         SYSTEM_PROMPT = f.read()
 except FileNotFoundError:
     SYSTEM_PROMPT = ""
-    print(f"Warning: System prompt file not found at {SYSTEM_PROMPT_FILE}")
+    logger.warning(f"System prompt file not found at {SYSTEM_PROMPT_FILE}")
 
 
 def reload_prompts() -> None:
@@ -80,7 +81,7 @@ def reload_prompts() -> None:
         with open(SYSTEM_PROMPT_FILE, "r", encoding="utf-8") as f:
             SYSTEM_PROMPT = f.read()
     except FileNotFoundError:
-        print(f"Warning: System prompt file not found at {SYSTEM_PROMPT_FILE}")
+        logger.warning(f"System prompt file not found at {SYSTEM_PROMPT_FILE}")
 
 
 def update_paths(new_prompt_name: str) -> dict:

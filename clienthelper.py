@@ -1,6 +1,7 @@
 import os
 from typing import List, Dict, Optional, Any, Union
-from rich import print as rr  # Using rich for better console output
+from utils.logger import logger
+rr = logger.info
 # Ensure you have the necessary libraries installed:
 # pip install openai anthropic python-dotenv
 # Create a .env file in your project root for API keys if you prefer:
@@ -111,7 +112,9 @@ class MinimalLLMClient:
         """Sets the default temperature for this client."""
         if not (0.0 <= temperature <= 2.0): # OpenAI typical range
             # Anthropic range is 0.0 to 1.0, but we'll use OpenAI's broader range for consistency here
-            print(f"Warning: Temperature {temperature} might be outside the typical optimal range for some models.")
+            logger.warning(
+                f"Temperature {temperature} might be outside the typical optimal range for some models."
+            )
         self.temperature = temperature
         return self
 
@@ -206,7 +209,9 @@ class MinimalLLMClient:
                 return self.client.messages.create(**api_params)
 
         except Exception as e:
-            print(f"Error calling LLM provider {self.provider} with model {current_model}: {e}")
+            logger.error(
+                f"Error calling LLM provider {self.provider} with model {current_model}: {e}"
+            )
             raise
 
     def get_text(self, response: Any) -> str:
@@ -283,9 +288,9 @@ class MinimalLLMClient:
                         "stop_sequence": getattr(response, 'stop_sequence', None)
                     }
         except AttributeError as e:
-            print(f"Could not extract some metadata, attribute missing: {e}")
+            logger.warning(f"Could not extract some metadata, attribute missing: {e}")
         except Exception as e:
-            print(f"An error occurred while extracting metadata: {e}")
+            logger.error(f"An error occurred while extracting metadata: {e}")
 
         return meta
 

@@ -3,8 +3,7 @@ import asyncio
 from typing import List, Dict, Any
 import os  # Keep os if needed, e.g. by loaded modules, or for future use
 from dotenv import load_dotenv  # Optional: Uncomment if you use .env files for API keys
-from icecream import ic, install
-install()  # Initialize icecream for debug logging
+from utils.logger import logger, log_debug as ic
 from utils.agent_display_console import AgentDisplayConsole
 from agent import Agent
 
@@ -27,8 +26,10 @@ async def sampling_loop(
 
         except UnicodeEncodeError as ue:
             ic(f"UnicodeEncodeError: {ue}")
-            rr(f"Unicode encoding error: {ue}")
-            rr(f"ascii: {ue.args[1].encode('ascii', errors='replace').decode('ascii')}")
+            logger.error(f"Unicode encoding error: {ue}")
+            logger.error(
+                f"ascii: {ue.args[1].encode('ascii', errors='replace').decode('ascii')}"
+            )
             break
         except Exception as e:
             ic(
@@ -66,7 +67,9 @@ if __name__ == "__main__":
     # Optional: Load environment variables if you use .env files
     # For example, if OPENROUTER_API_KEY is in a .env file:
     load_dotenv()
-    print(f"OPENROUTER_API_KEY loaded: {os.getenv('OPENROUTER_API_KEY') is not None}")
+    logger.info(
+        f"OPENROUTER_API_KEY loaded: {os.getenv('OPENROUTER_API_KEY') is not None}"
+    )
 
     display = AgentDisplayConsole()
 
@@ -75,21 +78,21 @@ if __name__ == "__main__":
         task = await display.select_prompt_console()
 
         if task:
-            print("\n--- Starting Agent with Task ---")
+            logger.info("--- Starting Agent with Task ---")
             # AgentDisplayConsole is expected to be compatible with run_sampling_loop
             # due to its inheritance from AgentDisplayWeb and provision of necessary methods
             # like .loop, .add_message(), and .wait_for_user_input().
             await run_sampling_loop(task=task, display=display)
-            print("\n--- Agent finished ---")
+            logger.info("--- Agent finished ---")
         else:
-            print("No task selected. Exiting.")
+            logger.info("No task selected. Exiting.")
 
     try:
         asyncio.run(run_console_app())
     except KeyboardInterrupt:
-        print("\nApplication interrupted by user. Exiting.")
+        logger.info("Application interrupted by user. Exiting.")
     except Exception as e:
-        print(f"An unexpected error occurred: {e}")
+        logger.error(f"An unexpected error occurred: {e}")
         import traceback  # Uncomment for detailed traceback
 
         traceback.print_exc()  # Uncomment for detailed traceback
