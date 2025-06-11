@@ -3,12 +3,15 @@
 
 from typing import Dict, Any, List
 import json
-from icecream import ic
+import logging
 from .base import (
     BaseAnthropicTool,
     ToolResult,
 )
 from lmnr import observe
+
+logger = logging.getLogger(__name__)
+
 class ToolCollection:
     """Collection of tools for the agent to use."""
 
@@ -20,20 +23,20 @@ class ToolCollection:
             *tools: Tools to add to the collection
             display: Optional display object for UI interaction
         """
-        from loguru import logger 
-        t_log  = logger.bind(name="tool")
+        # from loguru import logger # Removed loguru import
+        # t_log  = logger.bind(name="tool") # Removed loguru specific binding
 
-        self.t_log = t_log
+        # self.t_log = t_log # Removed loguru logger instance
         self.tools: Dict[str, BaseAnthropicTool] = {}
         self.display = display
 
-        # Configure logging to a file
-        self.t_log.add(
-            "tool.log",
-            rotation="500 KB",
-            level="CRITICAL",
-            format="{time:YYYY-MM-DD HH:mm} | {level: <8} | {module}.{function}:{line} - {message}",
-        )
+        # Configure logging to a file # Removed loguru specific file configuration
+        # self.t_log.add(
+        #     "tool.log",
+        #     rotation="500 KB",
+        #     level="CRITICAL",
+        #     format="{time:YYYY-MM-DD HH:mm} | {level: <8} | {module}.{function}:{line} - {message}",
+        # )
 
         # Add each tool to the collection
         for tool in tools:
@@ -48,21 +51,21 @@ class ToolCollection:
         Returns:
             List[Dict[str, Any]]: List of tool parameters
         """
-        ic("---- COLLECTING TOOL PARAMS ----")
+        logger.debug("---- COLLECTING TOOL PARAMS ----")
         tool_params = []
 
         for tool_name, tool in self.tools.items():
-            ic(f"Tool: {tool_name}")
+            logger.debug(f"Tool: {tool_name}")
             try:
                 params = tool.to_params()
-                ic(f"Tool params for {tool_name}:")
-                ic(params)
+                logger.debug(f"Tool params for {tool_name}:")
+                logger.debug(params) # Assuming params is a dict/object that can be logged
                 tool_params.append(params)
             except Exception as e:
-                ic(f"Error getting params for tool {tool_name}: {str(e)}")
+                logger.error(f"Error getting params for tool {tool_name}: {str(e)}", exc_info=True)
 
-        ic(f"Total tools collected: {len(tool_params)}")
-        ic("---- END COLLECTING TOOL PARAMS ----")
+        logger.debug(f"Total tools collected: {len(tool_params)}")
+        logger.debug("---- END COLLECTING TOOL PARAMS ----")
         return tool_params
     observe()
     async def run(self, name: str, tool_input: Dict[str, Any]) -> ToolResult:
@@ -93,7 +96,7 @@ class ToolCollection:
             # Log the exact contents of tool_input in a more readable format
             formatted_input = json.dumps(tool_input, indent=2)
 
-            self.t_log.debug(f"EXACT TOOL INPUT: \n{formatted_input}")
+            logger.debug(f"EXACT TOOL INPUT: \n{formatted_input}") # Replaced self.t_log with logger
 
             result = await tool(**tool_input)
             # This unpacks tool_input as keyword arguments to the tool's __call__ method
@@ -164,7 +167,7 @@ class ToolCollection:
                     tool_name=result.tool_name,
                     command=command_str,
                 )
-            ic 
+            logger.debug("Tool run completed, returning result.")
             return result
 
         except Exception as e:

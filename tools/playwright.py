@@ -12,10 +12,11 @@ import re
 from .base import ToolResult
 
 # Configure logging for user feedback and debugging
-logging.basicConfig(
-    level=logging.CRITICAL, format="%(asctime)s - %(levelname)s - %(message)s"
-)
+# logging.basicConfig( # Removed basicConfig
+#     level=logging.CRITICAL, format="%(asctime)s - %(levelname)s - %(message)s"
+# )
 
+logger = logging.getLogger(__name__)
 
 class WebNavigatorTool:
     """
@@ -45,7 +46,7 @@ class WebNavigatorTool:
         self.browser = None
         self.context = None
         self.page = None
-        logging.info(
+        logger.info(
             "WebNavigatorTool initialized with download directory at '%s'.",
             self.download_dir,
         )
@@ -208,7 +209,7 @@ class WebNavigatorTool:
 
         except PlaywrightTimeoutError:
             error_msg = f"Timeout occurred while performing action '{action}' on {url}."
-            logging.error(error_msg)
+            logger.error(error_msg, exc_info=True)
             return ToolResult(error=error_msg)
         except Exception as e:
             error_msg = f"An error occurred while performing action '{action}' on {url}: {str(e)}"
@@ -334,7 +335,7 @@ class WebNavigatorTool:
         if max_length and len(content) > max_length:
             content = content[:max_length] + "..."
 
-        logging.info(
+        logger.info(
             "Read and processed content from '%s' using mode '%s'.", url, content_type
         )
         return content
@@ -390,7 +391,7 @@ class WebNavigatorTool:
         await page.goto(url)
         title = await page.title()
         self.session_history.append(f"navigate: {url}")
-        logging.info("Navigated to '%s' with title '%s'.", url, title)
+        logger.info("Navigated to '%s' with title '%s'.", url, title)
         return f"Navigated to {url}. Page title: {title}"
 
     async def download_file(self, page, url: str, file_path: str) -> str:
@@ -404,7 +405,7 @@ class WebNavigatorTool:
         save_path = os.path.join(self.download_dir, file_path)
         await download.save_as(save_path)
         self.session_history.append(f"download_file: {save_path}")
-        logging.info("Downloaded file from '%s' to '%s'.", url, save_path)
+        logger.info("Downloaded file from '%s' to '%s'.", url, save_path)
         return f"File downloaded and saved to {save_path}"
 
     async def fill_form(
@@ -418,7 +419,7 @@ class WebNavigatorTool:
             await page.fill(f"{form_selector} {field}", value)
         await page.click(f"{form_selector} button[type='submit']")
         self.session_history.append(f"fill_form: {url} with {form_data}")
-        logging.info("Filled form on '%s' with data '%s'.", url, form_data)
+        logger.info("Filled form on '%s' with data '%s'.", url, form_data)
         return f"Form on {url} filled with provided data and submitted."
 
     async def extract_data(self, page, url: str, data_selector: str) -> str:
@@ -428,7 +429,7 @@ class WebNavigatorTool:
         await page.goto(url)
         data = await page.inner_text(data_selector)
         self.session_history.append(f"extract_data: {url} - {data_selector}")
-        logging.info(
+        logger.info(
             "Extracted data from '%s' using selector '%s'.", url, data_selector
         )
         return data
@@ -440,7 +441,7 @@ class WebNavigatorTool:
         await page.goto(url)
         await page.click(element_selector)
         self.session_history.append(f"click_element: {url} - {element_selector}")
-        logging.info("Clicked element '%s' on '%s'.", element_selector, url)
+        logger.info("Clicked element '%s' on '%s'.", element_selector, url)
         return f"Clicked element '{element_selector}' on {url}."
 
     def integrate_external_api(
@@ -456,10 +457,10 @@ class WebNavigatorTool:
         }
         response = requests.get(api_url, headers=headers, params=params)
         if response.status_code == 200:
-            logging.info("Successfully integrated with external API '%s'.", api_url)
+            logger.info("Successfully integrated with external API '%s'.", api_url)
             return response.json()
         else:
-            logging.error(
+            logger.error(
                 "Failed to integrate with external API '%s'. Status code: %s",
                 api_url,
                 response.status_code,
@@ -473,5 +474,5 @@ class WebNavigatorTool:
         Returns the session history for contextual awareness.
         """
         history = "\n".join(self.session_history)
-        logging.info("Session history retrieved.")
+        logger.info("Session history retrieved.")
         return history

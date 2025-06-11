@@ -8,6 +8,9 @@ from typing import Union
 import os
 import mimetypes
 import base64
+import logging
+
+logger = logging.getLogger(__name__)
 
 try:
     from config import get_constant
@@ -69,8 +72,8 @@ except:
         "file_log.json",
     )
 
-# In-memory tracking of file operations
-FILE_OPERATIONS = {}
+# In-memory tracking of file operations # FILE_OPERATIONS removed
+# FILE_OPERATIONS = {} # Removed
 
 # Ensure log directory exists
 os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
@@ -80,10 +83,10 @@ if not os.path.exists(LOG_FILE):
     with open(LOG_FILE, "w") as f:
         json.dump({"files": {}}, f)
 
-# Track file operations
-file_operations = []
-tracked_files = set()
-file_contents = {}
+# Track file operations # Removed unused global variables
+# file_operations = [] # Removed
+# tracked_files = set() # Removed
+# file_contents = {} # Removed
 
 
 def log_file_operation(
@@ -118,21 +121,21 @@ def log_file_operation(
     if mime_type and mime_type.startswith("image/"):
         is_image = True
 
-    # Track file operations in memory
-    if file_path_str not in FILE_OPERATIONS:
-        FILE_OPERATIONS[file_path_str] = {
-            "operations": [],
-            "last_updated": timestamp,
-            "extension": extension,
-            "is_image": is_image,
-            "mime_type": mime_type,
-        }
-
-    # Update the in-memory tracking
-    FILE_OPERATIONS[file_path_str]["operations"].append(
-        {"timestamp": timestamp, "operation": operation}
-    )
-    FILE_OPERATIONS[file_path_str]["last_updated"] = timestamp
+    # Track file operations in memory # Removed FILE_OPERATIONS update logic
+    # if file_path_str not in FILE_OPERATIONS:
+    #     FILE_OPERATIONS[file_path_str] = {
+    #         "operations": [],
+    #         "last_updated": timestamp,
+    #         "extension": extension,
+    #         "is_image": is_image,
+    #         "mime_type": mime_type,
+    #     }
+    #
+    # # Update the in-memory tracking
+    # FILE_OPERATIONS[file_path_str]["operations"].append(
+    #     {"timestamp": timestamp, "operation": operation}
+    # )
+    # FILE_OPERATIONS[file_path_str]["last_updated"] = timestamp
 
     # Load existing log data or create a new one
     log_data = {"files": {}}
@@ -214,7 +217,7 @@ def log_file_operation(
                         )
 
             except Exception as read_error:
-                print(f"Error reading file content: {read_error}")
+                logger.error(f"Error reading file content for {file_path_str}: {read_error}", exc_info=True)
                 # Don't fail the entire operation, just log the error
                 if "metadata" not in log_data["files"][file_path_str]:
                     log_data["files"][file_path_str]["metadata"] = {}
@@ -227,7 +230,7 @@ def log_file_operation(
             log_data["files"][file_path_str]["content"] = file_content
 
     except Exception as e:
-        print(f"Error processing file content: {e}")
+        logger.error(f"Error processing file content for {file_path_str}: {e}", exc_info=True)
         # Don't fail the entire operation, just log the error
         if "metadata" not in log_data["files"][file_path_str]:
             log_data["files"][file_path_str]["metadata"] = {}
@@ -241,7 +244,7 @@ def log_file_operation(
         with open(LOG_FILE, "w") as f:
             json.dump(log_data, f, indent=2)
     except Exception as write_error:
-        print(f"Error writing to log file: {write_error}")
+        logger.error(f"Error writing to log file {LOG_FILE}: {write_error}", exc_info=True)
 
 
 def aggregate_file_states() -> str:
@@ -670,7 +673,7 @@ def get_all_current_code() -> str:
     try:
         # Ensure log file exists
         if not os.path.exists(LOG_FILE):
-            print(f"Log file not found: {LOG_FILE}")
+            logger.warning(f"Log file not found: {LOG_FILE}")
             # Initialize a new log file so future operations work
             with open(LOG_FILE, "w") as f:
                 json.dump({"files": {}}, f)
@@ -681,18 +684,18 @@ def get_all_current_code() -> str:
             with open(LOG_FILE, "r", encoding="utf-8") as f:
                 log_data = json.load(f)
         except json.JSONDecodeError:
-            print(f"Log file exists but contains invalid JSON: {LOG_FILE}")
+            logger.error(f"Log file contains invalid JSON: {LOG_FILE}")
             # Reset the log file with valid JSON
             with open(LOG_FILE, "w") as f:
                 json.dump({"files": {}}, f)
             return "Error reading log file. Log file has been reset."
         except Exception as e:
-            print(f"Unexpected error reading log file: {e}")
+            logger.error(f"Unexpected error reading log file: {e}", exc_info=True)
             return f"Error reading log file: {str(e)}"
 
         # Validate log structure
         if not isinstance(log_data, dict) or "files" not in log_data:
-            print("Log file has invalid format (missing 'files' key)")
+            logger.error("Log file has invalid format (missing 'files' key)")
             # Fix the format
             log_data = {"files": {}}
             with open(LOG_FILE, "w") as f:
@@ -742,7 +745,7 @@ def get_all_current_code() -> str:
                         {"path": file_path, "content": content, "extension": extension}
                     )
             except Exception as file_error:
-                print(f"Error processing file {file_path}: {file_error}")
+                logger.error(f"Error processing file {file_path}: {file_error}", exc_info=True)
                 # Continue processing other files
 
         # Sort files by path for consistent output
@@ -760,8 +763,8 @@ def get_all_current_code() -> str:
                     output.append(code["content"])
                     output.append("```\n")
                 except Exception as format_error:
-                    print(
-                        f"Error formatting code file {code.get('path')}: {format_error}"
+                    logger.error( # Replaced print with logger.error
+                        f"Error formatting code file {code.get('path')}: {format_error}", exc_info=True
                     )
                     # Add a simpler version without failing
                     output.append(f"## {code.get('path', 'Unknown file')}")
@@ -775,7 +778,7 @@ def get_all_current_code() -> str:
         return "\n".join(output)
 
     except Exception as e:
-        print(f"Critical error in get_all_current_code: {e}")
+        logger.critical(f"Critical error in get_all_current_code: {e}", exc_info=True)
         return "Error reading code files. Please check application logs for details."
 
 
@@ -824,7 +827,7 @@ def get_all_current_skeleton() -> str:
             try:
                 skeleton = extract_code_skeleton(file_info.get("content", ""))
             except Exception as e:
-                print(f"Error extracting skeleton from {file_path}: {e}")
+                logger.error(f"Error extracting skeleton from {file_path}: {e}", exc_info=True)
                 skeleton = "# Failed to extract skeleton"
 
         if skeleton:

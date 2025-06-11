@@ -5,12 +5,13 @@ from dotenv import load_dotenv
 from config import get_constant, write_to_file # check_docker_available removed
 from .base import BaseTool, ToolError, ToolResult
 from utils.agent_display_web_with_prompt import AgentDisplayWebWithPrompt
-from icecream import ic
+import logging
 from lmnr import observe
 
 load_dotenv()
-ic.configureOutput(includeContext=True, outputFunction=write_to_file)
+# ic.configureOutput(includeContext=True, outputFunction=write_to_file) # Removed icecream configuration
 
+logger = logging.getLogger(__name__)
 
 class BashTool(BaseTool):
     def __init__(self, display: AgentDisplayWebWithPrompt = None):
@@ -100,11 +101,11 @@ class BashTool(BaseTool):
                 try:
                     self.display.add_message("assistant", f"Error: {error}")
                 except Exception as display_error:
-                    ic(f"Error displaying message: {display_error}")
+                    logger.error(f"Error displaying message: {display_error}", exc_info=True)
             return ToolResult(error=error, tool_name=self.name, command=command)
 
     def to_params(self) -> dict:
-        ic(f"BashTool.to_params called with api_type: {self.api_type}")
+        logger.debug(f"BashTool.to_params called with api_type: {self.api_type}")
         params = {
             "type": "function",
             "function": {
@@ -122,5 +123,5 @@ class BashTool(BaseTool):
                 },
             },
         }
-        ic(f"BashTool params: {params}")
+        logger.debug(f"BashTool params: {params}")
         return params

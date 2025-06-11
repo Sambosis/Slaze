@@ -6,12 +6,15 @@ from pathlib import Path
 from typing import Any, List, Optional, TYPE_CHECKING
 
 from typing import Dict
-from icecream import ic
+import logging
+# from icecream import ic # Removed
 
 from .agent_display_web_with_prompt import (
     AgentDisplayWebWithPrompt,
 )  # Relative import for AgentDisplay
 from config import get_constant  # Updated import
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from tools.base import ToolResult
@@ -30,7 +33,7 @@ class OutputManager:
     def save_image(self, base64_data: str) -> Optional[Path]:
         """Save base64 image data to file and return path."""
         if not base64_data:
-            ic("Error: No base64 data provided to save_image")
+            logger.error("No base64 data provided to save_image")
             return None
 
         try:
@@ -44,13 +47,13 @@ class OutputManager:
                 f.write(image_data)
             return image_path
         except Exception as e:
-            ic(f"Error saving image: {e}")
+            logger.error(f"Error saving image: {e}", exc_info=True)
             return None
 
     def format_tool_output(self, result: "ToolResult", tool_name: str):
         """Format and display tool output."""
         if result is None:
-            ic("Error: None result provided to format_tool_output")
+            logger.error("None result provided to format_tool_output")
             return
 
         output_text = f"Used Tool: {tool_name}\n"
@@ -76,7 +79,7 @@ class OutputManager:
     def format_api_response(self, response: Dict[str, Any]):
         """Format and display API response."""
         if response is None or not hasattr(response, "content") or not response.content:
-            ic("Error: Invalid API response in format_api_response")
+            logger.error("Invalid API response in format_api_response")
             return
 
         if response.content and hasattr(response.content[0], "text"):
@@ -85,7 +88,7 @@ class OutputManager:
     def format_content_block(self, block: Dict[str, Any]) -> None:
         """Format and display content block."""
         if block is None:
-            ic("Error: None block provided to format_content_block")
+            logger.error("None block provided to format_content_block")
             return
 
         if getattr(block, "type", None) == "tool_use":
@@ -101,7 +104,7 @@ class OutputManager:
     ):
         """Format and display recent conversation."""
         if messages is None or not messages:
-            ic("Error: No messages provided to format_recent_conversation")
+            logger.warning("No messages provided to format_recent_conversation")
             return
 
         # recent_messages = messages[:num_recent] if len(messages) > num_recent else messages
@@ -115,7 +118,7 @@ class OutputManager:
     def _format_user_content(self, content: Any):
         """Format and display user content."""
         if content is None:
-            ic("Error: None content provided to _format_user_content")
+            logger.error("None content provided to _format_user_content")
             return
 
         if isinstance(content, list):
@@ -135,7 +138,7 @@ class OutputManager:
     def _format_assistant_content(self, content: Any):
         """Format and display assistant content."""
         if content is None:
-            ic("Error: None content provided to _format_assistant_content")
+            logger.error("None content provided to _format_assistant_content")
             return
 
         if isinstance(content, list):

@@ -3,8 +3,7 @@ import asyncio
 from typing import List, Dict, Any
 import os  # Keep os if needed, e.g. by loaded modules, or for future use
 from dotenv import load_dotenv  # Optional: Uncomment if you use .env files for API keys
-from icecream import ic, install
-install()  # Initialize icecream for debug logging
+import logging
 from utils.agent_display_console import AgentDisplayConsole
 from agent import Agent
 
@@ -12,6 +11,7 @@ from agent import Agent
 
 # Docker and web server related functions have been removed.
 
+logger = logging.getLogger(__name__)
 
 # ----------------  The main Agent Loop ----------------
 async def sampling_loop(
@@ -26,18 +26,19 @@ async def sampling_loop(
             running = await agent.step()
 
         except UnicodeEncodeError as ue:
-            ic(f"UnicodeEncodeError: {ue}")
-            rr(f"Unicode encoding error: {ue}")
-            rr(f"ascii: {ue.args[1].encode('ascii', errors='replace').decode('ascii')}")
+            logger.error(f"UnicodeEncodeError: {ue}", exc_info=True)
+            # rr(f"Unicode encoding error: {ue}") # Replaced by logger
+            # rr(f"ascii: {ue.args[1].encode('ascii', errors='replace').decode('ascii')}") # Replaced by logger
             break
         except Exception as e:
-            ic(
-                f"Error in sampling loop: {str(e).encode('ascii', errors='replace').decode('ascii')}"
+            logger.error(
+                f"Error in sampling loop: {str(e).encode('ascii', errors='replace').decode('ascii')}",
+                exc_info=True
             )
-            ic(
-                f"The error occurred at the following message: {agent.messages[-1]} and line: {e.__traceback__.tb_lineno}"
+            logger.error(
+                f"The error occurred at the following message: {agent.messages[-1]} and line: {e.__traceback__.tb_lineno if e.__traceback__ else 'N/A'}",
             )
-            ic(e.__traceback__.tb_frame.f_locals)
+            logger.debug(f"Locals at error: {e.__traceback__.tb_frame.f_locals if e.__traceback__ else 'N/A'}")
             agent.display.add_message("user", ("Error", str(e)))
             raise
     return agent.messages

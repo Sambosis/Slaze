@@ -3,13 +3,16 @@ from typing import Any, Dict, List
 import os
 from utils.agent_display_web_with_prompt import AgentDisplayWebWithPrompt
 from load_constants import *
-from config import write_to_file
+# from config import write_to_file # Removed as it was for ic
 from utils.file_logger import aggregate_file_states
 from openai import OpenAI
-from icecream import ic
-from rich import print as rr
+import logging
+# from icecream import ic # Removed
+# from rich import print as rr # Removed
 
-ic.configureOutput(includeContext=True, outputFunction=write_to_file)
+# ic.configureOutput(includeContext=True, outputFunction=write_to_file) # Removed
+
+logger = logging.getLogger(__name__)
 
 QUICK_SUMMARIES = []
 
@@ -128,7 +131,7 @@ async def summarize_recent_messages(
                         content[:70000] + " ... [TRUNCATED] ... " + content[-70000:]
                     )
                 conversation_text += f"\n{role}: {content}"
-        ic(f"conversation_text: {conversation_text}")
+        logger.debug(f"conversation_text for summary: {conversation_text[:500]}...") # Log snippet
         summary_prompt = f"""Please provide your response in a concise markdown format with short statements that document what happened. Structure your response as a list with clear labels for each step, such as:
 
             - **Action:** [brief description of what was done]
@@ -144,13 +147,13 @@ async def summarize_recent_messages(
         response = sum_client.chat.completions.create(
             model=model, messages=[{"role": "user", "content": summary_prompt}]
         )
-        ic(f"response: {response}")
+        logger.debug(f"Summary API response: {response}")
 
         # Add error handling for response
         if not response or not response.choices or len(response.choices) == 0:
-            error_msg = "Error: No valid response received from API"
-            print(response)
-            ic(error_msg)
+            error_msg = "Error: No valid response received from summary API"
+            # print(response) # Replaced by logger
+            logger.error(f"{error_msg} - Full response: {response}")
             return "Error generating summary: No valid response received from API"
 
         summary = response.choices[0].message.content
@@ -158,14 +161,14 @@ async def summarize_recent_messages(
         # Check if summary is None or empty
         if not summary:
             error_msg = "Error: Empty summary received from API"
-            ic(error_msg)
+            logger.error(error_msg)
             return "Error generating summary: Empty summary received from API"
 
-        ic(f"summary: {summary}")
+        logger.debug(f"Generated summary: {summary[:500]}...") # Log snippet
         return summary
     except Exception as e:
         error_msg = f"Error generating summary: {str(e)}"
-        ic(error_msg)
+        logger.error(error_msg, exc_info=True)
         return error_msg
 
 
@@ -284,7 +287,7 @@ async def reorganize_context(messages: List[Dict[str, Any]], summary: str) -> st
         conversation_text += "\n\nIMAGE GENERATION RESULTS:\n" + "\n".join(
             image_generation_results
         )
-    ic(f"conversation_text: {conversation_text}")
+    logger.debug(f"Conversation text for reorganize_context: {conversation_text[:500]}...") # Log snippet
     summary_prompt = f"""I need a summary of completed steps and next steps for a project that is ALREADY IN PROGRESS. 
     This is NOT a new project - you are continuing work on an existing codebase.
 
@@ -336,12 +339,12 @@ async def reorganize_context(messages: List[Dict[str, Any]], summary: str) -> st
         response = sum_client.chat.completions.create(
             model=model, messages=[{"role": "user", "content": summary_prompt}]
         )
-        ic(f"response: {response}")
+        logger.debug(f"Reorganize context API response: {response}")
         if not response or not response.choices:
             raise ValueError("No response received from OpenRouter API")
 
         summary = response.choices[0].message.content
-        ic(f"summary: {summary}")
+        logger.debug(f"Reorganized context summary: {summary[:500]}...") # Log snippet
         if not summary:
             raise ValueError("Empty response content from OpenRouter API")
 
@@ -366,7 +369,7 @@ async def reorganize_context(messages: List[Dict[str, Any]], summary: str) -> st
         return completed_items, steps
 
     except Exception as e:
-        ic(f"Error in reorganize_context: {str(e)}")
+        logger.error(f"Error in reorganize_context: {str(e)}", exc_info=True)
         # Return default values in case of error
         return (
             "Error processing context. Please try again.",
@@ -455,5 +458,5 @@ async def refresh_context_async(
     - All completed steps have ALREADY BEEN DONE successfully.
     - Continue the project by implementing the next steps, building on the existing work.
     """
-    rr(f"combined_content: {combined_content}")
+    logger.info(f"Refreshed context combined_content (first 500 chars): {combined_content[:500]}...")
     return combined_content

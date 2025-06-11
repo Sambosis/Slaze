@@ -2,12 +2,14 @@ from serpapi import GoogleSearch
 from typing import Literal, Optional
 from .base import ToolResult, BaseAnthropicTool
 import os
-from icecream import ic
-from rich import print as rr
+import logging
+# from icecream import ic # Removed
+# from rich import print as rr # Removed
 from dotenv import load_dotenv
 
 load_dotenv()
 
+logger = logging.getLogger(__name__)
 
 class GoogleSearchTool(BaseAnthropicTool):
     """
@@ -78,13 +80,13 @@ class GoogleSearchTool(BaseAnthropicTool):
                 params["location"] = location
 
             # Execute search
-            ic("Executing Google search with params:", params)
+            logger.debug(f"Executing Google search with params: {params}")
             search = GoogleSearch(params)
             results = search.get_dict()
             return ToolResult(output=results)
 
         except Exception as e:
-            ic(e)
+            logger.error(f"Exception during Google search: {e}", exc_info=True)
             error_msg = f"Failed to execute Google search: {str(e)}"
-            rr(f"Google search error: {error_msg}")
+            # rr(f"Google search error: {error_msg}") # Replaced by logger.error above
             return ToolResult(error=error_msg)

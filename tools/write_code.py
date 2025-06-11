@@ -16,7 +16,8 @@ from openai import (
     RateLimitError,
 )
 from pydantic import BaseModel
-from rich import print as rr
+import logging
+# from rich import print as rr # Removed
 from tenacity import (
     RetryCallState,
     retry,
@@ -27,7 +28,7 @@ from tenacity import (
 
 from tools.base import BaseAnthropicTool, ToolResult
 from config import get_constant
-from icecream import ic  # type: ignore
+# from icecream import ic  # type: ignore # Removed
 from pygments import highlight  # type: ignore
 from pygments.formatters import HtmlFormatter  # type: ignore
 from pygments.lexers import get_lexer_by_name, guess_lexer  # type: ignore
@@ -45,6 +46,7 @@ googlepro = "google/gemini-2.5-pro-preview"
 googleflash = "google/gemini-2.5-flash-preview"
 MODEL_STRING = googlepro  # Default model string, can be overridden in config
 
+logger = logging.getLogger(__name__)
 
 # --- Retry Predicate Function ---
 def should_retry_llm_call(retry_state: RetryCallState) -> bool:
@@ -61,8 +63,8 @@ def should_retry_llm_call(retry_state: RetryCallState) -> bool:
 
     # Always retry on our custom LLMResponseError
     if isinstance(exception, LLMResponseError):
-        rr(
-            f"[bold yellow]Retry triggered by LLMResponseError: {str(exception)[:200]}[/bold yellow]"
+        logger.warning(
+            f"Retry triggered by LLMResponseError: {str(exception)[:200]}"
         )
         return True
 
@@ -75,8 +77,8 @@ def should_retry_llm_call(retry_state: RetryCallState) -> bool:
             InternalServerError,  # Server-side errors from OpenAI (500 class)
         ),
     ):
-        rr(
-            f"[bold yellow]Retry triggered by OpenAI API Error ({type(exception).__name__}): {str(exception)[:200]}[/bold yellow]"
+        logger.warning(
+            f"Retry triggered by OpenAI API Error ({type(exception).__name__}): {str(exception)[:200]}"
         )
         return True
 
@@ -90,14 +92,14 @@ def should_retry_llm_call(retry_state: RetryCallState) -> bool:
             503,
             504,
         ]:
-            rr(
-                f"[bold yellow]Retry triggered by OpenAI APIStatusError (status {exception.status_code}): {str(exception)[:200]}[/bold yellow]"
+            logger.warning(
+                f"Retry triggered by OpenAI APIStatusError (status {exception.status_code}): {str(exception)[:200]}"
             )
             return True
 
     # For any other Exception, you might want to log it but not retry,
     # or add it here if known to be transient.
-    # rr(f"[bold red]Non-retryable exception encountered: {type(exception).__name__}: {exception}[/bold red]")
+    # logger.error(f"Non-retryable exception encountered: {type(exception).__name__}: {exception}")
     return False
 
 
@@ -132,10 +134,10 @@ class WriteCodeTool(BaseAnthropicTool):
             input_schema=None, display=display
         )  # Assuming BaseAnthropicTool takes these
         self.display = display
-        ic("Initializing WriteCodeTool")
+        logger.debug("Initializing WriteCodeTool")
 
     def to_params(self) -> dict:
-        ic(f"WriteCodeTool.to_params called with api_type: {self.api_type}")
+        logger.debug(f"WriteCodeTool.to_params called with api_type: {self.api_type}")
         params = {
             "type": "function",
             "function": {
@@ -188,7 +190,7 @@ class WriteCodeTool(BaseAnthropicTool):
                 },
             },
         }
-        ic(f"WriteCodeTool params: {params}")
+        logger.debug(f"WriteCodeTool params: {params}")
         return params
 
     # --- Logging Callback for Retries ---
@@ -215,16 +217,16 @@ class WriteCodeTool(BaseAnthropicTool):
                 max_attempts_str = str(stop_condition.max_attempt_number)
 
             log_msg = (
-                f"{log_prefix}Retrying [u]{fn_name}[/u] due to [bold red]{type(exc).__name__}[/bold red]: {str(exc)[:150]}. "
-                f"Attempt [bold cyan]{retry_state.attempt_number}[/bold cyan] of {max_attempts_str}. "
-                f"Waiting [bold green]{retry_state.next_action.sleep:.2f}s[/bold green]..."
+                f"{log_prefix}Retrying {fn_name} due to {type(exc).__name__}: {str(exc)[:150]}. "
+                f"Attempt {retry_state.attempt_number} of {max_attempts_str}. "
+                f"Waiting {retry_state.next_action.sleep:.2f}s..."
             )
         else:
             log_msg = (
-                f"{log_prefix}Retrying [u]{fn_name}[/u] (no direct exception, or outcome not yet available). "
-                f"Attempt [bold cyan]{retry_state.attempt_number}[/bold cyan]. Waiting [bold green]{retry_state.next_action.sleep:.2f}s[/bold green]..."
+                f"{log_prefix}Retrying {fn_name} (no direct exception, or outcome not yet available). "
+                f"Attempt {retry_state.attempt_number}. Waiting {retry_state.next_action.sleep:.2f}s..."
             )
-        rr(log_msg)
+        logger.info(log_msg) # Rich text formatting removed
 
     async def __call__(
         self,
@@ -265,7 +267,7 @@ class WriteCodeTool(BaseAnthropicTool):
                 )
             host_repo_path = Path(host_repo_dir)
             if not host_repo_path.is_dir():
-                rr(
+                logger.warning(
                     f"Configured REPO_DIR '{host_repo_dir}' does not exist or is not a directory."
                 )
                 # Decide if you want to raise an error or attempt to create it
@@ -283,18 +285,18 @@ class WriteCodeTool(BaseAnthropicTool):
             host_project_path_obj = (
                 host_repo_path / project_name
             ).resolve()  # Resolve to absolute path early
-            rr(f"Resolved HOST project path for writing: {host_project_path_obj}")
+            logger.info(f"Resolved HOST project path for writing: {host_project_path_obj}")
 
             # Ensure the HOST directory exists
             host_project_path_obj.mkdir(parents=True, exist_ok=True)
-            rr(f"Ensured host project directory exists: {host_project_path_obj}")
+            logger.info(f"Ensured host project directory exists: {host_project_path_obj}")
             # --- END: Path Correction Logic ---
 
             # Validate files input
             try:
                 file_details = [FileDetail(**f) for f in files]
             except Exception as pydantic_error:
-                rr(f"Pydantic validation error for 'files': {pydantic_error}")
+                logger.error(f"Pydantic validation error for 'files': {pydantic_error}", exc_info=True)
                 return ToolResult(
                     error=f"Invalid format for 'files' parameter: {pydantic_error}",
                     tool_name=self.name,
@@ -337,7 +339,7 @@ class WriteCodeTool(BaseAnthropicTool):
                     error_msg = (
                         f"Error generating skeleton for {filename_key}: {result}"
                     )
-                    rr(error_msg)
+                    logger.error(error_msg, exc_info=True)
                     errors_skeleton.append(error_msg)
                     skeletons[filename_key] = (
                         f"# Error generating skeleton: {result}"  # Placeholder
@@ -375,7 +377,7 @@ class WriteCodeTool(BaseAnthropicTool):
             errors_write = []
             success_count = 0
 
-            rr(
+            logger.info(
                 f"Starting file writing phase for {len(code_results)} results to HOST path: {host_project_path_obj}"
             )
 
@@ -386,18 +388,18 @@ class WriteCodeTool(BaseAnthropicTool):
                 absolute_path = (
                     host_project_path_obj / filename
                 ).resolve()  # Ensure absolute path
-                rr(f"Processing result for: {filename} (Host Path: {absolute_path})")
+                logger.info(f"Processing result for: {filename} (Host Path: {absolute_path})")
 
                 if isinstance(result, Exception):
                     error_msg = f"Error generating code for {filename}: {result}"
-                    rr(error_msg)
+                    logger.error(error_msg, exc_info=True)
                     errors_code_gen.append(error_msg)
                     write_results.append(
                         {"filename": filename, "status": "error", "message": error_msg}
                     )
                     # Attempt to write error file to the resolved host path
                     try:
-                        rr(
+                        logger.info(
                             f"Attempting to write error file for {filename} to {absolute_path}"
                         )
                         absolute_path.parent.mkdir(parents=True, exist_ok=True)
@@ -405,22 +407,22 @@ class WriteCodeTool(BaseAnthropicTool):
                         absolute_path.write_text(
                             error_content, encoding="utf-8", errors="replace"
                         )
-                        rr(
+                        logger.info(
                             f"Successfully wrote error file for {filename} to {absolute_path}"
                         )
                     except Exception as write_err:
-                        rr(
-                            f"Failed to write error file for {filename} to {absolute_path}: {write_err}"
+                        logger.error(
+                            f"Failed to write error file for {filename} to {absolute_path}: {write_err}", exc_info=True
                         )
 
                 else:  # Code generation successful
                     code_content = result
-                    rr(
+                    logger.info(
                         f"Code generation successful for {filename}. Attempting to write to absolute host path: {absolute_path}"
                     )
 
                     if not code_content or not code_content.strip():
-                        rr(
+                        logger.warning(
                             f"Generated code content for {filename} is empty or whitespace only. Skipping write."
                         )
                         write_results.append(
@@ -433,41 +435,41 @@ class WriteCodeTool(BaseAnthropicTool):
                         continue  # Skip to next file
 
                     try:
-                        rr(f"Ensuring directory exists: {absolute_path.parent}")
+                        logger.debug(f"Ensuring directory exists: {absolute_path.parent}")
                         absolute_path.parent.mkdir(parents=True, exist_ok=True)
                         operation = "modify" if absolute_path.exists() else "create"
-                        rr(f"Operation type for {filename}: {operation}")
+                        logger.debug(f"Operation type for {filename}: {operation}")
 
                         fixed_code = ftfy.fix_text(code_content)
-                        rr(
+                        logger.debug(
                             f"Code content length for {filename} (after ftfy): {len(fixed_code)}"
                         )
 
                         # >>> THE WRITE CALL to the HOST path <<<
-                        rr(f"Executing write_text for: {absolute_path}")
+                        logger.debug(f"Executing write_text for: {absolute_path}")
                         absolute_path.write_text(
                             fixed_code, encoding="utf-8", errors="replace"
                         )
-                        rr(f"Successfully executed write_text for: {absolute_path}")
+                        logger.info(f"Successfully executed write_text for: {absolute_path}")
 
                         # File existence and size check
                         if absolute_path.exists():
-                            rr(
+                            logger.info(
                                 f"CONFIRMED: File exists at {absolute_path} after write."
                             )
                             try:
                                 size = absolute_path.stat().st_size
-                                rr(f"CONFIRMED: File size is {size} bytes.")
+                                logger.info(f"CONFIRMED: File size is {size} bytes.")
                                 if size == 0 and len(fixed_code) > 0:
-                                    rr(
+                                    logger.warning(
                                         "File size is 0 despite non-empty content being written!"
                                     )
                             except Exception as stat_err:
-                                rr(
+                                logger.warning(
                                     f"Could not get file stats for {absolute_path}: {stat_err}"
                                 )
                         else:
-                            rr(
+                            logger.error(
                                 f"FAILED: File DOES NOT exist at {absolute_path} immediately after write_text call!"
                             )
 
@@ -478,11 +480,11 @@ class WriteCodeTool(BaseAnthropicTool):
                         try:
                             # Ensure convert_to_docker_path can handle the absolute host path
                             docker_path_display = convert_to_docker_path(absolute_path)
-                            rr(
+                            logger.debug(
                                 f"Converted host path {absolute_path} to display path {docker_path_display}"
                             )
                         except Exception as conv_err:
-                            rr(
+                            logger.warning(
                                 f"Could not convert host path {absolute_path} to docker path for display: {conv_err}. Using host path for display."
                             )
 
@@ -499,10 +501,10 @@ class WriteCodeTool(BaseAnthropicTool):
                                     ),  # Use relative filename key
                                 },
                             )
-                            rr(f"Logged file operation for {absolute_path}")
+                            logger.debug(f"Logged file operation for {absolute_path}")
                         except Exception as log_error:
-                            rr(
-                                f"Failed to log code writing for {filename} ({absolute_path}): {log_error}"
+                            logger.error(
+                                f"Failed to log code writing for {filename} ({absolute_path}): {log_error}", exc_info=True
                             )
 
                         # Use docker_path_display in the results if that's what the UI expects
@@ -516,7 +518,7 @@ class WriteCodeTool(BaseAnthropicTool):
                             }
                         )
                         success_count += 1
-                        rr(
+                        logger.info(
                             f"Successfully processed and wrote {filename} to {absolute_path}"
                         )
 
@@ -533,8 +535,8 @@ class WriteCodeTool(BaseAnthropicTool):
                             self.display.add_message("tool", fixed_code)
 
                     except Exception as write_error:
-                        rr(
-                            f"Caught exception during write operation for {filename} at path {absolute_path}"
+                        logger.error(
+                            f"Caught exception during write operation for {filename} at path {absolute_path}", exc_info=True
                         )
                         errors_write.append(
                             f"Error writing file {filename}: {write_error}"
@@ -580,16 +582,16 @@ class WriteCodeTool(BaseAnthropicTool):
             )
 
         except ValueError as ve:  # Catch specific config/path errors
-            error_message = f"Configuration Error in WriteCodeTool __call__: {str(ve)}\n{traceback.format_exc()}"
-            rr(error_message)
+            error_message = f"Configuration Error in WriteCodeTool __call__: {str(ve)}"
+            logger.critical(error_message, exc_info=True)
             return ToolResult(error=error_message, tool_name=self.name, command=command)
         except Exception as e:
-            error_message = f"Critical Error in WriteCodeTool __call__: {str(e)}\n{traceback.format_exc()}"
-            rr("Critical error during codebase generation")
+            error_message = f"Critical Error in WriteCodeTool __call__: {str(e)}"
+            logger.critical("Critical error during codebase generation", exc_info=True)
             # Optionally include host_project_path_obj if it was set
             if host_project_path_obj:
                 error_message += f"\nAttempted Host Path: {host_project_path_obj}"
-            print(error_message)
+            # print(error_message) # Replaced by logger
             return ToolResult(error=error_message, tool_name=self.name, command=command)
 
     # --- Helper for logging final output ---
@@ -607,8 +609,8 @@ class WriteCodeTool(BaseAnthropicTool):
                     f.write(f"{content}\n")
                     f.write(f"--- End {output_type} for: {str(file_path)} ---\n")
         except Exception as file_error:
-            rr(
-                f"[bold red]Failed to log generated {output_type} for {file_path.name} to {get_constant('CODE_FILE')}: {file_error}[/bold red]"
+            logger.error(
+                f"Failed to log generated {output_type} for {file_path.name} to {get_constant('CODE_FILE')}: {file_error}", exc_info=True
             )
 
     def format_output(self, data: dict) -> str:
@@ -677,12 +679,12 @@ class WriteCodeTool(BaseAnthropicTool):
                     with open(path, "r", encoding="utf-8") as task_file:
                         task_desc = task_file.read().strip()
                         if task_desc:
-                            rr(f"[green]Read task description from: {path}[/green]")
+                            logger.info(f"Read task description from: {path}")
                             return task_desc
             except Exception as e:
-                rr(f"[yellow]Warning: Error reading task file {path}: {e}[/yellow]")
+                logger.warning(f"Error reading task file {path}: {e}", exc_info=True)
 
-        rr("[yellow]Warning: task.txt not found in any specified location. Using default task description.[/yellow]")
+        logger.warning("task.txt not found in any specified location. Using default task description.")
         return "No overall task description provided (task.txt not found)."
 
     # --- Refactored Code Generation Method ---
@@ -729,28 +731,28 @@ class WriteCodeTool(BaseAnthropicTool):
                 model_to_use=model_to_use,
             )
         except LLMResponseError as e:
-            ic(f"LLMResponseError for {file_path.name} after all retries: {e}")
-            rr(
-                f"[bold red]LLM generated invalid content for {file_path.name} after retries: {e}[/bold red]"
-            )
+            logger.error(f"LLMResponseError for {file_path.name} after all retries: {e}", exc_info=True)
+            # rr( # Replaced by logger
+            #     f"[bold red]LLM generated invalid content for {file_path.name} after retries: {e}[/bold red]"
+            # )
             final_code_string = f"# Error generating code for {file_path.name}: LLMResponseError - {str(e)}"
         except APIError as e:  # Catch specific OpenAI errors
-            ic(
-                f"OpenAI APIError for {file_path.name} after all retries: {type(e).__name__} - {e}"
+            logger.error(
+                f"OpenAI APIError for {file_path.name} after all retries: {type(e).__name__} - {e}", exc_info=True
             )
-            rr(
-                f"[bold red]LLM call failed due to APIError for {file_path.name} after retries: {e}[/bold red]"
-            )
+            # rr( # Replaced by logger
+            #     f"[bold red]LLM call failed due to APIError for {file_path.name} after retries: {e}[/bold red]"
+            # )
             final_code_string = (
                 f"# Error generating code for {file_path.name}: API Error - {str(e)}"
             )
         except Exception as e:
-            ic(
-                f"Unexpected error during code generation for {file_path.name} after retries: {type(e).__name__} - {e}"
+            logger.critical(
+                f"Unexpected error during code generation for {file_path.name} after retries: {type(e).__name__} - {e}", exc_info=True
             )
-            rr(
-                f"[bold red]LLM call ultimately failed for {file_path.name} due to unexpected error: {e}[/bold red]"
-            )
+            # rr( # Replaced by logger
+            #     f"[bold red]LLM call ultimately failed for {file_path.name} due to unexpected error: {e}[/bold red]"
+            # )
             final_code_string = (
                 f"# Error generating code for {file_path.name} (final): {str(e)}"
             )
@@ -787,8 +789,8 @@ class WriteCodeTool(BaseAnthropicTool):
             "attempt_number",
             1,
         )
-        rr(
-            f"LLM Code Gen for [cyan]{file_path.name}[/cyan]: Model [yellow]{model_to_use}[/yellow], Attempt [bold]{current_attempt}[/bold]"
+        logger.info(
+            f"LLM Code Gen for {file_path.name}: Model {model_to_use}, Attempt {current_attempt}"
         )
 
         completion = await client.chat.completions.create(
@@ -801,10 +803,10 @@ class WriteCodeTool(BaseAnthropicTool):
             and completion.choices[0].message
             and completion.choices[0].message.content
         ):
-            ic(f"No valid completion content received for {file_path.name}")
-            rr(
-                f"[bold red]Invalid or empty completion content from LLM for {file_path.name}[/bold red]"
-            )
+            logger.error(f"No valid completion content received for {file_path.name}")
+            # rr( # Replaced by logger
+            #     f"[bold red]Invalid or empty completion content from LLM for {file_path.name}[/bold red]"
+            # )
             raise LLMResponseError(
                 f"Invalid or empty completion content from LLM for {file_path.name}"
             )
@@ -815,21 +817,21 @@ class WriteCodeTool(BaseAnthropicTool):
             raw_code_string, file_path
         )
 
-        rr(
-            f"Extracted code for [cyan]{file_path.name}[/cyan]. Lang: {detected_language}. Raw len: {len(raw_code_string)}, Extracted len: {len(code_string or '')}"
+        logger.info(
+            f"Extracted code for {file_path.name}. Lang: {detected_language}. Raw len: {len(raw_code_string)}, Extracted len: {len(code_string or '')}"
         )
 
         if code_string == "No Code Found":  # Critical check
             if raw_code_string.strip():
-                rr(
-                    f"[bold orange_red1]Could not extract code for {file_path.name}, raw response was not empty. LLM might have misunderstood.[/bold orange_red1]"
+                logger.error(
+                    f"Could not extract code for {file_path.name}, raw response was not empty. LLM might have misunderstood."
                 )
                 raise LLMResponseError(
                     f"Extracted 'No Code Found' for {file_path.name}. Raw: '{raw_code_string[:100]}...'"
                 )
             else:
-                rr(
-                    f"[bold red]LLM response for {file_path.name} was effectively empty (raw string).[/bold red]"
+                logger.error(
+                    f"LLM response for {file_path.name} was effectively empty (raw string)."
                 )
                 raise LLMResponseError(
                     f"LLM response for {file_path.name} was effectively empty (raw string)."
@@ -838,8 +840,8 @@ class WriteCodeTool(BaseAnthropicTool):
         if code_string.startswith(
             f"# Error: Code generation failed for {file_path.name}"
         ) or code_string.startswith(f"# Failed to generate code for {file_path.name}"):
-            rr(
-                f"[bold red]LLM returned a placeholder error message for {file_path.name}: {code_string[:100]}[/bold red]"
+            logger.error(
+                f"LLM returned a placeholder error message for {file_path.name}: {code_string[:100]}"
             )
             raise LLMResponseError(
                 f"LLM returned placeholder error for {file_path.name}: {code_string[:100]}"
@@ -886,34 +888,34 @@ class WriteCodeTool(BaseAnthropicTool):
                 model_to_use=model_to_use,
             )
         except LLMResponseError as e:
-            ic(
-                f"LLMResponseError for skeleton {target_file_name} after all retries: {e}"
+            logger.error(
+                f"LLMResponseError for skeleton {target_file_name} after all retries: {e}", exc_info=True
             )
-            rr(
-                f"[bold red]LLM generated invalid skeleton for {target_file_name} after retries: {e}[/bold red]"
-            )
+            # rr( # Replaced by logger
+            #     f"[bold red]LLM generated invalid skeleton for {target_file_name} after retries: {e}[/bold red]"
+            # )
             final_skeleton_string = f"# Error generating skeleton for {target_file_name}: LLMResponseError - {str(e)}"
         except APIError as e:  # Catch specific OpenAI errors
-            ic(
-                f"OpenAI APIError for skeleton {target_file_name} after all retries: {type(e).__name__} - {e}"
+            logger.error(
+                f"OpenAI APIError for skeleton {target_file_name} after all retries: {type(e).__name__} - {e}", exc_info=True
             )
-            rr(
-                f"[bold red]LLM skeleton call failed due to APIError for {target_file_name} after retries: {e}[/bold red]"
-            )
+            # rr( # Replaced by logger
+            #     f"[bold red]LLM skeleton call failed due to APIError for {target_file_name} after retries: {e}[/bold red]"
+            # )
             final_skeleton_string = f"# Error generating skeleton for {target_file_name}: API Error - {str(e)}"
         except Exception as e:
-            ic(
-                f"Unexpected error during skeleton generation for {target_file_name} after retries: {type(e).__name__} - {e}"
+            logger.critical(
+                f"Unexpected error during skeleton generation for {target_file_name} after retries: {type(e).__name__} - {e}", exc_info=True
             )
-            rr(
-                f"[bold red]LLM skeleton call ultimately failed for {target_file_name} due to unexpected error: {e}[/bold red]"
-            )
+            # rr( # Replaced by logger
+            #     f"[bold red]LLM skeleton call ultimately failed for {target_file_name} due to unexpected error: {e}[/bold red]"
+            # )
             final_skeleton_string = (
                 f"# Error generating skeleton for {target_file_name} (final): {str(e)}"
             )
 
         self._log_generated_output(final_skeleton_string, file_path, "Skeleton")
-        ic(
+        logger.debug(
             f"Final Skeleton for {target_file_name}:\n{final_skeleton_string[:300]}..."
         )  # Log snippet
         return final_skeleton_string
@@ -945,8 +947,8 @@ class WriteCodeTool(BaseAnthropicTool):
             "attempt_number",
             1,
         )
-        rr(
-            f"LLM Skeleton Gen for [cyan]{target_file_path.name}[/cyan]: Model [yellow]{model_to_use}[/yellow], Attempt [bold]{current_attempt}[/bold]"
+        logger.info(
+            f"LLM Skeleton Gen for {target_file_path.name}: Model {model_to_use}, Attempt {current_attempt}"
         )
 
         completion = await client.chat.completions.create(
@@ -959,12 +961,12 @@ class WriteCodeTool(BaseAnthropicTool):
             and completion.choices[0].message
             and completion.choices[0].message.content
         ):
-            ic(
+            logger.error(
                 f"No valid skeleton completion content received for {target_file_path.name}"
             )
-            rr(
-                f"[bold red]Invalid or empty skeleton completion content from LLM for {target_file_path.name}[/bold red]"
-            )
+            # rr( # Replaced by logger
+            #     f"[bold red]Invalid or empty skeleton completion content from LLM for {target_file_path.name}[/bold red]"
+            # )
             raise LLMResponseError(
                 f"Invalid or empty skeleton completion from LLM for {target_file_path.name}"
             )
@@ -975,21 +977,21 @@ class WriteCodeTool(BaseAnthropicTool):
             raw_skeleton, target_file_path
         )
 
-        rr(
-            f"Extracted skeleton for [cyan]{target_file_path.name}[/cyan]. Lang: {detected_language}. Raw len: {len(raw_skeleton)}, Extracted len: {len(skeleton_string or '')}"
+        logger.info(
+            f"Extracted skeleton for {target_file_path.name}. Lang: {detected_language}. Raw len: {len(raw_skeleton)}, Extracted len: {len(skeleton_string or '')}"
         )
 
         if skeleton_string == "No Code Found":  # Critical check
             if raw_skeleton.strip():
-                rr(
-                    f"[bold orange_red1]Could not extract skeleton for {target_file_path.name}, raw response was not empty.[/bold orange_red1]"
+                logger.error(
+                    f"Could not extract skeleton for {target_file_path.name}, raw response was not empty."
                 )
                 raise LLMResponseError(
                     f"Extracted 'No Code Found' for skeleton {target_file_path.name}. Raw: '{raw_skeleton[:100]}...'"
                 )
             else:
-                rr(
-                    f"[bold red]LLM response for skeleton {target_file_path.name} was effectively empty (raw string).[/bold red]"
+                logger.error(
+                    f"LLM response for skeleton {target_file_path.name} was effectively empty (raw string)."
                 )
                 raise LLMResponseError(
                     f"LLM response for skeleton {target_file_path.name} was effectively empty (raw string)."
@@ -1000,8 +1002,8 @@ class WriteCodeTool(BaseAnthropicTool):
         ) or skeleton_string.startswith(
             f"# Failed to generate skeleton for {target_file_path.name}"
         ):
-            rr(
-                f"[bold red]LLM returned a placeholder error for skeleton {target_file_path.name}: {skeleton_string[:100]}[/bold red]"
+            logger.error(
+                f"LLM returned a placeholder error for skeleton {target_file_path.name}: {skeleton_string[:100]}"
             )
             raise LLMResponseError(
                 f"LLM returned placeholder error for skeleton {target_file_path.name}: {skeleton_string[:100]}"
@@ -1035,7 +1037,7 @@ class WriteCodeTool(BaseAnthropicTool):
                 # Return the whole text as the code block
                 return text.strip(), language
             except Exception:  # pygments.util.ClassNotFound or others
-                rr("Could not guess language for code without backticks.")
+                logger.warning("Could not guess language for code without backticks.")
                 return text.strip(), "unknown"  # Return unknown if guess fails
 
         # Found opening backticks ```
@@ -1059,7 +1061,7 @@ class WriteCodeTool(BaseAnthropicTool):
             try:
                 language = guess_lexer(code_block).aliases[0]
             except Exception:
-                rr(
+                logger.warning(
                     f"Could not guess language for extracted code block (File: {file_path})."
                 )
                 language = "unknown"  # Fallback if guess fails
