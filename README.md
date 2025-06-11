@@ -48,6 +48,49 @@ to an LLM to produce a more detailed task description. A project directory under
 Tool activity and agent messages are streamed to the console and also logged to
 `logs/` for later reference.
 
+## Logging
+
+This project uses Python's built-in `logging` module for application logging.
+
+**Configuration**:
+*   Logging is configured centrally in `config.py`.
+*   Key settings include console logging (level controlled by the `LOG_LEVEL_CONSOLE` constant, typically "INFO") and rotating file logging to `logs/app.log` (level controlled by the `LOG_LEVEL_FILE` constant, typically "DEBUG"). Log rotation (based on size and backup count) is set up for `logs/app.log`.
+
+**Usage**:
+*   To use logging in a module, obtain a logger instance:
+    ```python
+    import logging
+    logger = logging.getLogger(__name__)
+    ```
+*   Example log messages:
+    ```python
+    logger.debug("Detailed debug information.")
+    logger.info("An informational message.")
+    logger.warning("A warning occurred.")
+    logger.error("An error occurred.")
+    logger.critical("A critical error occurred.")
+    ```
+*   To log exceptions:
+    ```python
+    try:
+        # ... some operation ...
+        pass
+    except Exception as e:
+        logger.error(f"Operation failed: {e}", exc_info=True)
+    # Or, if the message is sufficient and you want the stack trace:
+    # logger.exception("Operation failed")
+    ```
+
+**Specialized File Operation Logging**:
+*   For auditing file creations, modifications, and deletions, the project uses a specialized logger in `utils.file_logger.py`.
+*   This system logs detailed information, including file content (for non-binary files) or metadata (for images/binary), to `logs/file_creation_log.json`.
+*   This JSON log is distinct from the main application logging in `logs/app.log` and provides a structured audit trail for file manipulations.
+
+**Viewing Logs**:
+*   Logs are output to the console (typically INFO level and above by default).
+*   Detailed logs (typically DEBUG level and above by default) are stored in `logs/app.log`.
+*   The `file_creation_log.json` in the `logs/` directory contains the audit trail for file operations.
+
 ## Directory overview
 
 - `run.py` – Console runner that starts the agent and sampling loop.

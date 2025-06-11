@@ -3,11 +3,19 @@ import json
 from datetime import datetime
 import subprocess
 
+import logging
+import logging.handlers
 from cycler import V
-from icecream import ic
 
 global PROJECT_DIR
 PROJECT_DIR = None
+
+# Logging constants
+LOG_LEVEL_CONSOLE = "INFO"
+LOG_LEVEL_FILE = "DEBUG"
+LOG_FILE_APP = "logs/app.log"
+LOG_MAX_BYTES = 10 * 1024 * 1024  # 10MB
+LOG_BACKUP_COUNT = 5
 
 # Define the top-level directory
 TOP_LEVEL_DIR = Path.cwd()
@@ -27,7 +35,7 @@ SCRIPTS_DIR = TOP_LEVEL_DIR / "scripts"
 TESTS_DIR = TOP_LEVEL_DIR / "tests"
 LOGS_DIR = TOP_LEVEL_DIR / "logs"
 PROMPTS_DIR = TOP_LEVEL_DIR / "prompts"
-ICECREAM_OUTPUT_FILE = LOGS_DIR / "debug_log.md"
+# ICECREAM_OUTPUT_FILE = LOGS_DIR / "debug_log.md" # Removed as per requirement
 LOGS_DIR.mkdir(parents=True, exist_ok=True)
 LOG_FILE = LOGS_DIR / "file_creation_log.json"
 MESSAGES_FILE = LOGS_DIR / "messages.md"
@@ -72,7 +80,7 @@ def write_constants_to_file():
         "PROMPTS_DIR": str(PROMPTS_DIR),
         "LOG_FILE": str(LOG_FILE),
         "MESSAGES_FILE": str(MESSAGES_FILE),
-        "ICECREAM_OUTPUT_FILE": str(ICECREAM_OUTPUT_FILE),
+        # "ICECREAM_OUTPUT_FILE": str(ICECREAM_OUTPUT_FILE), # Removed as per requirement
         "CODE_FILE": str(CODE_FILE),
         "TASK": "NOT YET CREATED",
     }
@@ -166,9 +174,9 @@ def get_project_dir():
     return PROJECT_DIR
 
 
-def write_to_file(s: str, file_path: str = ICECREAM_OUTPUT_FILE):
+def write_to_file(s: str, file_path: Path): # Modified to take Path object
     """Write debug output to a file in a compact, VS Code collapsible format."""
-    datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
+    # datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f") # Removed as it's not used
     lines = s.split("\n")
     output = []
 
@@ -223,4 +231,92 @@ def write_to_file(s: str, file_path: str = ICECREAM_OUTPUT_FILE):
 with open(SYSTEM_PROMPT_DIR / "system_prompt.md", "r", encoding="utf-8") as f:
     SYSTEM_PROMPT = f.read()
 
-ic.configureOutput(includeContext=True, outputFunction=write_to_file)
+# ic.configureOutput(includeContext=True, outputFunction=write_to_file) # Removed icecream configuration
+
+def setup_logging():
+    """Set up logging for the application."""
+    logger = logging.getLogger()  # Root logger
+    logger.setLevel(logging.DEBUG)  # Set root logger level
+
+    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(module)s - %(funcName)s - %(lineno)d - %(message)s')
+
+    # Console Handler
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(getattr(logging, get_constant("LOG_LEVEL_CONSOLE").upper(), logging.INFO))
+    console_handler.setFormatter(formatter)
+    logger.addHandler(console_handler)
+
+    # File Handler
+    LOGS_DIR.mkdir(parents=True, exist_ok=True) # Ensure logs directory exists
+    log_file_path = get_constant("LOG_FILE_APP")
+    # Ensure the log file path is absolute or relative to TOP_LEVEL_DIR if not already absolute
+    if not Path(log_file_path).is_absolute():
+        log_file_path = TOP_LEVEL_DIR / log_file_path
+    else:
+        log_file_path = Path(log_file_path)
+
+    # Ensure the directory for the log file exists
+    log_file_path.parent.mkdir(parents=True, exist_ok=True)
+
+    file_handler = logging.handlers.RotatingFileHandler(
+        log_file_path,
+        maxBytes=get_constant("LOG_MAX_BYTES"),
+        backupCount=get_constant("LOG_BACKUP_COUNT")
+    )
+    file_handler.setLevel(getattr(logging, get_constant("LOG_LEVEL_FILE").upper(), logging.DEBUG))
+    file_handler.setFormatter(formatter)
+    logger.addHandler(file_handler)
+
+# Call setup_logging() to apply the configuration when the module is imported.
+# This needs to be after all constants are defined and functions like get_constant are available.
+# However, get_constant relies on write_constants_to_file, which itself relies on constants being defined.
+# We need to ensure LOG_LEVEL_CONSOLE, LOG_LEVEL_FILE, LOG_FILE_APP, LOG_MAX_BYTES, LOG_BACKUP_COUNT are available
+# to get_constant before setup_logging is called.
+
+# Define these specific constants directly for setup_logging to use initially.
+_initial_constants_for_logging = {
+    "LOG_LEVEL_CONSOLE": LOG_LEVEL_CONSOLE,
+    "LOG_LEVEL_FILE": LOG_LEVEL_FILE,
+    "LOG_FILE_APP": LOG_FILE_APP,
+    "LOG_MAX_BYTES": LOG_MAX_BYTES,
+    "LOG_BACKUP_COUNT": LOG_BACKUP_COUNT,
+    "LOGS_DIR": LOGS_DIR, # Added for consistency, though LOGS_DIR is already a Path
+    "TOP_LEVEL_DIR": TOP_LEVEL_DIR # Added for resolving log file path
+}
+
+_original_get_constant = get_constant
+
+def _get_constant_for_logging_setup(name):
+    if name in _initial_constants_for_logging:
+        # Ensure Path objects are returned for directory/file constants if stored as strings
+        val = _initial_constants_for_logging[name]
+        if (
+            isinstance(val, str)
+            and ("PATH" in name or "DIR" in name or "FILE" in name)
+            and name != "LOG_FILE_APP"
+            and name != "LOG_LEVEL_FILE"  # Ensure log level strings are not converted to Path
+            and name != "LOG_LEVEL_CONSOLE" # Ensure log level strings are not converted to Path
+        ):
+             # LOG_FILE_APP is handled specially for path resolution later
+            return Path(val)
+        return val
+    return _original_get_constant(name)
+
+# Temporarily override get_constant for setup_logging
+get_constant_temp_override = get_constant
+get_constant = _get_constant_for_logging_setup
+
+setup_logging()
+
+# Restore original get_constant
+get_constant = get_constant_temp_override
+
+# Now, write all constants to file, including the new logging ones.
+# This ensures they are available for subsequent calls to get_constant() from other modules.
+set_constant("LOG_LEVEL_CONSOLE", LOG_LEVEL_CONSOLE)
+set_constant("LOG_LEVEL_FILE", LOG_LEVEL_FILE)
+set_constant("LOG_FILE_APP", LOG_FILE_APP) # Stored as string, will be resolved by Path() later
+set_constant("LOG_MAX_BYTES", LOG_MAX_BYTES)
+set_constant("LOG_BACKUP_COUNT", LOG_BACKUP_COUNT)
+
+logging.info("Logging setup complete.")

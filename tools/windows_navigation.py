@@ -9,7 +9,7 @@ import logging
 from .base import ToolResult
 
 # Configure logging
-logging.basicConfig(level=logging.CRITICAL)
+# logging.basicConfig(level=logging.CRITICAL) # Removed basicConfig
 logger = logging.getLogger(__name__)
 
 

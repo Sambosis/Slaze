@@ -7,7 +7,7 @@ import os
 from re import M
 from typing import Dict
 from openai import OpenAI
-from icecream import ic
+import logging
 from rich import print as rr
 
 from tools import (
@@ -28,6 +28,8 @@ from config import *
 from dotenv import load_dotenv
 
 load_dotenv()
+
+logger = logging.getLogger(__name__)
 
 
 class Agent:
@@ -99,8 +101,8 @@ class Agent:
         )
         # SET THE CONSTANT TASK to self.task
         try:
-            ic(content_block['name'])
-            ic(content_block["input"])
+            logger.debug(f"Tool name: {content_block['name']}")
+            logger.debug(f"Tool input: {content_block['input']}")
             result = await self.tool_collection.run(
                 name=content_block["name"],
                 tool_input=content_block["input"],
@@ -118,7 +120,7 @@ class Agent:
             )
         finally:
             tool_result = self._make_api_tool_result(result, content_block["id"])
-            # ic(tool_result)
+            # logger.debug(f"Tool result: {tool_result}") # This might be too verbose, let's comment it out for now
             tool_output = (
                 result.output
                 if hasattr(result, "output") and result.output

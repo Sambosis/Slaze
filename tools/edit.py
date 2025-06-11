@@ -6,21 +6,23 @@ from typing import Literal, get_args, Dict
 from .base import BaseTool, ToolError, ToolResult
 from .run import maybe_truncate
 from typing import List, Optional
-from icecream import ic
-from config import get_constant, write_to_file
+import logging
+from config import get_constant, write_to_file # write_to_file might be unused after ic removal
 from utils.file_logger import log_file_operation
-from loguru import logger as ll
+# from loguru import logger as ll # Removed loguru import
 
-# Configure logging to a file
-ll.add(
-    "edit.log",
-    rotation="500 KB",
-    level="DEBUG",
-    format="{time: MM-DD HH:mm} | {level: <8} | {module}.{function}:{line} - {message}",
-)
+# Configure logging to a file # Removed loguru specific file configuration
+# ll.add(
+#     "edit.log",
+#     rotation="500 KB",
+#     level="DEBUG",
+#     format="{time: MM-DD HH:mm} | {level: <8} | {module}.{function}:{line} - {message}",
+# )
 
 # Configure icecream for debugging
-ic.configureOutput(includeContext=True, outputFunction=write_to_file)
+# ic.configureOutput(includeContext=True, outputFunction=write_to_file) # Removed
+
+logger = logging.getLogger(__name__)
 
 Command = Literal[
     "view",
@@ -49,7 +51,7 @@ class EditTool(BaseTool):
         self._file_history = defaultdict(list)
 
     def to_params(self) -> dict:
-        ic(f"EditTool.to_params called with api_type: {self.api_type}")
+        logger.debug(f"EditTool.to_params called with api_type: {self.api_type}")
         params = {
             "type": "function",
             "function": {
@@ -82,7 +84,7 @@ class EditTool(BaseTool):
                 },
             },
         }
-        ic(f"EditTool params: {params}")
+        logger.debug(f"EditTool params: {params}")
         return params
 
     def format_output(self, data: Dict) -> str:
@@ -273,7 +275,7 @@ class EditTool(BaseTool):
         self, path: Path, view_range: Optional[List[int]] = None
     ) -> ToolResult:
         """Implement the view command using cross-platform methods."""
-        ic(path)
+        logger.debug(f"Viewing path: {path}")
 
         try:
             # Cross-platform directory listing using pathlib
@@ -335,7 +337,7 @@ class EditTool(BaseTool):
         """Implement the str_replace command, which replaces old_str with new_str in the file content."""
         try:
             # Read the file content
-            ic(path)
+            logger.debug(f"Replacing string in path: {path}")
             file_content = self.read_file(path).expandtabs()
             old_str = old_str.expandtabs()
             new_str = new_str.expandtabs() if new_str is not None else ""
@@ -443,19 +445,19 @@ class EditTool(BaseTool):
                 .decode("ascii")
             )
         except Exception as e:
-            ic(f"Error reading file {path}: {e}")
+            logger.error(f"Error reading file {path}: {e}", exc_info=True)
             raise ToolError(f"Ran into {e} while trying to read {path}") from None
 
     def write_file(self, path: Path, file: str):
         """Write file content ensuring correct project directory"""
         try:
             # Normalize path to be within project directory
-            ic(path)
+            logger.debug(f"Writing to path: {path}")
             full_path = path
-            ic(full_path)
+            logger.debug(f"Full path for writing: {full_path}")
             # Create parent directories if needed
             full_path.parent.mkdir(parents=True, exist_ok=True)
-            ic(file)
+            logger.debug(f"File content to write (first 100 chars): {file[:100]}")
             # Write the file
             full_path.write_text(file, encoding="utf-8")
             # Log the file operation

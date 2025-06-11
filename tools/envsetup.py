@@ -6,17 +6,19 @@ import os # Added os import
 from config import PROJECT_DIR
 from .base import ToolResult, BaseAnthropicTool
 import subprocess
-from loguru import logger as ll
-from rich import print as rr
+import logging
+# from loguru import logger as ll # Removed loguru
+# from rich import print as rr # Removed rich print
 
-# Configure logging to a file
-ll.add(
-    "my_log_file.log",
-    rotation="500 KB",
-    level="DEBUG",
-    format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {module}.{function}:{line} - {message}",
-)
+# Configure logging to a file # Removed loguru configuration
+# ll.add(
+#     "my_log_file.log",
+#     rotation="500 KB",
+#     level="DEBUG",
+#     format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {module}.{function}:{line} - {message}",
+# )
 
+logger = logging.getLogger(__name__)
 
 class ProjectCommand(str, Enum):
     """Commands supported by the ProjectSetupTool."""
@@ -165,13 +167,13 @@ class ProjectSetupTool(BaseAnthropicTool):
                     for clean_pkg in actual_packages_to_install:
                         if not clean_pkg:
                             continue
-                        rr(f"Attempting to install package: {clean_pkg} using uv")
+                        logger.info(f"Attempting to install package: {clean_pkg} using uv")
                         result = subprocess.run(["uv", "pip", "install", clean_pkg], capture_output=True, text=True)
                         if result.returncode == 0:
                             installed_packages.append(clean_pkg)
-                            rr(f"Successfully installed {clean_pkg}")
+                            logger.info(f"Successfully installed {clean_pkg}")
                         else:
-                            rr(f"Failed to install {clean_pkg}: {result.stderr}")
+                            logger.error(f"Failed to install {clean_pkg}: {result.stderr}")
                             raise RuntimeError(f"uv pip install {clean_pkg} failed: {result.stderr}")
                 self.display.add_message("user", f"Project setup complete in {project_path}")
 
@@ -266,7 +268,7 @@ class ProjectSetupTool(BaseAnthropicTool):
             result = subprocess.run(cmd, capture_output=True, text=True)
 
             run_output = f"stdout: {result.stdout}\nstderr: {result.stderr}"
-            rr(run_output)
+            logger.info(f"Run app output for {file_path}:\n{run_output}")
             return {
                 "command": "run_app",
                 "status": "success" if result.returncode == 0 else "error",
@@ -391,7 +393,7 @@ class ProjectSetupTool(BaseAnthropicTool):
             return ToolResult(output=self.format_output(result))
 
         except Exception as e:
-            ll.exception(f"Exception in ProjectSetupTool __call__ for command {command if 'command' in locals() else 'unknown'}")
+            logger.exception(f"Exception in ProjectSetupTool __call__ for command {command if 'command' in locals() else 'unknown'}")
             err_msg = f"Failed to execute {command.value if hasattr(command, 'value') else command}: {str(e)}"
             if self.display is not None:
                 self.display.add_message(

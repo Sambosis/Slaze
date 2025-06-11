@@ -1,12 +1,13 @@
 from typing import Literal
 from .base import ToolResult, BaseAnthropicTool
-from icecream import ic
+import logging
 from enum import Enum
 from dotenv import load_dotenv
 
 load_dotenv()
 # DockerService import removed
 
+logger = logging.getLogger(__name__)
 
 class PictureCommand(str, Enum):
     CREATE = "create"
@@ -24,7 +25,7 @@ class PictureGenerationTool(BaseAnthropicTool):
         self.display = display  # Explicitly set self.display
 
     def to_params(self) -> dict:
-        ic(f"PictureGenerationTool.to_params called with api_type: {self.api_type}")
+        logger.debug(f"PictureGenerationTool.to_params called with api_type: {self.api_type}")
         params = {
             "type": "function",
             "function": {
@@ -59,7 +60,7 @@ class PictureGenerationTool(BaseAnthropicTool):
                 },
             },
         }
-        ic(f"PictureGenerationTool params: {params}")
+        logger.debug(f"PictureGenerationTool params: {params}")
         return params
 
     async def generate_picture(
@@ -122,7 +123,7 @@ class PictureGenerationTool(BaseAnthropicTool):
                     file_path=output_path_obj, operation="create", metadata=metadata
                 )
             except Exception as log_error:
-                print(f"Warning: Failed to log image creation: {log_error}")
+                logger.warning(f"Failed to log image creation: {log_error}", exc_info=True)
                 # Continue anyway - don't let logging failure prevent success
 
             # Create base64 for display
@@ -148,7 +149,7 @@ class PictureGenerationTool(BaseAnthropicTool):
                 try:
                     log_file_operation(output_path_obj, "update", metadata=metadata)
                 except Exception as log_error:
-                    print(f"Warning: Failed to log image resize: {log_error}")
+                    logger.warning(f"Failed to log image resize: {log_error}", exc_info=True)
                     # Continue anyway - don't let logging failure prevent success
 
                 # Update base64 data
@@ -173,7 +174,7 @@ class PictureGenerationTool(BaseAnthropicTool):
 
             error_stack = traceback.format_exc()
             error_message = f"Error generating image: {str(e)}"
-            print(f"Error generating image: {str(e)}\n{error_stack}")
+            logger.error(f"Error generating image: {str(e)}\n{error_stack}", exc_info=True)
             return {"status": "error", "message": error_message}
 
     def format_output(self, data: dict) -> str:

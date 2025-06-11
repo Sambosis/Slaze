@@ -4,9 +4,10 @@ import os
 from pathlib import Path
 from collections import defaultdict
 from typing import Dict, List, Literal, Optional, get_args
+import logging
 
-from loguru import logger as ll
-from icecream import ic
+# from loguru import logger as ll # Removed loguru import
+# from icecream import ic # Removed
 from lmnr import observe
 
 from config import get_constant
@@ -17,6 +18,7 @@ from utils.file_logger import log_file_operation
 Command = Literal["view", "create", "str_replace", "insert", "undo_edit"]
 SNIPPET_LINES = 4
 
+logger = logging.getLogger(__name__)
 
 class FileEditorTool(BaseAnthropicTool):
     """A cross-platform filesystem editor tool. All operations run locally."""
@@ -95,7 +97,7 @@ class FileEditorTool(BaseAnthropicTool):
                 },
             },
         }
-        ic(f"FileEditorTool params: {params}")
+        logger.debug(f"FileEditorTool params: {params}")
         return params
 
     def format_output(self, data: Dict) -> str:
@@ -264,7 +266,7 @@ class FileEditorTool(BaseAnthropicTool):
             )
 
     async def view(self, path: Path, view_range: Optional[List[int]] = None) -> ToolResult:
-        ic(path)
+        logger.debug(f"Viewing path: {path}")
         try:
             files = []
             for level in range(3):
@@ -312,7 +314,7 @@ class FileEditorTool(BaseAnthropicTool):
 
     def str_replace(self, path: Path, old_str: str, new_str: Optional[str]) -> ToolResult:
         try:
-            ic(path)
+            logger.debug(f"Replacing string in path: {path}")
             file_content = self.read_file(path).expandtabs()
             old_str = old_str.expandtabs()
             new_str = new_str.expandtabs() if new_str is not None else ""
@@ -341,7 +343,7 @@ class FileEditorTool(BaseAnthropicTool):
             success_msg += "Review the changes and make sure they are as expected. Edit the file again if necessary."
             return ToolResult(output=success_msg, error=None, base64_image=None)
         except Exception as e:
-            ll.error(f"Error in string replacement: {str(e)}")
+            logger.error(f"Error in string replacement: {str(e)}", exc_info=True) # Replaced ll.error with logger.error and added exc_info
             return ToolResult(output=None, error=str(e), base64_image=None)
 
     def insert(self, path: Path, insert_line: int, new_str: str) -> ToolResult:
@@ -386,20 +388,22 @@ class FileEditorTool(BaseAnthropicTool):
         try:
             return path.read_text(encoding="utf-8").encode("ascii", errors="replace").decode("ascii")
         except Exception as e:
-            ic(f"Error reading file {path}: {e}")
+            logger.error(f"Error reading file {path}: {e}", exc_info=True)
             raise ToolError(f"Ran into {e} while trying to read {path}") from None
 
     def write_file(self, path: Path, file: str):
         try:
             if not isinstance(path, Path):
-                ic(f"Warning: FileEditorTool.write_file received a non-Path object for path: {type(path)}. Converting.")
+                logger.warning(f"FileEditorTool.write_file received a non-Path object for path: {type(path)}. Converting.")
                 try:
                     path = Path(path)
                 except Exception as e:
                     raise ToolError(f"Failed to convert path '{str(path)}' to Path object in write_file: {e}")
 
             # path is now guaranteed to be a Path object
+            logger.debug(f"Writing to path: {path}")
             path.parent.mkdir(parents=True, exist_ok=True)
+            logger.debug(f"File content to write (first 100 chars): {file[:100]}")
             path.write_text(file, encoding="utf-8")
             log_file_operation(path, "modify") # path is Path object
         except Exception as e:

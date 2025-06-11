@@ -2,10 +2,11 @@
 from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass, fields, replace
 from typing import Any, Optional, Dict
+import logging
 
 from utils.agent_display_web_with_prompt import AgentDisplayWebWithPrompt
-from icecream import ic
 
+logger = logging.getLogger(__name__)
 
 @dataclass(kw_only=True, frozen=True)
 class ToolResult:
@@ -111,7 +112,7 @@ class BaseTool(metaclass=ABCMeta):
 
     def to_params(self) -> Dict[str, Any]:
         """Convert the tool to xAI API parameters."""
-        ic(f"BaseTool.to_params called for {self.name}")
+        logger.debug(f"BaseTool.to_params called for {self.name}")
         params = {
             "type": "function",
             "function": {
@@ -120,7 +121,7 @@ class BaseTool(metaclass=ABCMeta):
                 "parameters": self.input_schema,
             },
         }
-        ic(f"BaseTool params for {self.name}: {params}")
+        logger.debug(f"BaseTool params for {self.name}: {params}")
         return params
 
 
