@@ -2,15 +2,13 @@ from typing import ClassVar, Literal
 import subprocess
 import re
 from dotenv import load_dotenv
-from config import get_constant, write_to_file # check_docker_available removed
+from config import get_constant
 from .base import BaseTool, ToolError, ToolResult
 from utils.agent_display_web_with_prompt import AgentDisplayWebWithPrompt
 from utils.logger import logger, log_debug as ic
 from lmnr import observe
 
 load_dotenv()
-ic.configureOutput(includeContext=True, outputFunction=write_to_file)
-
 
 class BashTool(BaseTool):
     def __init__(self, display: AgentDisplayWebWithPrompt = None):

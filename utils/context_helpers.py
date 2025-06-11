@@ -3,7 +3,6 @@ from typing import Any, Dict, List
 import os
 from utils.agent_display_web_with_prompt import AgentDisplayWebWithPrompt
 from load_constants import *
-from config import write_to_file
 from utils.file_logger import aggregate_file_states
 from openai import OpenAI
 from utils.logger import logger, log_debug as ic, log_info as rr
