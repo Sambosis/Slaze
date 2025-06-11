@@ -27,7 +27,7 @@ from tenacity import (
 )
 
 from tools.base import BaseAnthropicTool, ToolResult
-from config import get_constant
+from config import MAIN_MODEL, get_constant
 # from icecream import ic  # type: ignore # Removed
 from pygments import highlight  # type: ignore
 from pygments.formatters import HtmlFormatter  # type: ignore
@@ -42,9 +42,8 @@ from system_prompt.code_prompts import code_prompt_generate, code_skeleton_promp
 import ftfy
 import traceback
 
-googlepro = "google/gemini-2.5-pro-preview"
-googleflash = "google/gemini-2.5-flash-preview"
-MODEL_STRING = googlepro  # Default model string, can be overridden in config
+
+MODEL_STRING = MAIN_MODEL  # Default model string, can be overridden in config
 
 logger = logging.getLogger(__name__)
 

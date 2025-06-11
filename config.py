@@ -30,7 +30,7 @@ LOG_BACKUP_COUNT = 5
 # Define the top-level directory
 TOP_LEVEL_DIR = Path.cwd()
 WORKER_DIR = TOP_LEVEL_DIR # For worker processes, from load_constants.py
-
+openaio3 = "openai/o3"
 googlepro = "google/gemini-2.5-pro-preview"
 googleflash = "google/gemini-2.5-flash-preview"
 # Define the repository directory based on PROJECT_DIR
@@ -57,8 +57,8 @@ USER_LOG_FILE = LOGS_DIR / "user_messages.log"
 ASSISTANT_LOG_FILE = LOGS_DIR / "assistant_messages.log"
 TOOL_LOG_FILE = LOGS_DIR / "tool_messages.log"
 
-SUMMARY_MODEL = googlepro # Model for summaries
-MAIN_MODEL = googlepro    # Primary model for main agent operations
+SUMMARY_MODEL = openaio3 # Model for summaries
+MAIN_MODEL = openaio3    # Primary model for main agent operations
 
 # Feature flag constants
 COMPUTER_USE_BETA_FLAG = "computer-use-2024-10-22"
