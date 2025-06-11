@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 from typing import Optional, Any
 import logging
 import logging.handlers
+import sys
 from cycler import V
 
 global PROJECT_DIR
@@ -13,6 +14,11 @@ PROJECT_DIR = None
 
 # Load environment variables from .env file
 load_dotenv()
+
+try:
+    sys.stdout.reconfigure(encoding="utf-8")
+except Exception:
+    pass
 
 # Logging constants
 LOG_LEVEL_CONSOLE = "INFO"
