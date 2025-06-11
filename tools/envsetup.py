@@ -261,12 +261,6 @@ class ProjectSetupTool(BaseAnthropicTool):
         """Runs a Python application locally."""
         try:
             file_path = project_path / filename
-            venv_dir = project_path / ".venv"
-            if venv_dir.exists():
-                python_executable = self._get_venv_executable(venv_dir, "python")
-            else:
-                python_executable = "python" if os.name == "nt" else "python3"
-                rr(f"Warning: venv not found at {venv_dir}, attempting to run {filename} with system Python.")
 
             cmd = ["uv", "run", str(file_path)]
             result = subprocess.run(cmd, capture_output=True, text=True)
@@ -302,13 +296,7 @@ class ProjectSetupTool(BaseAnthropicTool):
                     "project_path": str(project_path),
                 }
 
-            venv_dir = project_path / ".venv"
 
-            if venv_dir.exists():
-                python_executable = self._get_venv_executable(venv_dir, "python")
-            else:
-                python_executable = "python" if os.name == "nt" else "python3"
-                rr(f"Warning: venv not found at {venv_dir}, attempting to run {entry_file.name} with system Python.")
 
             cmd = ["uv", "run",  str(entry_file)]
             result = subprocess.run(cmd, capture_output=True, text=True)
