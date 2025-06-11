@@ -48,17 +48,8 @@ MODEL_STRING = MAIN_MODEL  # Default model string, can be overridden in config
 logger = logging.getLogger(__name__)
 
 # --- Retry Predicate Function ---
-def should_retry_llm_call(retry_state: RetryCallState) -> bool:
-    """
-    Determines if a retry should occur based on the raised exception.
-    Accesses the exception from retry_state.outcome.exception().
-    """
-    if not retry_state.outcome:  # Should not happen if called after an attempt
-        return False
-
-    exception = retry_state.outcome.exception()
-    if not exception:  # No exception, successful outcome
-        return False
+def should_retry_llm_call(exception: Exception) -> bool:
+    """Return True if the exception warrants a retry."""
 
     # Always retry on our custom LLMResponseError
     if isinstance(exception, LLMResponseError):
