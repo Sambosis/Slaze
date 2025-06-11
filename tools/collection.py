@@ -8,7 +8,6 @@ from .base import (
     BaseAnthropicTool,
     ToolResult,
 )
-from lmnr import observe
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +66,6 @@ class ToolCollection:
         logger.debug(f"Total tools collected: {len(tool_params)}")
         logger.debug("---- END COLLECTING TOOL PARAMS ----")
         return tool_params
-    observe()
     async def run(self, name: str, tool_input: Dict[str, Any]) -> ToolResult:
         """
         Run a tool with the given name and input.
