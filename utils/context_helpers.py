@@ -2,8 +2,9 @@ from typing import Any, Dict, List
 
 import os
 from utils.agent_display_web_with_prompt import AgentDisplayWebWithPrompt
-from load_constants import *
 # from config import write_to_file # Removed as it was for ic
+# Removed: from load_constants import *
+from config import get_constant # Import get_constant
 from utils.file_logger import aggregate_file_states
 from openai import OpenAI
 import logging
@@ -145,7 +146,8 @@ async def summarize_recent_messages(
             Messages to summarize:
             {conversation_text}"""
         response = sum_client.chat.completions.create(
-            model=model, messages=[{"role": "user", "content": summary_prompt}]
+            model=model, messages=[{"role": "user", "content": summary_prompt}],
+            max_tokens=get_constant("MAX_SUMMARY_TOKENS", 4000) # Use get_constant
         )
         logger.debug(f"Summary API response: {response}")
 
@@ -385,7 +387,7 @@ async def refresh_context_async(
     and appending current file contents.
     """
     filtered = filter_messages(messages)
-    summary = get_all_summaries()
+    summary = get_all_summaries() # This is a local function in context_helpers
     completed, next_steps = await reorganize_context(filtered, summary)
 
     file_contents = aggregate_file_states()
@@ -424,11 +426,11 @@ async def refresh_context_async(
     Make sure you give clear guidance on how to import various files and in general how they should work together.
     """
 
-    messages = [{"role": "user", "content": prompt}]
+    messages_for_llm = [{"role": "user", "content": prompt}]
     response = client.chat.completions.create(
-        model=MAIN_MODEL,
-        messages=messages,
-        max_tokens=MAX_SUMMARY_TOKENS,
+        model=get_constant("MAIN_MODEL", "google/gemini-2.5-pro-preview"), # Use get_constant
+        messages=messages_for_llm, # Corrected variable name
+        max_tokens=get_constant("MAX_SUMMARY_TOKENS", 20000) # Use get_constant
     )
     new_task = response.choices[0].message.content
 
