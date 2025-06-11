@@ -10,7 +10,7 @@ def code_skeleton_prompt(
     all_file_details: Optional[
         List[Dict[str, Any]]
     ] = None,  # Add context of other files
-) -> list:
+    ) -> list:
     """
     Creates a prompt that asks the LLM to generate code skeleton/structure
     based on a description, considering the broader project context.
@@ -118,7 +118,7 @@ def code_prompt_generate(
     external_imports: Optional[List[str]] = None,
     internal_imports: Optional[List[str]] = None,
     target_file: Optional[str] = None,
-) -> list:
+    ) -> list:
     """
     Generates the prompt messages for code generation, incorporating skeletons and file-specific import lists.
     """
@@ -149,7 +149,7 @@ def code_prompt_generate(
 
     user_prompt_parts = [f"## Target File: {target_file or 'unknown'}\n"]
     user_prompt_parts.append(
-        f"## Code Description for Target File:\n{code_description}\n"
+        f"Overall Project Goal: {agent_task}\n## Code Description for Target File:\n{code_description}\n"
     )
 
     if skeletons:

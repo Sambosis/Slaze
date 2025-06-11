@@ -266,6 +266,7 @@ class ProjectSetupTool(BaseAnthropicTool):
             result = subprocess.run(cmd, capture_output=True, text=True)
 
             run_output = f"stdout: {result.stdout}\nstderr: {result.stderr}"
+            rr(run_output)
             return {
                 "command": "run_app",
                 "status": "success" if result.returncode == 0 else "error",
