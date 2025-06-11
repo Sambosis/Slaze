@@ -30,6 +30,7 @@ LOG_BACKUP_COUNT = 5
 # Define the top-level directory
 TOP_LEVEL_DIR = Path.cwd()
 WORKER_DIR = TOP_LEVEL_DIR # For worker processes, from load_constants.py
+sonnet4 = "anthropic/claude-sonnet-4"
 openaio3 = "openai/o3"
 openaio3pro = "openai/o3-pro"
 googlepro = "google/gemini-2.5-pro-preview"
@@ -59,7 +60,7 @@ ASSISTANT_LOG_FILE = LOGS_DIR / "assistant_messages.log"
 TOOL_LOG_FILE = LOGS_DIR / "tool_messages.log"
 
 SUMMARY_MODEL = googleflash  # Model for summaries
-MAIN_MODEL = openaio3pro  # Primary model for main agent operations
+MAIN_MODEL = sonnet4  # Primary model for main agent operations
 CODE_MODEL = googlepro  # Model for code generation tasks
 # Feature flag constants
 COMPUTER_USE_BETA_FLAG = "computer-use-2024-10-22"
