@@ -474,7 +474,7 @@ class EditTool(BaseTool):
         expand_tabs: bool = True,
     ) -> str:
         """Generate output for the CLI based on the content of a file."""
-        file_content = maybe_truncate(file_content)
+        # file_content = maybe_truncate(file_content)
         if expand_tabs:
             file_content = file_content.expandtabs()
         file_content = "\n".join(
