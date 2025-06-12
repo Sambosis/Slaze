@@ -30,11 +30,7 @@ LOG_BACKUP_COUNT = 5
 # Define the top-level directory
 TOP_LEVEL_DIR = Path.cwd()
 WORKER_DIR = TOP_LEVEL_DIR # For worker processes, from load_constants.py
-sonnet4 = "anthropic/claude-sonnet-4"
-openaio3 = "openai/o3"
-openaio3pro = "openai/o3-pro"
-googlepro = "google/gemini-2.5-pro-preview"
-googleflash = "google/gemini-2.5-flash-preview"
+
 # Define the repository directory based on PROJECT_DIR
 REPO_DIR = TOP_LEVEL_DIR / "repo"
 
@@ -59,8 +55,14 @@ USER_LOG_FILE = LOGS_DIR / "user_messages.log"
 ASSISTANT_LOG_FILE = LOGS_DIR / "assistant_messages.log"
 TOOL_LOG_FILE = LOGS_DIR / "tool_messages.log"
 
+
+sonnet4 = "anthropic/claude-sonnet-4"
+openaio3 = "openai/o3"
+openaio3pro = "openai/o3-pro"
+googlepro = "google/gemini-2.5-pro-preview"
+googleflash = "google/gemini-2.5-flash-preview"
 SUMMARY_MODEL = googleflash  # Model for summaries
-MAIN_MODEL = openaio3  # Primary model for main agent operations
+MAIN_MODEL = googlepro  # Primary model for main agent operations
 CODE_MODEL = googlepro  # Model for code generation tasks
 # Feature flag constants
 COMPUTER_USE_BETA_FLAG = "computer-use-2024-10-22"
@@ -366,7 +368,11 @@ def setup_logging():
 
     formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(module)s - %(funcName)s - %(lineno)d - %(message)s')
 
-
+    # Console Handler
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(getattr(logging, _get_constant_for_logging_setup("LOG_LEVEL_CONSOLE").upper(), logging.INFO))
+    console_handler.setFormatter(formatter)
+    logger.addHandler(console_handler)
 
     # File Handler
     # Use _get_constant_for_logging_setup for LOGS_DIR during setup
