@@ -229,7 +229,7 @@ class Agent:
         """Run one step of the agent using OpenAI."""
         self.step_count += 1
         messages = self.messages
-        rr(MAIN_MODEL)
+        rr(f"Step {self.step_count} with {len(messages)} messages")
         try:
             response = self.client.chat.completions.create(
                 model=MAIN_MODEL,
@@ -256,11 +256,11 @@ class Agent:
 
         if msg.tool_calls:
             for tc in msg.tool_calls:
-                rr(tc)
-            for tc in msg.tool_calls:
                 args = (
                     json.loads(tc.function.arguments) if tc.function.arguments else {}
                 )
+                for arg in args.values():
+                    rr(arg)
                 tool_result = await self.run_tool(
                     {"name": tc.function.name, "id": tc.id, "input": args}
                 )
