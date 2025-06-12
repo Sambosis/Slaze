@@ -366,11 +366,7 @@ def setup_logging():
 
     formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(module)s - %(funcName)s - %(lineno)d - %(message)s')
 
-    # Console Handler
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(getattr(logging, _get_constant_for_logging_setup("LOG_LEVEL_CONSOLE").upper(), logging.INFO))
-    console_handler.setFormatter(formatter)
-    logger.addHandler(console_handler)
+
 
     # File Handler
     # Use _get_constant_for_logging_setup for LOGS_DIR during setup

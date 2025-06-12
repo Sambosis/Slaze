@@ -13,13 +13,8 @@ from agent import Agent
 
 import sys # Add this import
 
-# Configure root logger for UTF-8
+# Configure root logger for UTF-8 and file output only
 root_logger = logging.getLogger()
-handler = logging.StreamHandler(sys.stdout)
-handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
-# Explicitly set encoding to UTF-8 for the handler
-handler.stream.reconfigure(encoding='utf-8') # type: ignore
-root_logger.addHandler(handler)
 root_logger.setLevel(logging.INFO)
 
 # Test logger with a unicode character
