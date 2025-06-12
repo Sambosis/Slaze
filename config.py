@@ -60,7 +60,7 @@ ASSISTANT_LOG_FILE = LOGS_DIR / "assistant_messages.log"
 TOOL_LOG_FILE = LOGS_DIR / "tool_messages.log"
 
 SUMMARY_MODEL = googleflash  # Model for summaries
-MAIN_MODEL = sonnet4  # Primary model for main agent operations
+MAIN_MODEL = openaio3  # Primary model for main agent operations
 CODE_MODEL = googlepro  # Model for code generation tasks
 # Feature flag constants
 COMPUTER_USE_BETA_FLAG = "computer-use-2024-10-22"
