@@ -1,2 +1,3 @@
-Run the main app by using run.py.
-The main entry point to the agent system is the `Agent` class, which is defined in `agents.py`. This class provides a framework for creating and managing agents that can perform tasks, interact with users, and utilize tools.
+We are currently working on the functionality inside of the 'stls' folder.
+
+There is a test script in the root of the repo named test_all.py that can be used to test the functionality of the of the stls functionality.

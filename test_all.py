@@ -17,8 +17,8 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 slaze_base_dir = (
     script_dir  # Base directory for cloning Slaze, can be changed if needed
 )
-slaze_repo_path = os.path.join(slaze_base_dir, repo_dir_name)
-
+# slaze_repo_path = os.path.join(slaze_base_dir, repo_dir_name)
+slaze_repo_path = script_dir
 
 def run_command(command, working_dir=None, env_vars=None):
     """Helper function to run shell commands."""
@@ -56,12 +56,12 @@ def run_command(command, working_dir=None, env_vars=None):
     return process.returncode
 
 
-# Clone the repository if it doesn't exist
-if not os.path.exists(slaze_repo_path):
-    print(f"Directory '{slaze_repo_path}' not found. Cloning repository...")
-    run_command(["git", "clone", repo_url, slaze_repo_path], working_dir=slaze_base_dir)
-else:
-    print(f"Directory '{slaze_repo_path}' already exists. Skipping clone.")
+# # Clone the repository if it doesn't exist
+# if not os.path.exists(slaze_repo_path):
+#     print(f"Directory '{slaze_repo_path}' not found. Cloning repository...")
+#     run_command(["git", "clone", repo_url, slaze_repo_path], working_dir=slaze_base_dir)
+# else:
+#     print(f"Directory '{slaze_repo_path}' already exists. Skipping clone.")
 
 # Change to the Slaze directory for subsequent commands
 print(f"Changing working directory to: {slaze_repo_path}")
@@ -69,7 +69,7 @@ print(f"Changing working directory to: {slaze_repo_path}")
 # Subsequent run_command calls will use this CWD if not overridden.
 
 # Run uv sync
-run_command(["uv", "sync", "-q"], working_dir=slaze_repo_path)
+# run_command(["uv", "sync", "-q"], working_dir=slaze_repo_path)
 
 # Run the runner script
 runner_script_path = os.path.join("stls", "runner.py")  # Relative to slaze_repo_path
