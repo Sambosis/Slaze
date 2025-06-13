@@ -174,6 +174,7 @@ def train_agent(config: argparse.Namespace) -> None:
         verbose=1,
         tensorboard_log=str(log_dir / "tensorboard_logs"),
         device=device,
+        use_sde=False, # Add this line
     )
 
     # --- Start Training ---
