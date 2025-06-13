@@ -115,15 +115,23 @@ def train_agent(config: argparse.Namespace) -> None:
         'print_time_penalty': -0.01,       # Per second
         'filament_penalty': -0.5,          # Per mm^3
     }
-    
+
     print("Initializing DesignEnvironment...")
+    # Provide basic configuration dictionaries for the mocked
+    # slicer and physics verifiers. These values are not used by the
+    # current stub implementations but are required by the
+    # ``DesignEnvironment`` constructor.
+    slicer_config = {"slicer_path": "dummy_slicer", "config_path": None}
+    physics_config = {"duration_steps": 2400}
     env = DesignEnvironment(
         generator=generator,
         num_motifs=config.num_motifs,
         design_prompt="Design a vertical stand for a standard smartphone.",
         max_steps=config.max_episode_steps,
         reward_weights=reward_weights,
-        output_dir=str(env_output_dir)
+        output_dir=str(env_output_dir),
+        slicer_config=slicer_config,
+        physics_config=physics_config
     )
 
     # --- Setup Callbacks ---
@@ -139,13 +147,11 @@ def train_agent(config: argparse.Namespace) -> None:
     # `AgentPolicy` is a custom nn.Module. SB3 takes this as a policy class
     # and `policy_kwargs` are passed to its constructor.
     # SB3 automatically infers state_dim and action_dim from the env.
-    policy_kwargs = {
-        'hidden_dim': config.hidden_dim,
-    }
-
+    # Use SB3's MultiInputPolicy since the environment returns a dictionary
+    # observation.
     print("Instantiating PPO agent...")
     model = PPO(
-        policy=AgentPolicy,
+        policy="MultiInputPolicy",
         env=env,
         learning_rate=config.learning_rate,
         n_steps=config.n_steps,
@@ -157,7 +163,6 @@ def train_agent(config: argparse.Namespace) -> None:
         ent_coef=config.ent_coef,
         vf_coef=config.vf_coef,
         max_grad_norm=config.max_grad_norm,
-        policy_kwargs=policy_kwargs,
         verbose=1,
         tensorboard_log=str(log_dir / "tensorboard_logs"),
         device=device,

@@ -15,7 +15,7 @@ import uuid
 from pathlib import Path
 from typing import Dict, List, Tuple, Any, Optional
 
-import gym
+import gymnasium as gym
 import numpy as np
 
 # --- Internal Imports ---

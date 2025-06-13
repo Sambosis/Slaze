@@ -48,7 +48,7 @@ sys.argv = [
     "--num-motifs",
     "2",
     "--total-timesteps",
-    "2048",  # Using a single rollout buffer size for a minimal test
+    "10",  # Keep training extremely short for tests
 ]
 
 # Run the agent training script as a module
