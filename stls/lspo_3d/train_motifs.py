@@ -34,7 +34,7 @@ from tqdm import tqdm
 # Internal project imports
 # Assuming that processor.py has been run and has outputted text files with CSG traces.
 # from src.lspo_3d.data.processor import process_raw_models # Not used; we load pre-processed traces.
-from src.lspo_3d.models.motif_encoder import MotifEncoder
+from lspo_3d.models.motif_encoder import MotifEncoder
 
 # Set up basic logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')

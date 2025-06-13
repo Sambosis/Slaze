@@ -20,9 +20,9 @@ import numpy as np
 
 # --- Internal Imports ---
 from lspo_3d.models.generator import CadQueryGenerator
-from src.lspo_3d.oracles.csg_executor import execute_cad_script
-from src.lspo_3d.oracles.physics_verifier import verify_stability
-from src.lspo_3d.oracles.slicer_verifier import get_slicer_metrics, SlicerMetrics
+from lspo_3d.oracles.csg_executor import execute_cad_script
+from lspo_3d.oracles.physics_verifier import verify_stability
+from lspo_3d.oracles.slicer_verifier import get_slicer_metrics, SlicerMetrics
 
 # Set up a logger for this module
 logger = logging.getLogger(__name__)
