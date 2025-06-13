@@ -2,7 +2,9 @@ import os
 import time
 import copy
 import itertools
-from typing import List, Dict, Any, Tuple, Optional
+from typing import List, Dict, Any, Tuple, Optional  
+import matplotlib
+matplotlib.use('agg')
 
 import torch
 import torch.nn.functional as F
