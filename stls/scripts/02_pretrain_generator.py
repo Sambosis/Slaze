@@ -20,7 +20,9 @@ from src.lspo_3d import config
 from src.lspo_3d.data.dataset import CSGDataset
 from src.lspo_3d.data.tokenizer import CSGTokenizer
 from src.lspo_3d.models.encoder import CSGEncoder
-from lspo_3d.models.generator import CSGGenerator
+# Import the experimental CSGGenerator from the src package. The
+# top-level `lspo_3d` package only exposes the CadQuery generator.
+from src.lspo_3d.models.generator import CSGGenerator
 from src.lspo_3d.utils import setup_logging
 
 # Setup basic logging

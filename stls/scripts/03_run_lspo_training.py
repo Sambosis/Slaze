@@ -11,7 +11,9 @@ from stable_baselines3.common.vec_env import DummyVecEnv
 # Internal project imports
 from src.lspo_3d import config
 from src.lspo_3d import utils
-from lspo_3d.models.generator import CSGGenerator
+# Import the experimental CSGGenerator from the src package. The
+# top-level `lspo_3d` package only provides the CadQuery generator.
+from src.lspo_3d.models.generator import CSGGenerator
 from src.lspo_3d.oracles.slicer import SlicerOracle
 from src.lspo_3d.oracles.physics import PhysicsOracle
 from src.lspo_3d.rl.environment import DesignEnvironment
