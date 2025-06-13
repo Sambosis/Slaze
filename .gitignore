@@ -21,3 +21,4 @@ repo/
 *.log
 logs/
 venv/
+stls/3d_lspo/
