@@ -1,0 +1,1 @@
+result = cq.Workplane("XY").box(5, 5, 5).faces(">Z").circle(2).cutThruAll()
