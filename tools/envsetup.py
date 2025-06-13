@@ -7,6 +7,7 @@ from config import PROJECT_DIR
 from .base import ToolResult, BaseAnthropicTool
 import subprocess
 import logging
+from rich import print as rr # Using rich for better output formatting
 # from loguru import logger as ll # Removed loguru
 # from rich import print as rr # Removed rich print
 
@@ -269,6 +270,7 @@ class ProjectSetupTool(BaseAnthropicTool):
 
             run_output = f"stdout: {result.stdout}\nstderr: {result.stderr}"
             logger.info(f"Run app output for {file_path}:\n{run_output}")
+            rr(f"Run app output for {file_path}:\n{run_output}")  # Using rich print for better formatting
             return {
                 "command": "run_app",
                 "status": "success" if result.returncode == 0 else "error",

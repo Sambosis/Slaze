@@ -8,6 +8,7 @@ from config import get_constant # Import get_constant
 from utils.file_logger import aggregate_file_states
 from openai import OpenAI
 import logging
+from tenacity import retry, stop_after_attempt, wait_random_exponential
 # from icecream import ic # Removed
 # from rich import print as rr # Removed
 
@@ -378,7 +379,10 @@ async def reorganize_context(messages: List[Dict[str, Any]], summary: str) -> st
             "Error processing steps. Please try again.",
         )
 
-
+@retry(
+    stop=stop_after_attempt(max_attempt_number=5),
+    wait=wait_random_exponential(multiplier=2, min=4, max=10),
+)
 async def refresh_context_async(
     task: str, messages: List[Dict], display: AgentDisplayWebWithPrompt, client
 ) -> str:

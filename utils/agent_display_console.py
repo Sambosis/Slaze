@@ -8,10 +8,10 @@ from rich.table import Table
 from rich.prompt import Prompt, Confirm, IntPrompt
 from rich.syntax import Syntax
 # Assuming config.py is at the root and contains PROMPTS_DIR, LOGS_DIR, etc.
-from config import PROMPTS_DIR, LOGS_DIR, set_project_dir, set_constant, get_constant # get_docker_project_dir removed
+from config import PROMPTS_DIR, LOGS_DIR, MAIN_MODEL, set_project_dir, set_constant, get_constant # get_docker_project_dir removed
 # Assuming agent_display_web.py is in utils and contains AgentDisplayWeb, log_message
 from utils.agent_display_web import AgentDisplayWeb, log_message
-
+from tenacity import retry, stop_after_attempt, wait_exponential # type: ignore
 class AgentDisplayConsole(AgentDisplayWeb):
     def __init__(self):
         # Initialize attributes that would have been set by AgentDisplayWeb's __init__,
@@ -19,13 +19,13 @@ class AgentDisplayConsole(AgentDisplayWeb):
         self.user_messages = []
         self.assistant_messages = []
         self.tool_results = []
-        
+
         try:
             self.loop = asyncio.get_event_loop()
         except RuntimeError:
             self.loop = asyncio.new_event_loop()
             asyncio.set_event_loop(self.loop)
-            
+
         self.input_queue = asyncio.Queue() # For compatibility if any inherited method uses it
         self.user_interupt = False # For compatibility
 
@@ -53,7 +53,7 @@ class AgentDisplayConsole(AgentDisplayWeb):
                 # This case should ideally not be hit if __init__ sets the loop.
                 self.loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(self.loop)
-        
+
         user_input = await asyncio.to_thread(input, prompt_message)
         return user_input
 
@@ -74,6 +74,12 @@ class AgentDisplayConsole(AgentDisplayWeb):
 
     def setup_socketio_events(self):
         pass
+    @retry(stop=stop_after_attempt(6), wait=wait_exponential(multiplier=2, min=4, max=10))
+    async def call_llm(self, client, model, messages):
+        completion = await asyncio.to_thread(
+            client.chat.completions.create, model=model, messages=messages
+        )   
+        return completion
 
     async def select_prompt_console(self):
         console = self.console # Use the instance console
@@ -132,11 +138,11 @@ class AgentDisplayConsole(AgentDisplayWeb):
             try:
                 task = prompt_path.read_text(encoding='utf-8')
                 # task = ftfy.fix_text(task) # ftfy removed
-                
+
                 console.print(Panel(Syntax(task, "markdown", theme="dracula", line_numbers=True), title="Current Prompt Content"))
                 if Confirm.ask(f"Do you want to edit '{prompt_path.name}'?", default=False, console=console):
                     console.print("[cyan]Enter new prompt content. Press Ctrl+D (Unix) or Ctrl+Z then Enter (Windows) to save.[/cyan]")
-                    
+
                     new_lines = []
                     # Rich's Prompt.ask doesn't handle multi-line input in the way needed here (EOF signal).
                     # So, falling back to the existing line-by-line input mechanism.
@@ -149,7 +155,7 @@ class AgentDisplayConsole(AgentDisplayWeb):
                             new_lines.append(line)
                         except EOFError: # User signaled end of input
                             break
-                    
+
                     if new_lines:
                         task = "\n".join(new_lines)
                         # task = ftfy.fix_text(task) # ftfy removed
@@ -167,10 +173,10 @@ class AgentDisplayConsole(AgentDisplayWeb):
             new_filename_input = Prompt.ask("Enter a filename for the new prompt (e.g., my_new_task, press Enter for default 'custom_prompt')", default="custom_prompt", console=console)
             if new_filename_input.strip():
                 filename_stem = new_filename_input.strip().replace(" ", "_").replace(".md", "")
-            
+
             new_prompt_path = PROMPTS_DIR / f"{filename_stem}.md"
             console.print(Panel(f"[cyan]Enter the prompt text for '{new_prompt_path.name}'.\nPress Ctrl+D (Unix) or Ctrl+Z then Enter (Windows) to save.[/cyan]", title="Create New Prompt"))
-            
+
             new_prompt_lines = []
             # Similar to editing, using existing mechanism for multi-line input.
             while True:
@@ -179,7 +185,7 @@ class AgentDisplayConsole(AgentDisplayWeb):
                     new_prompt_lines.append(line)
                 except EOFError:
                     break
-            
+
             if new_prompt_lines:
                 task = "\n".join(new_prompt_lines)
                 # task = ftfy.fix_text(task) # ftfy removed
@@ -198,20 +204,15 @@ class AgentDisplayConsole(AgentDisplayWeb):
         if OPENROUTER_API_KEY and task:
             try:
                 client = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=OPENROUTER_API_KEY)
-                model = "anthropic/claude-3.5-sonnet"
-                
+                model = MAIN_MODEL
+
                 ai_prompt_template = f"""Do what would make sense as far as creating the final task definition. If the user asks a simple non coding question you may simpley just repeat the task. If it something unexpected then use your judgement to create a task definition that would work for the circumstance. If it sounds like a programming project follow these instruction. First, restate the problem in more detail. At this stage if there are any decisons that were left for the developer, you should make the choices needed and include them in your restated description of the promlem.
 After you have restated the expanded description. You will provide a file tree for the program. In general, lean towards creating less files and folders while still keeping things organized and manageable. You will use absolute imports. Do not create any non code files such as pyproject, gitignore, readme, etc.. You will need to attempt to list every file that will be needed and be thorough. This is all code files that will need to be created, all asset files etc. For each file, in additon to the path and filename, you should give a brief statement about the purpose of the file and explicitly give the correct way to import the file using absolut imports. Do not actually create any of the code for the project. Just the expanded description and the file tree with the extra info included. The structure should focus on simplicity and reduced subdirectories and files.
 Task: {task}"""
-                
+
                 messages = [{"role": "user", "content": ai_prompt_template}]
                 console.print("[yellow]Sending task to AI for analysis (this may take a moment)...[/yellow]")
-                
-                completion = await asyncio.to_thread(
-                    client.chat.completions.create,
-                    model=model,
-                    messages=messages
-                )
+                completion = await self.call_llm(client, model, messages)
                 processed_task = completion.choices[0].message.content
                 if processed_task:
                     task = processed_task # ftfy removed
@@ -254,9 +255,9 @@ Task: {task}"""
             console.print(f"Task definition saved to '{task_file_path}'")
         except Exception as e:
             console.print(f"[bold red]Error saving task to {task_file_path}: {e}[/bold red]")
-            
+
         console.print(f"[bold blue]Project directory set to: '{project_dir}'[/bold blue]")
-        
+
         return task
 
 async def main_test():
