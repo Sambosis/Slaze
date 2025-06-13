@@ -11,7 +11,7 @@ sys.path.insert(0, str(project_root))
 
 # --- Step 1: Create the Initial Generator Model ---
 print("--- Running Initial Generator Creation ---")
-generator_creation_script_path = project_root / "stls" / "create_initial_generator.py"
+generator_creation_script_path = project_root / "create_initial_generator.py"
 
 # Temporarily switch sys.argv for the generator creation script
 original_argv = list(sys.argv)
@@ -33,7 +33,7 @@ print("\n--- Running Agent Training ---")
 
 # Construct absolute paths for required files and directories
 motif_path_abs = project_root / "artifacts" / "motifs" / "motif_assignments.pt"
-generator_path_abs = project_root / "initial_generator"
+generator_path_abs = project_root / "lspo_3d" / "initial_generator"
 log_dir_abs = project_root / "logs"
 
 # Set the command-line arguments for the training script
@@ -48,7 +48,7 @@ sys.argv = [
     "--num-motifs",
     "2",
     "--total-timesteps",
-    "2048" # Using a single rollout buffer size for a minimal test
+    "2048",  # Using a single rollout buffer size for a minimal test
 ]
 
 # Run the agent training script as a module
