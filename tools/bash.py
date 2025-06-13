@@ -66,7 +66,9 @@ class BashTool(BaseTool):
                 self.display.add_message("user", f"Executing command: {command}")
 
             try:
-                # Execute the command locally
+                # Execute the command locally relative to PROJECT_DIR if set
+                project_dir = get_constant("PROJECT_DIR")
+                cwd = str(project_dir) if project_dir else None
                 result = subprocess.run(
                     command,
                     shell=True,
@@ -75,6 +77,7 @@ class BashTool(BaseTool):
                     encoding="utf-8",
                     errors="replace",
                     check=False,
+                    cwd=cwd,
                 )
                 output = result.stdout
                 error = result.stderr
