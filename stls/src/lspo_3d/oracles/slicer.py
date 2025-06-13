@@ -17,7 +17,7 @@ from typing import Match, Optional
 # These imports are included as per the project structure specification,
 # even if not all are directly used in this specific implementation.
 # For example, a shared logger might be configured in `utils`.
-from lspo_3d import config
+from src.lspo_3d import config
 from lspo_3d import utils
 
 

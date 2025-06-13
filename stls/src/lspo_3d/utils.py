@@ -15,7 +15,7 @@ import sys
 from typing import Union, List, Tuple, Optional
 
 # The config module is expected to hold constants like executable paths.
-from lspo_3d import config
+from src.lspo_3d import config
 
 
 def setup_logging(

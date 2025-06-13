@@ -10,7 +10,7 @@ from tokenizers import Tokenizer, models, pre_tokenizers, trainers, decoders
 from tokenizers.processors import TemplateProcessing
 
 # Internal project imports
-from lspo_3d import config
+from src.lspo_3d import config
 from lspo_3d import utils
 
 logger = logging.getLogger(__name__)

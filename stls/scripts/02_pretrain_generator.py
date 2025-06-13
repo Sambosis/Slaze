@@ -16,7 +16,7 @@ from tqdm import tqdm
 # For example:
 # import sys
 # sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from lspo_3d import config
+from src.lspo_3d import config
 from lspo_3d.data.dataset import CSGDataset
 from lspo_3d.data.tokenizer import CSGTokenizer
 from lspo_3d.models.encoder import CSGEncoder

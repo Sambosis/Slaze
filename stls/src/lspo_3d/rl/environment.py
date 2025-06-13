@@ -6,7 +6,7 @@ import gym
 import numpy as np
 from gym import spaces
 
-from lspo_3d import config
+from src.lspo_3d import config
 from lspo_3d.models.generator import CSGGenerator
 from lspo_3d.oracles.reward import calculate_reward
 

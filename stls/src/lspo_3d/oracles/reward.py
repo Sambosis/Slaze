@@ -15,7 +15,7 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Dict, Tuple
 
-from lspo_3d import config
+from src.lspo_3d import config
 
 # Type checking to avoid circular imports, standard for complex projects.
 if TYPE_CHECKING:
