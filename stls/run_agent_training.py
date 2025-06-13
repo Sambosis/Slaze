@@ -11,7 +11,7 @@ sys.path.insert(0, str(project_root))
 
 # --- Step 1: Create the Initial Generator Model ---
 print("--- Running Initial Generator Creation ---")
-generator_creation_script_path = project_root / "create_initial_generator.py"
+generator_creation_script_path = project_root / "stls" / "create_initial_generator.py"
 
 # Temporarily switch sys.argv for the generator creation script
 original_argv = list(sys.argv)
