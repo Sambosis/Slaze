@@ -22,3 +22,5 @@ repo/
 logs/
 venv/
 stls/3d_lspo/
+*.safetensors
+*.pt
