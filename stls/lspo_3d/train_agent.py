@@ -34,7 +34,7 @@ except ImportError:
         "Please install it with: pip install stable-baselines3[extra]"
     )
 
-from stls.src.lspo_3d.config import PRUSA_SLICER_PATH, OPENSCAD_PATH
+from stls.src.lspo_3d.config import PRUSA_SLICER_PATH
 from lspo_3d.environment import DesignEnvironment
 from lspo_3d.models.agent import AgentPolicy
 from lspo_3d.models.generator import CadQueryGenerator
