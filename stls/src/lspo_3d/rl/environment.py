@@ -7,7 +7,10 @@ import numpy as np
 from gym import spaces
 
 from src.lspo_3d import config
-from lspo_3d.models.generator import CSGGenerator
+# Use the CSGGenerator defined in the src package. Importing from the
+# top-level `lspo_3d` package would fail because that package only
+# exposes the `CadQueryGenerator` used in a different pipeline.
+from src.lspo_3d.models.generator import CSGGenerator
 from src.lspo_3d.oracles.reward import calculate_reward
 
 
