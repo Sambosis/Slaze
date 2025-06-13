@@ -34,6 +34,7 @@ except ImportError:
         "Please install it with: pip install stable-baselines3[extra]"
     )
 
+from stls.src.lspo_3d.config import PRUSA_SLICER_PATH, OPENSCAD_PATH
 from lspo_3d.environment import DesignEnvironment
 from lspo_3d.models.agent import AgentPolicy
 from lspo_3d.models.generator import CadQueryGenerator
@@ -115,10 +116,22 @@ def train_agent(config: argparse.Namespace) -> None:
         'print_time_penalty': -0.01,       # Per second
         'filament_penalty': -0.5,          # Per mm^3
     }
+
+    slicer_config = {
+        "slicer_path": PRUSA_SLICER_PATH,
+        "config_path": None,
+    }
+
+    physics_config = {
+        "duration_steps": 2400,
+        "load_config": {},
+    }
     
     print("Initializing DesignEnvironment...")
     env = DesignEnvironment(
         generator=generator,
+        slicer_config=slicer_config,
+        physics_config=physics_config,
         num_motifs=config.num_motifs,
         design_prompt="Design a vertical stand for a standard smartphone.",
         max_steps=config.max_episode_steps,
