@@ -18,7 +18,7 @@ from torch.utils.data import Dataset
 
 # Internal project imports
 from lspo_3d.data.tokenizer import CSGTokenizer
-from lspo_3d import config
+from src.lspo_3d import config
 from lspo_3d import utils
 
 # Configure logger

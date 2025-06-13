@@ -8,7 +8,7 @@ configuration, meaning all parameters are defined as top-level constants for
 easy import and access from any module.
 
 Example Usage:
-    from lspo_3d import config
+    from src.lspo_3d import config
     learning_rate = config.PPO_POLICY_LR
     data_path = config.SCAD_CORPUS_DIR
 """

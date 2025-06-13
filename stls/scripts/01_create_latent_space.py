@@ -35,7 +35,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 # Internal project imports
-from lspo_3d import config, utils
+from src.lspo_3d import config, utils
 from lspo_3d.data.dataset import CSGDataset
 from lspo_3d.data.tokenizer import CSGTokenizer
 from lspo_3d.models.encoder import CSGEncoder

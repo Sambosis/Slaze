@@ -9,7 +9,7 @@ from stable_baselines3 import PPO as sb3_PPO
 from stable_baselines3.common.vec_env import DummyVecEnv
 
 # Internal project imports
-from lspo_3d import config
+from src.lspo_3d import config
 from lspo_3d import utils
 from lspo_3d.models.generator import CSGGenerator
 from lspo_3d.oracles.slicer import SlicerOracle

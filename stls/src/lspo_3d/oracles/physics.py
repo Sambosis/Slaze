@@ -14,7 +14,7 @@ import math
 
 import pybullet as p
 
-from lspo_3d import config
+from src.lspo_3d import config
 
 # Set up a logger for this module
 logger = logging.getLogger(__name__)

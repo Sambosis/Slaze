@@ -14,7 +14,7 @@ import torch
 import torch.nn as nn
 from torch import Tensor
 
-from lspo_3d import config
+from src.lspo_3d import config
 
 
 class PositionalEncoding(nn.Module):
