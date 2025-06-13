@@ -22,7 +22,7 @@ from stable_baselines3.common.callbacks import BaseCallback
 
 if typing.TYPE_CHECKING:
     from src.lspo_3d import config
-    from lspo_3d.rl.environment import DesignEnvironment
+    from src.lspo_3d.rl.environment import DesignEnvironment
 
 
 class CustomActorCriticPolicy(ActorCriticPolicy):

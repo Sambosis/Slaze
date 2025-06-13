@@ -13,8 +13,8 @@ from stable_baselines3.common.vec_env import DummyVecEnv
 from transformers import TrainingArguments
 
 # Internal project imports
-from lspo_3d.environment import DesignEnvironment
-from lspo_3d.models.agent import AgentPolicy
+from src.lspo_3d.environment import DesignEnvironment
+from src.lspo_3d.models.agent import AgentPolicy
 from lspo_3d.models.generator import CadQueryGenerator, train_generator_with_dpo
 
 

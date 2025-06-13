@@ -8,8 +8,8 @@ importing the main classes and functions here, users can access them directly
 from the `lspo_3d` namespace instead of needing to know the detailed internal
 structure.
 
-For example, instead of `from lspo_3d.data.tokenizer import CSGTokenizer`, one can
-simply use `from lspo_3d import CSGTokenizer`.
+For example, instead of `from src.lspo_3d.data.tokenizer import CSGTokenizer`, one can
+simply use `from src.lspo_3d import CSGTokenizer`.
 
 Attributes:
     __version__ (str): The current version of the lspo_3d package.

@@ -19,8 +19,8 @@ from src.lspo_3d import config
 
 # Type checking to avoid circular imports, standard for complex projects.
 if TYPE_CHECKING:
-    from lspo_3d.oracles.physics import PhysicsOracle
-    from lspo_3d.oracles.slicer import SlicerOracle
+    from src.lspo_3d.oracles.physics import PhysicsOracle
+    from src.lspo_3d.oracles.slicer import SlicerOracle
 
 logger = logging.getLogger(__name__)
 

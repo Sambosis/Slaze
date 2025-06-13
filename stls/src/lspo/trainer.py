@@ -9,7 +9,7 @@ matplotlib.use('agg')
 import torch
 import torch.nn.functional as F
 import numpy as np
-import gym
+import gymnasium as gym
 from transformers import T5ForConditionalGeneration, AutoTokenizer, AdamW
 from stable_baselines3 import PPO
 from stable_baselines3.common.buffers import RolloutBuffer

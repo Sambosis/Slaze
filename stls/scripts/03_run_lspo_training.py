@@ -10,12 +10,12 @@ from stable_baselines3.common.vec_env import DummyVecEnv
 
 # Internal project imports
 from src.lspo_3d import config
-from lspo_3d import utils
+from src.lspo_3d import utils
 from lspo_3d.models.generator import CSGGenerator
-from lspo_3d.oracles.slicer import SlicerOracle
-from lspo_3d.oracles.physics import PhysicsOracle
-from lspo_3d.rl.environment import DesignEnvironment
-from lspo_3d.rl.agent import PPOAgent  # Potentially holds custom policies/logic for SB3
+from src.lspo_3d.oracles.slicer import SlicerOracle
+from src.lspo_3d.oracles.physics import PhysicsOracle
+from src.lspo_3d.rl.environment import DesignEnvironment
+from src.lspo_3d.rl.agent import PPOAgent  # Potentially holds custom policies/logic for SB3
 
 
 def fine_tune_generator(

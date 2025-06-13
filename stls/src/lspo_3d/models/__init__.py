@@ -6,7 +6,7 @@ This allows users to import model classes directly from the 'lspo_3d.models'
 namespace instead of from the specific module files.
 
 Example Usage:
-    from lspo_3d.models import CSGEncoder, CSGGenerator
+    from src.lspo_3d.models import CSGEncoder, CSGGenerator
 """
 
 from .encoder import CSGEncoder

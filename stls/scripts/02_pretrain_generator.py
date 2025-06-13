@@ -17,11 +17,11 @@ from tqdm import tqdm
 # import sys
 # sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from src.lspo_3d import config
-from lspo_3d.data.dataset import CSGDataset
-from lspo_3d.data.tokenizer import CSGTokenizer
-from lspo_3d.models.encoder import CSGEncoder
+from src.lspo_3d.data.dataset import CSGDataset
+from src.lspo_3d.data.tokenizer import CSGTokenizer
+from src.lspo_3d.models.encoder import CSGEncoder
 from lspo_3d.models.generator import CSGGenerator
-from lspo_3d.utils import setup_logging
+from src.lspo_3d.utils import setup_logging
 
 # Setup basic logging
 setup_logging()

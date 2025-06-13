@@ -36,9 +36,9 @@ from tqdm import tqdm
 
 # Internal project imports
 from src.lspo_3d import config, utils
-from lspo_3d.data.dataset import CSGDataset
-from lspo_3d.data.tokenizer import CSGTokenizer
-from lspo_3d.models.encoder import CSGEncoder
+from src.lspo_3d.data.dataset import CSGDataset
+from src.lspo_3d.data.tokenizer import CSGTokenizer
+from src.lspo_3d.models.encoder import CSGEncoder
 
 
 def train_encoder(

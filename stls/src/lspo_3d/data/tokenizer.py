@@ -11,7 +11,7 @@ from tokenizers.processors import TemplateProcessing
 
 # Internal project imports
 from src.lspo_3d import config
-from lspo_3d import utils
+from src.lspo_3d import utils
 
 logger = logging.getLogger(__name__)
 

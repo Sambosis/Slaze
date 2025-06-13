@@ -6,8 +6,8 @@ loading and tokenization of OpenSCAD scripts.
 
 By importing the main classes here, users can access them directly from the
 'lspo_3d.data' namespace, e.g.:
-    from lspo_3d.data import CSGDataset
-    from lspo_3d.data import CSGTokenizer
+    from src.lspo_3d.data import CSGDataset
+    from src.lspo_3d.data import CSGTokenizer
 """
 
 from .dataset import CSGDataset

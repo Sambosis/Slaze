@@ -18,7 +18,7 @@ from typing import Match, Optional
 # even if not all are directly used in this specific implementation.
 # For example, a shared logger might be configured in `utils`.
 from src.lspo_3d import config
-from lspo_3d import utils
+from src.lspo_3d import utils
 
 
 @dataclasses.dataclass
