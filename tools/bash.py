@@ -91,6 +91,7 @@ class BashTool(BaseTool):
                 error = error[:100000] + " ... [TRUNCATED] ... " + error[-100000:]
 
             formatted_output = f"command: {command}\nsuccess: {str(success).lower()}\noutput: {output}\nerror: {error}"
+            rr(formatted_output)
             # Create a new ToolResult instead of modifying an existing one
             return ToolResult(
                 output=formatted_output, tool_name=self.name, command=command
@@ -98,6 +99,7 @@ class BashTool(BaseTool):
 
         except Exception as e:
             error = str(e)
+            rr(error)
             if self.display is not None:
                 try:
                     self.display.add_message("assistant", f"Error: {error}")
