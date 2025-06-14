@@ -7,7 +7,10 @@ agent, as it learns to select optimal sequences of design motifs to generate
 3D models.
 """
 
-from typing import Tuple
+from typing import Tuple, Any
+
+import gymnasium as gym
+import numpy as np
 
 import torch
 import torch.nn as nn
@@ -27,7 +30,14 @@ class AgentPolicy(nn.Module):
     within a PPO training loop.
     """
 
-    def __init__(self, state_dim: int, action_dim: int, hidden_dim: int = 256):
+    def __init__(
+        self,
+        observation_space,
+        action_space,
+        lr_schedule=None,
+        hidden_dim: int = 256,
+        **_ignored: Any,
+    ):
         """
         Initializes the layers of the actor-critic network.
 
@@ -38,7 +48,17 @@ class AgentPolicy(nn.Module):
             action_dim (int): The number of possible discrete actions (design motifs).
             hidden_dim (int): The size of the hidden layers in the network.
         """
-        super(AgentPolicy, self).__init__()
+        super().__init__()
+
+        # Derive state and action dimensions from the gym spaces
+        if isinstance(observation_space, gym.spaces.Dict):
+            prompt_dim = observation_space["prompt_embedding"].shape[0]
+            seq_dim = observation_space["sequence"].shape[0]
+            state_dim = prompt_dim + seq_dim
+        else:
+            state_dim = int(np.prod(observation_space.shape))
+
+        action_dim = action_space.n
 
         # Shared network layers for feature extraction
         self.shared_net = nn.Sequential(
