@@ -30,13 +30,7 @@ def _sanitize_script_string(script: str) -> str:
     This helper normalizes common curly quotes to standard ASCII quotes and
     strips characters outside the ASCII range.
     """
-    replacements = {
-        "“": '"',
-        "”": '"',
-        "‘": "'",
-        "’": "'",
-    }
-    for bad, good in replacements.items():
+    for bad, good in REPLACEMENTS.items():
         script = script.replace(bad, good)
     # Remove any remaining non-ASCII characters
     script = script.encode("ascii", "ignore").decode("ascii")
