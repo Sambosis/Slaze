@@ -20,7 +20,7 @@ sys.argv = [
     "--num_motifs",
     "2",
     "--model_name",
-    "distilbert-base-uncased"
+    "all-MiniLM-L6-v2",
 ]
 
 # Run the script as a module
