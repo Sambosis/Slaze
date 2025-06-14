@@ -75,6 +75,7 @@ def execute_cad_script(
     # 4. Use a try/except block to safely execute the script_string.
     try:
         # Execute the script within the defined scope
+        script_string = script_string.replace("’", "'")
         exec(script_string, sandbox_scope)
 
         # 5. After execution, retrieve the `result` object from the sandbox scope.
