@@ -36,7 +36,6 @@ except ImportError:
 
 from src.lspo_3d.config import PRUSA_SLICER_PATH
 from lspo_3d.environment import DesignEnvironment
-from lspo_3d.models.agent import AgentPolicy
 from lspo_3d.models.generator import CadQueryGenerator
 
 
@@ -149,16 +148,19 @@ def train_agent(config: argparse.Namespace) -> None:
     )
 
     # --- Define PPO Policy and Hyperparameters ---
-    # `AgentPolicy` is a custom nn.Module. SB3 takes this as a policy class
-    # and `policy_kwargs` are passed to its constructor.
-    # SB3 automatically infers state_dim and action_dim from the env.
+    # Use the built-in MultiInputPolicy to handle the dictionary observation
+    # space returned by ``DesignEnvironment``. ``policy_kwargs`` configures the
+    # underlying MLP used for the actor and critic networks.
     policy_kwargs = {
-        'hidden_dim': config.hidden_dim,
+        "net_arch": [
+            dict(pi=[config.hidden_dim, config.hidden_dim],
+                 vf=[config.hidden_dim, config.hidden_dim])
+        ],
     }
 
     print("Instantiating PPO agent...")
     model = PPO(
-        policy=AgentPolicy,
+        policy="MultiInputPolicy",
         env=env,
         learning_rate=config.learning_rate,
         n_steps=config.n_steps,
