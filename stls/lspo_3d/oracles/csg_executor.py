@@ -22,6 +22,27 @@ import cadquery as cq
 logger = logging.getLogger(__name__)
 
 
+def _sanitize_script_string(script: str) -> str:
+    """Return a version of ``script`` safe for ``exec``.
+
+    The raw output from language models may contain curly quotes or other
+    non-ASCII characters that cause ``exec`` to fail with a syntax error.
+    This helper normalizes common curly quotes to standard ASCII quotes and
+    strips characters outside the ASCII range.
+    """
+    replacements = {
+        "“": '"',
+        "”": '"',
+        "‘": "'",
+        "’": "'",
+    }
+    for bad, good in replacements.items():
+        script = script.replace(bad, good)
+    # Remove any remaining non-ASCII characters
+    script = script.encode("ascii", "ignore").decode("ascii")
+    return script
+
+
 def execute_cad_script(
     script_string: str, output_dir: Union[str, Path], output_filename: str
 ) -> Optional[str]:
@@ -66,6 +87,10 @@ def execute_cad_script(
         base_filename += '.stl'
     full_output_path = os.path.join(output_dir, base_filename)
 
+    # Sanitize the script before execution to avoid issues with non-ASCII
+    # characters commonly produced by language models.
+    script_string = _sanitize_script_string(script_string)
+
 
     # 3. Set up a controlled environment for `exec()` to act as a sandbox.
     #    This scope should include the `cadquery` module (`cq`).
@@ -74,8 +99,10 @@ def execute_cad_script(
 
     # 4. Use a try/except block to safely execute the script_string.
     try:
+        # Compile the script first so syntax errors are caught explicitly
+        compiled_script = compile(script_string, "<string>", "exec")
         # Execute the script within the defined scope
-        exec(script_string, sandbox_scope)
+        exec(compiled_script, sandbox_scope)
 
         # 5. After execution, retrieve the `result` object from the sandbox scope.
         result_object = sandbox_scope.get("result")
