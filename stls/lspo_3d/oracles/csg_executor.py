@@ -102,7 +102,9 @@ def execute_cad_script(
         # Compile the script first so syntax errors are caught explicitly
         compiled_script = compile(script_string, "<string>", "exec")
         # Execute the script within the defined scope
+
         exec(compiled_script, sandbox_scope)
+
 
         # 5. After execution, retrieve the `result` object from the sandbox scope.
         result_object = sandbox_scope.get("result")
