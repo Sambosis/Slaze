@@ -168,11 +168,11 @@ class CadQueryGenerator(torch.nn.Module):
                 attention_mask=attention_mask,
                 **generation_kwargs,
             )
-
+        rr(f"[bold green]Output Sequences:[/bold green] {output_sequences}")
         # 4. Decode just the newly generated tokens back into a string.
         new_tokens = output_sequences[0, prompt_input_len:]
         generated_script = self.tokenizer.decode(new_tokens, skip_special_tokens=True)
-
+        rr(f"[bold green]Generated Script:[/bold green] {generated_script}")
         # 5. Return the cleaned-up script.
         return generated_script.strip()
 
