@@ -4,7 +4,7 @@ import os
 from utils.agent_display_web_with_prompt import AgentDisplayWebWithPrompt
 # from config import write_to_file # Removed as it was for ic
 # Removed: from load_constants import *
-from config import get_constant # Import get_constant
+from config import MAIN_MODEL, get_constant # Import get_constant
 from utils.file_logger import aggregate_file_states
 from openai import OpenAI
 import logging
@@ -97,7 +97,7 @@ async def summarize_recent_messages(
             api_key=OPENROUTER_API_KEY,
         )
         all_summaries = get_all_summaries()
-        model = gflash
+        model = MAIN_MODEL
         conversation_text = ""
         for msg in short_messages:
             role = msg["role"].upper()
@@ -338,7 +338,7 @@ async def reorganize_context(messages: List[Dict[str, Any]], summary: str) -> st
             base_url="https://openrouter.ai/api/v1",
             api_key=OPENROUTER_API_KEY,
         )
-        model = "meta-llama/llama-3.3-70b-instruct:nitro"
+        model = MAIN_MODEL
         response = sum_client.chat.completions.create(
             model=model, messages=[{"role": "user", "content": summary_prompt}]
         )
