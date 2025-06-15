@@ -28,6 +28,35 @@ except Exception as e:
 # Restore original argv
 sys.argv = original_argv
 
+# --- Step 1b: Ensure motif assignments exist ---
+motif_assignments_path = project_root / "artifacts" / "motifs" / "motif_assignments.pt"
+if not motif_assignments_path.exists():
+    print("--- Motif assignments not found. Running motif discovery ---")
+    motif_data_dir = project_root / "data" / "processed"
+    motif_output_dir = project_root / "artifacts" / "motifs"
+
+    sys.argv = [
+        "lspo_3d/train_motifs.py",
+        "--data_dir",
+        str(motif_data_dir),
+        "--output_dir",
+        str(motif_output_dir),
+        "--num_motifs",
+        "2",
+        "--model_name",
+        "distilbert-base-uncased",
+    ]
+    try:
+        runpy.run_module("lspo_3d.train_motifs", run_name="__main__")
+        print("--- Motif discovery completed ---")
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        print(f"--- Motif discovery failed: {e} ---")
+        sys.exit(1)
+    finally:
+        sys.argv = original_argv
+
 # --- Step 2: Run the Agent Training Script ---
 print("\n--- Running Agent Training ---")
 
