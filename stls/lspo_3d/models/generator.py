@@ -10,7 +10,7 @@ library. It also includes methods for fine-tuning, saving, and loading the model
 """
 
 from __future__ import annotations
-
+from rich import print as rr
 import torch
 from transformers import (
     AutoModelForCausalLM,
@@ -143,7 +143,7 @@ class CadQueryGenerator(torch.nn.Module):
         """
         # 1. Format the input string.
         formatted_input = _format_input_for_generation(design_prompt, motif_ids)
-
+        rr(f"[bold green]Formatted Input:[/bold green] {formatted_input}")
         # 2. Tokenize the input string and move to the model's device.
         inputs = self.tokenizer(formatted_input, return_tensors="pt")
         input_ids = inputs.input_ids.to(self.device)
