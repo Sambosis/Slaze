@@ -27,7 +27,7 @@ from tenacity import (
 )
 
 from tools.base import BaseAnthropicTool, ToolResult
-from config import CODE_MODEL, get_constant
+from config import CODE_MODEL, get_constant, LOG_FILE
 # from icecream import ic  # type: ignore # Removed
 from pygments import highlight  # type: ignore
 from pygments.formatters import HtmlFormatter  # type: ignore
@@ -679,6 +679,18 @@ class WriteCodeTool(BaseAnthropicTool):
         logger.warning("task.txt not found in any specified location. Using default task description.")
         return "No overall task description provided (task.txt not found)."
 
+    def _read_file_creation_log(self) -> str:
+        """Return the contents of ``file_creation_log.json`` or a fallback message."""
+        log_path = Path(LOG_FILE)
+        if not log_path.exists():
+            return "No file creation log available."
+        try:
+            with open(log_path, "r", encoding="utf-8") as f:
+                return f.read()
+        except Exception as e:
+            logger.warning(f"Error reading file creation log: {e}", exc_info=True)
+            return "Error reading file creation log."
+
     # --- Refactored Code Generation Method ---
     async def _call_llm_to_generate_code(
         self,
@@ -699,6 +711,7 @@ class WriteCodeTool(BaseAnthropicTool):
             for fname, skel in all_skeletons.items()
         )
         agent_task = self._get_task_description()
+        log_contents = self._read_file_creation_log()
 
         prepared_messages = code_prompt_generate(
             current_code_base="",
@@ -709,6 +722,7 @@ class WriteCodeTool(BaseAnthropicTool):
             external_imports=external_imports,
             internal_imports=internal_imports,
             target_file=str(file_path.name),
+            file_creation_log=log_contents,
         )
 
         model_to_use = get_constant("CODE_GEN_MODEL") or MODEL_STRING
@@ -860,6 +874,7 @@ class WriteCodeTool(BaseAnthropicTool):
         external_imports = file_detail.external_imports
         internal_imports = file_detail.internal_imports
         all_files_dict_list = [f.model_dump() for f in all_file_details]
+        log_contents = self._read_file_creation_log()
 
         prepared_messages = code_skeleton_prompt(
             code_description=file_detail.code_description,
@@ -868,6 +883,7 @@ class WriteCodeTool(BaseAnthropicTool):
             external_imports=external_imports,
             internal_imports=internal_imports,
             all_file_details=all_files_dict_list,
+            file_creation_log=log_contents,
         )
 
         model_to_use = get_constant("SKELETON_GEN_MODEL") or MODEL_STRING
