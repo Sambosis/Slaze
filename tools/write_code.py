@@ -185,6 +185,67 @@ class WriteCodeTool(BaseAnthropicTool):
         logger.debug(f"WriteCodeTool params: {params}")
         return params
 
+    def _get_file_creation_log_content(self) -> str:
+        """Reads the file creation log and returns its content."""
+        from config import get_constant
+        from pathlib import Path
+        import logging
+
+        logger = logging.getLogger(__name__)
+
+        try:
+            log_file_env_var = get_constant("LOG_FILE")
+            if log_file_env_var:
+                LOG_FILE_PATH = Path(log_file_env_var)
+            else:
+                # Default path relative to project root if constant is not set or None
+                LOG_FILE_PATH = Path("logs") / "file_log.json"
+        except KeyError:
+            # Constant not found, use default
+            LOG_FILE_PATH = Path("logs") / "file_log.json"
+            logger.warning(
+                "LOG_FILE constant not found in config, defaulting to %s",
+                LOG_FILE_PATH,
+            )
+        except Exception as e:
+            # Other potential errors from get_constant or Path()
+            LOG_FILE_PATH = Path("logs") / "file_log.json"
+            logger.error(
+                "Error determining LOG_FILE_PATH, defaulting to %s: %s",
+                LOG_FILE_PATH,
+                e,
+                exc_info=True,
+            )
+
+        try:
+            if LOG_FILE_PATH.exists() and LOG_FILE_PATH.is_file():
+                content = LOG_FILE_PATH.read_text(encoding="utf-8")
+                if not content.strip():
+                    logger.warning("File creation log %s is empty.", LOG_FILE_PATH)
+                    return "File creation log is empty."
+                return content
+            else:
+                logger.warning(
+                    "File creation log not found or is not a file: %s", LOG_FILE_PATH
+                )
+                return "File creation log not found or is not a file."
+        except IOError as e:
+            logger.error(
+                "IOError reading file creation log %s: %s",
+                LOG_FILE_PATH,
+                e,
+                exc_info=True,
+            )
+            return f"Error reading file creation log: {e}"
+        except Exception as e:
+            logger.error(
+                "Unexpected error reading file creation log %s: %s",
+                LOG_FILE_PATH,
+                e,
+                exc_info=True,
+            )
+            return f"Unexpected error reading file creation log: {e}"
+
     # --- Logging Callback for Retries ---
     def _log_llm_retry_attempt(self, retry_state: RetryCallState):
         """Logs information about the current retry attempt."""
@@ -699,16 +760,18 @@ class WriteCodeTool(BaseAnthropicTool):
             for fname, skel in all_skeletons.items()
         )
         agent_task = self._get_task_description()
+        log_content = self._get_file_creation_log_content()
 
         prepared_messages = code_prompt_generate(
-            current_code_base="",
+            current_code_base="", # Assuming current_code_base is handled or intentionally empty
             code_description=code_description,
-            research_string="",
+            research_string="", # Assuming research_string is handled or intentionally empty
             agent_task=agent_task,
             skeletons=skeleton_context,
             external_imports=external_imports,
             internal_imports=internal_imports,
             target_file=str(file_path.name),
+            file_creation_log_content=log_content,
         )
 
         model_to_use = get_constant("CODE_GEN_MODEL") or MODEL_STRING
@@ -846,7 +909,7 @@ class WriteCodeTool(BaseAnthropicTool):
         self,
         file_detail: FileDetail,
         file_path: Path,
-        all_file_details: List[FileDetail],
+        all_file_details: List[FileDetail], # This parameter is no longer used directly by code_skeleton_prompt but might be kept for other reasons or future use.
         ) -> str:
         """Request a skeleton from the LLM for the target file."""
         target_file_name = file_path.name
@@ -855,11 +918,12 @@ class WriteCodeTool(BaseAnthropicTool):
         #         "assistant", f"Generating skeleton for {target_file_name}"
         #     )
 
+        log_content = self._get_file_creation_log_content()
         agent_task = self._get_task_description()
 
         external_imports = file_detail.external_imports
         internal_imports = file_detail.internal_imports
-        all_files_dict_list = [f.model_dump() for f in all_file_details]
+        # all_files_dict_list = [f.model_dump() for f in all_file_details] # Removed as per requirement
 
         prepared_messages = code_skeleton_prompt(
             code_description=file_detail.code_description,
@@ -867,7 +931,7 @@ class WriteCodeTool(BaseAnthropicTool):
             agent_task=agent_task,
             external_imports=external_imports,
             internal_imports=internal_imports,
-            all_file_details=all_files_dict_list,
+            file_creation_log_content=log_content,
         )
 
         model_to_use = get_constant("SKELETON_GEN_MODEL") or MODEL_STRING
