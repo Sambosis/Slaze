@@ -1,7 +1,7 @@
 import json
 import datetime
 from pathlib import Path
-from config import get_constant
+from config import get_constant, LOGS_DIR
 
 import ast
 from typing import Union
