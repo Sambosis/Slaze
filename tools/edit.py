@@ -276,60 +276,62 @@ class EditTool(BaseTool):
     ) -> ToolResult:
         """Implement the view command using cross-platform methods."""
         logger.debug(f"Viewing path: {path}")
-
         try:
-            # Cross-platform directory listing using pathlib
-            files = []
-            for level in range(3):  # 0-2 levels deep
-                if level == 0:
-                    pattern = "*"
-                else:
-                    pattern = os.path.join(*["*"] * (level + 1))
+            if path.is_dir():
+                # Cross-platform directory listing using pathlib
+                files = []
+                for level in range(3):  # 0-2 levels deep
+                    if level == 0:
+                        pattern = "*"
+                    else:
+                        pattern = os.path.join(*["*"] * (level + 1))
 
-                for item in path.glob(pattern):
-                    # Skip hidden files and directories
-                    if not any(part.startswith(".") for part in item.parts):
-                        files.append(str(item.resolve()))  # Ensure absolute paths
+                    for item in path.glob(pattern):
+                        # Skip hidden files and directories
+                        if not any(part.startswith(".") for part in item.parts):
+                            files.append(str(item.resolve()))  # Ensure absolute paths
 
-            stdout = "\n".join(sorted(files))
-            stdout = f"Here's the files and directories up to 2 levels deep in {path}, excluding hidden items:\n{stdout}\n"
-            return ToolResult(output=stdout, error=None, base64_image=None)
+                stdout = "\n".join(sorted(files))
+                stdout = f"Here's the files and directories up to 2 levels deep in {path}, excluding hidden items:\n{stdout}\n"
+                return ToolResult(output=stdout, error=None, base64_image=None)
+            elif path.is_file():
+                # If it's a file, read its content
+                file_content = self.read_file(path)
+                init_line = 1
+                if view_range:
+                    if len(view_range) != 2 or not all(isinstance(i, int) for i in view_range):
+                        raise ToolError(
+                            "Invalid `view_range`. It should be a list of two integers."
+                        )
+                    file_lines = file_content.split("\n")
+                    n_lines_file = len(file_lines)
+                    init_line, final_line = view_range
+                    if init_line < 1 or init_line > n_lines_file:
+                        raise ToolError(
+                            f"Invalid `view_range`: {view_range}. Its first element `{init_line}` should be within the range of lines of the file: {[1, n_lines_file]}"
+                        )
+                    if final_line > n_lines_file:
+                        raise ToolError(
+                            f"Invalid `view_range`: {view_range}. Its second element `{final_line}` should be smaller than the number of lines in the file: `{n_lines_file}`"
+                        )
+                    if final_line != -1 and final_line < init_line:
+                        raise ToolError(
+                            f"Invalid `view_range`: {view_range}. Its second element `{final_line}` should be larger or equal than its first `{init_line}`"
+                        )
+
+                    if final_line == -1:
+                        file_content = "\n".join(file_lines[init_line - 1 :])
+                    else:
+                        file_content = "\n".join(file_lines[init_line - 1 : final_line])
+                return ToolResult(
+                    output=self._make_output(file_content, str(path), init_line=init_line),
+                    error=None,
+                    base64_image=None,
+                )
+            else:
+                return ToolResult(output="", error=f"Path not found or is not a file or directory: {path}", base64_image=None)
         except Exception as e:
             return ToolResult(output="", error=str(e), base64_image=None)
-
-        # If it's a file, read its content
-        file_content = self.read_file(path)
-        init_line = 1
-        if view_range:
-            if len(view_range) != 2 or not all(isinstance(i, int) for i in view_range):
-                raise ToolError(
-                    "Invalid `view_range`. It should be a list of two integers."
-                )
-            file_lines = file_content.split("\n")
-            n_lines_file = len(file_lines)
-            init_line, final_line = view_range
-            if init_line < 1 or init_line > n_lines_file:
-                raise ToolError(
-                    f"Invalid `view_range`: {view_range}. Its first element `{init_line}` should be within the range of lines of the file: {[1, n_lines_file]}"
-                )
-            if final_line > n_lines_file:
-                raise ToolError(
-                    f"Invalid `view_range`: {view_range}. Its second element `{final_line}` should be smaller than the number of lines in the file: `{n_lines_file}`"
-                )
-            if final_line != -1 and final_line < init_line:
-                raise ToolError(
-                    f"Invalid `view_range`: {view_range}. Its second element `{final_line}` should be larger or equal than its first `{init_line}`"
-                )
-
-            if final_line == -1:
-                file_content = "\n".join(file_lines[init_line - 1 :])
-            else:
-                file_content = "\n".join(file_lines[init_line - 1 : final_line])
-        return ToolResult(
-            output=self._make_output(file_content, str(path), init_line=init_line),
-            error=None,
-            base64_image=None,
-        )
 
     def str_replace(
         self, path: Path, old_str: str, new_str: Optional[str]
