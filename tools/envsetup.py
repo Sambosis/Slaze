@@ -177,7 +177,7 @@ class ProjectSetupTool(BaseAnthropicTool):
                             logger.error(f"Failed to install {clean_pkg}: {result.stderr}")
                             raise RuntimeError(f"uv pip install {clean_pkg} failed: {result.stderr}")
                 self.display.add_message("user", f"Project setup complete in {project_path}")
-
+            rr(result)
             return {
                 "command": "setup_project",
                 "status": "success",
@@ -267,7 +267,7 @@ class ProjectSetupTool(BaseAnthropicTool):
 
             cmd = ["uv", "run", str(file_path)]
             result = subprocess.run(cmd, capture_output=True, text=True)
-
+            rr(result)
             run_output = f"stdout: {result.stdout}\nstderr: {result.stderr}"
             logger.info(f"Run app output for {file_path}:\n{run_output}")
             rr(f"Run app output for {file_path}:\n{run_output}")  # Using rich print for better formatting

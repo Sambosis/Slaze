@@ -116,6 +116,8 @@ class WriteCodeTool(BaseAnthropicTool):
     api_type: Literal["custom"] = "custom"
     description: str = (
         "Generates a codebase consisting of multiple files based on descriptions, skeletons, and import lists. "
+        "This is the tool to use to generate a code files for a codebase, can create any amount of files. "
+        "Use this tool to generate init files."
         "Creates skeletons first, then generates full code asynchronously, writing to the host filesystem."
         )
 

@@ -6,6 +6,7 @@ from config import get_constant, write_to_file # check_docker_available removed
 from .base import BaseTool, ToolError, ToolResult
 from utils.agent_display_web_with_prompt import AgentDisplayWebWithPrompt
 import logging
+from rich import print as rr
 
 load_dotenv()
 # ic.configureOutput(includeContext=True, outputFunction=write_to_file) # Removed icecream configuration
