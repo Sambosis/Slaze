@@ -101,7 +101,8 @@ if __name__ == "__main__":
 
 
     # Optional: Archive logs if needed
-    archive_logs()
+    archive_result = archive_logs()
+    print(f"Archive logs result: {archive_result}")
     display = AgentDisplayConsole()
 
     async def run_console_app():
