@@ -28,7 +28,17 @@ logging.basicConfig(
         logging.StreamHandler(sys.stdout) # Explicitly use sys.stdout
     ]
 )
-
+"""
+# Basic logging configuration using the potentially reconfigured sys.stdout
+# This will set the default handler for the root logger.
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(sys.stdout) # Explicitly use sys.stdout
+    ]
+)
+"""
 # Test logger with a unicode character
 logger = logging.getLogger(__name__) # This line should remain to keep the local logger
 logger.info("Logging configured. Testing with Unicode: │")

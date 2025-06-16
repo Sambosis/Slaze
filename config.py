@@ -392,7 +392,8 @@ def setup_logging():
     file_handler = logging.handlers.RotatingFileHandler(
         log_file_path,
         maxBytes=_get_constant_for_logging_setup("LOG_MAX_BYTES"), # Use overridden getter
-        backupCount=_get_constant_for_logging_setup("LOG_BACKUP_COUNT") # Use overridden getter
+        backupCount=_get_constant_for_logging_setup("LOG_BACKUP_COUNT"), # Use overridden getter
+        encoding='utf-8'
     )
     file_handler.setLevel(getattr(logging, _get_constant_for_logging_setup("LOG_LEVEL_FILE").upper(), logging.DEBUG))
     file_handler.setFormatter(formatter)
