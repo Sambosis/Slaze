@@ -1,3 +1,2 @@
-We are currently working on the functionality inside of the 'stls' folder.
-
-There is a test script in the root of the repo named test_all.py that can be used to test the functionality of the of the stls functionality.
+We are currently working on the main Slaze functionality.
+The main entrypoint for the Slaze functionality is the run.py file.
