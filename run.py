@@ -1,21 +1,33 @@
 # run.py - console version
+import sys # Ensure sys is imported early
 import asyncio
+import logging
+
+# Configure stream encoding to UTF-8 as early as possible
+# This should be one of the very first things your application does.
+if hasattr(sys.stdout, 'reconfigure') and sys.stdout.encoding != 'utf-8':
+    sys.stdout.reconfigure(encoding='utf-8')
+if hasattr(sys.stderr, 'reconfigure') and sys.stderr.encoding != 'utf-8':
+    sys.stderr.reconfigure(encoding='utf-8')
+
+# Now import other modules that might configure logging
 from typing import List, Dict, Any
 import os  # Keep os if needed, e.g. by loaded modules, or for future use
 from dotenv import load_dotenv  # Optional: Uncomment if you use .env files for API keys
-import logging
 from utils.agent_display_console import AgentDisplayConsole
+from utils.file_logger import archive_logs
 from agent import Agent
+from config import load_constants, set_constant, get_constant, get_constants
 
-# from main import run_sampling_loop # Assuming main.py has run_sampling_loop and is importable
-
-# Docker and web server related functions have been removed.
-
-import sys # Add this import
-
-# Configure root logger for UTF-8 and file output only
-root_logger = logging.getLogger()
-root_logger.setLevel(logging.INFO)
+# Basic logging configuration using the potentially reconfigured sys.stdout
+# This will set the default handler for the root logger.
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(sys.stdout) # Explicitly use sys.stdout
+    ]
+)
 
 # Test logger with a unicode character
 logger = logging.getLogger(__name__) # This line should remain to keep the local logger
@@ -77,6 +89,9 @@ if __name__ == "__main__":
     load_dotenv()
     print(f"OPENROUTER_API_KEY loaded: {os.getenv('OPENROUTER_API_KEY') is not None}")
 
+
+    # Optional: Archive logs if needed
+    archive_logs()
     display = AgentDisplayConsole()
 
     async def run_console_app():
@@ -101,4 +116,5 @@ if __name__ == "__main__":
         print(f"An unexpected error occurred: {e}")
         import traceback  # Uncomment for detailed traceback
 
+        traceback.print_exc()  # Uncomment for detailed traceback
         traceback.print_exc()  # Uncomment for detailed traceback

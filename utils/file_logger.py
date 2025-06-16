@@ -912,3 +912,41 @@ def should_skip_for_zip(path):
     ]
 
     return any(skip_dir in path_str for skip_dir in dirs_to_skip)
+
+
+def archive_logs():
+    """Archive all log files in LOGS_DIR by moving them to an archive folder with a timestamp."""
+    try:
+        # Create timestamp for the archive folder
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        archive_dir = Path(LOGS_DIR, "archive", timestamp)
+        archive_dir.mkdir(parents=True, exist_ok=True)
+
+        # Get all files in LOGS_DIR
+        log_path = Path(LOGS_DIR)
+        log_files = [f for f in log_path.iterdir() if f.is_file()]
+
+        # Skip archiving if there are no files
+        if not log_files:
+            return "No log files to archive"
+
+        # Move each file to the archive directory
+        for file_path in log_files:
+            # Skip archive directory itself
+            if "archive" in str(file_path):
+                continue
+
+            # Create destination path
+            dest_path = Path(archive_dir, file_path.name)
+
+            # Copy the file if it exists (some might be created later)
+            if file_path.exists():
+                shutil.copy2(file_path, dest_path)
+
+                # Clear the original file but keep it
+                with open(file_path, "w") as f:
+                    f.write("")
+
+        return f"Archived {len(log_files)} log files to {archive_dir}"
+    except Exception as e:
+        return f"Error archiving files: {str(e)}"
