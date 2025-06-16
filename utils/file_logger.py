@@ -1,5 +1,6 @@
 import json
 import datetime
+import shutil
 from pathlib import Path
 from config import get_constant, LOGS_DIR
 
@@ -918,7 +919,7 @@ def archive_logs():
     """Archive all log files in LOGS_DIR by moving them to an archive folder with a timestamp."""
     try:
         # Create timestamp for the archive folder
-        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         archive_dir = Path(LOGS_DIR, "archive", timestamp)
         archive_dir.mkdir(parents=True, exist_ok=True)
 
