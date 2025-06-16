@@ -6,6 +6,7 @@ from config import get_constant, write_to_file # check_docker_available removed
 from .base import BaseTool, ToolError, ToolResult
 from utils.agent_display_web_with_prompt import AgentDisplayWebWithPrompt
 import logging
+import os
 from rich import print as rr
 
 load_dotenv()
@@ -20,7 +21,9 @@ class BashTool(BaseTool):
 
     description = """
         A tool that allows the agent to run bash commands directly on the host system.
-        The tool parameters follow the OpenAI function calling format.
+        All commands are executed relative to the current project directory if one
+        has been set via the configuration. The tool parameters follow the OpenAI
+        function calling format.
         """
 
     name: ClassVar[Literal["bash"]] = "bash"
@@ -91,7 +94,14 @@ class BashTool(BaseTool):
             if len(error) > 200000:
                 error = error[:100000] + " ... [TRUNCATED] ... " + error[-100000:]
 
-            formatted_output = f"command: {command}\nsuccess: {str(success).lower()}\noutput: {output}\nerror: {error}"
+            working_dir = cwd or os.getcwd()
+            formatted_output = (
+                f"command: {command}\n"
+                f"working_directory: {working_dir}\n"
+                f"success: {str(success).lower()}\n"
+                f"output: {output}\n"
+                f"error: {error}"
+            )
             rr(formatted_output)
             # Create a new ToolResult instead of modifying an existing one
             return ToolResult(
