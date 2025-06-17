@@ -64,7 +64,7 @@ class BashTool(BaseTool):
         output = ""
         error = ""
         success = False
-
+        timeout = 42
         try:
             if self.display is not None:
                 self.display.add_message("user", f"Executing command: {command}")
