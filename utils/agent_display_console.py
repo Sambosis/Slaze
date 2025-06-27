@@ -3,7 +3,14 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.prompt import Prompt, Confirm, IntPrompt
 from rich.syntax import Syntax
-from config import PROMPTS_DIR
+from pathlib import Path
+from config import (
+    PROMPTS_DIR,
+    get_constant,
+    set_constant,
+    set_prompt_name,
+    write_constants_to_file,
+)
 
 class AgentDisplayConsole:
     def __init__(self):
@@ -51,8 +58,14 @@ class AgentDisplayConsole:
 
         if choice != create_new_option_num:
             prompt_path = options[str(choice)]
-            task = prompt_path.read_text(encoding='utf-8')
-            self.console.print(Panel(Syntax(task, "markdown", theme="dracula", line_numbers=True), title="Current Prompt Content"))
+            task = prompt_path.read_text(encoding="utf-8")
+            prompt_name = prompt_path.stem
+            self.console.print(
+                Panel(
+                    Syntax(task, "markdown", theme="dracula", line_numbers=True),
+                    title="Current Prompt Content",
+                )
+            )
             if Confirm.ask(f"Do you want to edit '{prompt_path.name}'?", default=False):
                 new_lines = []
                 while True:
@@ -63,10 +76,11 @@ class AgentDisplayConsole:
                         break
                 if new_lines:
                     task = "\n".join(new_lines)
-                    prompt_path.write_text(task, encoding='utf-8')
+                    prompt_path.write_text(task, encoding="utf-8")
         else:
             new_filename_input = Prompt.ask("Enter a filename for the new prompt", default="custom_prompt")
             filename_stem = new_filename_input.strip().replace(" ", "_").replace(".md", "")
+            prompt_name = filename_stem
             new_prompt_path = PROMPTS_DIR / f"{filename_stem}.md"
             new_prompt_lines = []
             while True:
@@ -77,7 +91,17 @@ class AgentDisplayConsole:
                     break
             if new_prompt_lines:
                 task = "\n".join(new_prompt_lines)
-                new_prompt_path.write_text(task, encoding='utf-8')
+                new_prompt_path.write_text(task, encoding="utf-8")
             else:
                 task = ""
+
+        # Configure repository directory for this prompt
+        base_repo_dir = Path(get_constant("TOP_LEVEL_DIR")) / "repo"
+        repo_dir = base_repo_dir / prompt_name
+        repo_dir.mkdir(parents=True, exist_ok=True)
+        set_prompt_name(prompt_name)
+        set_constant("PROJECT_DIR", repo_dir)
+        set_constant("REPO_DIR", repo_dir)
+        write_constants_to_file()
+
         return task
