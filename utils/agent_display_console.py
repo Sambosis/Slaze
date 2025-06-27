@@ -3,7 +3,8 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.prompt import Prompt, Confirm, IntPrompt
 from rich.syntax import Syntax
-from config import PROMPTS_DIR
+from pathlib import Path # Added for Path operations
+from config import PROMPTS_DIR, REPO_DIR, set_prompt_name, set_constant # Added config imports
 
 class AgentDisplayConsole:
     def __init__(self):
@@ -51,6 +52,15 @@ class AgentDisplayConsole:
 
         if choice != create_new_option_num:
             prompt_path = options[str(choice)]
+            selected_prompt_name = prompt_path.stem # e.g., "foo" from "foo.md"
+
+            # Set PROMPT_NAME and PROJECT_DIR in config
+            set_prompt_name(selected_prompt_name)
+            project_dir_path = Path(REPO_DIR) / selected_prompt_name
+            set_constant("PROJECT_DIR", str(project_dir_path))
+            self.console.print(f"[cyan]Config: PROMPT_NAME set to '{selected_prompt_name}'[/cyan]")
+            self.console.print(f"[cyan]Config: PROJECT_DIR set to '{str(project_dir_path)}'[/cyan]")
+
             task = prompt_path.read_text(encoding='utf-8')
             self.console.print(Panel(Syntax(task, "markdown", theme="dracula", line_numbers=True), title="Current Prompt Content"))
             if Confirm.ask(f"Do you want to edit '{prompt_path.name}'?", default=False):
@@ -67,6 +77,14 @@ class AgentDisplayConsole:
         else:
             new_filename_input = Prompt.ask("Enter a filename for the new prompt", default="custom_prompt")
             filename_stem = new_filename_input.strip().replace(" ", "_").replace(".md", "")
+
+            # Set PROMPT_NAME and PROJECT_DIR in config
+            set_prompt_name(filename_stem)
+            project_dir_path = Path(REPO_DIR) / filename_stem
+            set_constant("PROJECT_DIR", str(project_dir_path))
+            self.console.print(f"[cyan]Config: PROMPT_NAME set to '{filename_stem}'[/cyan]")
+            self.console.print(f"[cyan]Config: PROJECT_DIR set to '{str(project_dir_path)}'[/cyan]")
+
             new_prompt_path = PROMPTS_DIR / f"{filename_stem}.md"
             new_prompt_lines = []
             while True:
