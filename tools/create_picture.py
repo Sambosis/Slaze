@@ -97,7 +97,7 @@ class PictureGenerationTool(BaseAnthropicTool):
             }
             # Get the image data from replicate
             client = replicate.Client()
-            output = client.run("google/imagen-3-fast", input=input_data)
+            output = client.run("google/imagen-4-fast", input=input_data)
 
             # Read all bytes from the FileOutput object
             image_data = output.read()

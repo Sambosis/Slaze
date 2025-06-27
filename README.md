@@ -39,6 +39,20 @@ Execute:
 python run.py
 ```
 
+## Running the web UI
+
+To use the interactive web interface, run:
+
+```bash
+python run.py web
+```
+
+By default the server starts on port 5001. Open your browser to:
+
+```
+http://localhost:5001/
+```
+
 The script loads environment variables with `dotenv` and launches the `AgentDisplayConsole`. You will be prompted to choose a prompt from `prompts/` or create a new one. After choosing a task, the agent runs, using tools and displaying output directly in the terminal.
 
 When creating a new prompt you can edit the text before saving. If the

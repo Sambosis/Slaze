@@ -1,0 +1,154 @@
+import asyncio
+import os
+import threading
+import logging
+from queue import Queue
+from flask import Flask, render_template, jsonify, request, redirect, url_for, send_from_directory
+from flask_socketio import SocketIO, disconnect
+from config import LOGS_DIR, PROMPTS_DIR
+from openai import OpenAI
+import ftfy
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+def log_message(msg_type, message):
+    """Log a message to a file."""
+    if msg_type == "user":
+        emojitag = "🤡 "
+    elif msg_type == "assistant":
+        emojitag = "🧞‍♀️ "
+    elif msg_type == "tool":
+        emojitag = "📎 "
+    else:
+        emojitag = "❓ "
+    log_file = os.path.join(LOGS_DIR, f"{msg_type}_messages.log")
+    with open(log_file, "a", encoding="utf-8") as file:
+        file.write(emojitag * 5)
+        file.write(f"\n{message}\n\n")
+
+class WebUI:
+    def __init__(self, agent_runner):
+        logging.info("Initializing WebUI")
+        # More robust path for templates
+        template_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'templates'))
+        logging.info(f"Template directory set to: {template_dir}")
+        self.app = Flask(__name__, template_folder=template_dir)
+        self.app.config["SECRET_KEY"] = "secret!"
+        self.socketio = SocketIO(self.app, async_mode="threading", cookie=None)
+        self.user_messages = []
+        self.assistant_messages = []
+        self.tool_results = []
+        self.input_queue = asyncio.Queue()
+        self.agent_runner = agent_runner
+        self.setup_routes()
+        self.setup_socketio_events()
+        logging.info("WebUI initialized")
+
+    def setup_routes(self):
+        logging.info("Setting up routes")
+
+        @self.app.route("/")
+        def select_prompt_route():
+            logging.info("Serving prompt selection page")
+            prompt_files = list(PROMPTS_DIR.glob("*.md"))
+            options = [file.name for file in prompt_files]
+            return render_template("select_prompt.html", options=options)
+
+        @self.app.route("/run_agent", methods=["POST"])
+        def run_agent_route():
+            logging.info("Received request to run agent")
+            choice = request.form.get("choice")
+            filename = request.form.get("filename")
+            prompt_text = request.form.get("prompt_text")
+            logging.info(f"Form data: choice={choice}, filename={filename}")
+
+            if choice == "new":
+                logging.info("Creating new prompt")
+                new_prompt_path = PROMPTS_DIR / f"{filename}.md"
+                with open(new_prompt_path, "w", encoding="utf-8") as f:
+                    f.write(prompt_text)
+                task = prompt_text
+            else:
+                logging.info(f"Loading existing prompt: {choice}")
+                prompt_path = PROMPTS_DIR / choice
+                if prompt_text:
+                    logging.info("Updating existing prompt")
+                    with open(prompt_path, "w", encoding="utf-8") as f:
+                        f.write(prompt_text)
+                with open(prompt_path, "r", encoding="utf-8") as f:
+                    task = f.read()
+                filename = prompt_path.stem
+            
+            logging.info("Starting agent runner in background task")
+            self.socketio.start_background_task(self.agent_runner, task, self)
+            return render_template("index.html")
+
+        @self.app.route("/messages")
+        def get_messages():
+            logging.info("Serving messages")
+            return jsonify(
+                {
+                    "user": self.user_messages,
+                    "assistant": self.assistant_messages,
+                    "tool": self.tool_results,
+                }
+            )
+
+        @self.app.route("/api/prompts/<path:filename>")
+        def api_get_prompt(filename):
+            """Return the raw content of a prompt file."""
+            logging.info(f"Serving prompt content for: {filename}")
+            try:
+                prompt_path = PROMPTS_DIR / filename
+                with open(prompt_path, "r", encoding="utf-8") as f:
+                    data = f.read()
+                return data, 200, {"Content-Type": "text/plain; charset=utf-8"}
+            except FileNotFoundError:
+                logging.error(f"Prompt not found: {filename}")
+                return "Prompt not found", 404
+        logging.info("Routes set up")
+
+    def setup_socketio_events(self):
+        logging.info("Setting up SocketIO events")
+
+        @self.socketio.on("connect")
+        def handle_connect():
+            logging.info("Client connected")
+
+        @self.socketio.on("disconnect")
+        def handle_disconnect():
+            logging.info("Client disconnected")
+
+        @self.socketio.on("user_input")
+        def handle_user_input(data):
+            user_input = data.get("input", "")
+            logging.info(f"Received user input: {user_input}")
+            self.input_queue.put_nowait(user_input)
+        logging.info("SocketIO events set up")
+
+    def start_server(self, host="0.0.0.0", port=5001):
+        logging.info(f"Starting server on {host}:{port}")
+        self.socketio.run(self.app, host=host, port=port, use_reloader=False, allow_unsafe_werkzeug=True)
+
+    def add_message(self, msg_type, content):
+        logging.info(f"Adding message of type {msg_type}")
+        log_message(msg_type, content)
+        if msg_type == "user":
+            self.user_messages.append(content)
+        elif msg_type == "assistant":
+            self.assistant_messages.append(content)
+        elif msg_type == "tool":
+            self.tool_results.append(content)
+        self.broadcast_update()
+
+    def broadcast_update(self):
+        logging.info("Broadcasting update to clients")
+        self.socketio.emit(
+            "update",
+            {
+                "user": self.user_messages,
+                "assistant": self.assistant_messages,
+                "tool": self.tool_results,
+            },
+        )
+

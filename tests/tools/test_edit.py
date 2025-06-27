@@ -1,6 +1,6 @@
 import pytest
 from pathlib import Path
-from tools.edit import EditTool, ToolResult
+from tools.edit import EditTool
 
 # TODO: Consider adding if __name__ == "__main__": pytest.main() for standalone execution.
 

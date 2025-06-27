@@ -1,7 +1,8 @@
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Union
 
 import os
-from utils.agent_display_web_with_prompt import AgentDisplayWebWithPrompt
+from utils.web_ui import WebUI
+from utils.agent_display_console import AgentDisplayConsole
 # from config import write_to_file # Removed as it was for ic
 # Removed: from load_constants import *
 from config import MAIN_MODEL, get_constant # Import get_constant
@@ -84,12 +85,12 @@ def format_messages_to_string(messages):
 
 
 async def summarize_recent_messages(
-    short_messages: List[Dict[str, Any]], display: AgentDisplayWebWithPrompt
+    short_messages: List[Dict[str, Any]], display: Union[WebUI, AgentDisplayConsole]
 ) -> str:
     """
     Summarize the most recent messages.
     """
-    gflash = "google/gemini-2.5-flash-preview"
+    
     try:
         OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
         sum_client = OpenAI(
@@ -384,7 +385,7 @@ async def reorganize_context(messages: List[Dict[str, Any]], summary: str) -> st
     wait=wait_random_exponential(multiplier=2, min=4, max=10),
 )
 async def refresh_context_async(
-    task: str, messages: List[Dict], display: AgentDisplayWebWithPrompt, client
+    task: str, messages: List[Dict], display: Union[WebUI, AgentDisplayConsole], client
 ) -> str:
     """
     Create a combined context string by filtering and (if needed) summarizing messages

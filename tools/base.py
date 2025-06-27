@@ -1,10 +1,11 @@
 ## base.py
 from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass, fields, replace
-from typing import Any, Optional, Dict
+from typing import Any, Optional, Dict, Union
 import logging
 
-from utils.agent_display_web_with_prompt import AgentDisplayWebWithPrompt
+from utils.web_ui import WebUI
+from utils.agent_display_console import AgentDisplayConsole
 
 logger = logging.getLogger(__name__)
 
@@ -73,14 +74,12 @@ class ToolError(Exception):
 class BaseTool(metaclass=ABCMeta):
     """Base class for all tools."""
 
-    name: str = "base_tool"
     api_type: str = "custom"
-    description: str = "Base tool implementation"
 
     def __init__(
         self,
         input_schema: Optional[Dict[str, Any]] = None,
-        display: Optional[AgentDisplayWebWithPrompt] = None,
+        display: Optional[Union[WebUI, AgentDisplayConsole]] = None,
     ):
         self.input_schema = input_schema or {
             "type": "object",
@@ -89,7 +88,7 @@ class BaseTool(metaclass=ABCMeta):
         }
         self.display = display
 
-    def set_display(self, display: AgentDisplayWebWithPrompt):
+    def set_display(self, display: Optional[Union[WebUI, AgentDisplayConsole]]):
         """Set the display instance for the tool."""
         self.display = display
 

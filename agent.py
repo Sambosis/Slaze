@@ -1,11 +1,9 @@
 # agent.py
 """is the main file that contains the Agent class. The Agent class is responsible for interfacing with the LLM API and running the tools. It receives messages from the user, sends them to the LLM API, and processes the response. It also manages the state of the conversation, such as the context and the messages exchanged between the user and the assistant. The Agent class uses the ToolCollection class to run the tools and generate the responses. The Agent class also uses the OutputManager class to format the messages and display them in the web interface. The Agent class uses the TokenTracker class to track the token usage and display it in the web interface. The Agent class uses the AgentDisplayWebWithPrompt class to display the messages in the web interface and prompt the user for input. The Agent class is used by the run.py and serve.py scripts to start the application and run the web server."""
 
-import asyncio
 import json
 import os
-from re import M
-from typing import Dict
+from typing import Dict, Union
 from openai import OpenAI
 import logging
 from rich import print as rr
@@ -19,10 +17,11 @@ from tools import (
     ToolCollection,
     ToolResult,
 )
-from utils.agent_display_web_with_prompt import AgentDisplayWebWithPrompt
-from utils.context_helpers import *
-from utils.output_manager import *
-from config import *
+from utils.web_ui import WebUI
+from utils.agent_display_console import AgentDisplayConsole
+from utils.context_helpers import extract_text_from_content, refresh_context_async
+from utils.output_manager import OutputManager
+from config import COMPUTER_USE_BETA_FLAG, PROMPT_CACHING_BETA_FLAG, MAIN_MODEL, MAX_SUMMARY_TOKENS
 # from token_tracker import TokenTracker
 
 from dotenv import load_dotenv
@@ -33,7 +32,7 @@ logger = logging.getLogger(__name__)
 
 
 class Agent:
-    def __init__(self, task: str, display: AgentDisplayWebWithPrompt):
+    def __init__(self, task: str, display: Union[WebUI, AgentDisplayConsole]):
         self.task = task
         # set the task to TASK  in config
         self.display = display

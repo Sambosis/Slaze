@@ -3,15 +3,14 @@ import hashlib
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Any, List, Optional, TYPE_CHECKING
+from typing import Any, List, Optional, TYPE_CHECKING, Union
 
 from typing import Dict
 import logging
 # from icecream import ic # Removed
 
-from .agent_display_web_with_prompt import (
-    AgentDisplayWebWithPrompt,
-)  # Relative import for AgentDisplay
+from .web_ui import WebUI
+from .agent_display_console import AgentDisplayConsole
 from config import get_constant  # Updated import
 
 logger = logging.getLogger(__name__)
@@ -22,7 +21,7 @@ if TYPE_CHECKING:
 
 class OutputManager:
     def __init__(
-        self, display: AgentDisplayWebWithPrompt, image_dir: Optional[Path] = None
+        self, display: Union[WebUI, AgentDisplayConsole], image_dir: Optional[Path] = None
     ):
         LOGS_DIR = Path(get_constant("LOGS_DIR"))
         self.image_dir = LOGS_DIR / "computer_tool_images"

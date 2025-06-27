@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Select Prompt</title>
+    <style>
+        body { font-family: sans-serif; margin: 0; padding: 20px; background-color: #f4f4f4; }
+        .container { max-width: 900px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        h1 { color: #333; }
+        form div { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        select, input[type="text"], textarea { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
+        textarea { min-height: 150px; resize: vertical; }
+        button { padding: 10px 15px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background-color: #0056b3; }
+        .back-link { display: block; margin-top: 20px; text-decoration: none; color: #007bff; }
+        .back-link:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Select or Create a Prompt</h1>
+        <form action="/run_agent" method="POST">
+            <div>
+                <label for="choice">Choose an existing prompt:</label>
+                <select id="choice" name="choice" onchange="loadPromptContent()">
+                    <option value="">--Select--</option>
+                    {% for option in options %}
+                    <option value="{{ option }}">{{ option }}</option>
+                    {% endfor %}
+                    <option value="new">Create New Prompt</option>
+                </select>
+            </div>
+
+            <div id="new_prompt_fields" style="display: none;">
+                <label for="filename">New Prompt Filename (e.g., my_new_task.md):</label>
+                <input type="text" id="filename" name="filename" placeholder="my_new_task">
+            </div>
+
+            <div>
+                <label for="prompt_text">Prompt Content:</label>
+                <textarea id="prompt_text" name="prompt_text" placeholder="Enter your prompt here..."></textarea>
+            </div>
+
+            <button type="submit">Submit Prompt</button>
+        </form>
+        <a href="/" class="back-link">Back to Agent</a>
+    </div>
+
+    <script>
+        function loadPromptContent() {
+            var choice = document.getElementById('choice').value;
+            var newPromptFields = document.getElementById('new_prompt_fields');
+            var promptTextarea = document.getElementById('prompt_text');
+
+            if (choice === 'new') {
+                newPromptFields.style.display = 'block';
+                promptTextarea.value = ''; // Clear textarea for new prompt
+            } else {
+                newPromptFields.style.display = 'none';
+                if (choice) { // If an existing prompt is selected
+                    fetch('/api/prompts/' + choice)
+                        .then(response => response.text())
+                        .then(data => {
+                            promptTextarea.value = data;
+                        })
+                        .catch(error => {
+                            console.error('Error loading prompt content:', error);
+                            promptTextarea.value = 'Error loading prompt content.';
+                        });
+                } else {
+                    promptTextarea.value = ''; // Clear if '--Select--' is chosen
+                }
+            }
+        }
+    </script>
+</body>
+</html>

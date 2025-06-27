@@ -38,9 +38,9 @@ from utils.file_logger import (
     get_language_from_extension,
 )
 from system_prompt.code_prompts import code_prompt_generate, code_skeleton_prompt
-
 import ftfy
-import traceback
+
+
 
 
 MODEL_STRING = CODE_MODEL  # Default model string, can be overridden in config
@@ -1135,7 +1135,7 @@ def html_format_code(code, extension):
         # Try to get a lexer based on the file extension
         try:
             lexer = get_lexer_by_name(extension.lower().lstrip("."))
-        except:
+        except Exception:
             # If that fails, try to guess the lexer from the code content
             lexer = guess_lexer(code)
 

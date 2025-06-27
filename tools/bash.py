@@ -1,10 +1,11 @@
-from typing import ClassVar, Literal
+from typing import ClassVar, Literal, Union
 import subprocess
 import re
 from dotenv import load_dotenv
-from config import get_constant, write_to_file # check_docker_available removed
+from config import get_constant # check_docker_available removed
 from .base import BaseTool, ToolError, ToolResult
-from utils.agent_display_web_with_prompt import AgentDisplayWebWithPrompt
+from utils.web_ui import WebUI
+from utils.agent_display_console import AgentDisplayConsole
 import logging
 import os
 from rich import print as rr
@@ -15,7 +16,7 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 class BashTool(BaseTool):
-    def __init__(self, display: AgentDisplayWebWithPrompt = None):
+    def __init__(self, display: Union[WebUI, AgentDisplayConsole] = None):
         self.display = display
         super().__init__(input_schema=None, display=display)
 
@@ -54,7 +55,7 @@ class BashTool(BaseTool):
         if ls_match:
             path = ls_match.group(1)
             # Use ls with grep to filter out hidden entries
-            return f'ls -la {path} | grep -v "^d*\\."'
+            return f'ls -la {path} | grep -v "^d*\\."' 
 
         # Return the original command if it doesn't match any patterns
         return command

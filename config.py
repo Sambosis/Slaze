@@ -1,13 +1,9 @@
 from pathlib import Path
 import json
-from datetime import datetime
-import subprocess
 from dotenv import load_dotenv
 from typing import Optional, Any
-import logging
 import logging.handlers
 import sys
-from cycler import V
 
 global PROJECT_DIR
 PROJECT_DIR = None
@@ -61,9 +57,10 @@ openaio3 = "openai/o3"
 openaio3pro = "openai/o3-pro"
 googlepro = "google/gemini-2.5-pro-preview"
 googleflash = "google/gemini-2.5-flash-preview"
-SUMMARY_MODEL = googleflash  # Model for summaries
+googleflashlite = "google/gemini-2.5-flash-lite-preview-06-17"
+SUMMARY_MODEL = googleflashlite  # Model for summaries
 MAIN_MODEL = googlepro  # Primary model for main agent operations
-CODE_MODEL = googlepro  # Model for code generation tasks
+CODE_MODEL = googleflashlite  # Model for code generation tasks
 # Feature flag constants
 COMPUTER_USE_BETA_FLAG = "computer-use-2024-10-22"
 PROMPT_CACHING_BETA_FLAG = "prompt-caching-2024-07-31"
@@ -169,79 +166,60 @@ def get_constants(): # Renamed from original get_constants to avoid conflict dur
     return constants
 
 
-# Function to load the constants from a file
-def load_constants():
-    const_file = CACHE_DIR / "constants.json"
-    try:
-        # If file is empty, return an empty dict
-        if const_file.stat().st_size == 0:
-            return {}
-        with open(const_file, "r") as f:
-            constants = json.load(f)
-        return constants
-    except FileNotFoundError:
-        return {}
 
 
-# Get a constant by name
-def get_constant(name):
-    write_constants_to_file()
-    constants = load_constants()
-    if constants:
-        return_constant = constants.get(name)
-        # If return_constant contains PATH, DIR or FILE then return as Path
-        if (
-            return_constant
-            and ("PATH" in name or "DIR" in name or "FILE" in name)
-            and isinstance(return_constant, str)
-        ):
-            return Path(return_constant)
-        else:
-            return return_constant
-    else:
-        return None
 
 
-# Function to set a constant
-def set_constant(name, value):
-    constants = load_constants() or {}
+
+
+
+
+
+
+
+# Function to set a constant and persist it
+def get_constant(name: str, default: Any = None) -> Any:
+    # `get_constants()` now ensures the file is written if it doesn't exist.
+    constants = get_constants()
+    value = constants.get(name, default)
+
+    # Convert path strings to Path objects if applicable
+    if value is not None and isinstance(value, str):
+        if "PATH" in name.upper() or "DIR" in name.upper() or "FILE" in name.upper():
+            # Check for specific string values that shouldn't become paths (e.g. model names)
+            if not any(x in name for x in ["MODEL", "FLAG", "LEVEL", "TASK", "NAME"]): # Add more keywords if needed
+                try:
+                    return Path(value)
+                except TypeError: # Handle cases where value might not be a valid path string
+                    return value
+    return value
+
+# Function to set a constant and persist it
+def set_constant(name: str, value: Any):
+    constants = get_constants() # Load current constants
+
     # Convert Path objects to strings for JSON serialization
     if isinstance(value, Path):
         constants[name] = str(value)
     else:
         constants[name] = value
+
+    # Write all constants (including the updated one) back to the file
+    # This uses the same structure as write_constants_to_file to keep it consistent
+    # We update the dictionary `constants` and then dump it.
+    # For simplicity, we'll call write_constants_to_file which uses the global Python vars.
+    # So, if we want set_constant to be robust for *any* key, we might need to update globals first,
+    # or make write_constants_to_file accept a dictionary.
+
+    # Update the global variable if it exists (e.g. PROJECT_DIR, MAIN_MODEL etc.)
+    # This makes the change immediately available to the current session.
+    if name in globals():
+        globals()[name] = value
+
     with open(CACHE_DIR / "constants.json", "w") as f:
         json.dump(constants, f, indent=4)
+    logging.info(f"Constant '{name}' set to '{value}' and persisted.")
     return True
-
-
-def set_project_dir(project_name: str) -> Path:
-    """
-    Set up project directories for both local and Docker.
-    This function also creates the project directory if it doesn't already exist.
-
-    Args:
-        project_name: The name of the project
-
-    Returns:
-        The Path to the project directory
-    """
-    global PROJECT_DIR, LLM_GEN_CODE_DIR
-    PROJECT_DIR = REPO_DIR / project_name
-    LLM_GEN_CODE_DIR = TOP_LEVEL_DIR / "llm_gen_code"
-
-    # Create repo directory if it doesn't exist
-    REPO_DIR.mkdir(parents=True, exist_ok=True)
-
-    # Create the project directory if it doesn't exist
-    PROJECT_DIR.mkdir(parents=True, exist_ok=True)
-
-    # Create llm_gen_code directory if it doesn't exist
-    LLM_GEN_CODE_DIR.mkdir(parents=True, exist_ok=True)
-
-    set_constant("PROJECT_DIR", str(PROJECT_DIR))
-    set_constant("LLM_GEN_CODE_DIR", str(LLM_GEN_CODE_DIR))
-    return PROJECT_DIR
 
 
 # Function to get the project directory
@@ -311,50 +289,6 @@ write_constants_to_file()
 def load_constants():
     return get_constants()
 
-# Get a constant by name
-def get_constant(name: str, default: Any = None) -> Any:
-    # `get_constants()` now ensures the file is written if it doesn't exist.
-    constants = get_constants()
-    value = constants.get(name, default)
-
-    # Convert path strings to Path objects if applicable
-    if value is not None and isinstance(value, str):
-        if "PATH" in name.upper() or "DIR" in name.upper() or "FILE" in name.upper():
-            # Check for specific string values that shouldn't become paths (e.g. model names)
-            if not any(x in name for x in ["MODEL", "FLAG", "LEVEL", "TASK", "NAME"]): # Add more keywords if needed
-                try:
-                    return Path(value)
-                except TypeError: # Handle cases where value might not be a valid path string
-                    return value
-    return value
-
-# Function to set a constant and persist it
-def set_constant(name: str, value: Any):
-    constants = get_constants() # Load current constants
-
-    # Convert Path objects to strings for JSON serialization
-    if isinstance(value, Path):
-        constants[name] = str(value)
-    else:
-        constants[name] = value
-
-    # Write all constants (including the updated one) back to the file
-    # This uses the same structure as write_constants_to_file to keep it consistent
-    # We update the dictionary `constants` and then dump it.
-    # For simplicity, we'll call write_constants_to_file which uses the global Python vars.
-    # So, if we want set_constant to be robust for *any* key, we might need to update globals first,
-    # or make write_constants_to_file accept a dictionary.
-    # For now, let's assume set_constant is used for keys that are already part of the global set for write_constants_to_file.
-
-    # Update the global variable if it exists (e.g. PROJECT_DIR, MAIN_MODEL etc.)
-    # This makes the change immediately available to the current session.
-    if name in globals():
-        globals()[name] = value
-
-    with open(CACHE_DIR / "constants.json", "w") as f:
-        json.dump(constants, f, indent=4)
-    logging.info(f"Constant '{name}' set to '{value}' and persisted.")
-    return True
 
 
 # --- Logging Setup ---

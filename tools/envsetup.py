@@ -3,7 +3,6 @@ from typing import Literal, List
 from pathlib import Path
 import os # Added os import
 
-from config import PROJECT_DIR
 from .base import ToolResult, BaseAnthropicTool
 import subprocess
 import logging
@@ -135,7 +134,7 @@ class ProjectSetupTool(BaseAnthropicTool):
             if not venv_dir.exists():
                 subprocess.run(["uv", "venv", str(venv_dir)], check=True)
 
-            python_executable = self._get_venv_executable(venv_dir, "python")
+
             installed_packages = []
 
             if packages:
@@ -195,6 +194,8 @@ class ProjectSetupTool(BaseAnthropicTool):
 
     async def add_dependencies(self, project_path: Path, packages: List[str]) -> dict:
         installed_packages = []
+        venv_dir = project_path / ".venv"
+        python_executable = self._get_venv_executable(venv_dir, "python")
 
         try:
             for i, package_item in enumerate(packages, 1):

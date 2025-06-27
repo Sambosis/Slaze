@@ -1,0 +1,208 @@
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: #f0f2f5;
+    color: #333;
+    line-height: 1.6;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    color: #212529;
+}
+
+header {
+    background-color: #28a745;
+    color: #ffffff;
+    padding: 1rem 0;
+    text-align: center;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+header h1 {
+    margin: 0;
+    font-size: 2.5rem;
+    font-weight: 600;
+}
+
+main {
+    flex: 1;
+    padding: 30px 15px;
+    max-width: 1200px;
+    margin: 20px auto;
+    background-color: #ffffff;
+    border-radius: 10px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+main section {
+    width: 100%;
+    margin-bottom: 30px;
+    padding: 25px;
+    background-color: #ffffff;
+    border-radius: 8px;
+    border: 1px solid #dee2e6;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+main section h2 {
+    text-align: center;
+    color: #17a2b8;
+    margin-top: 0;
+    margin-bottom: 20px;
+    font-size: 1.8rem;
+    font-weight: 500;
+}
+
+#abacus-container {
+    background-color: #e9ecef;
+    border: none;
+}
+
+.abacus {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    gap: 20px;
+    padding: 20px;
+    border-radius: 8px;
+    background-color: #d3d3d3;
+    width: fit-content;
+    margin: 0 auto;
+    box-shadow: inset 0 0 10px rgba(0,0,0,0.2);
+}
+
+.rod {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    border: 4px solid #4a4a4a;
+    border-radius: 12px;
+    background-color: #8B4513;
+    padding: 8px 4px;
+    width: 60px;
+    height: 280px;
+    box-shadow: 0 3px 6px rgba(0,0,0,0.3);
+}
+
+.bead-set {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-around;
+    align-items: center;
+    height: 100%;
+    width: 100%;
+    box-sizing: border-box;
+    position: relative;
+}
+
+.bead-set-high {
+    padding-bottom: 10px;
+    margin-bottom: 5px;
+}
+
+.bead-set-low {
+    padding-top: 10px;
+    margin-top: 5px;
+}
+
+.bead {
+    width: 36px;
+    height: 36px;
+    background-color: #FFD700;
+    border: 3px solid #b8860b;
+    border-radius: 50%;
+    box-shadow: 0 3px 3px rgba(0,0,0,0.4);
+    transition: transform 0.2s ease-in-out, background-color 0.2s ease-in-out;
+    z-index: 2;
+    cursor: pointer;
+}
+
+.bead.active {
+    transform: translateY(-20px);
+    background-color: #f0ad4e;
+}
+
+.input-group {
+    margin: 10px 20px;
+    display: inline-block;
+    vertical-align: top;
+    text-align: center;
+}
+
+.input-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: bold;
+    font-size: 1.1rem;
+    color: #495057;
+}
+
+.input-group input[type="number"] {
+    padding: 12px 15px;
+    border: 1px solid #ced4da;
+    border-radius: 5px;
+    width: 120px;
+    font-size: 1.2rem;
+    text-align: center;
+    transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+}
+
+.input-group input[type="number"]:focus {
+    border-color: #80bdff;
+    outline: 0;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+.operation-buttons {
+    text-align: center;
+    margin-top: 25px;
+    padding-top: 10px;
+    border-top: 1px solid #eee;
+}
+
+.operation-buttons button {
+    padding: 12px 25px;
+    margin: 0 10px;
+    font-size: 1.1rem;
+    font-weight: 500;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+    box-shadow: 0 2px 4px rgba(0, 123, 255, 0.5);
+}
+
+.operation-buttons button:hover {
+    background-color: #0056b3;
+    box-shadow: 0 3px 6px rgba(0, 123, 255, 0.7);
+}
+
+#result-section {
+    background-color: #d4edda;
+    border-color: #c3e6cb;
+}
+
+#calculation-result {
+    font-size: 2rem;
+    font-weight: bold;
+    color: #155724;
+    text-align: center;
+    margin: 0;
+}
+
+footer {
+    margin-top: auto;
+    background-color: #343a40;
+    color: #ffffff;
+    text-align: center;
+    padding: 1.5rem 0;
+    font-size: 0.95rem;
+    font-weight: 400;
+}
