@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 from typing import Optional, Any
 import logging.handlers
 import sys
+import platform
 
 global PROJECT_DIR
 PROJECT_DIR = None
@@ -22,6 +23,7 @@ LOG_LEVEL_FILE = "DEBUG"
 LOG_FILE_APP = "logs/app.log"
 LOG_MAX_BYTES = 10 * 1024 * 1024  # 10MB
 LOG_BACKUP_COUNT = 5
+OS_NAME = platform.system()
 
 # Define the top-level directory
 TOP_LEVEL_DIR = Path.cwd()
@@ -87,6 +89,7 @@ def set_prompt_name(name: str):
 try:
     with open(SYSTEM_PROMPT_FILE, "r", encoding="utf-8") as f:
         SYSTEM_PROMPT = f.read()
+    SYSTEM_PROMPT += f"\n\nHost operating system: {OS_NAME}. Use appropriate commands for this environment."
 except FileNotFoundError:
     SYSTEM_PROMPT = "System prompt file not found. Please ensure 'system_prompt/system_prompt.md' exists."
     logging.error(f"CRITICAL: System prompt file not found at {SYSTEM_PROMPT_FILE}")
@@ -100,6 +103,7 @@ def reload_system_prompt() -> str:
     try:
         with open(SYSTEM_PROMPT_FILE, "r", encoding="utf-8") as f:
             SYSTEM_PROMPT = f.read()
+        SYSTEM_PROMPT += f"\n\nHost operating system: {OS_NAME}. Use appropriate commands for this environment."
         logging.info(f"System prompt reloaded from {SYSTEM_PROMPT_FILE}")
         return SYSTEM_PROMPT
     except FileNotFoundError:
@@ -137,6 +141,7 @@ def write_constants_to_file():
         "LOG_FILE_APP": LOG_FILE_APP,
         "LOG_MAX_BYTES": LOG_MAX_BYTES,
         "LOG_BACKUP_COUNT": LOG_BACKUP_COUNT,
+        "OS_NAME": OS_NAME,
         "SUMMARY_MODEL": SUMMARY_MODEL,
         "MAIN_MODEL": MAIN_MODEL,
         "COMPUTER_USE_BETA_FLAG": COMPUTER_USE_BETA_FLAG,

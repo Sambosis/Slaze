@@ -11,6 +11,7 @@ from config import (
     get_constant,
     set_constant,
     set_prompt_name,
+    write_constants_to_file,
 )
 from pathlib import Path
 from openai import OpenAI
@@ -95,6 +96,7 @@ class WebUI:
             set_prompt_name(prompt_name)
             set_constant("PROJECT_DIR", repo_dir)
             set_constant("REPO_DIR", repo_dir)
+            write_constants_to_file()
             
             logging.info("Starting agent runner in background thread")
             coro = self.agent_runner(task, self)

@@ -125,18 +125,24 @@ class ProjectSetupTool(BaseAnthropicTool):
     async def setup_project(self, project_path: Path, packages: List[str]) -> dict:
         """Set up a local Python project."""
         host_repo_dir = get_constant("REPO_DIR")
-        if host_repo_dir:
-            host_repo_path = Path(host_repo_dir)
-            project_path_obj = Path(project_path)
-            if project_path_obj.is_absolute():
-                if "repo" in project_path_obj.parts:
-                    repo_index = project_path_obj.parts.index("repo")
-                    relative_subpath = Path(*project_path_obj.parts[repo_index + 1 :])
-                else:
-                    relative_subpath = Path(project_path_obj.name)
+        if not host_repo_dir:
+            prompt_name = get_constant("PROMPT_NAME")
+            if prompt_name:
+                host_repo_dir = Path(get_constant("TOP_LEVEL_DIR")) / "repo" / prompt_name
             else:
-                relative_subpath = project_path_obj
-            project_path = (host_repo_path / relative_subpath).resolve()
+                host_repo_dir = Path(get_constant("TOP_LEVEL_DIR")) / "repo"
+        host_repo_path = Path(host_repo_dir)
+
+        project_path_obj = Path(project_path)
+        if project_path_obj.is_absolute():
+            if "repo" in project_path_obj.parts:
+                repo_index = project_path_obj.parts.index("repo")
+                relative_subpath = Path(*project_path_obj.parts[repo_index + 1 :])
+            else:
+                relative_subpath = Path(project_path_obj.name)
+        else:
+            relative_subpath = project_path_obj
+        project_path = (host_repo_path / relative_subpath).resolve()
 
         project_path.mkdir(parents=True, exist_ok=True)
         venv_dir = project_path / ".venv"
