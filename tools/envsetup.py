@@ -114,7 +114,6 @@ class ProjectSetupTool(BaseAnthropicTool):
 
         return "\n".join(output_lines)
 
-
     def _get_venv_executable(self, venv_dir_path: Path, executable_name: str) -> Path:
         """Gets the path to an executable in the venv's scripts/bin directory."""
         if os.name == 'nt':  # Windows

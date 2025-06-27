@@ -79,8 +79,9 @@ class WebUI:
                     task = f.read()
                 filename = prompt_path.stem
             
-            logging.info("Starting agent runner in background task")
-            self.socketio.start_background_task(self.agent_runner, task, self)
+            logging.info("Starting agent runner in background thread")
+            coro = self.agent_runner(task, self)
+            self.socketio.start_background_task(asyncio.run, coro)
             return render_template("index.html")
 
         @self.app.route("/messages")
@@ -126,7 +127,7 @@ class WebUI:
             self.input_queue.put_nowait(user_input)
         logging.info("SocketIO events set up")
 
-    def start_server(self, host="0.0.0.0", port=5001):
+    def start_server(self, host="0.0.0.0", port=5000):
         logging.info(f"Starting server on {host}:{port}")
         self.socketio.run(self.app, host=host, port=port, use_reloader=False, allow_unsafe_werkzeug=True)
 
@@ -151,4 +152,11 @@ class WebUI:
                 "tool": self.tool_results,
             },
         )
+
+    async def wait_for_user_input(self, prompt_message: str = None) -> str:
+        """
+        Await the next user input sent via the web UI input queue.
+        The prompt_message parameter is ignored in the web interface.
+        """
+        return await self.input_queue.get()
 

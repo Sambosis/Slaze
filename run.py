@@ -47,7 +47,7 @@ def console():
         print("\nApplication interrupted by user. Exiting.")
 
 @cli.command()
-@click.option('--port', default=5001, help='Port to run the web server on.')
+@click.option('--port', default=5000, help='Port to run the web server on.')
 def web(port):
     """Run the agent with a web interface."""
     
