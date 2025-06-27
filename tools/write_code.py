@@ -326,18 +326,25 @@ class WriteCodeTool(BaseAnthropicTool):
                 # Decide if you want to raise an error or attempt to create it
                 # For now, let's proceed and let mkdir handle creation/errors later
 
-            # Assume project_path might be a full docker path or just the project name.
-            # We want the final component to use relative to the host REPO_DIR.
-            project_name = Path(project_path).name
-            if not project_name or project_name in [".", ".."]:
-                raise ValueError(
-                    f"Could not extract a valid project name from input project_path: {project_path}"
-                )
+            # project_path may include additional subdirectories. Preserve any
+            # path components inside the repository directory so generated files
+            # end up in e.g. repo/<prompt>/<app_name>/ rather than being
+            # flattened.
+            project_path_obj = Path(project_path)
+            if project_path_obj.is_absolute():
+                # If the absolute path contains the repo directory, strip that
+                # portion so we keep the relative path under repo.
+                if "repo" in project_path_obj.parts:
+                    repo_index = project_path_obj.parts.index("repo")
+                    relative_subpath = Path(*project_path_obj.parts[repo_index + 1 :])
+                else:
+                    # Fallback to just using the last component
+                    relative_subpath = Path(project_path_obj.name)
+            else:
+                relative_subpath = project_path_obj
 
             # Construct the ACTUAL host path where files should be written
-            host_project_path_obj = (
-                host_repo_path / project_name
-            ).resolve()  # Resolve to absolute path early
+            host_project_path_obj = (host_repo_path / relative_subpath).resolve()
             logger.info(f"Resolved HOST project path for writing: {host_project_path_obj}")
 
             # Ensure the HOST directory exists

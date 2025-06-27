@@ -5,7 +5,14 @@ import logging
 from queue import Queue
 from flask import Flask, render_template, jsonify, request, redirect, url_for, send_from_directory
 from flask_socketio import SocketIO, disconnect
-from config import LOGS_DIR, PROMPTS_DIR
+from config import (
+    LOGS_DIR,
+    PROMPTS_DIR,
+    get_constant,
+    set_constant,
+    set_prompt_name,
+)
+from pathlib import Path
 from openai import OpenAI
 import ftfy
 
@@ -65,12 +72,14 @@ class WebUI:
             if choice == "new":
                 logging.info("Creating new prompt")
                 new_prompt_path = PROMPTS_DIR / f"{filename}.md"
+                prompt_name = Path(filename).stem
                 with open(new_prompt_path, "w", encoding="utf-8") as f:
                     f.write(prompt_text)
                 task = prompt_text
             else:
                 logging.info(f"Loading existing prompt: {choice}")
                 prompt_path = PROMPTS_DIR / choice
+                prompt_name = prompt_path.stem
                 if prompt_text:
                     logging.info("Updating existing prompt")
                     with open(prompt_path, "w", encoding="utf-8") as f:
@@ -78,6 +87,14 @@ class WebUI:
                 with open(prompt_path, "r", encoding="utf-8") as f:
                     task = f.read()
                 filename = prompt_path.stem
+
+            # Configure repository directory for this prompt
+            base_repo_dir = Path(get_constant("TOP_LEVEL_DIR")) / "repo"
+            repo_dir = base_repo_dir / prompt_name
+            repo_dir.mkdir(parents=True, exist_ok=True)
+            set_prompt_name(prompt_name)
+            set_constant("PROJECT_DIR", repo_dir)
+            set_constant("REPO_DIR", repo_dir)
             
             logging.info("Starting agent runner in background thread")
             coro = self.agent_runner(task, self)
