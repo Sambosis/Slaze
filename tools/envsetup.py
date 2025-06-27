@@ -1,22 +1,15 @@
 from enum import Enum
 from typing import Literal, List
 from pathlib import Path
-import os # Added os import
+import os
 
 from .base import ToolResult, BaseAnthropicTool
 import subprocess
 import logging
-from rich import print as rr # Using rich for better output formatting
-# from loguru import logger as ll # Removed loguru
-# from rich import print as rr # Removed rich print
+from rich import print as rr
 
-# Configure logging to a file # Removed loguru configuration
-# ll.add(
-#     "my_log_file.log",
-#     rotation="500 KB",
-#     level="DEBUG",
-#     format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {module}.{function}:{line} - {message}",
-# )
+# Import necessary items from config
+from config import REPO_DIR, PROMPT_NAME, get_constant
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +59,7 @@ class ProjectSetupTool(BaseAnthropicTool):
                         },
                         "project_path": {
                             "type": "string",
-                            "description": "Path to the project directory",
+                            "description": "Name or relative path of the project directory (e.g., 'myApp'). This will be created inside 'repo/<prompt_name>/'.",
                         },
                         "environment": {
                             "type": "string",
@@ -354,22 +347,46 @@ class ProjectSetupTool(BaseAnthropicTool):
                 packages = []
 
             # Convert string path to Path object
-            project_path = Path(project_path)
+            # project_path_str = project_path # Keep original name from LLM for clarity
+
+            # Retrieve PROMPT_NAME from config
+            # Ensure PROMPT_NAME is up-to-date by fetching from constants.json via get_constant
+            current_prompt_name = get_constant("PROMPT_NAME")
+            if not current_prompt_name:
+                return ToolResult(
+                    error="PROMPT_NAME is not set in the configuration. Cannot determine project base path.",
+                    tool_name=self.name,
+                )
+
+            # Construct the full path: REPO_DIR / PROMPT_NAME / project_path_from_llm
+            # Ensure REPO_DIR is a Path object
+            repo_directory = Path(REPO_DIR)
+
+            # The project_path from LLM is relative to REPO_DIR / current_prompt_name
+            # Convert project_path (from LLM) to Path object to handle potential subdirectories correctly.
+            relative_project_path_segment = Path(project_path)
+            full_project_path = repo_directory / current_prompt_name / relative_project_path_segment
+
+            # Ensure project_path (the relative part) doesn't try to escape the intended directory
+            # by checking for '..' or leading slashes if project_path is not just a simple name.
+            # Path(project_path).is_absolute() or ".." in str(project_path) could be checks.
+            # For now, we assume project_path is a simple name like "myFooApp".
+            # If project_path could contain subdirectories like "subdir/myFooApp", Path joining handles it.
 
             if environment != "python":
                 return ToolResult(error="Only python environment is supported", tool_name=self.name)
 
             if command == ProjectCommand.SETUP_PROJECT:
-                result = await self.setup_project(project_path, packages)
+                result = await self.setup_project(full_project_path, packages)
 
             elif command == ProjectCommand.ADD_DEPENDENCIES:
-                result = await self.add_dependencies(project_path, packages)
+                result = await self.add_dependencies(full_project_path, packages)
 
-            elif command == ProjectCommand.RUN_APP:
-                result = await self.run_project(project_path, entry_filename)
+            elif command == ProjectCommand.RUN_APP: # Should be run_app, not run_project
+                result = await self.run_app(full_project_path, entry_filename)
 
             elif command == ProjectCommand.RUN_PROJECT:
-                result = await self.run_project(project_path, entry_filename)
+                result = await self.run_project(full_project_path, entry_filename)
 
             else:
                 return ToolResult(error=f"Unknown command: {command_value}", tool_name=self.name)
