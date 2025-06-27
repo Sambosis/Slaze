@@ -60,7 +60,7 @@ googleflash = "google/gemini-2.5-flash-preview"
 googleflashlite = "google/gemini-2.5-flash-lite-preview-06-17"
 SUMMARY_MODEL = googleflashlite  # Model for summaries
 MAIN_MODEL = googlepro  # Primary model for main agent operations
-CODE_MODEL = googleflashlite  # Model for code generation tasks
+CODE_MODEL = googlepro  # Model for code generation tasks
 # Feature flag constants
 COMPUTER_USE_BETA_FLAG = "computer-use-2024-10-22"
 PROMPT_CACHING_BETA_FLAG = "prompt-caching-2024-07-31"
