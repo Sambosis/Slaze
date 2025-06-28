@@ -28,13 +28,13 @@ from config import (
     MAX_SUMMARY_TOKENS,
     reload_system_prompt,
 )
-# from token_tracker import TokenTracker
 
 from dotenv import load_dotenv
 import asyncio # Added asyncio
 from pathlib import Path # Added Path
 from config import set_constant, get_constant, MAIN_MODEL # Added config imports
-
+-from config import set_constant, get_constant, MAIN_MODEL # Added config imports
++from config import set_constant, get_constant  # Added config imports
 load_dotenv()
 
 logger = logging.getLogger(__name__)
@@ -175,7 +175,17 @@ class Agent:
 
         # Revise the task and save it
         try:
-            revised_task = asyncio.run(self._revise_and_save_task(self.task))
+            # Create a new event loop if one doesn't exist, otherwise use the existing one
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    logger.warning("Event loop already running, deferring task revision")
+                    revised_task = self.task  # Keep original task for now
+                else:
+                    revised_task = loop.run_until_complete(self._revise_and_save_task(self.task))
+            except RuntimeError:
+                # No event loop exists in current thread
+                revised_task = asyncio.run(self._revise_and_save_task(self.task))
             self.task = revised_task # Update self.task to the revised one
             logger.info(f"Agent task updated to revised version: {self.task[:100]}...")
         except Exception as e:
