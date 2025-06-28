@@ -51,13 +51,13 @@ class EditTool(BaseTool):
         self._file_history = defaultdict(list)
 
     def _resolve_path(self, path: str | Path) -> Path:
-        """Resolve a given path relative to PROJECT_DIR if not absolute."""
+        """Resolve a given path relative to PROJECT_DIR if not absolute, and normalize it."""
         p = Path(path)
         if not p.is_absolute():
             project_dir = get_constant("PROJECT_DIR")
             if project_dir:
                 p = Path(project_dir) / p
-        return p
+        return p.resolve()
 
     def to_params(self) -> dict:
         logger.debug(f"EditTool.to_params called with api_type: {self.api_type}")
