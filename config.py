@@ -88,8 +88,14 @@ def set_prompt_name(name: str):
 # --- System Prompt Loading ---
 try:
     with open(SYSTEM_PROMPT_FILE, "r", encoding="utf-8") as f:
-        SYSTEM_PROMPT = f.read()
-    SYSTEM_PROMPT += f"\n\nHost operating system: {OS_NAME}. Use appropriate commands for this environment."
+        _prompt_contents = f.read()
+    if "{{OS_NAME}}" in _prompt_contents:
+        SYSTEM_PROMPT = _prompt_contents.replace("{{OS_NAME}}", OS_NAME)
+    else:
+        SYSTEM_PROMPT = _prompt_contents + (
+            f"\n\nHost operating system: {OS_NAME}. "
+            "Use appropriate commands for this environment."
+        )
 except FileNotFoundError:
     SYSTEM_PROMPT = "System prompt file not found. Please ensure 'system_prompt/system_prompt.md' exists."
     logging.error(f"CRITICAL: System prompt file not found at {SYSTEM_PROMPT_FILE}")
@@ -102,8 +108,14 @@ def reload_system_prompt() -> str:
     global SYSTEM_PROMPT
     try:
         with open(SYSTEM_PROMPT_FILE, "r", encoding="utf-8") as f:
-            SYSTEM_PROMPT = f.read()
-        SYSTEM_PROMPT += f"\n\nHost operating system: {OS_NAME}. Use appropriate commands for this environment."
+            contents = f.read()
+        if "{{OS_NAME}}" in contents:
+            SYSTEM_PROMPT = contents.replace("{{OS_NAME}}", OS_NAME)
+        else:
+            SYSTEM_PROMPT = contents + (
+                f"\n\nHost operating system: {OS_NAME}. "
+                "Use appropriate commands for this environment."
+            )
         logging.info(f"System prompt reloaded from {SYSTEM_PROMPT_FILE}")
         return SYSTEM_PROMPT
     except FileNotFoundError:
