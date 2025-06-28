@@ -1,0 +1,1 @@
+Create a strategy game that is based in Harford County Maryland. Use Pygame.
