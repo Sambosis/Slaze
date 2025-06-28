@@ -1,4 +1,6 @@
 from typing import Any, Dict, List, Union
+from pathlib import Path
+from datetime import datetime
 
 import os
 from utils.web_ui import WebUI
@@ -233,8 +235,21 @@ def truncate_message_content(content: Any, max_length: int = 150_000) -> Any:
 
 
 def add_summary(summary: str) -> None:
-    """Add a new summary to the global list with timestamp."""
-    QUICK_SUMMARIES.append(summary.strip())
+    """Add a new summary to the global list with timestamp and log it to a file."""
+    stripped_summary = summary.strip()
+    QUICK_SUMMARIES.append(stripped_summary)
+
+    try:
+        summary_file_path = Path(get_constant("SUMMARY_FILE"))
+        summary_file_path.parent.mkdir(parents=True, exist_ok=True)
+
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        log_entry = f"\n--------------------\n[{timestamp}]\n{stripped_summary}\n--------------------\n"
+
+        with open(summary_file_path, "a", encoding="utf-8") as f:
+            f.write(log_entry)
+    except Exception as e:
+        logger.error(f"Failed to log summary to file: {e}", exc_info=True)
 
 
 def get_all_summaries() -> str:
