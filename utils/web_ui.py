@@ -46,7 +46,8 @@ class WebUI:
         self.user_messages = []
         self.assistant_messages = []
         self.tool_results = []
-        self.input_queue = asyncio.Queue()
+        # Using a standard Queue for cross-thread communication
+        self.input_queue = Queue()
         self.agent_runner = agent_runner
         self.setup_routes()
         self.setup_socketio_events()
@@ -143,7 +144,8 @@ class WebUI:
         def handle_user_input(data):
             user_input = data.get("input", "")
             logging.info(f"Received user input: {user_input}")
-            self.input_queue.put_nowait(user_input)
+            # Queue is thread-safe; use blocking put to notify waiting tasks
+            self.input_queue.put(user_input)
         logging.info("SocketIO events set up")
 
     def start_server(self, host="0.0.0.0", port=5000):
@@ -173,9 +175,7 @@ class WebUI:
         )
 
     async def wait_for_user_input(self, prompt_message: str = None) -> str:
-        """
-        Await the next user input sent via the web UI input queue.
-        The prompt_message parameter is ignored in the web interface.
-        """
-        return await self.input_queue.get()
+        """Await the next user input sent via the web UI input queue."""
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(None, self.input_queue.get)
 
