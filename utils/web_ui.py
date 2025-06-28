@@ -1,8 +1,8 @@
 import asyncio
+from queue import Queue
 import os
 import threading
 import logging
-from queue import Queue
 from flask import Flask, render_template, jsonify, request, redirect, url_for, send_from_directory
 from flask_socketio import SocketIO, disconnect
 from config import (
@@ -46,7 +46,9 @@ class WebUI:
         self.user_messages = []
         self.assistant_messages = []
         self.tool_results = []
-        self.input_queue = asyncio.Queue()
+        # Use a thread-safe queue so it can be accessed from different threads
+        # without tying it to a specific asyncio event loop.
+        self.input_queue = Queue()
         self.agent_runner = agent_runner
         self.setup_routes()
         self.setup_socketio_events()
@@ -143,7 +145,8 @@ class WebUI:
         def handle_user_input(data):
             user_input = data.get("input", "")
             logging.info(f"Received user input: {user_input}")
-            self.input_queue.put_nowait(user_input)
+            # Put the user input into the thread-safe queue.
+            self.input_queue.put(user_input)
         logging.info("SocketIO events set up")
 
     def start_server(self, host="0.0.0.0", port=5000):
@@ -177,5 +180,7 @@ class WebUI:
         Await the next user input sent via the web UI input queue.
         The prompt_message parameter is ignored in the web interface.
         """
-        return await self.input_queue.get()
+        # Wait for the next item from the thread-safe queue without blocking the
+        # event loop.
+        return await asyncio.to_thread(self.input_queue.get)
 
