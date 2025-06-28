@@ -6,7 +6,7 @@ import time
 from enum import Enum
 from pathlib import Path
 from typing import Any, Literal, Optional, List, Dict
-
+# pyright: ignore[reportMissingImports]
 from openai import (
     APIConnectionError,
     APIError,
