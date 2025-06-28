@@ -31,16 +31,157 @@ from config import (
 # from token_tracker import TokenTracker
 
 from dotenv import load_dotenv
+import asyncio # Added asyncio
+from pathlib import Path # Added Path
+from config import set_constant, get_constant, MAIN_MODEL # Added config imports
 
 load_dotenv()
 
 logger = logging.getLogger(__name__)
 
 
+async def call_llm_for_task_revision(prompt_text: str, client: OpenAI, model: str) -> str:
+    """
+    Calls an LLM to revise the given prompt_text, incorporating detailed instructions
+    for structuring the task, especially for programming projects.
+    """
+    logger.info(f"Attempting to revise/structure task with LLM ({model}): '{prompt_text[:100]}...'")
+
+    # This combined prompt is based on the user-provided example
+    detailed_revision_prompt_template = (
+        "Your primary function is to analyze and structure a user's request. Your output will be used as the main task definition for a subsequent AI agent that generates software projects. "
+        "Carefully consider the user's input and transform it into a detailed and actionable task definition.\n\n"
+        "USER'S ORIGINAL REQUEST:\n"
+        "------------------------\n"
+        "{user_request}\n"
+        "------------------------\n\n"
+        "INSTRUCTIONS:\n"
+        "1.  **Analyze the Request Type:**\n"
+        "    *   **If the request sounds like a programming project:** Proceed with instructions 2-4.\n"
+        "    *   **If the user asks a simple non-coding question:** Simply repeat the user's question as the task definition. For example, if the user asks 'What is the capital of France?', the output should be 'What is the capital of France?'.\n"
+        "    *   **If the request is unexpected or ambiguous:** Use your best judgment to create a concise task definition that makes sense for the circumstance. Prioritize clarity.\n\n"
+        "2.  **For Programming Projects - Expand Description:**\n"
+        "    *   Restate the problem in significantly more detail. Flesh out the requirements.\n"
+        "    *   If there are any decisions left for the developer (e.g., choice of a specific algorithm, UI details if not specified), you MUST make those choices now and clearly include them in your expanded description. Be specific.\n\n"
+        "3.  **For Programming Projects - Define File Tree:**\n"
+        "    *   After the expanded description, provide a file tree for the program. This tree should list ALL necessary code files and any crucial asset files (e.g., `main.py`, `utils/helper.py`, `assets/icon.png`).\n"
+        "    *   For each file in the tree, you MUST provide:\n"
+        "        *   The full path relative to the project root (e.g., `src/app.py`, `tests/test_module.py`).\n"
+        "        *   A brief, clear statement about the purpose of that specific file.\n"
+        "        *   Explicitly state the correct way to import the file/module using absolute imports from the project root (e.g., `from src import app`, `import src.models.user`). Assume the project root is the primary location for running the code or is added to PYTHONPATH.\n"
+        "    *   **Important Considerations for File Tree:**\n"
+        "        *   Lean towards creating FEWER files and folders while maintaining organization and manageability. Avoid overly nested structures unless strictly necessary.\n"
+        "        *   Focus on simplicity.\n"
+        "        *   Do NOT create or list non-code project management files like `pyproject.toml`, `.gitignore`, `README.md`, `LICENSE`, etc. Only list files that are part of the application's codebase or directly used assets.\n\n"
+        "4.  **Output Format:**\n"
+        "    *   The output should start with the expanded description (if a programming project) or the direct task (if non-coding).\n"
+        "    *   This should be followed by the file tree section (if a programming project), clearly delineated.\n"
+        "    *   Do NOT include any conversational preamble, your own comments about the process, or any text beyond the structured task definition itself.\n"
+        "    *   Example structure for a programming project:\n"
+        "        \"\"\"\n"
+        "        [Expanded Description of the project, including decisions made...]\n\n"
+        "        File Tree:\n"
+        "        - project_root/\n"
+        "          - src/\n"
+        "            - __init__.py (Purpose: Marks 'src' as a package. Import: `import src`)\n"
+        "            - main.py (Purpose: Main entry point of the application. Import: `from src import main` or `import src.main`)\n"
+        "            - module_one/\n"
+        "              - __init__.py (Purpose: Marks 'module_one' as a sub-package. Import: `from src import module_one`)\n"
+        "              - functions.py (Purpose: Contains utility functions for module_one. Import: `from src.module_one import functions`)\n"
+        "          - assets/\n"
+        "            - image.png (Purpose: An image asset for the UI.)\n"
+        "        \"\"\"\n\n"
+        "Now, process the user's original request based on these instructions."
+    )
+
+    formatted_revision_prompt = detailed_revision_prompt_template.format(user_request=prompt_text)
+
+    try:
+        # The user's example used "anthropic/claude-3.7-sonnet:beta".
+        # We should use the model specified or fall back to a strong default like MAIN_MODEL.
+        # For this refinement, let's honor the specific model from the example if available, else MAIN_MODEL.
+        # This requires checking if 'model' param can be overridden or if we add a new constant.
+        # For now, I'll stick to the 'model' parameter passed to this function.
+        # If the calling code passes "anthropic/claude-3.7-sonnet:beta", it will be used.
+        # Otherwise, it will use MAIN_MODEL as per current Agent._revise_and_save_task.
+
+        response = await client.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": formatted_revision_prompt}],
+            temperature=0.3, # Lower temperature for more focused, less creative revision
+            n=1,
+            stop=None,
+        )
+        if response.choices and response.choices[0].message and response.choices[0].message.content:
+            revised_task = response.choices[0].message.content.strip()
+            # Basic check to ensure LLM didn't just return an empty string or something very short
+            if len(revised_task) < 0.5 * len(prompt_text) and len(prompt_text) > 50 : # Heuristic: if significantly shorter
+                 logger.warning(f"LLM task revision is much shorter than original. Original: '{prompt_text[:100]}...', Revised: '{revised_task[:100]}...'. Using original.")
+                 return prompt_text
+
+            logger.info(f"Task successfully revised by LLM ({model}): '{revised_task[:100]}...'")
+            return revised_task
+        else:
+            logger.warning(f"LLM task revision ({model}) returned empty or invalid response. Using original task: '{prompt_text[:100]}...'")
+            return prompt_text
+    except Exception as e:
+        logger.error(f"Error during LLM task revision with model {model}: {e}. Using original task: '{prompt_text[:100]}...'", exc_info=True)
+        return prompt_text
+
+
 class Agent:
+    async def _revise_and_save_task(self, initial_task: str) -> str:
+        """
+        Revises the task using an LLM, saves it to task.txt, updates the
+        TASK constant, and returns the revised task.
+        """
+        revised_task_from_llm = await call_llm_for_task_revision(initial_task, self.client, MAIN_MODEL)
+        logger.info(f"Task revision result: '{initial_task[:100]}...' -> '{revised_task_from_llm[:100]}...'")
+
+        repo_dir_val = get_constant("REPO_DIR")
+        if not repo_dir_val:
+            logger.error("REPO_DIR not found in constants. Cannot save revised task.txt.")
+            # Fallback: update self.task and TASK constant but don't write to file.
+            set_constant("TASK", revised_task_from_llm)
+            return revised_task_from_llm
+
+        repo_dir = Path(repo_dir_val)
+        task_file_path = repo_dir / "logs" / "task.txt"
+
+        try:
+            task_file_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(task_file_path, "w", encoding="utf-8") as f:
+                f.write(revised_task_from_llm)
+            logger.info(f"Revised task saved to {task_file_path}")
+        except Exception as e:
+            logger.error(f"Error saving revised task to {task_file_path}: {e}", exc_info=True)
+            # Continue even if file write fails, but log it.
+
+        set_constant("TASK", revised_task_from_llm)
+        logger.info("TASK constant updated with revised task.")
+        return revised_task_from_llm
+
     def __init__(self, task: str, display: Union[WebUI, AgentDisplayConsole]):
         self.task = task
-        # set the task to TASK  in config
+        # Set initial task constant
+        set_constant("TASK", self.task)
+        logger.info(f"Initial TASK constant set to: {self.task[:100]}...")
+
+        # Initialize client and other properties needed by _revise_and_save_task
+        self.client = OpenAI(
+            api_key=os.getenv("OPENROUTER_API_KEY") or os.getenv("OPENAI_API_KEY"),
+            base_url=os.getenv("OPENAI_BASE_URL", "https://openrouter.ai/api/v1"),
+        )
+
+        # Revise the task and save it
+        try:
+            revised_task = asyncio.run(self._revise_and_save_task(self.task))
+            self.task = revised_task # Update self.task to the revised one
+            logger.info(f"Agent task updated to revised version: {self.task[:100]}...")
+        except Exception as e:
+            logger.error(f"Error during task revision process in __init__: {e}", exc_info=True)
+            # self.task remains the original task if revision fails
+
         self.display = display
         self.context_recently_refreshed = False
         self.refresh_count = 45
@@ -56,10 +197,12 @@ class Agent:
         self.output_manager = OutputManager(self.display)
         self.system_prompt = reload_system_prompt()
         self.messages = [{"role": "system", "content": self.system_prompt}]
-        self.client = OpenAI(
-            api_key=os.getenv("OPENROUTER_API_KEY") or os.getenv("OPENAI_API_KEY"),
-            base_url=os.getenv("OPENAI_BASE_URL", "https://openrouter.ai/api/v1"),
-        )
+        # self.client is already initialized before _revise_and_save_task is called.
+        # No need to initialize it again here.
+        # self.client = OpenAI(
+        #     api_key=os.getenv("OPENROUTER_API_KEY") or os.getenv("OPENAI_API_KEY"),
+        #     base_url=os.getenv("OPENAI_BASE_URL", "https://openrouter.ai/api/v1"),
+        # )
         self.enable_prompt_caching = True
         self.betas = [COMPUTER_USE_BETA_FLAG, PROMPT_CACHING_BETA_FLAG]
         self.image_truncation_threshold = 1
