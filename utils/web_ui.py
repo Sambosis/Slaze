@@ -35,9 +35,8 @@ def log_message(msg_type, message):
         file.write(f"\n{message}\n\n")
 
 class WebUI:
-    def __init__(self, agent_runner):
+    def __init__(self, agent_runner_starter, loop: asyncio.AbstractEventLoop): # Modified constructor
         logging.info("Initializing WebUI")
-        # More robust path for templates
         template_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'templates'))
         logging.info(f"Template directory set to: {template_dir}")
         self.app = Flask(__name__, template_folder=template_dir)
@@ -46,8 +45,12 @@ class WebUI:
         self.user_messages = []
         self.assistant_messages = []
         self.tool_results = []
-        self.input_queue = asyncio.Queue()
-        self.agent_runner = agent_runner
+
+        self.loop = loop # Store the loop
+        # Create the queue within the provided loop's context
+        self.input_queue = asyncio.Queue(loop=self.loop)
+
+        self.agent_runner_starter = agent_runner_starter # This is now the wrapper from run.py
         self.setup_routes()
         self.setup_socketio_events()
         logging.info("WebUI initialized")
@@ -98,9 +101,9 @@ class WebUI:
             set_constant("REPO_DIR", repo_dir)
             write_constants_to_file()
             
-            logging.info("Starting agent runner in background thread")
-            coro = self.agent_runner(task, self)
-            self.socketio.start_background_task(asyncio.run, coro)
+            logging.info("Starting agent runner using agent_runner_starter")
+            # Call the starter function which will use run_coroutine_threadsafe via the wrapper
+            self.agent_runner_starter(task, self) # Pass self (display_ref)
             return render_template("index.html")
 
         @self.app.route("/messages")
@@ -143,7 +146,8 @@ class WebUI:
         def handle_user_input(data):
             user_input = data.get("input", "")
             logging.info(f"Received user input: {user_input}")
-            self.input_queue.put_nowait(user_input)
+            # Safely put item into the queue from this SocketIO thread
+            self.loop.call_soon_threadsafe(self.input_queue.put_nowait, user_input)
         logging.info("SocketIO events set up")
 
     def start_server(self, host="0.0.0.0", port=5000):
