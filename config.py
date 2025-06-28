@@ -69,7 +69,7 @@ PROMPT_CACHING_BETA_FLAG = "prompt-caching-2024-07-31"
 
 # Limits
 MAX_SUMMARY_MESSAGES = 40 # Max messages for context summarization input
-MAX_SUMMARY_TOKENS = 20000 # Max tokens for context summarization output (aligning with config.py's original value)
+MAX_SUMMARY_TOKENS = 120000 # Max tokens for context summarization output (aligning with config.py's original value)
 
 # Create a cache directory if it does not exist
 CACHE_DIR = TOP_LEVEL_DIR / "cache"

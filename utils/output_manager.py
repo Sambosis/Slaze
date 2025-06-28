@@ -7,7 +7,6 @@ from typing import Any, List, Optional, TYPE_CHECKING, Union
 
 from typing import Dict
 import logging
-# from icecream import ic # Removed
 
 from .web_ui import WebUI
 from .agent_display_console import AgentDisplayConsole
