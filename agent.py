@@ -21,7 +21,13 @@ from utils.web_ui import WebUI
 from utils.agent_display_console import AgentDisplayConsole
 from utils.context_helpers import extract_text_from_content, refresh_context_async
 from utils.output_manager import OutputManager
-from config import COMPUTER_USE_BETA_FLAG, PROMPT_CACHING_BETA_FLAG, MAIN_MODEL, MAX_SUMMARY_TOKENS
+from config import (
+    COMPUTER_USE_BETA_FLAG,
+    PROMPT_CACHING_BETA_FLAG,
+    MAIN_MODEL,
+    MAX_SUMMARY_TOKENS,
+    reload_system_prompt,
+)
 # from token_tracker import TokenTracker
 
 from dotenv import load_dotenv
@@ -48,7 +54,8 @@ class Agent:
             display=self.display,
         )
         self.output_manager = OutputManager(self.display)
-        self.messages = []
+        self.system_prompt = reload_system_prompt()
+        self.messages = [{"role": "system", "content": self.system_prompt}]
         self.client = OpenAI(
             api_key=os.getenv("OPENROUTER_API_KEY") or os.getenv("OPENAI_API_KEY"),
             base_url=os.getenv("OPENAI_BASE_URL", "https://openrouter.ai/api/v1"),
