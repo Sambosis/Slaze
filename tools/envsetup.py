@@ -132,7 +132,7 @@ class ProjectSetupTool(BaseAnthropicTool):
             else:
                 host_repo_dir = Path(get_constant("TOP_LEVEL_DIR")) / "repo"
         host_repo_path = Path(host_repo_dir)
-
+        installed_packages = []
         project_path_obj = Path(project_path)
         if project_path_obj.is_absolute():
             if "repo" in project_path_obj.parts:
@@ -152,10 +152,11 @@ class ProjectSetupTool(BaseAnthropicTool):
                 self.display.add_message("user", f"Creating virtual environment in {project_path}")
 
             if not venv_dir.exists():
-                subprocess.run(["uv", "venv", str(venv_dir)], check=True)
+                subprocess.run(["uv", "venv", str(venv_dir)], check=True, cwd=project_path, capture_output=True)
 
-
-            installed_packages = []
+            # Run 'uv init' directly in the project directory; no venv activation is performed here
+            subprocess.run(args=["uv", "init", "--no-workspace"], cwd=project_path, check=True)
+            logger.info(f"Project initialized at {project_path}")
 
             if packages:
                 if isinstance(packages, str):
@@ -188,13 +189,13 @@ class ProjectSetupTool(BaseAnthropicTool):
                         if not clean_pkg:
                             continue
                         logger.info(f"Attempting to install package: {clean_pkg} using uv")
-                        result = subprocess.run(["uv", "pip", "install", clean_pkg], capture_output=True, text=True)
+                        result = subprocess.run(["uv", "add", clean_pkg], capture_output=True, text=True, cwd=project_path, check=True)
                         if result.returncode == 0:
                             installed_packages.append(clean_pkg)
                             logger.info(f"Successfully installed {clean_pkg}")
                         else:
                             logger.error(f"Failed to install {clean_pkg}: {result.stderr}")
-                            raise RuntimeError(f"uv pip install {clean_pkg} failed: {result.stderr}")
+                            raise RuntimeError(f"uv add {clean_pkg} failed: {result.stderr}")
                 self.display.add_message("user", f"Project setup complete in {project_path}")
             rr(result)
             return {
@@ -243,12 +244,9 @@ class ProjectSetupTool(BaseAnthropicTool):
                         )
                     result = subprocess.run([
                         "uv",
-                        "pip",
-                        "install",
-                        "--python",
-                        str(python_executable),
+                        "add",
                         package,
-                    ], capture_output=True, text=True)
+                    ], capture_output=True, text=True, cwd=project_path)
                     if result.returncode == 0:
                         installed_packages.append(package)
                         if self.display is not None:
@@ -287,7 +285,7 @@ class ProjectSetupTool(BaseAnthropicTool):
             file_path = project_path / filename
 
             cmd = ["uv", "run", str(file_path)]
-            result = subprocess.run(cmd, capture_output=True, text=True)
+            result = subprocess.run(cmd, capture_output=True, text=True, check=True, cwd=project_path)
             rr(result)
             run_output = f"stdout: {result.stdout}\nstderr: {result.stderr}"
             logger.info(f"Run app output for {file_path}:\n{run_output}")
@@ -325,7 +323,7 @@ class ProjectSetupTool(BaseAnthropicTool):
 
 
             cmd = ["uv", "run", str(entry_file)]
-            result = subprocess.run(cmd, capture_output=True, text=True)
+            result = subprocess.run(cmd, capture_output=True, text=True, check=True, cwd=project_path)
             run_output = f"stdout: {result.stdout}\nstderr: {result.stderr}"
             rr(result)
             return {
@@ -355,7 +353,7 @@ class ProjectSetupTool(BaseAnthropicTool):
             if hasattr(command, "value"):
                 command_value = command.value
             else:
-                # If command is a string, try to convert it to an Enum
+                # If command is a string, try to convert it to an Enums
                 try:
                     command = ProjectCommand(command)
                     command_value = command.value
