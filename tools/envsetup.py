@@ -188,7 +188,7 @@ class ProjectSetupTool(BaseAnthropicTool):
                         if not clean_pkg:
                             continue
                         logger.info(f"Attempting to install package: {clean_pkg} using uv")
-                        result = subprocess.run(["uv", "pip", "install", clean_pkg], capture_output=True, text=True)
+                        result = subprocess.run(["uv", "pip", "install", "--no-workspace", clean_pkg], capture_output=True, text=True)
                         if result.returncode == 0:
                             installed_packages.append(clean_pkg)
                             logger.info(f"Successfully installed {clean_pkg}")
@@ -245,8 +245,9 @@ class ProjectSetupTool(BaseAnthropicTool):
                         "uv",
                         "pip",
                         "install",
-                        "-p",
+                        "--python",
                         str(python_executable),
+                        "--no-workspace",
                         package,
                     ], capture_output=True, text=True)
                     if result.returncode == 0:
@@ -286,7 +287,7 @@ class ProjectSetupTool(BaseAnthropicTool):
         try:
             file_path = project_path / filename
 
-            cmd = ["uv", "run", str(file_path)]
+            cmd = ["uv", "run", "--no-workspace", str(file_path)]
             result = subprocess.run(cmd, capture_output=True, text=True)
             rr(result)
             run_output = f"stdout: {result.stdout}\nstderr: {result.stderr}"
@@ -324,7 +325,7 @@ class ProjectSetupTool(BaseAnthropicTool):
 
 
 
-            cmd = ["uv", "run",  str(entry_file)]
+            cmd = ["uv", "run", "--no-workspace", str(entry_file)]
             result = subprocess.run(cmd, capture_output=True, text=True)
             run_output = f"stdout: {result.stdout}\nstderr: {result.stderr}"
             rr(result)

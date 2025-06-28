@@ -110,4 +110,4 @@ dependencies = [
 ]
 
 [tool.uv.workspace]
-members = ["repo/stls"]
+members = ["repo/stls", "repo/grokgame"]
