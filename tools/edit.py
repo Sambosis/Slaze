@@ -50,6 +50,15 @@ class EditTool(BaseTool):
         self.display = display  # Explicitly set self.display
         self._file_history = defaultdict(list)
 
+    def _resolve_path(self, path: str | Path) -> Path:
+        """Resolve a given path relative to PROJECT_DIR if not absolute, and normalize it."""
+        p = Path(path)
+        if not p.is_absolute():
+            project_dir = get_constant("PROJECT_DIR")
+            if project_dir:
+                p = Path(project_dir) / p
+        return p.resolve()
+
     def to_params(self) -> dict:
         logger.debug(f"EditTool.to_params called with api_type: {self.api_type}")
         params = {
@@ -134,8 +143,8 @@ class EditTool(BaseTool):
                     "user", f"EditTool Executing Command: {command} on path: {path}"
                 )
 
-            # Normalize the path first by converting to a Path object
-            _path = Path(path)
+            # Normalize the path first relative to PROJECT_DIR
+            _path = self._resolve_path(path)
             if command == "create":
                 if not file_text:
                     raise ToolError(
@@ -275,6 +284,7 @@ class EditTool(BaseTool):
         self, path: Path, view_range: Optional[List[int]] = None
     ) -> ToolResult:
         """Implement the view command using cross-platform methods."""
+        path = self._resolve_path(path)
         logger.debug(f"Viewing path: {path}")
         try:
             if path.is_dir():
@@ -338,6 +348,7 @@ class EditTool(BaseTool):
     ) -> ToolResult:
         """Implement the str_replace command, which replaces old_str with new_str in the file content."""
         try:
+            path = self._resolve_path(path)
             # Read the file content
             logger.debug(f"Replacing string in path: {path}")
             file_content = self.read_file(path).expandtabs()
@@ -390,6 +401,7 @@ class EditTool(BaseTool):
 
     def insert(self, path: Path, insert_line: int, new_str: str) -> ToolResult:
         """Implement the insert command, which inserts new_str at the specified line in the file content."""
+        path = self._resolve_path(path)
         file_text = self.read_file(path).expandtabs()
         new_str = new_str.expandtabs()
         file_text_lines = file_text.split("\n")
@@ -429,6 +441,7 @@ class EditTool(BaseTool):
 
     def undo_edit(self, path: Path) -> ToolResult:
         """Implement the undo_edit command."""
+        path = self._resolve_path(path)
         if not self._file_history[path]:
             raise ToolError(f"No edit history found for {path}.")
 
@@ -441,6 +454,7 @@ class EditTool(BaseTool):
 
     def read_file(self, path: Path) -> str:
         try:
+            path = self._resolve_path(path)
             return (
                 path.read_text(encoding="utf-8")
                 .encode("ascii", errors="replace")
@@ -454,8 +468,8 @@ class EditTool(BaseTool):
         """Write file content ensuring correct project directory"""
         try:
             # Normalize path to be within project directory
-            logger.debug(f"Writing to path: {path}")
-            full_path = path
+            full_path = self._resolve_path(path)
+            logger.debug(f"Writing to path: {full_path}")
             logger.debug(f"Full path for writing: {full_path}")
             # Create parent directories if needed
             full_path.parent.mkdir(parents=True, exist_ok=True)
