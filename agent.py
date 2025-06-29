@@ -36,7 +36,6 @@ load_dotenv()
 
 logger = logging.getLogger(__name__)
 
-
 class Agent:
     def __init__(self, task: str, display: Union[WebUI, AgentDisplayConsole]):
         self.task = task

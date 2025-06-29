@@ -74,6 +74,7 @@ dependencies = [
     "pyperclip==1.9.0",
     "pyrect==0.2.0",
     "pyscreeze==1.0.1",
+    "pytest>=8.4.1",
     "python-dateutil==2.9.0.post0",
     "python-dotenv==1.0.1",
     "python-engineio==4.11.2",
