@@ -21,8 +21,9 @@ This guide explains how to run the Slaze agent with the built-in web interface.
    ```bash
    python run.py web
    ```
-2. The server listens on port `5000` by default. The port can be changed with the `--port` option.
-3. Open your browser to `http://localhost:5000/` (or the port you specified).
+2. The server listens on host `0.0.0.0` and port `5000` by default. Both can be changed with the `--host` and `--port` options.
+3. Open your browser to `http://localhost:5000/` (or the host/port you specified).
+   If `localhost` does not work, use the IP address you provided to `--host`.
 4. Use the interface to select an existing prompt or create a new one, then click **Start** to launch the agent.
 5. The agent will stream its conversation to the page. Logs and generated files are stored under the `logs/` and `repo/` directories.
 
