@@ -129,12 +129,12 @@ async def call_llm_for_task_revision(prompt_text: str, client: OpenAI, model: st
 
 
 class Agent:
-    async def _revise_and_save_task(self, initial_task: str) -> str:
+    def _revise_and_save_task(self, initial_task: str) -> str:
         """
         Revises the task using an LLM, saves it to task.txt, updates the
         TASK constant, and returns the revised task.
         """
-        revised_task_from_llm = await call_llm_for_task_revision(initial_task, self.client, MAIN_MODEL)
+        revised_task_from_llm = call_llm_for_task_revision(initial_task, self.client, MAIN_MODEL)
         logger.info(f"Task revision result: '{initial_task[:100]}...' -> '{revised_task_from_llm[:100]}...'")
 
         repo_dir_val = get_constant("REPO_DIR")
