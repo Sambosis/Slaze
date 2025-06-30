@@ -105,7 +105,7 @@ async def call_llm_for_task_revision(prompt_text: str, client: OpenAI, model: st
         # If the calling code passes "anthropic/claude-3.7-sonnet:beta", it will be used.
         # Otherwise, it will use MAIN_MODEL as per current Agent._revise_and_save_task.
 
-        response = await client.chat.completions.create(
+        response = client.chat.completions.create(
             model=model,
             messages=[{"role": "user", "content": formatted_revision_prompt}],
             temperature=0.3, # Lower temperature for more focused, less creative revision
