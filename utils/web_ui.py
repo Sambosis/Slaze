@@ -176,6 +176,16 @@ class WebUI:
 
     async def wait_for_user_input(self, prompt_message: str = None) -> str:
         """Await the next user input sent via the web UI input queue."""
+        if prompt_message:
+            logging.info(f"Emitting agent_prompt: {prompt_message}")
+            self.socketio.emit("agent_prompt", {"message": prompt_message})
+
         loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(None, self.input_queue.get)
+        user_response = await loop.run_in_executor(None, self.input_queue.get)
+
+        # Clear the prompt after input is received
+        logging.info("Emitting agent_prompt_clear")
+        self.socketio.emit("agent_prompt_clear")
+
+        return user_response
 
