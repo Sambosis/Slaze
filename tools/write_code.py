@@ -744,8 +744,15 @@ class WriteCodeTool(BaseAnthropicTool):
             except Exception as e:
                 logger.warning(f"Error reading task file {path}: {e}", exc_info=True)
 
-        logger.warning("task.txt not found in any specified location. Using default task description.")
-        return "No overall task description provided (task.txt not found)."
+        logger.warning("task.txt not found in any specified location. Trying 'TASK' constant as fallback.")
+        # Try to get from "TASK" constant as a last resort if file is not found
+        task_from_constant = get_constant("TASK")
+        if task_from_constant and task_from_constant != "NOT YET CREATED" and task_from_constant.strip(): # Check if not default or empty
+            logger.info("Using task description from 'TASK' constant as fallback.")
+            return task_from_constant
+
+        logger.error("No overall task description provided (task.txt not found and TASK constant not set, default, or empty).")
+        return "No overall task description provided (task.txt not found and TASK constant not set, default, or empty)."
 
     # --- Refactored Code Generation Method ---
     async def _call_llm_to_generate_code(
