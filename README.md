@@ -36,7 +36,7 @@ OPENAI_BASE_URL=https://openrouter.ai/api/v1  # optional override for OpenRouter
 Execute:
 
 ```bash
-python run.py
+python run.py console
 ```
 
 ## Running the web UI
@@ -47,11 +47,13 @@ To use the interactive web interface, run:
 python run.py web
 ```
 
-By default the server starts on port 5001. Open your browser to:
+By default the server starts on port 5000. Open your browser to:
 
 ```
-http://localhost:5001/
+http://localhost:5000/
 ```
+
+For a detailed walkthrough see [docs/web_interface_guide.md](docs/web_interface_guide.md).
 
 The script loads environment variables with `dotenv` and launches the `AgentDisplayConsole`. You will be prompted to choose a prompt from `prompts/` or create a new one. After choosing a task, the agent runs, using tools and displaying output directly in the terminal.
 
