@@ -175,7 +175,18 @@ class WebUI:
         )
 
     async def wait_for_user_input(self, prompt_message: str = None) -> str:
-        """Await the next user input sent via the web UI input queue."""
+        """Await and return the next user input from the web UI.
+
+        If ``prompt_message`` is provided, it will be displayed to the user so
+        they know the application is waiting for instructions. This mirrors the
+        behaviour of the console interface where a prompt is printed before
+        reading input.
+        """
+        if prompt_message:
+            # Display the prompt message in the UI so the user knows what to do
+            self.add_message("assistant", prompt_message)
+
         loop = asyncio.get_running_loop()
+        # Wait for the next message submitted via the web interface
         return await loop.run_in_executor(None, self.input_queue.get)
 

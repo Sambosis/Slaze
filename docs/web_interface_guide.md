@@ -26,4 +26,9 @@ This guide explains how to run the Slaze agent with the built-in web interface.
 4. Use the interface to select an existing prompt or create a new one, then click **Start** to launch the agent.
 5. The agent will stream its conversation to the page. Logs and generated files are stored under the `logs/` and `repo/` directories.
 
+   When the agent has no further tool calls to make, the page now displays a
+   prompt asking whether you would like to provide additional instructions or
+   exit. Enter your response in the text box and press **Send**. Typing `exit`
+   ends the session.
+
 For command line usage, see the main [README](../README.md).
