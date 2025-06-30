@@ -87,7 +87,10 @@ class PictureGenerationTool(BaseAnthropicTool):
             # DockerService instantiation removed
             # Assuming output_path is a direct host path now
             from pathlib import Path
+            import os
             output_path_obj = Path(output_path)
+            # Ensure the output directory exists
+            os.makedirs(output_path_obj.parent, exist_ok=True)
             # Create input data for the model
             input_data = {
                 "prompt": prompt,
