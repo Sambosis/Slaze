@@ -43,15 +43,18 @@ python run.py console
 
 To use the interactive web interface, run:
 
+
 ```bash
 python run.py web
 ```
 
-By default the server starts on port 5000. Open your browser to:
+By default the server starts on host `0.0.0.0` on port `5000`. You can change these with the `--host` and `--port` options. After starting the server open your browser to:
 
 ```
 http://localhost:5000/
 ```
+
+If `localhost` does not resolve correctly on your machine, replace it with the IP address specified via `--host`.
 
 For a detailed walkthrough see [docs/web_interface_guide.md](docs/web_interface_guide.md).
 

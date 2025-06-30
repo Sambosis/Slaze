@@ -49,17 +49,19 @@ def console():
 
 @cli.command()
 @click.option('--port', default=5000, help='Port to run the web server on.')
-def web(port):
+@click.option('--host', default='0.0.0.0', help='Host interface to bind the web server.')
+def web(port, host):
     """Run the agent with a web interface."""
     
     display = WebUI(run_agent_async)
     
-    url = f"http://localhost:{port}"
-    print(f"Web server started on port {port}. Opening your browser to {url}")
+    url_host = 'localhost' if host in ['0.0.0.0', ''] else host
+    url = f"http://{url_host}:{port}"
+    print(f"Web server started on {host}:{port}. Opening your browser to {url}")
     webbrowser.open(url)
     print("Waiting for user to start a task from the web interface.")
     
-    display.start_server(port=port)
+    display.start_server(host=host, port=port)
     
     # The Flask-SocketIO server is a blocking call that will keep the application
     # alive. It's started in display.start_server().
