@@ -18,7 +18,8 @@ def cli():
 async def run_agent_async(task, display):
     """Asynchronously runs the agent with a given task and display."""
     agent = Agent(task=task, display=display)
-    agent.messages.append({"role": "user", "content": task})
+    await agent._revise_and_save_task(agent.task)
+    agent.messages.append({"role": "user", "content": agent.task})
     await sampling_loop(agent=agent)
 
 async def sampling_loop(agent: Agent):

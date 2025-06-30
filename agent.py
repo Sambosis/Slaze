@@ -129,12 +129,12 @@ async def call_llm_for_task_revision(prompt_text: str, client: OpenAI, model: st
 
 
 class Agent:
-    def _revise_and_save_task(self, initial_task: str) -> str:
+    async def _revise_and_save_task(self, initial_task: str) -> str:
         """
         Revises the task using an LLM, saves it to task.txt, updates the
         TASK constant, and returns the revised task.
         """
-        revised_task_from_llm = call_llm_for_task_revision(initial_task, self.client, MAIN_MODEL)
+        revised_task_from_llm = await call_llm_for_task_revision(initial_task, self.client, MAIN_MODEL)
         logger.info(f"Task revision result: '{initial_task[:100]}...' -> '{revised_task_from_llm[:100]}...'")
 
         repo_dir_val = get_constant("REPO_DIR")
@@ -172,14 +172,6 @@ class Agent:
             base_url=os.getenv("OPENAI_BASE_URL", "https://openrouter.ai/api/v1"),
         )
 
-        # Revise the task and save it
-        try:
-            revised_task = self._revise_and_save_task(self.task)
-            self.task = revised_task  # Update self.task to the revised one
-            logger.info(f"Agent task updated to revised version: {self.task[:100]}...")
-        except Exception as e:
-            logger.error(f"Error during task revision process in __init__: {e}", exc_info=True)
-            # self.task remains the original task if revision fails
         self.display = display
         self.context_recently_refreshed = False
         self.refresh_count = 45
