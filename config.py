@@ -60,8 +60,8 @@ openaio3pro = "openai/o3-pro"
 googlepro = "google/gemini-2.5-pro-preview"
 googleflash = "google/gemini-2.5-flash-preview"
 googleflashlite = "google/gemini-2.5-flash-lite-preview-06-17"
-SUMMARY_MODEL = googleflashlite  # Model for summaries
-MAIN_MODEL = googlepro  # Primary model for main agent operations
+SUMMARY_MODEL = sonnet4  # Model for summaries
+MAIN_MODEL = sonnet4  # Primary model for main agent operations
 CODE_MODEL = googlepro  # Model for code generation tasks
 # Feature flag constants
 COMPUTER_USE_BETA_FLAG = "computer-use-2024-10-22"
@@ -183,17 +183,6 @@ def get_constants(): # Renamed from original get_constants to avoid conflict dur
     return constants
 
 
-
-
-
-
-
-
-
-
-
-
-
 # Function to set a constant and persist it
 def get_constant(name: str, default: Any = None) -> Any:
     # `get_constants()` now ensures the file is written if it doesn't exist.
@@ -305,7 +294,6 @@ write_constants_to_file()
 # Function to load the constants from a file (original name, now calls the new get_constants)
 def load_constants():
     return get_constants()
-
 
 
 # --- Logging Setup ---

@@ -1,0 +1,1 @@
+Create a strategy game that is based in Harford County Maryland. Use specific local references and have one team fight against another. The user should be based in Joppatowne. Use Pygame. 

@@ -33,8 +33,7 @@ from dotenv import load_dotenv
 import asyncio # Added asyncio
 from pathlib import Path # Added Path
 from config import set_constant, get_constant, MAIN_MODEL # Added config imports
--from config import set_constant, get_constant, MAIN_MODEL # Added config imports
-+from config import set_constant, get_constant  # Added config imports
+
 load_dotenv()
 
 logger = logging.getLogger(__name__)
