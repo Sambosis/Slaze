@@ -174,23 +174,12 @@ class Agent:
 
         # Revise the task and save it
         try:
-            # Create a new event loop if one doesn't exist, otherwise use the existing one
-            try:
-                loop = asyncio.get_event_loop()
-                if loop.is_running():
-                    logger.warning("Event loop already running, deferring task revision")
-                    revised_task = self.task  # Keep original task for now
-                else:
-                    revised_task = loop.run_until_complete(self._revise_and_save_task(self.task))
-            except RuntimeError:
-                # No event loop exists in current thread
-                revised_task = asyncio.run(self._revise_and_save_task(self.task))
-            self.task = revised_task # Update self.task to the revised one
+            revised_task = self._revise_and_save_task(self.task)
+            self.task = revised_task  # Update self.task to the revised one
             logger.info(f"Agent task updated to revised version: {self.task[:100]}...")
         except Exception as e:
             logger.error(f"Error during task revision process in __init__: {e}", exc_info=True)
             # self.task remains the original task if revision fails
-
         self.display = display
         self.context_recently_refreshed = False
         self.refresh_count = 45
