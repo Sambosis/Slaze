@@ -32,6 +32,7 @@
         <div class="messages" id="messages">
             <!-- Messages will be loaded here -->
         </div>
+        <div id="agent_prompt_area" class="agent-prompt" style="margin-top: 10px; margin-bottom: 10px; padding: 10px; background-color: #f0f0f0; border-radius: 4px; text-align: center; display: none;"></div>
         <div class="input-area">
             <textarea id="user_input" placeholder="Type your message here..."></textarea>
             <button onclick="sendMessage()">Send</button>
@@ -62,12 +63,34 @@
             messagesDiv.scrollTop = messagesDiv.scrollHeight; // Scroll to bottom
         });
 
+        socket.on('agent_prompt', function(data) {
+            var promptArea = document.getElementById('agent_prompt_area');
+            if (data.message) {
+                promptArea.textContent = data.message;
+                promptArea.style.display = 'block';
+            } else {
+                promptArea.textContent = '';
+                promptArea.style.display = 'none';
+            }
+        });
+
+        socket.on('agent_prompt_clear', function() {
+            var promptArea = document.getElementById('agent_prompt_area');
+            promptArea.textContent = '';
+            promptArea.style.display = 'none';
+        });
+
         function sendMessage() {
             var input = document.getElementById('user_input');
+            var promptArea = document.getElementById('agent_prompt_area');
             var message = input.value;
             if (message.trim() !== '') {
                 socket.emit('user_input', { input: message });
                 input.value = '';
+                // It's better to rely on agent_prompt_clear from backend
+                // but as a fallback, hide it immediately on send.
+                // promptArea.textContent = '';
+                // promptArea.style.display = 'none';
             }
         }
 
