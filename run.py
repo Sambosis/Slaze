@@ -64,4 +64,5 @@ def web(port):
     # alive. It's started in display.start_server().
 
 if __name__ == "__main__":
+    print("Starting Slazy Agent CLI...")
     cli()
