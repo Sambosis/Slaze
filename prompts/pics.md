@@ -1,1 +1,1 @@
-create 3 pictures of turtles with hats Using the LLM agent's create picture tool to generate the image.  No code is needed.  Just call the tool and create pictures
+create 3 pictures of ducks with hats Using the LLM agent's create picture tool to generate the image.  No code is needed.  Just call the tool and create pictures
