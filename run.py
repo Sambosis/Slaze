@@ -59,7 +59,7 @@ def web(port):
     webbrowser.open(url)
     print("Waiting for user to start a task from the web interface.")
     
-    display.start_server(port=port)
+    display.start_server(host='0.0.0.0', port=port)
     
     # The Flask-SocketIO server is a blocking call that will keep the application
     # alive. It's started in display.start_server().
