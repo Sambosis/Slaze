@@ -3,6 +3,7 @@ import click
 
 from dotenv import load_dotenv
 import webbrowser
+import socket
 
 from agent import Agent
 from utils.agent_display_console import AgentDisplayConsole
@@ -51,10 +52,19 @@ def console():
 @click.option('--port', default=5000, help='Port to run the web server on.')
 def web(port):
     """Run the agent with a web interface."""
-    
+
     display = WebUI(run_agent_async)
-    
-    url = f"http://localhost:{port}"
+
+    # Determine the local IP address for convenience when accessing from
+    # another machine on the network. Fallback to localhost if detection fails.
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.connect(("10.255.255.255", 1))
+            host_ip = s.getsockname()[0]
+    except Exception:
+        host_ip = "localhost"
+
+    url = f"http://{host_ip}:{port}"
     print(f"Web server started on port {port}. Opening your browser to {url}")
     webbrowser.open(url)
     print("Waiting for user to start a task from the web interface.")
