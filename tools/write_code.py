@@ -724,18 +724,23 @@ class WriteCodeTool(BaseAnthropicTool):
         Tries to read the task description from various locations.
         Returns the task description or a default message if not found.
         """
-        # Priority order: logs/task.txt first, then repo/logs/task.txt, then project root
-        possible_paths = [
-            os.path.join("logs", "task.txt"),  # Primary location
-        ]
+        possible_paths = []
         
-        # Add repo/logs/task.txt as fallback for backward compatibility
+        # Primary location: Use LOGS_DIR constant
+        logs_dir = get_constant("LOGS_DIR")
+        if logs_dir:
+            possible_paths.append(os.path.join(str(logs_dir), "task.txt"))
+        
+        # Fallback for backward compatibility: repo/logs/task.txt
         repo_dir = get_constant("REPO_DIR")
-        if repo_dir and isinstance(repo_dir, str): # Ensure repo_dir is a string
-            possible_paths.append(os.path.join(repo_dir, "logs", "task.txt"))
+        if repo_dir:
+            possible_paths.append(os.path.join(str(repo_dir), "logs", "task.txt"))
         
-        # Add project root as final fallback
-        possible_paths.append("task.txt")
+        # Additional fallbacks for backward compatibility
+        possible_paths.extend([
+            os.path.join("logs", "task.txt"),  # Relative logs directory
+            "task.txt"  # Project root
+        ])
 
         for path in possible_paths:
             try:
