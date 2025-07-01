@@ -389,7 +389,7 @@ Some additional text.
         plain_text = "This is just plain text without code blocks."
         code, language = write_code_tool.extract_code_block(plain_text)
         assert code == plain_text
-        assert language == "text"
+        assert language == "unknown"
 
     @pytest.mark.asyncio
     @patch('tools.write_code.get_constant')
