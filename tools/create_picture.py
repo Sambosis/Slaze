@@ -43,9 +43,13 @@ class PictureGenerationTool(BaseAnthropicTool):
                             "type": "string",
                             "description": "Text description of the image to generate",
                         },
+                        "project_path": {
+                            "type": "string",
+                            "description": "Path to the project directory (e.g., 'my_app'). Files will be saved relative to REPO_DIR/project_path.",
+                        },
                         "output_path": {
                             "type": "string",
-                            "description": "Path where the generated image will be saved",
+                            "description": "Path where the generated image will be saved, relative to the project_path (e.g., 'images/my_pic.png').",
                         },
                         "width": {
                             "type": "integer",
@@ -56,7 +60,7 @@ class PictureGenerationTool(BaseAnthropicTool):
                             "description": "Height to resize the image (required)",
                         },
                     },
-                    "required": ["command", "prompt", "width", "height"],
+                    "required": ["command", "prompt", "project_path", "output_path", "width", "height"],
                 },
             },
         }
@@ -64,14 +68,16 @@ class PictureGenerationTool(BaseAnthropicTool):
         return params
 
     async def generate_picture(
-        self, prompt: str, output_path: str, width: int, height: int
+        self, prompt: str, project_path: str, output_path: str, width: int, height: int
     ) -> dict:
         """
-        Generates an image based on the prompt using the specified width and height, and saves it to the output path.
+        Generates an image based on the prompt using the specified width and height,
+        and saves it to the output path relative to the project_path within REPO_DIR.
 
         Args:
             prompt: Text description of the image to generate
-            output_path: Path where the image should be saved
+            project_path: Path to the project directory.
+            output_path: Path where the image should be saved, relative to project_path.
             width: Width to resize the image to (required)
             height: Height to resize the image to (required)
 
@@ -83,11 +89,21 @@ class PictureGenerationTool(BaseAnthropicTool):
             import replicate
             import base64
             from PIL import Image
-
-            # DockerService instantiation removed
-            # Assuming output_path is a direct host path now
             from pathlib import Path
-            output_path_obj = Path(output_path)
+            from config import get_constant # Added import
+
+            # --- Path Construction ---
+            host_repo_dir = get_constant("REPO_DIR")
+            if not host_repo_dir:
+                raise ValueError("REPO_DIR is not configured in config.py.")
+
+            base_save_path = Path(host_repo_dir) / project_path
+            output_path_obj = (base_save_path / output_path).resolve()
+
+            # Ensure the parent directory exists
+            output_path_obj.parent.mkdir(parents=True, exist_ok=True)
+            logger.info(f"Resolved image output path: {output_path_obj}")
+
             # Create input data for the model
             input_data = {
                 "prompt": prompt,
@@ -205,7 +221,8 @@ class PictureGenerationTool(BaseAnthropicTool):
         *,
         command: PictureCommand,
         prompt: str,
-        output_path: str = "output",
+        project_path: str, # Added project_path
+        output_path: str,  # Removed default, now required
         width: int,
         height: int,
         **kwargs,
@@ -216,7 +233,8 @@ class PictureGenerationTool(BaseAnthropicTool):
         Args:
             command: The command to execute
             prompt: The text prompt to generate the image from
-            output_path: The path to save the image to
+            project_path: Path to the project directory.
+            output_path: The path to save the image to, relative to project_path.
             width: Width to resize the image (required)
             height: Height to resize the image (required)
             **kwargs: Additional parameters
@@ -226,7 +244,8 @@ class PictureGenerationTool(BaseAnthropicTool):
         """
         try:
             if command == PictureCommand.CREATE:
-                result = await self.generate_picture(prompt, output_path, width, height)
+                # Pass project_path to generate_picture
+                result = await self.generate_picture(prompt, project_path, output_path, width, height)
 
                 if "error" in result and result["error"]:
                     return ToolResult(
