@@ -138,15 +138,9 @@ class Agent:
         revised_task_from_llm = await call_llm_for_task_revision(initial_task, self.client, MAIN_MODEL)
         logger.info(f"Task revision result: '{initial_task[:100]}...' -> '{revised_task_from_llm[:100]}...'")
 
-        repo_dir_val = get_constant("REPO_DIR")
-        if not repo_dir_val:
-            logger.error("REPO_DIR not found in constants. Cannot save revised task.txt.")
-            # Fallback: update self.task and TASK constant but don't write to file.
-            set_constant("TASK", revised_task_from_llm)
-            return revised_task_from_llm
-
-        repo_dir = Path(repo_dir_val)
-        task_file_path = repo_dir / "logs" / "task.txt"
+        # Save task.txt to the logs directory instead of repo/logs
+        logs_dir = Path.cwd() / "logs"
+        task_file_path = logs_dir / "task.txt"
 
         try:
             task_file_path.parent.mkdir(parents=True, exist_ok=True)
