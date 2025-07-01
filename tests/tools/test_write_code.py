@@ -115,19 +115,83 @@ class TestWriteCodeTool:
     @pytest.mark.asyncio
     async def test_invalid_files_format(self, write_code_tool: WriteCodeTool):
         """Test that invalid file format returns an error."""
-        invalid_files = [
-            {"filename": "test.py"}  # Missing required code_description
+
+        # Missing required code_description
+        invalid_files_1 = [
+            {"filename": "test.py"}
         ]
-        
-        result = await write_code_tool(
+        result_1 = await write_code_tool(
             command=CodeCommand.WRITE_CODEBASE,
-            files=invalid_files,
+            files=invalid_files_1,
             project_path="test_project"
         )
-        
-        assert isinstance(result, ToolResult)
-        assert result.error is not None
-        assert "invalid format" in result.error.lower()
+        assert isinstance(result_1, ToolResult)
+        assert result_1.error is not None
+        assert "invalid format" in result_1.error.lower()
+
+        # Missing required filename
+        invalid_files_2 = [
+            {"code_description": "desc"}
+        ]
+        result_2 = await write_code_tool(
+            command=CodeCommand.WRITE_CODEBASE,
+            files=invalid_files_2,
+            project_path="test_project"
+        )
+        assert isinstance(result_2, ToolResult)
+        assert result_2.error is not None
+        assert "invalid format" in result_2.error.lower()
+
+        # Invalid type for external_imports (should be list, not string)
+        invalid_files_3 = [
+            {
+                "filename": "test.py",
+                "code_description": "desc",
+                "external_imports": "not_a_list"
+            }
+        ]
+        result_3 = await write_code_tool(
+            command=CodeCommand.WRITE_CODEBASE,
+            files=invalid_files_3,
+            project_path="test_project"
+        )
+        assert isinstance(result_3, ToolResult)
+        assert result_3.error is not None
+        assert "invalid format" in result_3.error.lower()
+
+        # Invalid type for internal_imports (should be list, not int)
+        invalid_files_4 = [
+            {
+                "filename": "test.py",
+                "code_description": "desc",
+                "internal_imports": 123
+            }
+        ]
+        result_4 = await write_code_tool(
+            command=CodeCommand.WRITE_CODEBASE,
+            files=invalid_files_4,
+            project_path="test_project"
+        )
+        assert isinstance(result_4, ToolResult)
+        assert result_4.error is not None
+        assert "invalid format" in result_4.error.lower()
+
+        # Unexpected field in file dict
+        invalid_files_5 = [
+            {
+                "filename": "test.py",
+                "code_description": "desc",
+                "unexpected_field": "unexpected"
+            }
+        ]
+        result_5 = await write_code_tool(
+            command=CodeCommand.WRITE_CODEBASE,
+            files=invalid_files_5,
+            project_path="test_project"
+        )
+        assert isinstance(result_5, ToolResult)
+        assert result_5.error is not None
+        assert "invalid format" in result_5.error.lower()
 
     @pytest.mark.asyncio
     @patch('tools.write_code.get_constant')
