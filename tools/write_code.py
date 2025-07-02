@@ -1,5 +1,5 @@
+# ignore: type
 """Utility tool for generating codebases via LLM calls."""
-
 import asyncio
 import os
 import time

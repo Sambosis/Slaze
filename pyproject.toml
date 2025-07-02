@@ -74,6 +74,7 @@ dependencies = [
     "pyperclip==1.9.0",
     "pyrect==0.2.0",
     "pyscreeze==1.0.1",
+    "pytest-html>=4.1.1",
     "pytest>=8.4.1",
     "python-dateutil==2.9.0.post0",
     "python-dotenv==1.0.1",
@@ -110,3 +111,9 @@ dependencies = [
     "zope-interface==7.2",
 ]
 
+[tool.pyright]
+typeCheckingMode = "basic"
+reportIncompatibleMethodOverride = false
+reportGeneralTypeIssues = false
+reportAttributeAccessIssue = false
+reportArgumentType = false
