@@ -1,1 +1,1 @@
-create a pygame version of tic tac toe where a user plays the computer. 
+create a pygame version of tic tac toe where a computer plays the computer. 
