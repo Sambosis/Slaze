@@ -112,13 +112,13 @@ class BashTool(BaseTool):
                 f"error: {error}"
             )
             rr(formatted_output)
-            return = ToolResult(
+            return ToolResult(
                 output=output,
                 error=error,
-                success=success,
+                #success=success,
                 tool_name=self.name,
                 command=command,
-                working_directory=cwd,
+                #working_directory=cwd,
                 )
 
 
