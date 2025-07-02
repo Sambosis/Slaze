@@ -1,1 +1,1 @@
-creat a  ee app that lets the user build custom lego structures 
+create a web app that lets the user build custom lego structures 

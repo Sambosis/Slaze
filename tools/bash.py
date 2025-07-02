@@ -2,6 +2,7 @@ from typing import ClassVar, Literal, Union
 import subprocess
 import re
 from dotenv import load_dotenv
+from regex import T
 from config import get_constant # check_docker_available removed
 from .base import BaseTool, ToolError, ToolResult
 from utils.web_ui import WebUI
@@ -32,8 +33,13 @@ class BashTool(BaseTool):
 
     async def __call__(self, command: str | None = None, **kwargs):
         if command is not None:
+            if self.display is not None:
+                self.display.add_message("assistant", f"Agent sent command: {command}")
+
             # Modify commands to exclude hidden files/paths
             modified_command = self._modify_command_if_needed(command)
+            if self.display is not None:
+                self.display.add_message("assistant", f"Modified command: {modified_command}")
             return await self._run_command(modified_command)
         raise ToolError("no command provided.")
 
@@ -87,54 +93,34 @@ class BashTool(BaseTool):
                 output = result.stdout
                 error = result.stderr
                 success = result.returncode == 0
-            except Exception as e:
-                error = f"Command execution error: {str(e)}"
-                success = False
-            if len(output) > 200000:
-                output = output[:100000] + " ... [TRUNCATED] ... " + output[-100000:]
-            if len(error) > 200000:
-                error = error[:100000] + " ... [TRUNCATED] ... " + error[-100000:]
 
-            # Determine working directory **before** we attempt the subprocess call
-            project_dir = get_constant("PROJECT_DIR")
-            cwd: str | None = str(project_dir) if project_dir else None
-
-            try:
-                result = subprocess.run(
-                    ["bash", "-c", command],
-                    cwd=cwd,
-                    capture_output=True,
-                    text=True,
-                    timeout=timeout,
-                )
-                success = result.returncode == 0
-                output = result.stdout
-                error = result.stderr
-            except subprocess.TimeoutExpired as e:
-                success = False
-                output = e.stdout or ""
-                error = e.stderr or ""
             except Exception as e:
                 success = False
                 output = ""
                 error = str(e)
-
+            if len(output) > 200000:
+                output = f"{output[:100000]} ... [TRUNCATED] ... {output[-100000:]}"
             if len(error) > 200000:
-                error = error[:100000] + " ... [TRUNCATED] ... " + error[-100000:]
+                error = f"{error[:100000]} ... [TRUNCATED] ... {error[-100000:]}"
 
-            working_dir = cwd or os.getcwd()
+
             formatted_output = (
                 f"command: {command}\n"
-                f"working_directory: {working_dir}\n"
+                f"working_directory: {cwd}\n"
                 f"success: {str(success).lower()}\n"
                 f"output: {output}\n"
                 f"error: {error}"
             )
             rr(formatted_output)
-            # Create a new ToolResult instead of modifying an existing one
-            return ToolResult(
-                output=formatted_output, tool_name=self.name, command=command
-            )
+            return = ToolResult(
+                output=output,
+                error=error,
+                success=success,
+                tool_name=self.name,
+                command=command,
+                working_directory=cwd,
+                )
+
 
         except Exception as e:
             error = str(e)
