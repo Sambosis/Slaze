@@ -127,3 +127,22 @@ Windows to keep things cross-platform.
 All environment variables can be placed in a `.env` file. The main ones are
 `OPENROUTER_API_KEY`/`OPENAI_API_KEY` and optionally `OPENAI_BASE_URL`.
 
+
+## Docker usage
+
+Build the image from the project root:
+
+```bash
+docker build -t slaze .
+```
+
+Run the container, supplying your API key:
+
+```bash
+docker run -e OPENROUTER_API_KEY=YOUR_KEY -p 5000:5000 slaze
+```
+
+You may also use `OPENAI_API_KEY` and optionally `OPENAI_BASE_URL` instead of
+`OPENROUTER_API_KEY`. The web interface will then be available at
+`http://localhost:5000/`.
+
