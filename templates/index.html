@@ -21,6 +21,11 @@
         .header h1 { margin: 0; }
         .header a { text-decoration: none; color: #007bff; }
         .header a:hover { text-decoration: underline; }
+        .tab-buttons { overflow: hidden; border-bottom: 1px solid #ccc; margin-bottom: 10px; }
+        .tab-button { background-color: #f1f1f1; border: none; outline: none; cursor: pointer; padding: 10px 20px; }
+        .tab-button.active { background-color: #ddd; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
     </style>
 </head>
 <body>
@@ -29,8 +34,25 @@
             <h1>Slazy Agent</h1>
             <a href="/select_prompt">Select/Create Prompt</a>
         </div>
-        <div class="messages" id="messages">
-            <!-- Messages will be loaded here -->
+        <div class="tab-buttons">
+            <button class="tab-button active" onclick="openTab(event, 'user_tab')">User</button>
+            <button class="tab-button" onclick="openTab(event, 'assistant_tab')">Assistant</button>
+            <button class="tab-button" onclick="openTab(event, 'tool_tab')">Tool</button>
+        </div>
+        <div id="user_tab" class="tab-content active">
+            <div class="messages" id="user_messages">
+                <!-- User messages will be loaded here -->
+            </div>
+        </div>
+        <div id="assistant_tab" class="tab-content">
+            <div class="messages" id="assistant_messages">
+                <!-- Assistant messages will be loaded here -->
+            </div>
+        </div>
+        <div id="tool_tab" class="tab-content">
+            <div class="messages" id="tool_messages">
+                <!-- Tool messages will be loaded here -->
+            </div>
         </div>
         <div id="agent_prompt_area" class="agent-prompt" style="margin-top: 10px; margin-bottom: 10px; padding: 10px; background-color: #f0f0f0; border-radius: 4px; text-align: center; display: none;"></div>
         <div class="input-area">
@@ -43,24 +65,55 @@
     <script>
         var socket = io();
 
+        function openTab(evt, tabId) {
+            var i, tabcontent, tabbuttons;
+            tabcontent = document.getElementsByClassName('tab-content');
+            for (i = 0; i < tabcontent.length; i++) {
+                tabcontent[i].classList.remove('active');
+            }
+            tabbuttons = document.getElementsByClassName('tab-button');
+            for (i = 0; i < tabbuttons.length; i++) {
+                tabbuttons[i].classList.remove('active');
+            }
+
+            document.getElementById(tabId).classList.add('active');
+            if (evt) {
+                evt.currentTarget.classList.add('active');
+            } else {
+                // activate corresponding button if event not provided
+                var button = document.querySelector('.tab-button[onclick*="' + tabId + '"]');
+                if (button) {
+                    button.classList.add('active');
+                }
+            }
+        }
+
         socket.on('connect', function() {
             console.log('Connected to SocketIO');
         });
 
         socket.on('update', function(data) {
-            var messagesDiv = document.getElementById('messages');
-            messagesDiv.innerHTML = ''; // Clear existing messages
+            var userDiv = document.getElementById('user_messages');
+            var assistantDiv = document.getElementById('assistant_messages');
+            var toolDiv = document.getElementById('tool_messages');
+            userDiv.innerHTML = '';
+            assistantDiv.innerHTML = '';
+            toolDiv.innerHTML = '';
 
             data.user.forEach(function(msg) {
-                messagesDiv.innerHTML += '<div class="message user-message">' + msg + '</div>';
+                userDiv.innerHTML += '<div class="message user-message">' + msg + '</div>';
             });
             data.assistant.forEach(function(msg) {
-                messagesDiv.innerHTML += '<div class="message assistant-message">' + msg + '</div>';
+                assistantDiv.innerHTML += '<div class="message assistant-message">' + msg + '</div>';
             });
             data.tool.forEach(function(msg) {
-                messagesDiv.innerHTML += '<div class="message tool-message">' + msg + '</div>';
+                toolDiv.innerHTML += '<div class="message tool-message">' + msg + '</div>';
             });
-            messagesDiv.scrollTop = messagesDiv.scrollHeight; // Scroll to bottom
+
+            // Scroll each tab to bottom
+            userDiv.scrollTop = userDiv.scrollHeight;
+            assistantDiv.scrollTop = assistantDiv.scrollHeight;
+            toolDiv.scrollTop = toolDiv.scrollHeight;
         });
 
         socket.on('agent_prompt', function(data) {
@@ -104,18 +157,24 @@
             fetch('/messages')
                 .then(response => response.json())
                 .then(data => {
-                    var messagesDiv = document.getElementById('messages');
+                    var userDiv = document.getElementById('user_messages');
+                    var assistantDiv = document.getElementById('assistant_messages');
+                    var toolDiv = document.getElementById('tool_messages');
                     data.user.forEach(function(msg) {
-                        messagesDiv.innerHTML += '<div class="message user-message">' + msg + '</div>';
+                        userDiv.innerHTML += '<div class="message user-message">' + msg + '</div>';
                     });
                     data.assistant.forEach(function(msg) {
-                        messagesDiv.innerHTML += '<div class="message assistant-message">' + msg + '</div>';
+                        assistantDiv.innerHTML += '<div class="message assistant-message">' + msg + '</div>';
                     });
                     data.tool.forEach(function(msg) {
-                        messagesDiv.innerHTML += '<div class="message tool-message">' + msg + '</div>';
+                        toolDiv.innerHTML += '<div class="message tool-message">' + msg + '</div>';
                     });
-                    messagesDiv.scrollTop = messagesDiv.scrollHeight; // Scroll to bottom
+                    userDiv.scrollTop = userDiv.scrollHeight;
+                    assistantDiv.scrollTop = assistantDiv.scrollHeight;
+                    toolDiv.scrollTop = toolDiv.scrollHeight;
                 });
+            // Default to showing the user tab on page load
+            openTab(null, 'user_tab');
         };
     </script>
 </body>
