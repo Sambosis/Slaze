@@ -60,9 +60,9 @@ openaio3pro = "openai/o3-pro"
 googlepro = "google/gemini-2.5-pro-preview"
 googleflash = "google/gemini-2.5-flash-preview"
 googleflashlite = "google/gemini-2.5-flash-lite-preview-06-17"
-SUMMARY_MODEL = sonnet4  # Model for summaries
-MAIN_MODEL = openaio3  # Primary model for main agent operations
-CODE_MODEL = googleflashlite  # Model for code generation tasks
+SUMMARY_MODEL = googleflashlite  # Model for summaries
+MAIN_MODEL = openaio3pro  # Primary model for main agent operations
+CODE_MODEL = openaio3pro  # Model for code generation tasks
 # Feature flag constants
 COMPUTER_USE_BETA_FLAG = "computer-use-2024-10-22"
 PROMPT_CACHING_BETA_FLAG = "prompt-caching-2024-07-31"
