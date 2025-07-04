@@ -1,0 +1,25 @@
+Defaulting to user installation because normal site-packages is not writeable
+Collecting sqlalchemy
+  Downloading sqlalchemy-2.0.41-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (9.6 kB)
+Collecting asyncpg
+  Downloading asyncpg-0.30.0-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (5.0 kB)
+Collecting aiosqlite
+  Downloading aiosqlite-0.21.0-py3-none-any.whl.metadata (4.3 kB)
+Collecting psycopg2-binary
+  Downloading psycopg2_binary-2.9.10-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (4.9 kB)
+Collecting greenlet>=1 (from sqlalchemy)
+  Downloading greenlet-3.2.3-cp313-cp313-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl.metadata (4.1 kB)
+Collecting typing-extensions>=4.6.0 (from sqlalchemy)
+  Downloading typing_extensions-4.14.0-py3-none-any.whl.metadata (3.0 kB)
+Downloading sqlalchemy-2.0.41-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (3.2 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 3.2/3.2 MB 163.6 MB/s eta 0:00:00
+Downloading asyncpg-0.30.0-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (3.6 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 3.6/3.6 MB 191.3 MB/s eta 0:00:00
+Downloading aiosqlite-0.21.0-py3-none-any.whl (15 kB)
+Downloading psycopg2_binary-2.9.10-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (3.0 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 3.0/3.0 MB 176.4 MB/s eta 0:00:00
+Downloading greenlet-3.2.3-cp313-cp313-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl (608 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 608.4/608.4 kB 36.1 MB/s eta 0:00:00
+Downloading typing_extensions-4.14.0-py3-none-any.whl (43 kB)
+Installing collected packages: typing-extensions, psycopg2-binary, greenlet, asyncpg, sqlalchemy, aiosqlite
+Successfully installed aiosqlite-0.21.0 asyncpg-0.30.0 greenlet-3.2.3 psycopg2-binary-2.9.10 sqlalchemy-2.0.41 typing-extensions-4.14.0
