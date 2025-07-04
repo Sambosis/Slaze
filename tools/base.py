@@ -98,7 +98,7 @@ class BaseTool(metaclass=ABCMeta):
         """The name of the tool."""
         pass
 
-    @property
+    # @property
     @abstractmethod
     def description(self) -> str:
         """A description of what the tool does."""

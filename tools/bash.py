@@ -33,8 +33,7 @@ class BashTool(BaseTool):
 
     async def __call__(self, command: str | None = None, **kwargs):
         if command is not None:
-            if self.display is not None:
-                self.display.add_message("assistant", f"Agent sent command: {command}")
+
 
             # Modify commands to exclude hidden files/paths
             modified_command = self._modify_command_if_needed(command)
@@ -71,38 +70,32 @@ class BashTool(BaseTool):
         output = ""
         error = ""
         success = False
-        timeout = 42
+        cwd = None
         try:
+            # Execute the command locally relative to PROJECT_DIR if set
+            project_dir = get_constant("PROJECT_DIR")
+            cwd = str(project_dir) if project_dir else None
+            terminal_display = f"terminal {cwd}>  {command}"
             if self.display is not None:
-                self.display.add_message("user", f"Executing command: {command}")
-
-            try:
-                # Execute the command locally relative to PROJECT_DIR if set
-                project_dir = get_constant("PROJECT_DIR")
-                cwd = str(project_dir) if project_dir else None
-                result = subprocess.run(
-                    command,
-                    shell=True,
-                    capture_output=True,
-                    text=True,
-                    encoding="utf-8",
-                    errors="replace",
-                    check=False,
-                    cwd=cwd,
+                self.display.add_message("assistant", terminal_display)
+            result = subprocess.run(
+                command,
+                shell=True,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                check=False,
+                cwd=cwd,
                 )
-                output = result.stdout
-                error = result.stderr
-                success = result.returncode == 0
+            output = result.stdout
+            error = result.stderr
+            success = result.returncode == 0
 
-            except Exception as e:
-                success = False
-                output = ""
-                error = str(e)
             if len(output) > 200000:
                 output = f"{output[:100000]} ... [TRUNCATED] ... {output[-100000:]}"
             if len(error) > 200000:
                 error = f"{error[:100000]} ... [TRUNCATED] ... {error[-100000:]}"
-
 
             formatted_output = (
                 f"command: {command}\n"
@@ -119,8 +112,7 @@ class BashTool(BaseTool):
                 tool_name=self.name,
                 command=command,
                 #working_directory=cwd,
-                )
-
+            )
 
         except Exception as e:
             error = str(e)
