@@ -4,6 +4,30 @@ import tempfile
 import os
 from pathlib import Path
 from unittest.mock import patch, MagicMock, AsyncMock
+import types
+
+
+@pytest.fixture(autouse=True)
+def patch_openai(monkeypatch):
+    """Patch OpenAI client to avoid real API calls and echo back the command."""
+    def dummy_openai(*args, **kwargs):
+        client = MagicMock()
+
+        def create(model=None, messages=None, temperature=0, max_tokens=60):
+            if messages:
+                user_content = messages[-1]["content"]
+                command_line = user_content.split("COMMAND:")[-1].strip()
+            else:
+                command_line = ""
+            message = types.SimpleNamespace(content=command_line)
+            choice = types.SimpleNamespace(message=message)
+            return types.SimpleNamespace(choices=[choice])
+
+        client.chat = types.SimpleNamespace(completions=types.SimpleNamespace(create=create))
+        return client
+
+    monkeypatch.setattr("tools.bash.OpenAI", dummy_openai)
+    monkeypatch.setattr("tools.bash.MAIN_MODEL", "test-model")
 from tools.bash import BashTool
 from tools.base import ToolResult, ToolError
 
@@ -293,6 +317,26 @@ async def test_error_truncation():
         assert result.output is not None
         assert "TRUNCATED" in result.output
         assert len(result.output) < 300000  # Should be truncated
+
+
+@pytest.mark.asyncio
+async def test_llm_command_conversion(monkeypatch):
+    """Ensure _convert_command_for_system returns the LLM output."""
+    bash_tool = BashTool()
+
+    def fake_create(model=None, messages=None, temperature=0, max_tokens=60):
+        message = types.SimpleNamespace(content="dir")
+        choice = types.SimpleNamespace(message=message)
+        return types.SimpleNamespace(choices=[choice])
+
+    dummy_client = MagicMock()
+    dummy_client.chat = types.SimpleNamespace(
+        completions=types.SimpleNamespace(create=fake_create)
+    )
+    monkeypatch.setattr("tools.bash.OpenAI", lambda *a, **k: dummy_client)
+
+    converted = await bash_tool._convert_command_for_system("ls")
+    assert converted == "dir"
 
 
 if __name__ == "__main__":

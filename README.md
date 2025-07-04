@@ -121,8 +121,9 @@ Some tools expect Docker to be available (container name defaults to
 `python-dev-container`). Ensure the container is running if you plan to use tools
 that execute commands inside Docker.
 
-The Bash tool automatically converts commands to PowerShell when running on
-Windows to keep things cross-platform.
+The Bash tool now sends commands to an LLM with information about the host
+operating system. The model returns an equivalent command for that system
+(for example, converting to PowerShell on Windows).
 
 All environment variables can be placed in a `.env` file. The main ones are
 `OPENROUTER_API_KEY`/`OPENAI_API_KEY` and optionally `OPENAI_BASE_URL`.
