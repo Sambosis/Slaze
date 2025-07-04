@@ -3,7 +3,9 @@ import subprocess
 import re
 from dotenv import load_dotenv
 from regex import T
-from config import get_constant # check_docker_available removed
+from config import get_constant, MAIN_MODEL  # check_docker_available removed
+from openai import OpenAI
+import asyncio
 from .base import BaseTool, ToolError, ToolResult
 from utils.web_ui import WebUI
 from utils.agent_display_console import AgentDisplayConsole
@@ -34,14 +36,53 @@ class BashTool(BaseTool):
     async def __call__(self, command: str | None = None, **kwargs):
         if command is not None:
             if self.display is not None:
-                self.display.add_message("assistant", f"Agent sent command: {command}")
+                try:
+                    self.display.add_message("assistant", f"Agent sent command: {command}")
+                except Exception as display_error:
+                    logger.error(f"Error displaying message: {display_error}", exc_info=True)
+                    return ToolResult(error=str(display_error), tool_name=self.name, command=command)
 
+            # Convert command for the current system via LLM
+            command_for_system = await self._convert_command_for_system(command)
             # Modify commands to exclude hidden files/paths
-            modified_command = self._modify_command_if_needed(command)
+            modified_command = self._modify_command_if_needed(command_for_system)
             if self.display is not None:
-                self.display.add_message("assistant", f"Modified command: {modified_command}")
+                try:
+                    self.display.add_message("assistant", f"Modified command: {modified_command}")
+                except Exception as display_error:
+                    logger.error(f"Error displaying message: {display_error}", exc_info=True)
+                    return ToolResult(error=str(display_error), tool_name=self.name, command=command)
             return await self._run_command(modified_command)
         raise ToolError("no command provided.")
+
+    async def _convert_command_for_system(self, command: str) -> str:
+        """Use an LLM to convert a command for the current operating system."""
+        os_name = get_constant("OS_NAME")
+        system_prompt = (
+            "You convert shell commands to run on a given operating system. "
+            "Return ONLY the converted command with no additional text."
+        )
+        user_prompt = f"OS: {os_name}\nCOMMAND: {command}"
+        try:
+            client = OpenAI()
+            response = await asyncio.get_running_loop().run_in_executor(
+                None,
+                lambda: client.chat.completions.create(
+                    model=MAIN_MODEL,
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt},
+                    ],
+                    temperature=0,
+                    max_tokens=60,
+                ),
+            )
+            converted = response.choices[0].message.content.strip()
+            converted = converted.strip("`").strip()
+            return converted.splitlines()[0]
+        except Exception as e:
+            logger.error(f"LLM command conversion failed: {e}")
+            return command
 
     def _modify_command_if_needed(self, command: str) -> str:
         """Modify find and ls commands to exclude hidden files/paths."""
@@ -89,10 +130,16 @@ class BashTool(BaseTool):
                     errors="replace",
                     check=False,
                     cwd=cwd,
+                    timeout=timeout,
                 )
                 output = result.stdout
                 error = result.stderr
                 success = result.returncode == 0
+
+            except subprocess.TimeoutExpired as e:
+                success = False
+                output = e.stdout or ""
+                error = e.stderr or ""
 
             except Exception as e:
                 success = False
@@ -113,7 +160,7 @@ class BashTool(BaseTool):
             )
             rr(formatted_output)
             return ToolResult(
-                output=output,
+                output=formatted_output,
                 error=error,
                 #success=success,
                 tool_name=self.name,
