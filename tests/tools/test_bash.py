@@ -103,7 +103,10 @@ async def test_command_modification_ls_la(bash_tool: BashTool):
 async def test_command_modification_no_change(bash_tool: BashTool):
     """Test that commands that don't match patterns are not modified."""
     original_command = "echo 'test'"
-    modified_command = bash_tool._modify_command_if_needed(original_command)
+    
+    # Mock the LLM converter to return the same command
+    with patch('tools.bash.convert_command_for_system', return_value=original_command):
+        modified_command = await bash_tool._convert_command_for_system(original_command)
     
     assert modified_command == original_command
 
@@ -225,7 +228,7 @@ def test_tool_properties(bash_tool: BashTool):
 
 @pytest.mark.asyncio
 async def test_find_command_modification_patterns():
-    """Test various find command patterns and their modifications."""
+    """Test various find command patterns and their modifications using legacy method."""
     bash_tool = BashTool()
     
     test_cases = [
@@ -235,29 +238,29 @@ async def test_find_command_modification_patterns():
     ]
     
     for original, expected in test_cases:
-        modified = bash_tool._modify_command_if_needed(original)
+        modified = bash_tool._legacy_modify_command(original)
         assert modified == expected, f"Expected '{expected}', got '{modified}'"
 
 
 @pytest.mark.asyncio
 async def test_ls_command_modification_patterns():
-    """Test various ls -la command patterns and their modifications."""
+    """Test various ls -la command patterns and their modifications using legacy method."""
     bash_tool = BashTool()
     
     test_cases = [
-        ("ls -la /path", 'ls -la /path | grep -v "^d*\\."'),
-        ("ls -la .", 'ls -la . | grep -v "^d*\\."'),
-        ("ls -la /home/user", 'ls -la /home/user | grep -v "^d*\\."'),
+        ("ls -la /path", 'ls -la /path | grep -v "^\\."'),
+        ("ls -la .", 'ls -la . | grep -v "^\\."'),
+        ("ls -la /home/user", 'ls -la /home/user | grep -v "^\\."'),
     ]
     
     for original, expected in test_cases:
-        modified = bash_tool._modify_command_if_needed(original)
+        modified = bash_tool._legacy_modify_command(original)
         assert modified == expected, f"Expected '{expected}', got '{modified}'"
 
 
 @pytest.mark.asyncio
 async def test_unmodified_commands():
-    """Test that commands that don't match modification patterns remain unchanged."""
+    """Test that commands that don't match modification patterns remain unchanged using legacy method."""
     bash_tool = BashTool()
     
     unmodified_commands = [
@@ -270,7 +273,7 @@ async def test_unmodified_commands():
     ]
     
     for command in unmodified_commands:
-        modified = bash_tool._modify_command_if_needed(command)
+        modified = bash_tool._legacy_modify_command(command)
         assert modified == command, f"Command '{command}' should not be modified"
 
 

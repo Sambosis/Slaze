@@ -7,6 +7,7 @@ from config import get_constant # check_docker_available removed
 from .base import BaseTool, ToolError, ToolResult
 from utils.web_ui import WebUI
 from utils.agent_display_console import AgentDisplayConsole
+from utils.command_converter import convert_command_for_system
 import logging
 import os
 from rich import print as rr
@@ -36,15 +37,28 @@ class BashTool(BaseTool):
             if self.display is not None:
                 self.display.add_message("assistant", f"Agent sent command: {command}")
 
-            # Modify commands to exclude hidden files/paths
-            modified_command = self._modify_command_if_needed(command)
+            # Convert command using LLM for current system
+            modified_command = await self._convert_command_for_system(command)
             if self.display is not None:
                 self.display.add_message("assistant", f"Modified command: {modified_command}")
             return await self._run_command(modified_command)
         raise ToolError("no command provided.")
 
-    def _modify_command_if_needed(self, command: str) -> str:
-        """Modify find and ls commands to exclude hidden files/paths."""
+    async def _convert_command_for_system(self, command: str) -> str:
+        """
+        Convert command using LLM to be appropriate for the current system.
+        Falls back to legacy regex-based modification if LLM conversion fails.
+        """
+        try:
+            # Try LLM-based conversion first
+            return await convert_command_for_system(command)
+        except Exception as e:
+            logger.warning(f"LLM command conversion failed, using fallback: {e}")
+            # Fallback to legacy regex-based modification
+            return self._legacy_modify_command(command)
+    
+    def _legacy_modify_command(self, command: str) -> str:
+        """Legacy fallback method for command modification using regex patterns."""
         # Handle find command
         find_pattern = r"^find\s+(\S+)\s+-type\s+f"
         find_match = re.match(find_pattern, command)
@@ -60,8 +74,8 @@ class BashTool(BaseTool):
         ls_match = re.match(ls_pattern, command)
         if ls_match:
             path = ls_match.group(1)
-            # Use ls with grep to filter out hidden entries
-            return f'ls -la {path} | grep -v "^d*\\."' 
+            # Use ls with grep to filter out hidden entries - improved pattern
+            return f'ls -la {path} | grep -v "^\\."' 
 
         # Return the original command if it doesn't match any patterns
         return command
