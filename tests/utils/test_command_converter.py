@@ -56,7 +56,37 @@ async def test_conversion_prompt_generation(command_converter: CommandConverter)
     assert "CRITICAL OUTPUT FORMAT" in prompt
     assert "EXAMPLES:" in prompt
     assert "RULES:" in prompt
-    assert "find /path -type f" in prompt  # Example command
+
+
+@pytest.mark.asyncio
+async def test_windows_conversion_prompt():
+    """Test that Windows-specific prompt is generated correctly."""
+    with patch('platform.system', return_value='Windows'):
+        with patch('platform.version', return_value='10.0.19041'):
+            with patch('platform.machine', return_value='AMD64'):
+                converter = CommandConverter()
+                prompt = converter.conversion_prompt
+                
+                # Check Windows-specific examples
+                assert 'Input: "dir"' in prompt
+                assert 'Output: dir' in prompt
+                assert 'Keep Windows commands (dir, type, copy, etc.) as-is' in prompt
+                assert 'do NOT convert to Linux equivalents' in prompt
+
+
+@pytest.mark.asyncio
+async def test_linux_conversion_prompt():
+    """Test that Linux-specific prompt is generated correctly."""
+    with patch('platform.system', return_value='Linux'):
+        with patch('platform.version', return_value='5.4.0'):
+            with patch('platform.machine', return_value='x86_64'):
+                converter = CommandConverter()
+                prompt = converter.conversion_prompt
+                
+                # Check Linux-specific examples
+                assert 'Input: "dir"' in prompt
+                assert 'Output: ls' in prompt
+                assert 'use "ls" not "dir"' in prompt
 
 
 @pytest.mark.asyncio

@@ -231,15 +231,17 @@ async def test_find_command_modification_patterns():
     """Test various find command patterns and their modifications using legacy method."""
     bash_tool = BashTool()
     
-    test_cases = [
-        ("find /path -type f", 'find /path -type f -not -path "*/\\.*"'),
-        ("find . -type f -name '*.py'", 'find . -type f -not -path "*/\\.*" -name \'*.py\''),
-        ("find /home -type f", 'find /home -type f -not -path "*/\\.*"'),
-    ]
-    
-    for original, expected in test_cases:
-        modified = bash_tool._legacy_modify_command(original)
-        assert modified == expected, f"Expected '{expected}', got '{modified}'"
+    # Mock platform.system to test Linux behavior
+    with patch('platform.system', return_value='Linux'):
+        test_cases = [
+            ("find /path -type f", 'find /path -type f -not -path "*/\\.*"'),
+            ("find . -type f -name '*.py'", 'find . -type f -not -path "*/\\.*" -name \'*.py\''),
+            ("find /home -type f", 'find /home -type f -not -path "*/\\.*"'),
+        ]
+        
+        for original, expected in test_cases:
+            modified = bash_tool._legacy_modify_command(original)
+            assert modified == expected, f"Expected '{expected}', got '{modified}'"
 
 
 @pytest.mark.asyncio
@@ -247,15 +249,37 @@ async def test_ls_command_modification_patterns():
     """Test various ls -la command patterns and their modifications using legacy method."""
     bash_tool = BashTool()
     
-    test_cases = [
-        ("ls -la /path", 'ls -la /path | grep -v "^\\."'),
-        ("ls -la .", 'ls -la . | grep -v "^\\."'),
-        ("ls -la /home/user", 'ls -la /home/user | grep -v "^\\."'),
-    ]
+    # Mock platform.system to test Linux behavior
+    with patch('platform.system', return_value='Linux'):
+        test_cases = [
+            ("ls -la /path", 'ls -la /path | grep -v "^\\."'),
+            ("ls -la .", 'ls -la . | grep -v "^\\."'),
+            ("ls -la /home/user", 'ls -la /home/user | grep -v "^\\."'),
+        ]
+        
+        for original, expected in test_cases:
+            modified = bash_tool._legacy_modify_command(original)
+            assert modified == expected, f"Expected '{expected}', got '{modified}'"
+
+
+@pytest.mark.asyncio
+async def test_windows_command_handling():
+    """Test Windows command handling using legacy method."""
+    bash_tool = BashTool()
     
-    for original, expected in test_cases:
-        modified = bash_tool._legacy_modify_command(original)
-        assert modified == expected, f"Expected '{expected}', got '{modified}'"
+    # Mock platform.system to test Windows behavior
+    with patch('platform.system', return_value='Windows'):
+        test_cases = [
+            ("dir", "dir"),  # Keep dir as-is
+            ("dir C:\\path", "dir C:\\path"),  # Keep dir with path
+            ("ls -la", "dir"),  # Convert ls to dir
+            ("ls -la /path", "dir /path"),  # Convert ls with path
+            ("find /path -type f", "dir /s /b \\path\\*"),  # Convert find
+        ]
+        
+        for original, expected in test_cases:
+            modified = bash_tool._legacy_modify_command(original)
+            assert modified == expected, f"Expected '{expected}', got '{modified}'"
 
 
 @pytest.mark.asyncio
@@ -263,18 +287,20 @@ async def test_unmodified_commands():
     """Test that commands that don't match modification patterns remain unchanged using legacy method."""
     bash_tool = BashTool()
     
-    unmodified_commands = [
-        "ls -l",
-        "find /path -name '*.txt'",  # Missing -type f
-        "ls -la",  # Missing path
-        "echo 'hello'",
-        "grep pattern file.txt",
-        "cat file.txt"
-    ]
-    
-    for command in unmodified_commands:
-        modified = bash_tool._legacy_modify_command(command)
-        assert modified == command, f"Command '{command}' should not be modified"
+    # Mock platform.system to test Linux behavior
+    with patch('platform.system', return_value='Linux'):
+        unmodified_commands = [
+            "ls -l",
+            "find /path -name '*.txt'",  # Missing -type f
+            "ls -la",  # Missing path
+            "echo 'hello'",
+            "grep pattern file.txt",
+            "cat file.txt"
+        ]
+        
+        for command in unmodified_commands:
+            modified = bash_tool._legacy_modify_command(command)
+            assert modified == command, f"Command '{command}' should not be modified"
 
 
 @pytest.mark.asyncio

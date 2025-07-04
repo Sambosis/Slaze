@@ -41,10 +41,62 @@ class CommandConverter:
     
     def _build_conversion_prompt(self) -> str:
         """Build the system prompt for command conversion."""
-        return f"""You are a bash command converter that adapts commands for different system environments.
+        os_name = self.system_info['os_name']
+        
+        # Build OS-specific examples and rules
+        if os_name == "Windows":
+            examples = """EXAMPLES:
+Input: "dir"
+Output: dir
+
+Input: "dir C:\\path"
+Output: dir C:\\path
+
+Input: "find /path -type f"
+Output: dir /s /b C:\\path\\* | findstr /v "\\\\\\."
+
+Input: "ls -la"
+Output: dir
+
+Input: "echo hello"
+Output: echo hello"""
+            
+            rules = f"""RULES:
+- Keep Windows commands (dir, type, copy, etc.) as-is - do NOT convert to Linux equivalents
+- If a Linux command is used, convert it to the Windows equivalent
+- For file listing: use "dir" not "ls"
+- For finding files: use "dir /s /b" not "find"
+- Use Windows path separators (\\) when needed
+- Hidden files on Windows start with . - filter them when appropriate
+- Ensure the command will work on {os_name}
+- Return ONLY the command, no other text"""
+        else:
+            examples = """EXAMPLES:
+Input: "find /path -type f"
+Output: find /path -type f -not -path "*/.*"
+
+Input: "ls -la /directory"  
+Output: ls -la /directory | grep -v "^\\."
+
+Input: "dir"
+Output: ls
+
+Input: "echo hello"
+Output: echo hello"""
+            
+            rules = f"""RULES:
+- Keep Linux/Unix commands as-is when they work correctly
+- If a Windows command is used, convert it to the Linux equivalent  
+- For file listing: use "ls" not "dir"
+- Always exclude hidden files/directories in find and ls operations
+- Use Linux path separators (/) when needed
+- Ensure the command will work on {os_name}
+- Return ONLY the command, no other text"""
+        
+        return f"""You are a command converter that adapts commands for different system environments.
 
 SYSTEM INFORMATION:
-- OS: {self.system_info['os_name']} {self.system_info['os_version']}
+- OS: {os_name} {self.system_info['os_version']}
 - Architecture: {self.system_info['architecture']}
 - Shell: {self.system_info['shell']}
 - Working Directory: {self.system_info['current_working_dir']}
@@ -52,9 +104,9 @@ SYSTEM INFORMATION:
 - File Separator: {self.system_info['file_separator']}
 
 CONVERSION GOALS:
-1. Ensure commands work properly on the current system
-2. Filter out hidden files/directories (those starting with .) when listing or finding files
-3. Adapt path separators and command syntax for the target OS
+1. Ensure commands work properly on the current system ({os_name})
+2. Filter out hidden files/directories when listing or finding files
+3. Convert between Windows and Linux command equivalents as needed
 4. Use appropriate flags and options for the target system
 5. Handle cross-platform compatibility issues
 
@@ -62,21 +114,9 @@ CRITICAL OUTPUT FORMAT:
 You MUST respond with ONLY the converted command, nothing else. No explanations, no markdown, no additional text.
 The response should be a single line containing only the executable command.
 
-EXAMPLES:
-Input: "find /path -type f"
-Output: find /path -type f -not -path "*/.*"
+{examples}
 
-Input: "ls -la /directory"  
-Output: ls -la /directory | grep -v "^\\.\\|/\\."
-
-Input: "echo hello"
-Output: echo hello
-
-RULES:
-- If the command doesn't need modification, return it unchanged
-- Always exclude hidden files/directories in find and ls operations
-- Ensure the command will work on {self.system_info['os_name']}
-- Return ONLY the command, no other text
+{rules}
 """
 
     async def convert_command(self, original_command: str) -> str:
