@@ -140,7 +140,9 @@ class BashTool(BaseTool):
             output = result.stdout
             error = result.stderr
             success = result.returncode == 0
-
+            terminal_display = f"{output}\n{error}"
+            if self.display is not None:
+                self.display.add_message("assistant", terminal_display)
             if len(output) > 200000:
                 output = f"{output[:100000]} ... [TRUNCATED] ... {output[-100000:]}"
             if len(error) > 200000:
