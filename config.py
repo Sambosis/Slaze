@@ -55,14 +55,15 @@ TOOL_LOG_FILE = LOGS_DIR / "tool_messages.log"
 
 
 sonnet4 = "anthropic/claude-sonnet-4"
+openai41 = "openai/gpt-4.1"
 openaio3 = "openai/o3"
 openaio3pro = "openai/o3-pro"
 googlepro = "google/gemini-2.5-pro-preview"
 googleflash = "google/gemini-2.5-flash-preview"
 googleflashlite = "google/gemini-2.5-flash-lite-preview-06-17"
 SUMMARY_MODEL = googleflashlite  # Model for summaries
-MAIN_MODEL = openaio3pro  # Primary model for main agent operations
-CODE_MODEL = openaio3pro  # Model for code generation tasks
+MAIN_MODEL = openai41  # Primary model for main agent operations
+CODE_MODEL = googlepro  # Model for code generation tasks
 # Feature flag constants
 COMPUTER_USE_BETA_FLAG = "computer-use-2024-10-22"
 PROMPT_CACHING_BETA_FLAG = "prompt-caching-2024-07-31"
