@@ -4,6 +4,7 @@ from pathlib import Path
 import os # Added os import
 
 from .base import ToolResult, BaseAnthropicTool
+from .bash import BashTool
 import subprocess
 import logging
 from config import get_constant
@@ -279,66 +280,47 @@ class ProjectSetupTool(BaseAnthropicTool):
                 "packages_installed": installed_packages,
             }
 
-    async def run_app(self, project_path: Path, filename: str) -> dict:
-        """Runs a Python application locally."""
+    async def run_project(self, project_path: Path, filename: str = "app.py") -> dict:
+        """Runs a Python project or app using uv run via BashTool."""
         try:
             file_path = project_path / filename
-
-            cmd = ["uv", "run", str(file_path)]
-            result = subprocess.run(cmd, capture_output=True, text=True, check=True, cwd=project_path)
-            rr(result)
-            run_output = f"stdout: {result.stdout}\nstderr: {result.stderr}"
-            logger.info(f"Run app output for {file_path}:\n{run_output}")
-            rr(f"Run app output for {file_path}:\n{run_output}")  # Using rich print for better formatting
-            return {
-                "command": "run_app",
-                "status": "success" if result.returncode == 0 else "error",
-                "project_path": str(project_path),
-                "run_output": run_output,
-                "errors": result.stderr,
-            }
-        except Exception as e:
-            return {
-                "command": "run_app",
-                "status": "error",
-                "project_path": str(project_path),
-                "errors": str(e),
-            }
-
-
-    async def run_project(
-        self, project_path: Path, entry_filename: str = "app.py"
-        ) -> dict:
-        """Runs a Python project locally."""
-        try:
-            entry_file = project_path / entry_filename
-            if not entry_file.exists():
+            if not file_path.exists():
                 return {
                     "command": "run_project",
                     "status": "error",
-                    "error": f"Entry file {entry_filename} does not exist",
+                    "error": f"File {filename} does not exist",
                     "project_path": str(project_path),
                 }
 
-
-
-            cmd = ["uv", "run", str(entry_file)]
-            result = subprocess.run(cmd, capture_output=True, text=True, check=True, cwd=project_path)
-            run_output = f"stdout: {result.stdout}\nstderr: {result.stderr}"
-            rr(result)
+            # Use BashTool to run the command
+            bash_tool = BashTool(display=self.display)
+            cmd = f"cd {str(project_path)} && uv run {filename}"
+            
+            result = await bash_tool(command=cmd)
+            
+            if result.error:
+                return {
+                    "command": "run_project",
+                    "status": "error",
+                    "project_path": str(project_path),
+                    "error": result.error,
+                    "run_output": result.output or "",
+                }
+            else:
+                return {
+                    "command": "run_project",
+                    "status": "success",
+                    "project_path": str(project_path),
+                    "run_output": result.output or "",
+                }
+                
+        except Exception as e:
             return {
                 "command": "run_project",
-                "status": "success" if result.returncode == 0 else "error",
+                "status": "error",
                 "project_path": str(project_path),
-                "run_output": run_output,
-                "errors": result.stderr,
+                "error": str(e),
             }
-        except Exception as e:
-            if self.display is not None:
-                self.display.add_message(
-                    "assistant", f"ProjectSetupTool error: {str(e)}"
-                )
-            return ToolResult(error=f"Failed to execute run_project: {str(e)}")
 
     async def __call__(self,*, command: ProjectCommand,
         project_path: str,
