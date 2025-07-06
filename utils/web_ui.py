@@ -3,7 +3,15 @@ import os
 import threading
 import logging
 from queue import Queue
-from flask import Flask, render_template, jsonify, request, redirect, url_for, send_from_directory
+from flask import (
+    Flask,
+    render_template,
+    jsonify,
+    request,
+    redirect,
+    url_for,
+    send_from_directory,
+)
 from flask_socketio import SocketIO, disconnect
 from config import (
     LOGS_DIR,
@@ -49,6 +57,23 @@ class WebUI:
         # Using a standard Queue for cross-thread communication
         self.input_queue = Queue()
         self.agent_runner = agent_runner
+        from tools import (
+            ToolCollection,
+            WriteCodeTool,
+            ProjectSetupTool,
+            BashTool,
+            PictureGenerationTool,
+            EditTool,
+        )
+
+        self.tool_collection = ToolCollection(
+            WriteCodeTool(display=self),
+            ProjectSetupTool(display=self),
+            BashTool(display=self),
+            PictureGenerationTool(display=self),
+            EditTool(display=self),
+            display=self,
+        )
         self.setup_routes()
         self.setup_socketio_events()
         logging.info("WebUI initialized")
@@ -127,6 +152,32 @@ class WebUI:
             except FileNotFoundError:
                 logging.error(f"Prompt not found: {filename}")
                 return "Prompt not found", 404
+
+        @self.app.route("/tools")
+        def tools_page():
+            """Display a page with buttons to run individual tools."""
+            tool_data = []
+            for name, tool in self.tool_collection.tools.items():
+                params = tool.to_params()["function"]["parameters"]
+                tool_data.append({"name": name, "params": params})
+            return render_template("tools.html", tools=tool_data)
+
+        @self.app.route("/run_tool", methods=["POST"])
+        def run_tool_route():
+            data = request.get_json(force=True)
+            name = data.get("name")
+            params = data.get("params", {})
+            logging.info(f"Running tool {name} with params {params}")
+            try:
+                result = asyncio.run(
+                    self.tool_collection.run(name=name, tool_input=params)
+                )
+                output = result.output
+                error = result.error
+            except Exception as e:
+                output = None
+                error = str(e)
+            return jsonify({"output": output, "error": error})
         logging.info("Routes set up")
 
     def setup_socketio_events(self):
