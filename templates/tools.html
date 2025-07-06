@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tool Management - Slazy Agent</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.0/socket.io.js"></script>
+    <style>
+        body { font-family: sans-serif; margin: 0; padding: 20px; background-color: #f4f4f4; }
+        .container { max-width: 1200px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .header h1 { margin: 0; color: #333; }
+        .header a { text-decoration: none; color: #007bff; font-weight: 500; }
+        .header a:hover { text-decoration: underline; }
+        
+        .tools-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-bottom: 30px; }
+        .tool-card { 
+            background: #f8f9fa; 
+            border: 1px solid #ddd; 
+            border-radius: 8px; 
+            padding: 20px; 
+            cursor: pointer; 
+            transition: all 0.3s ease;
+        }
+        .tool-card:hover { 
+            background: #e9ecef; 
+            border-color: #007bff; 
+            transform: translateY(-2px);
+        }
+        .tool-card.active { 
+            background: #007bff; 
+            color: white; 
+            border-color: #0056b3;
+        }
+        .tool-card h3 { margin: 0 0 10px 0; font-size: 1.2em; }
+        .tool-card p { margin: 0; font-size: 0.9em; opacity: 0.8; }
+        
+        .tool-form { 
+            display: none; 
+            background: white; 
+            border: 1px solid #ddd; 
+            border-radius: 8px; 
+            padding: 20px; 
+            margin-bottom: 20px;
+        }
+        .tool-form.active { display: block; }
+        .tool-form h3 { margin-top: 0; color: #007bff; }
+        
+        .form-group { margin-bottom: 15px; }
+        .form-group label { 
+            display: block; 
+            margin-bottom: 5px; 
+            font-weight: 500; 
+            color: #333;
+        }
+        .form-group input, .form-group textarea, .form-group select { 
+            width: 100%; 
+            padding: 10px; 
+            border: 1px solid #ddd; 
+            border-radius: 4px; 
+            font-size: 14px;
+            font-family: inherit;
+        }
+        .form-group textarea { 
+            resize: vertical; 
+            min-height: 80px; 
+            font-family: 'Courier New', monospace;
+        }
+        .form-group .help-text { 
+            font-size: 0.8em; 
+            color: #6c757d; 
+            margin-top: 5px;
+        }
+        
+        .form-actions { 
+            display: flex; 
+            gap: 10px; 
+            margin-top: 20px;
+        }
+        .btn { 
+            padding: 10px 20px; 
+            border: none; 
+            border-radius: 4px; 
+            cursor: pointer; 
+            font-size: 14px; 
+            font-weight: 500;
+        }
+        .btn-primary { background-color: #007bff; color: white; }
+        .btn-primary:hover { background-color: #0056b3; }
+        .btn-secondary { background-color: #6c757d; color: white; }
+        .btn-secondary:hover { background-color: #5a6268; }
+        
+        .results-area { 
+            margin-top: 20px; 
+            display: none;
+        }
+        .results-area.active { display: block; }
+        .results-content { 
+            background: #f8f9fa; 
+            border: 1px solid #ddd; 
+            border-radius: 4px; 
+            padding: 15px; 
+            font-family: 'Courier New', monospace; 
+            font-size: 13px; 
+            white-space: pre-wrap; 
+            max-height: 400px; 
+            overflow-y: auto;
+        }
+        .results-header { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            margin-bottom: 10px;
+        }
+        .results-header h4 { margin: 0; color: #333; }
+        
+        .loading { 
+            text-align: center; 
+            padding: 20px; 
+            color: #6c757d;
+        }
+        .loading::after {
+            content: "";
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #007bff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-left: 10px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Tool Management</h1>
+            <a href="/">Back to Agent</a>
+        </div>
+        
+        <div class="tools-grid">
+            <div class="tool-card" onclick="selectTool('read_file')">
+                <h3>📄 Read File</h3>
+                <p>Read the contents of a file with optional line range</p>
+            </div>
+            
+            <div class="tool-card" onclick="selectTool('run_terminal_cmd')">
+                <h3>⚡ Run Terminal Command</h3>
+                <p>Execute terminal commands with optional background execution</p>
+            </div>
+            
+            <div class="tool-card" onclick="selectTool('list_dir')">
+                <h3>📁 List Directory</h3>
+                <p>List the contents of a directory</p>
+            </div>
+            
+            <div class="tool-card" onclick="selectTool('grep_search')">
+                <h3>🔍 Grep Search</h3>
+                <p>Search for patterns in files using regex</p>
+            </div>
+            
+            <div class="tool-card" onclick="selectTool('edit_file')">
+                <h3>✏️ Edit File</h3>
+                <p>Edit existing files or create new ones</p>
+            </div>
+            
+            <div class="tool-card" onclick="selectTool('search_replace')">
+                <h3>🔄 Search & Replace</h3>
+                <p>Find and replace text in files</p>
+            </div>
+            
+            <div class="tool-card" onclick="selectTool('file_search')">
+                <h3>🔎 File Search</h3>
+                <p>Search for files by name using fuzzy matching</p>
+            </div>
+            
+            <div class="tool-card" onclick="selectTool('delete_file')">
+                <h3>🗑️ Delete File</h3>
+                <p>Delete files from the filesystem</p>
+            </div>
+            
+            <div class="tool-card" onclick="selectTool('web_search')">
+                <h3>🌐 Web Search</h3>
+                <p>Search the web for real-time information</p>
+            </div>
+            
+            <div class="tool-card" onclick="selectTool('edit_notebook')">
+                <h3>📓 Edit Notebook</h3>
+                <p>Edit Jupyter notebook cells</p>
+            </div>
+        </div>
+        
+        <!-- Tool Forms -->
+        <div id="read_file_form" class="tool-form">
+            <h3>📄 Read File</h3>
+            <div class="form-group">
+                <label for="read_file_path">File Path*</label>
+                <input type="text" id="read_file_path" placeholder="e.g., /path/to/file.txt">
+                <div class="help-text">Relative path in workspace or absolute path</div>
+            </div>
+            <div class="form-group">
+                <label for="read_file_start_line">Start Line (1-indexed)</label>
+                <input type="number" id="read_file_start_line" min="1" placeholder="1">
+                <div class="help-text">Leave empty to read from beginning</div>
+            </div>
+            <div class="form-group">
+                <label for="read_file_end_line">End Line (1-indexed, inclusive)</label>
+                <input type="number" id="read_file_end_line" min="1" placeholder="100">
+                <div class="help-text">Leave empty to read to end</div>
+            </div>
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="read_file_entire"> Read Entire File
+                </label>
+                <div class="help-text">Check to read the entire file (overrides line range)</div>
+            </div>
+            <div class="form-actions">
+                <button class="btn btn-primary" onclick="executeTool('read_file')">Execute</button>
+                <button class="btn btn-secondary" onclick="clearForm()">Clear</button>
+            </div>
+        </div>
+        
+        <div id="run_terminal_cmd_form" class="tool-form">
+            <h3>⚡ Run Terminal Command</h3>
+            <div class="form-group">
+                <label for="terminal_command">Command*</label>
+                <textarea id="terminal_command" placeholder="e.g., ls -la"></textarea>
+                <div class="help-text">Terminal command to execute</div>
+            </div>
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="terminal_background"> Run in Background
+                </label>
+                <div class="help-text">Check for long-running commands</div>
+            </div>
+            <div class="form-actions">
+                <button class="btn btn-primary" onclick="executeTool('run_terminal_cmd')">Execute</button>
+                <button class="btn btn-secondary" onclick="clearForm()">Clear</button>
+            </div>
+        </div>
+        
+        <div id="list_dir_form" class="tool-form">
+            <h3>📁 List Directory</h3>
+            <div class="form-group">
+                <label for="list_dir_path">Directory Path*</label>
+                <input type="text" id="list_dir_path" placeholder="e.g., . or /path/to/directory">
+                <div class="help-text">Relative path in workspace root</div>
+            </div>
+            <div class="form-actions">
+                <button class="btn btn-primary" onclick="executeTool('list_dir')">Execute</button>
+                <button class="btn btn-secondary" onclick="clearForm()">Clear</button>
+            </div>
+        </div>
+        
+        <div id="grep_search_form" class="tool-form">
+            <h3>🔍 Grep Search</h3>
+            <div class="form-group">
+                <label for="grep_query">Search Pattern*</label>
+                <input type="text" id="grep_query" placeholder="e.g., function\(">
+                <div class="help-text">Regex pattern to search for (escape special chars)</div>
+            </div>
+            <div class="form-group">
+                <label for="grep_include">Include Pattern</label>
+                <input type="text" id="grep_include" placeholder="e.g., *.py">
+                <div class="help-text">Glob pattern for files to include</div>
+            </div>
+            <div class="form-group">
+                <label for="grep_exclude">Exclude Pattern</label>
+                <input type="text" id="grep_exclude" placeholder="e.g., *.log">
+                <div class="help-text">Glob pattern for files to exclude</div>
+            </div>
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="grep_case_sensitive"> Case Sensitive
+                </label>
+            </div>
+            <div class="form-actions">
+                <button class="btn btn-primary" onclick="executeTool('grep_search')">Execute</button>
+                <button class="btn btn-secondary" onclick="clearForm()">Clear</button>
+            </div>
+        </div>
+        
+        <div id="edit_file_form" class="tool-form">
+            <h3>✏️ Edit File</h3>
+            <div class="form-group">
+                <label for="edit_file_path">File Path*</label>
+                <input type="text" id="edit_file_path" placeholder="e.g., /path/to/file.txt">
+                <div class="help-text">File to edit or create</div>
+            </div>
+            <div class="form-group">
+                <label for="edit_file_instructions">Instructions*</label>
+                <textarea id="edit_file_instructions" placeholder="Describe what you want to do"></textarea>
+                <div class="help-text">Single sentence describing the edit</div>
+            </div>
+            <div class="form-group">
+                <label for="edit_file_content">Code Edit*</label>
+                <textarea id="edit_file_content" rows="10" placeholder="Enter the code to edit..."></textarea>
+                <div class="help-text">Use // ... existing code ... to represent unchanged parts</div>
+            </div>
+            <div class="form-actions">
+                <button class="btn btn-primary" onclick="executeTool('edit_file')">Execute</button>
+                <button class="btn btn-secondary" onclick="clearForm()">Clear</button>
+            </div>
+        </div>
+        
+        <div id="search_replace_form" class="tool-form">
+            <h3>🔄 Search & Replace</h3>
+            <div class="form-group">
+                <label for="search_replace_file">File Path*</label>
+                <input type="text" id="search_replace_file" placeholder="e.g., /path/to/file.txt">
+            </div>
+            <div class="form-group">
+                <label for="search_replace_old">Old Text*</label>
+                <textarea id="search_replace_old" placeholder="Text to replace (must be unique)"></textarea>
+                <div class="help-text">Include 3-5 lines of context before and after</div>
+            </div>
+            <div class="form-group">
+                <label for="search_replace_new">New Text*</label>
+                <textarea id="search_replace_new" placeholder="Replacement text"></textarea>
+            </div>
+            <div class="form-actions">
+                <button class="btn btn-primary" onclick="executeTool('search_replace')">Execute</button>
+                <button class="btn btn-secondary" onclick="clearForm()">Clear</button>
+            </div>
+        </div>
+        
+        <div id="file_search_form" class="tool-form">
+            <h3>🔎 File Search</h3>
+            <div class="form-group">
+                <label for="file_search_query">Search Query*</label>
+                <input type="text" id="file_search_query" placeholder="e.g., main.py">
+                <div class="help-text">Fuzzy filename to search for</div>
+            </div>
+            <div class="form-actions">
+                <button class="btn btn-primary" onclick="executeTool('file_search')">Execute</button>
+                <button class="btn btn-secondary" onclick="clearForm()">Clear</button>
+            </div>
+        </div>
+        
+        <div id="delete_file_form" class="tool-form">
+            <h3>🗑️ Delete File</h3>
+            <div class="form-group">
+                <label for="delete_file_path">File Path*</label>
+                <input type="text" id="delete_file_path" placeholder="e.g., /path/to/file.txt">
+                <div class="help-text">Path of file to delete</div>
+            </div>
+            <div class="form-actions">
+                <button class="btn btn-primary" onclick="executeTool('delete_file')" 
+                        style="background-color: #dc3545;" onmouseover="this.style.backgroundColor='#c82333'">
+                    Delete File
+                </button>
+                <button class="btn btn-secondary" onclick="clearForm()">Clear</button>
+            </div>
+        </div>
+        
+        <div id="web_search_form" class="tool-form">
+            <h3>🌐 Web Search</h3>
+            <div class="form-group">
+                <label for="web_search_term">Search Term*</label>
+                <input type="text" id="web_search_term" placeholder="e.g., Python Flask tutorial">
+                <div class="help-text">Search term to look up on the web</div>
+            </div>
+            <div class="form-actions">
+                <button class="btn btn-primary" onclick="executeTool('web_search')">Execute</button>
+                <button class="btn btn-secondary" onclick="clearForm()">Clear</button>
+            </div>
+        </div>
+        
+        <div id="edit_notebook_form" class="tool-form">
+            <h3>📓 Edit Notebook</h3>
+            <div class="form-group">
+                <label for="notebook_path">Notebook Path*</label>
+                <input type="text" id="notebook_path" placeholder="e.g., /path/to/notebook.ipynb">
+            </div>
+            <div class="form-group">
+                <label for="notebook_cell_idx">Cell Index*</label>
+                <input type="number" id="notebook_cell_idx" min="0" placeholder="0">
+                <div class="help-text">0-based cell index</div>
+            </div>
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="notebook_is_new_cell"> Create New Cell
+                </label>
+                <div class="help-text">Check to create a new cell, uncheck to edit existing</div>
+            </div>
+            <div class="form-group">
+                <label for="notebook_language">Cell Language*</label>
+                <select id="notebook_language">
+                    <option value="python">Python</option>
+                    <option value="markdown">Markdown</option>
+                    <option value="javascript">JavaScript</option>
+                    <option value="typescript">TypeScript</option>
+                    <option value="r">R</option>
+                    <option value="sql">SQL</option>
+                    <option value="shell">Shell</option>
+                    <option value="raw">Raw</option>
+                    <option value="other">Other</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="notebook_old_content">Old Content</label>
+                <textarea id="notebook_old_content" placeholder="Current cell content (leave empty for new cells)"></textarea>
+            </div>
+            <div class="form-group">
+                <label for="notebook_new_content">New Content*</label>
+                <textarea id="notebook_new_content" placeholder="New cell content"></textarea>
+            </div>
+            <div class="form-actions">
+                <button class="btn btn-primary" onclick="executeTool('edit_notebook')">Execute</button>
+                <button class="btn btn-secondary" onclick="clearForm()">Clear</button>
+            </div>
+        </div>
+        
+        <div id="results" class="results-area">
+            <div class="results-header">
+                <h4>Results</h4>
+                <button class="btn btn-secondary" onclick="clearResults()">Clear</button>
+            </div>
+            <div id="results_content" class="results-content"></div>
+        </div>
+        
+        <div id="loading" class="loading" style="display: none;">
+            Executing tool...
+        </div>
+    </div>
+
+    <script>
+        var socket = io();
+        var currentTool = null;
+
+        socket.on('connect', function() {
+            console.log('Connected to SocketIO');
+        });
+
+        socket.on('tool_result', function(data) {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('results').classList.add('active');
+            document.getElementById('results_content').textContent = data.result;
+        });
+
+        socket.on('tool_error', function(data) {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('results').classList.add('active');
+            document.getElementById('results_content').textContent = 'Error: ' + data.error;
+        });
+
+        function selectTool(toolName) {
+            // Remove active class from all tool cards
+            document.querySelectorAll('.tool-card').forEach(function(card) {
+                card.classList.remove('active');
+            });
+            
+            // Hide all tool forms
+            document.querySelectorAll('.tool-form').forEach(function(form) {
+                form.classList.remove('active');
+            });
+            
+            // Show selected tool
+            event.target.closest('.tool-card').classList.add('active');
+            document.getElementById(toolName + '_form').classList.add('active');
+            currentTool = toolName;
+        }
+
+        function executeTool(toolName) {
+            if (!currentTool) return;
+
+            var params = {};
+            var requiredMissing = false;
+
+            // Collect parameters based on tool type
+            if (toolName === 'read_file') {
+                params.target_file = document.getElementById('read_file_path').value;
+                params.should_read_entire_file = document.getElementById('read_file_entire').checked;
+                params.start_line_one_indexed = parseInt(document.getElementById('read_file_start_line').value) || 1;
+                params.end_line_one_indexed_inclusive = parseInt(document.getElementById('read_file_end_line').value) || 500;
+                params.explanation = "User-requested file read via tool interface";
+                
+                if (!params.target_file) {
+                    alert('File path is required');
+                    return;
+                }
+            } else if (toolName === 'run_terminal_cmd') {
+                params.command = document.getElementById('terminal_command').value;
+                params.is_background = document.getElementById('terminal_background').checked;
+                params.explanation = "User-requested terminal command via tool interface";
+                
+                if (!params.command) {
+                    alert('Command is required');
+                    return;
+                }
+            } else if (toolName === 'list_dir') {
+                params.relative_workspace_path = document.getElementById('list_dir_path').value;
+                params.explanation = "User-requested directory listing via tool interface";
+                
+                if (!params.relative_workspace_path) {
+                    alert('Directory path is required');
+                    return;
+                }
+            } else if (toolName === 'grep_search') {
+                params.query = document.getElementById('grep_query').value;
+                params.include_pattern = document.getElementById('grep_include').value;
+                params.exclude_pattern = document.getElementById('grep_exclude').value;
+                params.case_sensitive = document.getElementById('grep_case_sensitive').checked;
+                params.explanation = "User-requested grep search via tool interface";
+                
+                if (!params.query) {
+                    alert('Search pattern is required');
+                    return;
+                }
+            } else if (toolName === 'edit_file') {
+                params.target_file = document.getElementById('edit_file_path').value;
+                params.instructions = document.getElementById('edit_file_instructions').value;
+                params.code_edit = document.getElementById('edit_file_content').value;
+                
+                if (!params.target_file || !params.instructions || !params.code_edit) {
+                    alert('File path, instructions, and code edit are required');
+                    return;
+                }
+            } else if (toolName === 'search_replace') {
+                params.file_path = document.getElementById('search_replace_file').value;
+                params.old_string = document.getElementById('search_replace_old').value;
+                params.new_string = document.getElementById('search_replace_new').value;
+                
+                if (!params.file_path || !params.old_string || !params.new_string) {
+                    alert('File path, old text, and new text are required');
+                    return;
+                }
+            } else if (toolName === 'file_search') {
+                params.query = document.getElementById('file_search_query').value;
+                params.explanation = "User-requested file search via tool interface";
+                
+                if (!params.query) {
+                    alert('Search query is required');
+                    return;
+                }
+            } else if (toolName === 'delete_file') {
+                params.target_file = document.getElementById('delete_file_path').value;
+                params.explanation = "User-requested file deletion via tool interface";
+                
+                if (!params.target_file) {
+                    alert('File path is required');
+                    return;
+                }
+                
+                if (!confirm('Are you sure you want to delete this file?')) {
+                    return;
+                }
+            } else if (toolName === 'web_search') {
+                params.search_term = document.getElementById('web_search_term').value;
+                params.explanation = "User-requested web search via tool interface";
+                
+                if (!params.search_term) {
+                    alert('Search term is required');
+                    return;
+                }
+            } else if (toolName === 'edit_notebook') {
+                params.target_notebook = document.getElementById('notebook_path').value;
+                params.cell_idx = parseInt(document.getElementById('notebook_cell_idx').value);
+                params.is_new_cell = document.getElementById('notebook_is_new_cell').checked;
+                params.cell_language = document.getElementById('notebook_language').value;
+                params.old_string = document.getElementById('notebook_old_content').value;
+                params.new_string = document.getElementById('notebook_new_content').value;
+                
+                if (!params.target_notebook || isNaN(params.cell_idx) || !params.cell_language || !params.new_string) {
+                    alert('Notebook path, cell index, language, and new content are required');
+                    return;
+                }
+            }
+
+            // Show loading
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('results').classList.remove('active');
+
+            // Send to server
+            socket.emit('execute_tool', {
+                tool: toolName,
+                params: params
+            });
+        }
+
+        function clearForm() {
+            if (!currentTool) return;
+            
+            // Clear all inputs in the current form
+            var form = document.getElementById(currentTool + '_form');
+            form.querySelectorAll('input[type="text"], input[type="number"], textarea').forEach(function(input) {
+                input.value = '';
+            });
+            form.querySelectorAll('input[type="checkbox"]').forEach(function(checkbox) {
+                checkbox.checked = false;
+            });
+            form.querySelectorAll('select').forEach(function(select) {
+                select.selectedIndex = 0;
+            });
+        }
+
+        function clearResults() {
+            document.getElementById('results').classList.remove('active');
+            document.getElementById('results_content').textContent = '';
+        }
+    </script>
+</body>
+</html>
