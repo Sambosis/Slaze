@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tool Runner</title>
+    <style>
+        body { font-family: sans-serif; margin: 0; padding: 20px; background-color: #f4f4f4; }
+        .container { max-width: 900px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        h1 { margin-top: 0; }
+        .tool-form { margin: 15px 0; padding: 15px; border: 1px solid #ddd; border-radius: 4px; background: #fafafa; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input[type=text], textarea { width: 100%; padding: 8px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 4px; }
+        button { padding: 8px 12px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background-color: #0056b3; }
+        pre { background: #eee; padding: 10px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Tool Runner</h1>
+        <a href="/" style="display:block;margin-bottom:15px;">Back</a>
+        {% for tool in tools %}
+        <div>
+            <button onclick="toggleForm('{{ tool.name }}')">{{ tool.name }}</button>
+            <div id="form-{{ tool.name }}" class="tool-form" style="display:none;">
+                {% for field, spec in tool.params.properties.items() %}
+                <label>{{ field }}</label>
+                {% if spec.type == 'array' or spec.type == 'object' %}
+                <textarea name="{{ field }}" placeholder='{{ spec | tojson }}'></textarea>
+                {% else %}
+                <input type="text" name="{{ field }}" placeholder="{{ spec.type }}">
+                {% endif %}
+                {% endfor %}
+                <button type="button" onclick="runTool('{{ tool.name }}')">Run</button>
+                <pre id="output-{{ tool.name }}"></pre>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+<script>
+function toggleForm(name){
+    var el=document.getElementById('form-'+name);
+    if(el.style.display==='none'){el.style.display='block';}else{el.style.display='none';}
+}
+function runTool(name){
+    var form=document.getElementById('form-'+name);
+    var inputs=form.querySelectorAll('input, textarea');
+    var params={};
+    inputs.forEach(function(inp){
+        if(inp.value){
+            try{params[inp.name]=JSON.parse(inp.value);}catch(e){params[inp.name]=inp.value;}
+        }
+    });
+    fetch('/run_tool',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name,params:params})})
+    .then(r=>r.json()).then(d=>{document.getElementById('output-'+name).textContent=d.output || d.error || 'No output';});
+}
+</script>
+</body>
+</html>
