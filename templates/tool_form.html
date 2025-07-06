@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ tool_name }}</title>
+    <style>
+        body { font-family: sans-serif; margin: 0; padding: 20px; background-color: #f4f4f4; }
+        .container { max-width: 900px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        form div { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input[type="text"], textarea, select { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
+        textarea { min-height: 100px; resize: vertical; }
+        button { padding: 10px 15px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background-color: #0056b3; }
+        pre { background: #f0f0f0; padding: 10px; border-radius: 4px; }
+        .back-link { display: block; margin-top: 20px; text-decoration: none; color: #007bff; }
+        .back-link:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>{{ tool_name }}</h1>
+        <form method="post">
+            {% for param, info in params.properties.items() %}
+            <div>
+                <label for="{{ param }}">{{ param }}</label>
+                {% if info.enum %}
+                <select name="{{ param }}" id="{{ param }}">
+                    {% for opt in info.enum %}
+                    <option value="{{ opt }}">{{ opt }}</option>
+                    {% endfor %}
+                </select>
+                {% elif info.type == 'array' %}
+                <textarea name="{{ param }}" id="{{ param }}" placeholder="Enter JSON array"></textarea>
+                {% else %}
+                <input type="text" name="{{ param }}" id="{{ param }}">
+                {% endif %}
+            </div>
+            {% endfor %}
+            <button type="submit">Run {{ tool_name }}</button>
+        </form>
+        {% if result %}
+        <h2>Result</h2>
+        <pre>{{ result }}</pre>
+        {% endif %}
+        <a href="{{ url_for('tools_route') }}" class="back-link">Back to Tools</a>
+    </div>
+</body>
+</html>
