@@ -18,6 +18,7 @@ from tools import (
     ToolResult,
 )
 from utils.web_ui import WebUI
+from utils.web_ui_interactive import WebUIInteractive
 from utils.agent_display_console import AgentDisplayConsole
 from utils.agent_display_interactive import AgentDisplayInteractive
 from unittest.mock import AsyncMock
@@ -163,7 +164,7 @@ class Agent:
         logger.info("TASK constant updated with revised task.")
         return revised_task_from_llm
 
-    def __init__(self, task: str, display: Union[WebUI, AgentDisplayConsole, AgentDisplayInteractive]):
+    def __init__(self, task: str, display: Union[WebUI, WebUIInteractive, AgentDisplayConsole, AgentDisplayInteractive]):
         self.task = task
         # Set initial task constant
         set_constant("TASK", self.task)
@@ -176,7 +177,7 @@ class Agent:
         )
 
         self.display = display
-        self.interactive_mode = isinstance(display, AgentDisplayInteractive)
+        self.interactive_mode = isinstance(display, (AgentDisplayInteractive, WebUIInteractive))
         self.context_recently_refreshed = False
         self.refresh_count = 45
         self.refresh_increment = 15  # the number     to increase the refresh count by

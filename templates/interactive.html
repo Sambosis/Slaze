@@ -1,0 +1,807 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Slazy Agent - Interactive Mode</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.0/socket.io.js"></script>
+    <style>
+        body { 
+            font-family: sans-serif; 
+            margin: 0; 
+            padding: 20px; 
+            background-color: #f4f4f4; 
+        }
+        .container { 
+            max-width: 1200px; 
+            margin: auto; 
+            background: white; 
+            padding: 20px; 
+            border-radius: 8px; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1); 
+        }
+        
+        .header { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            margin-bottom: 20px; 
+            padding-bottom: 20px; 
+            border-bottom: 2px solid #007bff; 
+        }
+        .header h1 { 
+            margin: 0; 
+            color: #333; 
+        }
+        .header .badge { 
+            background-color: #28a745; 
+            color: white; 
+            padding: 4px 12px; 
+            border-radius: 12px; 
+            font-size: 12px; 
+            font-weight: 500; 
+        }
+        .header a { 
+            text-decoration: none; 
+            color: #007bff; 
+            font-weight: 500; 
+            margin-left: 15px; 
+        }
+        .header a:hover { 
+            text-decoration: underline; 
+        }
+        
+        .main-content { 
+            display: flex; 
+            gap: 20px; 
+            min-height: 600px; 
+        }
+        
+        .conversation-panel { 
+            flex: 1; 
+            display: flex; 
+            flex-direction: column; 
+        }
+        
+        .interactive-panel { 
+            flex: 1; 
+            border: 2px solid #007bff; 
+            border-radius: 8px; 
+            padding: 20px; 
+            background-color: #f8f9fa; 
+        }
+        
+        .tab-container { 
+            flex: 1; 
+            display: flex; 
+            flex-direction: column; 
+        }
+        .tab-buttons { 
+            display: flex; 
+            border-bottom: 2px solid #ddd; 
+            margin-bottom: 0; 
+        }
+        .tab-button { 
+            flex: 1; 
+            padding: 12px 20px; 
+            background-color: #f8f9fa; 
+            border: none; 
+            border-bottom: 3px solid transparent;
+            cursor: pointer; 
+            font-size: 14px; 
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+        .tab-button:hover { 
+            background-color: #e9ecef; 
+        }
+        .tab-button.active { 
+            background-color: white; 
+            border-bottom-color: #007bff; 
+            color: #007bff;
+        }
+        .tab-button .badge {
+            background-color: #6c757d;
+            color: white;
+            border-radius: 12px;
+            padding: 2px 8px;
+            font-size: 11px;
+            margin-left: 8px;
+            min-width: 20px;
+            text-align: center;
+            display: inline-block;
+        }
+        .tab-button.active .badge { 
+            background-color: #007bff; 
+        }
+        
+        .tab-content { 
+            display: none; 
+            flex: 1; 
+        }
+        .tab-content.active { 
+            display: block; 
+        }
+        
+        .messages { 
+            border: 1px solid #ddd; 
+            padding: 15px; 
+            height: 100%; 
+            overflow-y: auto; 
+            background-color: #fafafa; 
+            border-radius: 4px; 
+        }
+        .message { 
+            margin-bottom: 15px; 
+            padding: 12px; 
+            border-radius: 8px; 
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .user-message { 
+            background-color: #dcf8c6; 
+            text-align: right; 
+            margin-left: 20%;
+        }
+        .assistant-message { 
+            background-color: #e3f2fd; 
+            text-align: left; 
+            margin-right: 20%;
+        }
+        .tool-message { 
+            background-color: #fff3e0; 
+            text-align: left; 
+            font-family: 'Courier New', monospace; 
+            white-space: pre-wrap; 
+            font-size: 13px;
+            margin-right: 10%;
+        }
+        .empty-state {
+            text-align: center;
+            color: #6c757d;
+            font-style: italic;
+            padding: 40px 20px;
+        }
+        
+        .input-area { 
+            display: flex; 
+            gap: 10px; 
+            margin-top: 15px; 
+        }
+        .input-area textarea { 
+            flex-grow: 1; 
+            padding: 12px; 
+            border: 1px solid #ddd; 
+            border-radius: 6px; 
+            resize: vertical; 
+            min-height: 50px; 
+            font-family: inherit;
+        }
+        .input-area button { 
+            padding: 12px 20px; 
+            background-color: #007bff; 
+            color: white; 
+            border: none; 
+            border-radius: 6px; 
+            cursor: pointer; 
+            font-weight: 500;
+        }
+        .input-area button:hover { 
+            background-color: #0056b3; 
+        }
+        .input-area button:last-child { 
+            background-color: #dc3545; 
+        }
+        .input-area button:last-child:hover { 
+            background-color: #c82333; 
+        }
+        
+        /* Interactive Panel Styles */
+        .interactive-panel h2 { 
+            margin-top: 0; 
+            color: #007bff; 
+            text-align: center; 
+        }
+        
+        .waiting-state { 
+            text-align: center; 
+            color: #6c757d; 
+            font-style: italic; 
+            padding: 40px 20px; 
+        }
+        
+        .tool-call-card { 
+            border: 1px solid #007bff; 
+            border-radius: 8px; 
+            padding: 20px; 
+            background-color: white; 
+            margin-bottom: 20px; 
+        }
+        
+        .tool-call-header { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            margin-bottom: 15px; 
+            padding-bottom: 15px; 
+            border-bottom: 1px solid #eee; 
+        }
+        
+        .tool-call-header h3 { 
+            margin: 0; 
+            color: #333; 
+        }
+        
+        .tool-call-id { 
+            font-size: 12px; 
+            color: #6c757d; 
+            font-family: monospace; 
+        }
+        
+        .parameters-table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            margin-bottom: 20px; 
+        }
+        
+        .parameters-table th, .parameters-table td { 
+            padding: 12px; 
+            text-align: left; 
+            border-bottom: 1px solid #eee; 
+        }
+        
+        .parameters-table th { 
+            background-color: #f8f9fa; 
+            font-weight: 600; 
+            color: #333; 
+        }
+        
+        .parameter-type { 
+            font-size: 12px; 
+            color: #6c757d; 
+            font-style: italic; 
+        }
+        
+        .parameter-value { 
+            font-family: monospace; 
+            font-size: 13px; 
+            max-width: 300px; 
+            word-wrap: break-word; 
+        }
+        
+        .json-preview { 
+            background-color: #f8f9fa; 
+            border: 1px solid #dee2e6; 
+            border-radius: 4px; 
+            padding: 12px; 
+            font-family: monospace; 
+            font-size: 13px; 
+            white-space: pre-wrap; 
+            max-height: 200px; 
+            overflow-y: auto; 
+            margin-bottom: 15px; 
+        }
+        
+        .action-buttons { 
+            display: flex; 
+            gap: 10px; 
+            justify-content: center; 
+            margin-top: 20px; 
+        }
+        
+        .action-buttons button { 
+            padding: 12px 20px; 
+            border: none; 
+            border-radius: 6px; 
+            cursor: pointer; 
+            font-weight: 500; 
+            transition: all 0.3s ease; 
+        }
+        
+        .btn-execute { 
+            background-color: #28a745; 
+            color: white; 
+        }
+        .btn-execute:hover { 
+            background-color: #218838; 
+        }
+        
+        .btn-edit { 
+            background-color: #ffc107; 
+            color: #212529; 
+        }
+        .btn-edit:hover { 
+            background-color: #e0a800; 
+        }
+        
+        .btn-view-json { 
+            background-color: #17a2b8; 
+            color: white; 
+        }
+        .btn-view-json:hover { 
+            background-color: #138496; 
+        }
+        
+        .btn-skip { 
+            background-color: #6c757d; 
+            color: white; 
+        }
+        .btn-skip:hover { 
+            background-color: #5a6268; 
+        }
+        
+        .btn-exit { 
+            background-color: #dc3545; 
+            color: white; 
+        }
+        .btn-exit:hover { 
+            background-color: #c82333; 
+        }
+        
+        .edit-form { 
+            display: none; 
+            margin-top: 20px; 
+        }
+        
+        .edit-form.active { 
+            display: block; 
+        }
+        
+        .form-group { 
+            margin-bottom: 15px; 
+        }
+        
+        .form-group label { 
+            display: block; 
+            margin-bottom: 5px; 
+            font-weight: 500; 
+        }
+        
+        .form-group input, .form-group textarea { 
+            width: 100%; 
+            padding: 8px 12px; 
+            border: 1px solid #ddd; 
+            border-radius: 4px; 
+            font-family: inherit; 
+        }
+        
+        .form-group textarea { 
+            height: 100px; 
+            resize: vertical; 
+            font-family: monospace; 
+        }
+        
+        .form-actions { 
+            display: flex; 
+            gap: 10px; 
+            justify-content: flex-end; 
+        }
+        
+        .form-actions button { 
+            padding: 8px 16px; 
+            border: none; 
+            border-radius: 4px; 
+            cursor: pointer; 
+            font-weight: 500; 
+        }
+        
+        .btn-save { 
+            background-color: #28a745; 
+            color: white; 
+        }
+        .btn-save:hover { 
+            background-color: #218838; 
+        }
+        
+        .btn-cancel { 
+            background-color: #6c757d; 
+            color: white; 
+        }
+        .btn-cancel:hover { 
+            background-color: #5a6268; 
+        }
+        
+        .status-message { 
+            padding: 15px; 
+            margin-bottom: 15px; 
+            border-radius: 4px; 
+            font-weight: 500; 
+        }
+        
+        .status-success { 
+            background-color: #d4edda; 
+            color: #155724; 
+            border: 1px solid #c3e6cb; 
+        }
+        
+        .status-error { 
+            background-color: #f8d7da; 
+            color: #721c24; 
+            border: 1px solid #f5c6cb; 
+        }
+        
+        .status-warning { 
+            background-color: #fff3cd; 
+            color: #856404; 
+            border: 1px solid #ffeaa7; 
+        }
+
+        #agent_prompt_area { 
+            margin: 15px 0; 
+            padding: 12px; 
+            background-color: #fff3cd; 
+            border: 1px solid #ffeaa7; 
+            border-radius: 6px; 
+            text-align: center; 
+            display: none;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div>
+                <h1>🔧 Slazy Agent - Interactive Mode</h1>
+                <span class="badge">Tool Call Review Enabled</span>
+            </div>
+            <div>
+                <a href="/">Standard Mode</a>
+                <a href="/select_prompt">Select Prompt</a>
+                <a href="/tools">Toolbox</a>
+            </div>
+        </div>
+        
+        <div class="main-content">
+            <div class="conversation-panel">
+                <div class="tab-container">
+                    <div class="tab-buttons">
+                        <button class="tab-button active" onclick="switchTab('user')" id="user-tab">
+                            👤 User <span class="badge" id="user-count">0</span>
+                        </button>
+                        <button class="tab-button" onclick="switchTab('assistant')" id="assistant-tab">
+                            🤖 Assistant <span class="badge" id="assistant-count">0</span>
+                        </button>
+                        <button class="tab-button" onclick="switchTab('tool')" id="tool-tab">
+                            🔧 Tools <span class="badge" id="tool-count">0</span>
+                        </button>
+                    </div>
+                    
+                    <div id="user-content" class="tab-content active">
+                        <div class="messages" id="user-messages">
+                            <div class="empty-state">No user messages yet</div>
+                        </div>
+                    </div>
+                    
+                    <div id="assistant-content" class="tab-content">
+                        <div class="messages" id="assistant-messages">
+                            <div class="empty-state">No assistant messages yet</div>
+                        </div>
+                    </div>
+                    
+                    <div id="tool-content" class="tab-content">
+                        <div class="messages" id="tool-messages">
+                            <div class="empty-state">No tool results yet</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="agent_prompt_area"></div>
+                
+                <div class="input-area">
+                    <textarea id="user_input" placeholder="Type your message here..."></textarea>
+                    <button onclick="sendMessage()">Send</button>
+                    <button onclick="interruptAgent()">Interrupt</button>
+                </div>
+            </div>
+            
+            <div class="interactive-panel">
+                <h2>🔍 Tool Call Review</h2>
+                <div id="tool-call-area">
+                    <div class="waiting-state">
+                        <p>Waiting for tool calls to review...</p>
+                        <p><small>When the agent wants to use a tool, it will appear here for your review and approval.</small></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        var socket = io();
+        var currentTab = 'user';
+        var currentToolCall = null;
+
+        socket.on('connect', function() {
+            console.log('Connected to SocketIO (Interactive Mode)');
+        });
+
+        // Tab switching functionality
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(function(content) {
+                content.classList.remove('active');
+            });
+            
+            document.querySelectorAll('.tab-button').forEach(function(button) {
+                button.classList.remove('active');
+            });
+            
+            document.getElementById(tabName + '-content').classList.add('active');
+            document.getElementById(tabName + '-tab').classList.add('active');
+            
+            currentTab = tabName;
+        }
+
+        // Message display functionality
+        function updateMessages(data) {
+            // Update user messages
+            var userMessagesDiv = document.getElementById('user-messages');
+            userMessagesDiv.innerHTML = '';
+            if (data.user.length === 0) {
+                userMessagesDiv.innerHTML = '<div class="empty-state">No user messages yet</div>';
+            } else {
+                data.user.forEach(function(msg) {
+                    userMessagesDiv.innerHTML += '<div class="message user-message">' + escapeHtml(msg) + '</div>';
+                });
+            }
+            
+            // Update assistant messages
+            var assistantMessagesDiv = document.getElementById('assistant-messages');
+            assistantMessagesDiv.innerHTML = '';
+            if (data.assistant.length === 0) {
+                assistantMessagesDiv.innerHTML = '<div class="empty-state">No assistant messages yet</div>';
+            } else {
+                data.assistant.forEach(function(msg) {
+                    assistantMessagesDiv.innerHTML += '<div class="message assistant-message">' + escapeHtml(msg) + '</div>';
+                });
+            }
+            
+            // Update tool messages
+            var toolMessagesDiv = document.getElementById('tool-messages');
+            toolMessagesDiv.innerHTML = '';
+            if (data.tool.length === 0) {
+                toolMessagesDiv.innerHTML = '<div class="empty-state">No tool results yet</div>';
+            } else {
+                data.tool.forEach(function(msg) {
+                    toolMessagesDiv.innerHTML += '<div class="message tool-message">' + escapeHtml(msg) + '</div>';
+                });
+            }
+            
+            // Update badge counts
+            document.getElementById('user-count').textContent = data.user.length;
+            document.getElementById('assistant-count').textContent = data.assistant.length;
+            document.getElementById('tool-count').textContent = data.tool.length;
+            
+            // Scroll current tab to bottom
+            var currentMessagesDiv = document.getElementById(currentTab + '-messages');
+            if (currentMessagesDiv) {
+                currentMessagesDiv.scrollTop = currentMessagesDiv.scrollHeight;
+            }
+        }
+
+        function escapeHtml(text) {
+            var map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            };
+            return text.replace(/[&<>"']/g, function(m) { return map[m]; });
+        }
+
+        // Socket event handlers
+        socket.on('update', function(data) {
+            updateMessages(data);
+        });
+
+        socket.on('agent_prompt', function(data) {
+            var promptArea = document.getElementById('agent_prompt_area');
+            if (data.message) {
+                promptArea.textContent = data.message;
+                promptArea.style.display = 'block';
+            } else {
+                promptArea.textContent = '';
+                promptArea.style.display = 'none';
+            }
+        });
+
+        socket.on('agent_prompt_clear', function() {
+            var promptArea = document.getElementById('agent_prompt_area');
+            promptArea.textContent = '';
+            promptArea.style.display = 'none';
+        });
+
+        // Tool call review functionality
+        socket.on('tool_call_review', function(data) {
+            console.log('Tool call review received:', data);
+            currentToolCall = data;
+            displayToolCallReview(data);
+        });
+
+        function displayToolCallReview(toolCall) {
+            var toolCallArea = document.getElementById('tool-call-area');
+            
+            var html = `
+                <div class="tool-call-card">
+                    <div class="tool-call-header">
+                        <h3>🔧 ${escapeHtml(toolCall.tool_name)}</h3>
+                        <span class="tool-call-id">ID: ${toolCall.id}</span>
+                    </div>
+                    
+                    <table class="parameters-table">
+                        <thead>
+                            <tr>
+                                <th>Parameter</th>
+                                <th>Value</th>
+                                <th>Type</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${toolCall.formatted_parameters.map(param => `
+                                <tr>
+                                    <td><strong>${escapeHtml(param.name)}</strong></td>
+                                    <td class="parameter-value">${escapeHtml(param.display_value)}</td>
+                                    <td class="parameter-type">${param.type}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                    
+                    <div class="action-buttons">
+                        <button class="btn-execute" onclick="executeToolCall()">✅ Execute</button>
+                        <button class="btn-edit" onclick="editToolCall()">✏️ Edit</button>
+                        <button class="btn-view-json" onclick="viewToolCallJson()">📄 View JSON</button>
+                        <button class="btn-skip" onclick="skipToolCall()">⏭️ Skip</button>
+                        <button class="btn-exit" onclick="exitAgent()">🚪 Exit</button>
+                    </div>
+                    
+                    <div class="edit-form" id="edit-form">
+                        <h4>Edit Parameters</h4>
+                        ${toolCall.formatted_parameters.map(param => `
+                            <div class="form-group">
+                                <label for="param-${param.name}">${param.name} (${param.type})</label>
+                                ${param.type === 'dict' || param.type === 'list' ? 
+                                    `<textarea id="param-${param.name}" placeholder="Enter JSON...">${JSON.stringify(param.value, null, 2)}</textarea>` :
+                                    `<input type="text" id="param-${param.name}" value="${escapeHtml(String(param.value))}" />`
+                                }
+                            </div>
+                        `).join('')}
+                        
+                        <div class="form-actions">
+                            <button class="btn-save" onclick="saveParameters()">Save Changes</button>
+                            <button class="btn-cancel" onclick="cancelEdit()">Cancel</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            toolCallArea.innerHTML = html;
+        }
+
+        function executeToolCall() {
+            if (currentToolCall) {
+                sendToolCallDecision('execute', currentToolCall.parameters);
+            }
+        }
+
+        function editToolCall() {
+            document.getElementById('edit-form').classList.add('active');
+        }
+
+        function viewToolCallJson() {
+            var jsonContent = JSON.stringify({
+                tool_name: currentToolCall.tool_name,
+                parameters: currentToolCall.parameters
+            }, null, 2);
+            
+            var popup = window.open('', '_blank', 'width=600,height=400');
+            popup.document.write(`
+                <html>
+                    <head><title>Tool Call JSON</title></head>
+                    <body>
+                        <pre style="font-family: monospace; white-space: pre-wrap; padding: 20px;">
+                            ${escapeHtml(jsonContent)}
+                        </pre>
+                    </body>
+                </html>
+            `);
+        }
+
+        function skipToolCall() {
+            if (currentToolCall) {
+                sendToolCallDecision('skip', currentToolCall.parameters);
+            }
+        }
+
+        function exitAgent() {
+            if (confirm('Are you sure you want to exit the agent?')) {
+                sendToolCallDecision('exit', currentToolCall.parameters);
+            }
+        }
+
+        function saveParameters() {
+            var modifiedParams = {};
+            
+            currentToolCall.formatted_parameters.forEach(param => {
+                var input = document.getElementById(`param-${param.name}`);
+                var value = input.value;
+                
+                if (param.type === 'dict' || param.type === 'list') {
+                    try {
+                        modifiedParams[param.name] = JSON.parse(value);
+                    } catch (e) {
+                        alert(`Invalid JSON for parameter ${param.name}: ${e.message}`);
+                        return;
+                    }
+                } else if (param.type === 'int') {
+                    modifiedParams[param.name] = parseInt(value, 10);
+                } else if (param.type === 'float') {
+                    modifiedParams[param.name] = parseFloat(value);
+                } else if (param.type === 'bool') {
+                    modifiedParams[param.name] = value.toLowerCase() === 'true';
+                } else {
+                    modifiedParams[param.name] = value;
+                }
+            });
+            
+            sendToolCallDecision('execute', modifiedParams);
+        }
+
+        function cancelEdit() {
+            document.getElementById('edit-form').classList.remove('active');
+        }
+
+        function sendToolCallDecision(action, parameters) {
+            if (currentToolCall) {
+                socket.emit('tool_call_decision', {
+                    id: currentToolCall.id,
+                    action: action,
+                    parameters: parameters
+                });
+                
+                // Reset the tool call area
+                document.getElementById('tool-call-area').innerHTML = `
+                    <div class="waiting-state">
+                        <p>Tool call ${action === 'execute' ? 'executed' : action}...</p>
+                        <p><small>Waiting for next tool call...</small></p>
+                    </div>
+                `;
+                
+                currentToolCall = null;
+            }
+        }
+
+        // Message input functionality
+        function sendMessage() {
+            var input = document.getElementById('user_input');
+            var message = input.value;
+            if (message.trim() !== '') {
+                socket.emit('user_input', { input: message });
+                input.value = '';
+            }
+        }
+
+        function interruptAgent() {
+            socket.emit('interrupt');
+            alert('Agent interruption requested.');
+        }
+
+        // Handle Enter key in textarea
+        document.getElementById('user_input').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+
+        // Fetch initial messages when page loads
+        window.onload = function() {
+            fetch('/messages')
+                .then(response => response.json())
+                .then(data => {
+                    updateMessages(data);
+                });
+        };
+    </script>
+</body>
+</html>
