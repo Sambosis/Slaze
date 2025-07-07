@@ -2,14 +2,14 @@ from enum import Enum
 from typing import Literal, List
 from pathlib import Path
 import os # Added os import
-
+# type: ignore[override]
 from .base import ToolResult, BaseAnthropicTool
 import subprocess
 import logging
 from config import get_constant
-from rich import print as rr # Using rich for better output formatting
+
 # from loguru import logger as ll # Removed loguru
-# from rich import print as rr # Removed rich print
+from rich import print as rr # Removed rich print
 
 # Configure logging to a file # Removed loguru configuration
 # ll.add(
@@ -99,7 +99,6 @@ class ProjectSetupTool(BaseAnthropicTool):
         output_lines.append(f"Status: {data['status']}")
         # output_lines.append(f"Project Path: {data['project_path']}")
 
-
         if data["status"] == "error":
             output_lines.append("\nErrors:")
             output_lines.append(f"{data.get('error', 'Unknown error')}")
@@ -179,7 +178,7 @@ class ProjectSetupTool(BaseAnthropicTool):
                                 # If parsing fails, treat the whole string as one package (or rely on pip to split)
                                 actual_packages_to_install.append(package_group.strip())
                         else: # Space separated or single package
-                             actual_packages_to_install.extend(package_group.split())
+                            actual_packages_to_install.extend(package_group.split())
                     elif isinstance(package_group, list): # if it's already a list of packages
                         actual_packages_to_install.extend(package_group)
                     else: # Assuming it's a single package name
@@ -283,9 +282,13 @@ class ProjectSetupTool(BaseAnthropicTool):
         """Runs a Python application locally."""
         try:
             file_path = project_path / filename
-
+            # get the REPO_DIR constant
+            host_repo_dir = get_constant("REPO_DIR")
             cmd = ["uv", "run", str(file_path)]
-            result = subprocess.run(cmd, capture_output=True, text=True, check=True, cwd=project_path)
+            print(f"Running command: {' '.join(cmd)} in {host_repo_dir}")
+            result = subprocess.run(
+                cmd, capture_output=True, text=True, check=True, cwd=host_repo_dir
+            )
             rr(result)
             run_output = f"stdout: {result.stdout}\nstderr: {result.stderr}"
             logger.info(f"Run app output for {file_path}:\n{run_output}")
@@ -305,7 +308,6 @@ class ProjectSetupTool(BaseAnthropicTool):
                 "errors": str(e),
             }
 
-
     async def run_project(
         self, project_path: Path, entry_filename: str = "app.py"
         ) -> dict:
@@ -319,11 +321,12 @@ class ProjectSetupTool(BaseAnthropicTool):
                     "error": f"Entry file {entry_filename} does not exist",
                     "project_path": str(project_path),
                 }
-
-
-
+            # get the REPO_DIR constant
+            host_repo_dir = get_constant("REPO_DIR")
             cmd = ["uv", "run", str(entry_file)]
-            result = subprocess.run(cmd, capture_output=True, text=True, check=True, cwd=project_path)
+            print(f"Running command: {' '.join(cmd)} in {host_repo_dir}")
+            # Use subprocess to run the command in the host_repo_dir
+            result = subprocess.run(cmd, capture_output=True, text=True, check=True, cwd=host_repo_dir)
             run_output = f"stdout: {result.stdout}\nstderr: {result.stderr}"
             rr(result)
             return {
@@ -340,13 +343,16 @@ class ProjectSetupTool(BaseAnthropicTool):
                 )
             return ToolResult(error=f"Failed to execute run_project: {str(e)}")
 
-    async def __call__(self,*, command: ProjectCommand,
+    async def __call__(
+        self,
+        *,
+        command: ProjectCommand,
         project_path: str,
         environment: str = "python",
         packages: List[str] = None,
         entry_filename: str = "app.py",
         **kwargs,
-        ) -> ToolResult:
+    ) -> ToolResult:  # type: ignore[override]
         """Executes the specified command for project management."""
         try:
             # Handle both string and Enum types for command
@@ -365,7 +371,7 @@ class ProjectSetupTool(BaseAnthropicTool):
 
             if self.display is not None:
                 self.display.add_message(
-                    "user", f"ProjectSetupTool Command: {command_value}"
+                    "user", f"ProjectSetupTool Command: {command_value}\nProject Path: {project_path}, Environment: {environment}, Packages: {packages}, Entry Filename: {entry_filename}"
                 )
 
             # Set default packages if not provided
@@ -393,7 +399,6 @@ class ProjectSetupTool(BaseAnthropicTool):
             else:
                 return ToolResult(error=f"Unknown command: {command_value}", tool_name=self.name)
 
-
             # Fix for 'ToolResult' object is not subscriptable error
             if isinstance(result, ToolResult):
                 if result.error:
@@ -402,14 +407,13 @@ class ProjectSetupTool(BaseAnthropicTool):
                 # This path is less likely given current internal methods return dicts for success.
                 if result.output: # Assuming output is a string that format_output can handle or a dict
                     if isinstance(result.output, str): # If format_output expects dict, this needs adjustment
-                         # This case means a ToolResult has string output. format_output might need to handle this.
-                         # For now, let's assume if result.output is a string, it's pre-formatted.
-                         return result
+                        # This case means a ToolResult has string output. format_output might need to handle this.
+                        # For now, let's assume if result.output is a string, it's pre-formatted.
+                        return result
                     # If result.output is dict, it's fine for format_output
                     return ToolResult(output=self.format_output(result.output)) # format_output expects dict
                 else: # ToolResult without error and without output, unlikely for this tool
                     return ToolResult(output=self.format_output({"status": "success", "message": "Operation completed.", "command": command_value}))
-
 
             # If result is a dictionary (expected case for successful operations from internal methods)
             return ToolResult(output=self.format_output(result))

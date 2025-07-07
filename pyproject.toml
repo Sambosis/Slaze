@@ -1,3 +1,5 @@
+[tool.mypy]
+disable_error_code = "override"
 [project]
 name = "slazy"
 version = "0.1.0"
