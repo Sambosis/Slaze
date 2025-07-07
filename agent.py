@@ -19,6 +19,7 @@ from tools import (
 )
 from utils.web_ui import WebUI
 from utils.agent_display_console import AgentDisplayConsole
+from utils.agent_display_interactive import AgentDisplayInteractive
 from unittest.mock import AsyncMock
 import asyncio
 from utils.context_helpers import extract_text_from_content, refresh_context_async
@@ -162,7 +163,7 @@ class Agent:
         logger.info("TASK constant updated with revised task.")
         return revised_task_from_llm
 
-    def __init__(self, task: str, display: Union[WebUI, AgentDisplayConsole]):
+    def __init__(self, task: str, display: Union[WebUI, AgentDisplayConsole, AgentDisplayInteractive]):
         self.task = task
         # Set initial task constant
         set_constant("TASK", self.task)
@@ -175,6 +176,7 @@ class Agent:
         )
 
         self.display = display
+        self.interactive_mode = isinstance(display, AgentDisplayInteractive)
         self.context_recently_refreshed = False
         self.refresh_count = 45
         self.refresh_increment = 15  # the number     to increase the refresh count by
@@ -240,6 +242,31 @@ class Agent:
         result = ToolResult(
             output="Tool execution not started", tool_name=content_block["name"]
         )
+        
+        # Handle interactive mode - show tool call to user for approval/editing
+        if self.interactive_mode:
+            decision = self.display.get_user_tool_decision(
+                content_block["name"], 
+                content_block["input"]
+            )
+            
+            if decision["action"] == "exit":
+                result = ToolResult(
+                    output="Tool execution cancelled by user (exit requested)",
+                    tool_name=content_block["name"],
+                )
+                return self._make_api_tool_result(result, content_block["id"])
+            
+            elif decision["action"] == "skip":
+                result = ToolResult(
+                    output="Tool execution skipped by user",
+                    tool_name=content_block["name"],
+                )
+                return self._make_api_tool_result(result, content_block["id"])
+            
+            # Use the potentially modified input
+            content_block["input"] = decision["modified_input"]
+        
         # SET THE CONSTANT TASK to self.task
         try:
             logger.debug(f"Tool name: {content_block['name']}")
@@ -408,6 +435,15 @@ class Agent:
                 tool_result = await self.run_tool(
                     {"name": tc.function.name, "id": tc.id, "input": args}
                 )
+                
+                # Check if user requested exit in interactive mode
+                if self.interactive_mode and tool_result.get("content"):
+                    for content_item in tool_result["content"]:
+                        if (isinstance(content_item, dict) and 
+                            content_item.get("type") == "text" and 
+                            "exit requested" in content_item.get("text", "")):
+                            return False  # Exit the agent loop
+                
                 result_text_parts = []
                 if isinstance(tool_result.get("content"), list):
                     for content_item in tool_result["content"]:

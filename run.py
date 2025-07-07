@@ -7,12 +7,19 @@ import socket
 
 from agent import Agent
 from utils.agent_display_console import AgentDisplayConsole
+from utils.agent_display_interactive import AgentDisplayInteractive
 from utils.web_ui import WebUI
 from utils.file_logger import archive_logs
 
 @click.group()
 def cli():
-    """Slazy Agent CLI"""
+    """Slazy Agent CLI
+    
+    Available modes:
+    - console: Standard console mode
+    - interactive: Console mode with tool call review and editing
+    - web: Web interface mode
+    """
     load_dotenv()
     archive_logs()
 
@@ -31,7 +38,7 @@ async def sampling_loop(agent: Agent):
 
 @cli.command()
 def console():
-    """Run the agent in console mode."""
+    """Run the agent in standard console mode (tools execute automatically)."""
     display = AgentDisplayConsole()
     
     async def run_console_app():
@@ -45,6 +52,26 @@ def console():
 
     try:
         asyncio.run(run_console_app())
+    except KeyboardInterrupt:
+        print("\nApplication interrupted by user. Exiting.")
+
+
+@cli.command()
+def interactive():
+    """Run the agent in interactive mode with tool call review."""
+    display = AgentDisplayInteractive()
+    
+    async def run_interactive_app():
+        task = await display.select_prompt_console()
+        if task:
+            print("\n--- Starting Agent with Task (Interactive Mode) ---")
+            await run_agent_async(task, display)
+            print("\n--- Agent finished ---")
+        else:
+            print("No task selected. Exiting.")
+
+    try:
+        asyncio.run(run_interactive_app())
     except KeyboardInterrupt:
         print("\nApplication interrupted by user. Exiting.")
 
