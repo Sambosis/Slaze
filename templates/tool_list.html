@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Toolbox</title>
+    <style>
+        body { font-family: sans-serif; margin: 0; padding: 20px; background-color: #f4f4f4; }
+        .container { max-width: 900px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .tool { border: 1px solid #ddd; padding: 15px; margin-bottom: 15px; border-radius: 6px; }
+        button { padding: 8px 12px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background-color: #0056b3; }
+        .back-link { display: block; margin-top: 20px; text-decoration: none; color: #007bff; }
+        .back-link:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Available Tools</h1>
+        {% for tool in tools %}
+        <div class="tool">
+            <h2>{{ tool.name }}</h2>
+            <p>{{ tool.description }}</p>
+            <form action="{{ url_for('run_tool_route', tool_name=tool.name) }}" method="get">
+                <button type="submit">Use {{ tool.name }}</button>
+            </form>
+        </div>
+        {% endfor %}
+        <a href="/" class="back-link">Back</a>
+    </div>
+</body>
+</html>
