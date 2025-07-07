@@ -16,9 +16,9 @@ def cli():
     load_dotenv()
     archive_logs()
 
-async def run_agent_async(task, display):
+async def run_agent_async(task, display, review_tool_calls: bool = False):
     """Asynchronously runs the agent with a given task and display."""
-    agent = Agent(task=task, display=display)
+    agent = Agent(task=task, display=display, review_tool_calls=review_tool_calls)
     await agent._revise_and_save_task(agent.task)
     agent.messages.append({"role": "user", "content": agent.task})
     await sampling_loop(agent=agent)
@@ -30,7 +30,13 @@ async def sampling_loop(agent: Agent):
         running = await agent.step()
 
 @cli.command()
-def console():
+@click.option(
+    "--review-tool-calls",
+    is_flag=True,
+    default=False,
+    help="Review tool calls before execution.",
+)
+def console(review_tool_calls):
     """Run the agent in console mode."""
     display = AgentDisplayConsole()
     
@@ -38,7 +44,7 @@ def console():
         task = await display.select_prompt_console()
         if task:
             print("\n--- Starting Agent with Task ---")
-            await run_agent_async(task, display)
+            await run_agent_async(task, display, review_tool_calls=review_tool_calls)
             print("\n--- Agent finished ---")
         else:
             print("No task selected. Exiting.")
@@ -50,10 +56,16 @@ def console():
 
 @cli.command()
 @click.option('--port', default=5000, help='Port to run the web server on.')
-def web(port):
+@click.option(
+    '--review-tool-calls',
+    is_flag=True,
+    default=False,
+    help='Review tool calls before execution.',
+)
+def web(port, review_tool_calls):
     """Run the agent with a web interface."""
 
-    display = WebUI(run_agent_async)
+    display = WebUI(lambda t, d: run_agent_async(t, d, review_tool_calls))
 
     # Determine the local IP address for convenience when accessing from
     # another machine on the network. Fallback to localhost if detection fails.

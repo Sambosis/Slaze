@@ -1,4 +1,5 @@
 import asyncio
+import json
 from rich.console import Console
 from rich.panel import Panel
 from rich.prompt import Prompt, Confirm, IntPrompt
@@ -105,3 +106,22 @@ class AgentDisplayConsole:
         write_constants_to_file()
 
         return task
+
+    async def review_tool_call(self, tool_name: str, params: dict) -> dict:
+        """Prompt the user to review and edit tool parameters."""
+        self.console.print(f"\n[bold]Tool Review:[/bold] {tool_name}")
+        new_params = {}
+        for key, value in params.items():
+            default = json.dumps(value) if not isinstance(value, str) else str(value)
+            user_val = await asyncio.to_thread(Prompt.ask, key, default=default)
+            if user_val == default:
+                new_params[key] = value
+            else:
+                try:
+                    new_params[key] = json.loads(user_val)
+                except Exception:
+                    new_params[key] = user_val
+        confirm = await asyncio.to_thread(Confirm.ask, "Execute tool?", default=True)
+        if confirm:
+            return new_params
+        return params
