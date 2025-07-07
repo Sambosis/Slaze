@@ -255,3 +255,20 @@ class WebUI:
 
         return user_response
 
+    async def review_tool_call(self, tool_name: str, params: dict) -> dict:
+        """Send a review message to the web UI and await edited parameters."""
+        prompt = (
+            f"Review tool call {tool_name}. Submit JSON to edit or press Enter to accept:\n"
+            f"{json.dumps(params, indent=2)}"
+        )
+        self.socketio.emit("agent_prompt", {"message": prompt})
+        loop = asyncio.get_running_loop()
+        user_input = await loop.run_in_executor(None, self.input_queue.get)
+        self.socketio.emit("agent_prompt_clear")
+        if user_input.strip():
+            try:
+                return json.loads(user_input)
+            except Exception:
+                self.add_message("assistant", "Invalid JSON. Using original parameters.")
+        return params
+

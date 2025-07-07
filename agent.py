@@ -3,7 +3,7 @@
 
 import json
 import os
-from typing import Dict, Union
+from typing import Dict, Union, Any
 from openai import OpenAI
 import logging
 from rich import print as rr
@@ -162,7 +162,7 @@ class Agent:
         logger.info("TASK constant updated with revised task.")
         return revised_task_from_llm
 
-    def __init__(self, task: str, display: Union[WebUI, AgentDisplayConsole]):
+    def __init__(self, task: str, display: Union[WebUI, AgentDisplayConsole], review_tool_calls: bool = False):
         self.task = task
         # Set initial task constant
         set_constant("TASK", self.task)
@@ -202,6 +202,7 @@ class Agent:
         self.step_count = 0
         # Add detailed logging of tool params
         self.tool_params = self.tool_collection.to_params()
+        self.review_tool_calls = review_tool_calls
 
     def log_tool_results(self, combined_content, tool_name, tool_input):
         """
@@ -341,6 +342,21 @@ class Agent:
             "is_error": is_error,
         }
 
+    async def review_tool_call(self, name: str, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Allow the user to review and optionally edit tool parameters."""
+        if not self.review_tool_calls:
+            return params
+
+        review_func = getattr(self.display, "review_tool_call", None)
+        if review_func and asyncio.iscoroutinefunction(review_func):
+            try:
+                new_params = await review_func(name, params)
+                if isinstance(new_params, dict):
+                    return new_params
+            except Exception as exc:
+                logger.error(f"Tool review failed: {exc}")
+        return params
+
     def _inject_prompt_caching(self):
         messages = self.messages
         breakpoints_remaining = 2
@@ -403,6 +419,7 @@ class Agent:
                 args = (
                     json.loads(tc.function.arguments) if tc.function.arguments else {}
                 )
+                args = await self.review_tool_call(tc.function.name, args)
                 for arg in args.values():
                     rr(arg)
                 tool_result = await self.run_tool(
