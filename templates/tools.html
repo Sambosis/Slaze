@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tool Runner</title>
+    <style>
+        body { font-family: sans-serif; margin: 0; padding: 20px; background-color: #f4f4f4; }
+        .container { max-width: 900px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        button { margin: 5px; padding: 8px 12px; }
+        pre { background: #fafafa; padding: 10px; border: 1px solid #ddd; border-radius: 4px; }
+        label { display:block; margin-top:10px; }
+        input, select, textarea { width:100%; padding:8px; margin-top:4px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Tool Runner</h1>
+        <div id="tool-buttons"></div>
+        <form id="tool-form" style="display:none;">
+            <h3 id="selected-tool"></h3>
+            <div id="form-fields"></div>
+            <button type="submit">Run Tool</button>
+        </form>
+        <pre id="tool-output"></pre>
+        <a href="/">Back</a>
+    </div>
+<script>
+const toolButtonsDiv = document.getElementById('tool-buttons');
+fetch('/api/tools').then(r=>r.json()).then(data=>{
+    data.tools.forEach(name=>{
+        const btn=document.createElement('button');
+        btn.textContent=name;
+        btn.onclick=()=>loadTool(name);
+        toolButtonsDiv.appendChild(btn);
+    });
+});
+function loadTool(name){
+    document.getElementById('tool-output').textContent='';
+    fetch('/api/tool_params/'+name).then(r=>r.json()).then(params=>{
+        const form=document.getElementById('tool-form');
+        const fieldsDiv=document.getElementById('form-fields');
+        document.getElementById('selected-tool').textContent=name;
+        fieldsDiv.innerHTML='';
+        const props=params.properties||{};
+        const req=params.required||[];
+        for(const [key,val] of Object.entries(props)){
+            const label=document.createElement('label');
+            label.textContent=key+(req.includes(key)?' *':'');
+            let input;
+            if(val.enum){
+                input=document.createElement('select');
+                val.enum.forEach(v=>{
+                    const opt=document.createElement('option');
+                    opt.value=v; opt.textContent=v; input.appendChild(opt);});
+            }else if(val.type==='string' && val.description && val.description.length>60){
+                input=document.createElement('textarea');
+            }else{
+                input=document.createElement('input');
+                input.type='text';
+            }
+            input.name=key;
+            label.appendChild(input);
+            fieldsDiv.appendChild(label);
+        }
+        form.style.display='block';
+        form.onsubmit=function(ev){
+            ev.preventDefault();
+            const data={tool:name};
+            new FormData(form).forEach((v,k)=>{data[k]=v});
+            fetch('/api/run_tool',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})
+                .then(r=>r.json()).then(res=>{
+                    document.getElementById('tool-output').textContent=res.output || res.error || 'No output';
+                });
+        };
+    });
+}
+</script>
+</body>
+</html>
