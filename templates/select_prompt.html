@@ -43,7 +43,21 @@
                 <textarea id="prompt_text" name="prompt_text" placeholder="Enter your prompt here..."></textarea>
             </div>
 
-            <button type="submit">Submit Prompt</button>
+            <div>
+                <label>Execution Mode:</label>
+                <div style="margin-top: 10px;">
+                    <label style="display: inline-block; margin-right: 20px; font-weight: normal;">
+                        <input type="radio" name="mode" value="standard" checked> 
+                        🚀 Standard Mode (Tools execute automatically)
+                    </label>
+                    <label style="display: inline-block; font-weight: normal;">
+                        <input type="radio" name="mode" value="interactive"> 
+                        🔧 Interactive Mode (Review tools before execution)
+                    </label>
+                </div>
+            </div>
+
+            <button type="submit">Start Agent</button>
         </form>
         <a href="/" class="back-link">Back to Agent</a>
         <a href="/tools" class="back-link">Toolbox</a>

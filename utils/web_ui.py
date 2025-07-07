@@ -70,6 +70,7 @@ class WebUI:
         )
         self.setup_routes()
         self.setup_socketio_events()
+        self.setup_interactive_routes()  # Add interactive routes to all web UIs
         logging.info("WebUI initialized")
 
     def setup_routes(self):
@@ -88,7 +89,8 @@ class WebUI:
             choice = request.form.get("choice")
             filename = request.form.get("filename")
             prompt_text = request.form.get("prompt_text")
-            logging.info(f"Form data: choice={choice}, filename={filename}")
+            mode = request.form.get("mode", "standard")
+            logging.info(f"Form data: choice={choice}, filename={filename}, mode={mode}")
 
             if choice == "new":
                 logging.info("Creating new prompt")
@@ -118,10 +120,27 @@ class WebUI:
             set_constant("REPO_DIR", repo_dir)
             write_constants_to_file()
             
-            logging.info("Starting agent runner in background thread")
-            coro = self.agent_runner(task, self)
-            self.socketio.start_background_task(asyncio.run, coro)
-            return render_template("index.html")
+            # Choose the appropriate display based on mode
+            if mode == "interactive":
+                # Import here to avoid circular imports
+                from .web_ui_interactive import WebUIInteractive
+                interactive_display = WebUIInteractive(self.agent_runner)
+                interactive_display.app = self.app  # Share the Flask app
+                interactive_display.socketio = self.socketio  # Share the SocketIO instance
+                interactive_display.user_messages = self.user_messages
+                interactive_display.assistant_messages = self.assistant_messages
+                interactive_display.tool_results = self.tool_results
+                interactive_display.input_queue = self.input_queue
+                
+                logging.info("Starting agent runner in background thread (interactive mode)")
+                coro = self.agent_runner(task, interactive_display)
+                self.socketio.start_background_task(asyncio.run, coro)
+                return redirect("/interactive")
+            else:
+                logging.info("Starting agent runner in background thread (standard mode)")
+                coro = self.agent_runner(task, self)
+                self.socketio.start_background_task(asyncio.run, coro)
+                return render_template("index.html")
 
         @self.app.route("/messages")
         def get_messages():
@@ -213,6 +232,15 @@ class WebUI:
             # Queue is thread-safe; use blocking put to notify waiting tasks
             self.input_queue.put(user_input)
         logging.info("SocketIO events set up")
+
+    def setup_interactive_routes(self):
+        """Set up routes for interactive mode (basic version)."""
+        
+        @self.app.route("/interactive")
+        def interactive_mode_route():
+            """Display the interactive mode interface."""
+            logging.info("Serving interactive mode page")
+            return render_template("interactive.html")
 
     def start_server(self, host="0.0.0.0", port=5000):
         logging.info(f"Starting server on {host}:{port}")

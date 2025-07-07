@@ -7,12 +7,21 @@ import socket
 
 from agent import Agent
 from utils.agent_display_console import AgentDisplayConsole
+from utils.agent_display_interactive import AgentDisplayInteractive
 from utils.web_ui import WebUI
+from utils.web_ui_interactive import WebUIInteractive
 from utils.file_logger import archive_logs
 
 @click.group()
 def cli():
-    """Slazy Agent CLI"""
+    """Slazy Agent CLI
+    
+    Available modes:
+    - console: Standard console mode (tools execute automatically)
+    - interactive: Console mode with tool call review and editing
+    - web: Web interface mode (tools execute automatically)
+    - web-interactive: Web interface with tool call review and editing
+    """
     load_dotenv()
     archive_logs()
 
@@ -31,7 +40,7 @@ async def sampling_loop(agent: Agent):
 
 @cli.command()
 def console():
-    """Run the agent in console mode."""
+    """Run the agent in standard console mode (tools execute automatically)."""
     display = AgentDisplayConsole()
     
     async def run_console_app():
@@ -48,10 +57,30 @@ def console():
     except KeyboardInterrupt:
         print("\nApplication interrupted by user. Exiting.")
 
+
+@cli.command()
+def interactive():
+    """Run the agent in interactive mode with tool call review."""
+    display = AgentDisplayInteractive()
+    
+    async def run_interactive_app():
+        task = await display.select_prompt_console()
+        if task:
+            print("\n--- Starting Agent with Task (Interactive Mode) ---")
+            await run_agent_async(task, display)
+            print("\n--- Agent finished ---")
+        else:
+            print("No task selected. Exiting.")
+
+    try:
+        asyncio.run(run_interactive_app())
+    except KeyboardInterrupt:
+        print("\nApplication interrupted by user. Exiting.")
+
 @cli.command()
 @click.option('--port', default=5000, help='Port to run the web server on.')
 def web(port):
-    """Run the agent with a web interface."""
+    """Run the agent with a web interface (tools execute automatically)."""
 
     display = WebUI(run_agent_async)
 
@@ -68,6 +97,33 @@ def web(port):
     print(f"Web server started on port {port}. Opening your browser to {url}")
     webbrowser.open(url)
     print("Waiting for user to start a task from the web interface.")
+    
+    display.start_server(port=port)
+    
+    # The Flask-SocketIO server is a blocking call that will keep the application
+    # alive. It's started in display.start_server().
+
+
+@cli.command()
+@click.option('--port', default=5001, help='Port to run the interactive web server on.')
+def web_interactive(port):
+    """Run the agent with an interactive web interface (tool call review enabled)."""
+
+    display = WebUIInteractive(run_agent_async)
+
+    # Determine the local IP address for convenience when accessing from
+    # another machine on the network. Fallback to localhost if detection fails.
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.connect(("10.255.255.255", 1))
+            host_ip = s.getsockname()[0]
+    except Exception:
+        host_ip = "localhost"
+
+    url = f"http://{host_ip}:{port}/interactive"
+    print(f"Interactive web server started on port {port}. Opening your browser to {url}")
+    webbrowser.open(url)
+    print("Tool call review enabled. You'll be able to review and edit tool calls before execution.")
     
     display.start_server(port=port)
     
