@@ -3,7 +3,15 @@ import os
 import threading
 import logging
 from queue import Queue
-from flask import Flask, render_template, jsonify, request, redirect, url_for, send_from_directory
+from flask import (
+    Flask,
+    render_template,
+    jsonify,
+    request,
+    redirect,
+    url_for,
+    send_from_directory,
+)
 from flask_socketio import SocketIO, disconnect
 from config import (
     LOGS_DIR,
@@ -17,7 +25,10 @@ from pathlib import Path
 from openai import OpenAI
 import ftfy
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
+
 
 def log_message(msg_type, message):
     """Log a message to a file."""
@@ -34,11 +45,14 @@ def log_message(msg_type, message):
         file.write(emojitag * 5)
         file.write(f"\n{message}\n\n")
 
+
 class WebUI:
     def __init__(self, agent_runner):
         logging.info("Initializing WebUI")
         # More robust path for templates
-        template_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'templates'))
+        template_dir = os.path.abspath(
+            os.path.join(os.path.dirname(__file__), "..", "templates")
+        )
         logging.info(f"Template directory set to: {template_dir}")
         self.app = Flask(__name__, template_folder=template_dir)
         self.app.config["SECRET_KEY"] = "secret!"
@@ -49,6 +63,23 @@ class WebUI:
         # Using a standard Queue for cross-thread communication
         self.input_queue = Queue()
         self.agent_runner = agent_runner
+        from tools import (
+            BashTool,
+            EditTool,
+            ProjectSetupTool,
+            WriteCodeTool,
+            PictureGenerationTool,
+            ToolCollection,
+        )
+
+        self.tool_collection = ToolCollection(
+            WriteCodeTool(display=self),
+            ProjectSetupTool(display=self),
+            BashTool(display=self),
+            PictureGenerationTool(display=self),
+            EditTool(display=self),
+            display=self,
+        )
         self.setup_routes()
         self.setup_socketio_events()
         logging.info("WebUI initialized")
@@ -98,7 +129,7 @@ class WebUI:
             set_constant("PROJECT_DIR", repo_dir)
             set_constant("REPO_DIR", repo_dir)
             write_constants_to_file()
-            
+
             logging.info("Starting agent runner in background thread")
             coro = self.agent_runner(task, self)
             self.socketio.start_background_task(asyncio.run, coro)
@@ -127,6 +158,39 @@ class WebUI:
             except FileNotFoundError:
                 logging.error(f"Prompt not found: {filename}")
                 return "Prompt not found", 404
+
+        @self.app.route("/tools")
+        def tool_page():
+            """Serve the standalone tool runner page."""
+            return render_template("tools.html")
+
+        @self.app.route("/api/tools")
+        def api_list_tools():
+            """Return a list of available tool names."""
+            return jsonify({"tools": list(self.tool_collection.tools.keys())})
+
+        @self.app.route("/api/tool_params/<tool_name>")
+        def api_tool_params(tool_name):
+            tool = self.tool_collection.tools.get(tool_name)
+            if not tool:
+                return jsonify({"error": "Tool not found"}), 404
+            params = tool.to_params().get("function", {}).get("parameters", {})
+            return jsonify(params)
+
+        @self.app.route("/api/run_tool", methods=["POST"])
+        def api_run_tool():
+            data = request.json or {}
+            tool_name = data.pop("tool", None)
+            if not tool_name:
+                return jsonify({"error": "Tool not specified"}), 400
+            try:
+                result = asyncio.run(self.tool_collection.run(tool_name, data))
+                output = result.output or ""
+                error = result.error or ""
+                return jsonify({"output": output, "error": error})
+            except Exception as e:
+                return jsonify({"error": str(e)}), 500
+
         logging.info("Routes set up")
 
     def setup_socketio_events(self):
@@ -146,11 +210,18 @@ class WebUI:
             logging.info(f"Received user input: {user_input}")
             # Queue is thread-safe; use blocking put to notify waiting tasks
             self.input_queue.put(user_input)
+
         logging.info("SocketIO events set up")
 
     def start_server(self, host="0.0.0.0", port=5000):
         logging.info(f"Starting server on {host}:{port}")
-        self.socketio.run(self.app, host=host, port=port, use_reloader=False, allow_unsafe_werkzeug=True)
+        self.socketio.run(
+            self.app,
+            host=host,
+            port=port,
+            use_reloader=False,
+            allow_unsafe_werkzeug=True,
+        )
 
     def add_message(self, msg_type, content):
         logging.info(f"Adding message of type {msg_type}")
@@ -188,4 +259,3 @@ class WebUI:
         self.socketio.emit("agent_prompt_clear")
 
         return user_response
-
