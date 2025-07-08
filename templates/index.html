@@ -726,17 +726,21 @@
                 // Initialize with existing values
                 let arrayValue = Array.isArray(value) ? value : (value ? [value] : []);
                 
+                // Create a unique ID for this array field
+                const arrayId = 'array_' + Math.random().toString(36).substr(2, 9);
+                
                 function updateTags() {
                     tagsContainer.innerHTML = '';
                     arrayValue.forEach(function(item, index) {
                         const tag = document.createElement('span');
                         tag.className = 'array-tag';
-                        tag.innerHTML = escapeHtml(item) + '<span class="remove" onclick="removeArrayItem(' + index + ')">×</span>';
+                        tag.innerHTML = escapeHtml(item) + '<span class="remove" onclick="removeArrayItem_' + arrayId + '(' + index + ')">×</span>';
                         tagsContainer.appendChild(tag);
                     });
                 }
                 
-                window.removeArrayItem = function(index) {
+                // Create a unique function for this array field
+                window['removeArrayItem_' + arrayId] = function(index) {
                     arrayValue.splice(index, 1);
                     updateTags();
                 };
@@ -770,9 +774,9 @@
                 input.rows = info.type === 'string' && (value || '').length > 100 ? 4 : 2;
             }
             
-            if (input && info.type !== 'boolean') {
+            if (input && info.type !== 'array') {
                 input.name = param;
-                if (info.type !== 'array') {
+                if (info.type !== 'boolean') {
                     group.appendChild(input);
                 }
             }
