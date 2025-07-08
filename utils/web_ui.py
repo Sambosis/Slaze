@@ -49,6 +49,7 @@ class WebUI:
         self.tool_results = []
         # Using a standard Queue for cross-thread communication
         self.input_queue = Queue()
+        self.tool_queue = Queue()
         self.agent_runner = agent_runner
         # Import tools lazily to avoid circular imports
         from tools import (
@@ -212,6 +213,12 @@ class WebUI:
             logging.info(f"Received user input: {user_input}")
             # Queue is thread-safe; use blocking put to notify waiting tasks
             self.input_queue.put(user_input)
+
+        @self.socketio.on("tool_response")
+        def handle_tool_response(data):
+            params = data.get("input", {})
+            logging.info("Received tool response")
+            self.tool_queue.put(params)
         logging.info("SocketIO events set up")
 
     def start_server(self, host="0.0.0.0", port=5000):
@@ -254,4 +261,15 @@ class WebUI:
         self.socketio.emit("agent_prompt_clear")
 
         return user_response
+
+    async def confirm_tool_call(self, tool_name: str, args: dict, schema: dict) -> dict | None:
+        """Send a tool prompt to the web UI and wait for edited parameters."""
+        self.socketio.emit(
+            "tool_prompt",
+            {"tool": tool_name, "values": args, "schema": schema},
+        )
+        loop = asyncio.get_running_loop()
+        params = await loop.run_in_executor(None, self.tool_queue.get)
+        self.socketio.emit("tool_prompt_clear")
+        return params
 

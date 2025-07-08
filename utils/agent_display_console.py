@@ -1,4 +1,5 @@
 import asyncio
+import json
 from rich.console import Console
 from rich.panel import Panel
 from rich.prompt import Prompt, Confirm, IntPrompt
@@ -105,3 +106,32 @@ class AgentDisplayConsole:
         write_constants_to_file()
 
         return task
+
+    async def confirm_tool_call(self, tool_name: str, args: dict, schema: dict) -> dict | None:
+        """Display tool call parameters and allow the user to edit them."""
+        self.console.print(Panel(f"Tool call: [bold]{tool_name}[/bold]", title="Confirm Tool"))
+        updated_args = dict(args)
+        properties = schema.get("properties", {}) if schema else {}
+
+        for param in properties:
+            current_val = args.get(param, "")
+            default_str = str(current_val) if current_val is not None else ""
+            user_val = Prompt.ask(param, default=default_str)
+            if user_val != default_str:
+                pinfo = properties.get(param, {})
+                if pinfo.get("type") == "integer":
+                    try:
+                        updated_args[param] = int(user_val)
+                    except ValueError:
+                        updated_args[param] = user_val
+                elif pinfo.get("type") == "array":
+                    try:
+                        updated_args[param] = json.loads(user_val)
+                    except Exception:
+                        updated_args[param] = [v.strip() for v in user_val.split(',') if v.strip()]
+                else:
+                    updated_args[param] = user_val
+
+        if Confirm.ask("Execute tool with these parameters?", default=True):
+            return updated_args
+        return None

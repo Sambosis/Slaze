@@ -114,15 +114,32 @@
         .header a { text-decoration: none; color: #007bff; font-weight: 500; }
         .header a:hover { text-decoration: underline; }
         
-        #agent_prompt_area { 
-            margin: 15px 0; 
-            padding: 12px; 
-            background-color: #fff3cd; 
-            border: 1px solid #ffeaa7; 
-            border-radius: 6px; 
-            text-align: center; 
+        #agent_prompt_area {
+            margin: 15px 0;
+            padding: 12px;
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 6px;
+            text-align: center;
             display: none;
             font-weight: 500;
+        }
+
+        #tool_prompt_modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            display: none;
+        }
+        #tool_prompt_modal .modal-content {
+            background: white;
+            padding: 20px;
+            margin: 10% auto;
+            max-width: 500px;
+            border-radius: 6px;
         }
     </style>
 </head>
@@ -167,6 +184,13 @@
         </div>
         
         <div id="agent_prompt_area"></div>
+
+        <div id="tool_prompt_modal">
+            <div class="modal-content">
+                <h3 id="tool_prompt_title"></h3>
+                <form id="tool_prompt_form"></form>
+            </div>
+        </div>
         
         <div class="input-area">
             <textarea id="user_input" placeholder="Type your message here..."></textarea>
@@ -278,6 +302,72 @@
             promptArea.textContent = '';
             promptArea.style.display = 'none';
         });
+
+        socket.on('tool_prompt', function(data) {
+            showToolPrompt(data);
+        });
+
+        socket.on('tool_prompt_clear', function() {
+            document.getElementById('tool_prompt_modal').style.display = 'none';
+        });
+
+        function showToolPrompt(data) {
+            var modal = document.getElementById('tool_prompt_modal');
+            var form = document.getElementById('tool_prompt_form');
+            var title = document.getElementById('tool_prompt_title');
+            title.textContent = 'Confirm ' + data.tool;
+            form.innerHTML = '';
+            var props = (data.schema && data.schema.properties) || {};
+            for (var param in props) {
+                var info = props[param];
+                var value = data.values && data.values[param] !== undefined ? data.values[param] : '';
+                var label = document.createElement('label');
+                label.textContent = param;
+                form.appendChild(label);
+                var input;
+                if (info.enum) {
+                    input = document.createElement('select');
+                    info.enum.forEach(function(opt) {
+                        var o = document.createElement('option');
+                        o.value = opt;
+                        o.textContent = opt;
+                        if (opt == value) o.selected = true;
+                        input.appendChild(o);
+                    });
+                } else if (info.type === 'array') {
+                    input = document.createElement('textarea');
+                    input.value = Array.isArray(value) ? JSON.stringify(value) : value;
+                } else {
+                    input = document.createElement('input');
+                    input.type = 'text';
+                    input.value = value;
+                }
+                input.name = param;
+                form.appendChild(input);
+            }
+            var submit = document.createElement('button');
+            submit.type = 'submit';
+            submit.textContent = 'Run';
+            form.appendChild(submit);
+            form.onsubmit = function(e) {
+                e.preventDefault();
+                var result = {};
+                for (var param in props) {
+                    var el = form.querySelector('[name="' + param + '"]');
+                    var val = el.value;
+                    if (props[param].type === 'integer') {
+                        var parsed = parseInt(val);
+                        if (!isNaN(parsed)) val = parsed;
+                    } else if (props[param].type === 'array') {
+                        try { val = JSON.parse(val); } catch (err) { val = val.split(',').map(function(v){return v.trim();}).filter(function(v){return v;}); }
+                    }
+                    result[param] = val;
+                }
+                socket.emit('tool_response', { input: result });
+                modal.style.display = 'none';
+            };
+            modal.style.display = 'block';
+        }
 
         function sendMessage() {
             var input = document.getElementById('user_input');

@@ -84,7 +84,7 @@ async def run_sampling_loop(
             "API key not found. Please set the OPENROUTER_API_KEY or OPENAI_API_KEY environment variable."
         )
     # set the task as a constant in config
-    agent = Agent(task=task, display=display)
+    agent = Agent(task=task, display=display, manual_tool_confirmation=False)
     agent.messages.append({"role": "user", "content": task})
     messages = await sampling_loop(
         agent=agent,
