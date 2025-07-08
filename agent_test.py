@@ -67,7 +67,7 @@ def test_agent_init(task, display_type):
     # Arrange
 
     # Act
-    agent = Agent(task, display_type())
+    agent = Agent(task, display_type(), manual_tool_confirmation=False)
 
     # Assert
     assert agent.task == task
@@ -119,7 +119,7 @@ def test_agent_init(task, display_type):
 )
 def test_log_tool_results(tmp_path, combined_content, tool_name, tool_input, expected_lines, case_id):
     # Arrange
-    agent = Agent("task", DummyDisplay())
+    agent = Agent("task", DummyDisplay(), manual_tool_confirmation=False)
     log_file = tmp_path / "tool.txt"
     os.makedirs(tmp_path, exist_ok=True)
     # Patch open to write to tmp_path
@@ -146,7 +146,7 @@ def test_log_tool_results(tmp_path, combined_content, tool_name, tool_input, exp
 )
 async def test_make_api_tool_result(tool_result, content_block, expected_is_error, expected_output, case_id):
     # Arrange
-    agent = Agent("task", DummyDisplay())
+    agent = Agent("task", DummyDisplay(), manual_tool_confirmation=False)
 
     # Act
     result = agent._make_api_tool_result(tool_result, content_block["id"])
@@ -172,7 +172,7 @@ async def test_make_api_tool_result(tool_result, content_block, expected_is_erro
 )
 async def test_run_tool(tool_run_result, run_raises, expected_output, expected_error, case_id):
     # Arrange
-    agent = Agent("task", DummyDisplay())
+    agent = Agent("task", DummyDisplay(), manual_tool_confirmation=False)
     content_block = {"name": "tool", "id": "tid", "input": {"foo": "bar"}}
     if run_raises:
         async def raise_exc(*a, **k): raise Exception("fail")
@@ -225,7 +225,7 @@ async def test_run_tool(tool_run_result, run_raises, expected_output, expected_e
 )
 def test_inject_prompt_caching(messages, expected_breakpoints, case_id):
     # Arrange
-    agent = Agent("task", DummyDisplay())
+    agent = Agent("task", DummyDisplay(), manual_tool_confirmation=False)
     agent.messages = messages.copy()
 
     # Act
@@ -252,7 +252,7 @@ def test_inject_prompt_caching(messages, expected_breakpoints, case_id):
 )
 def test_sanitize_tool_name(name, expected, case_id):
     # Arrange
-    agent = Agent("task", DummyDisplay())
+    agent = Agent("task", DummyDisplay(), manual_tool_confirmation=False)
 
     # Act
     result = agent._sanitize_tool_name(name)
@@ -263,7 +263,7 @@ def test_sanitize_tool_name(name, expected, case_id):
 @pytest.mark.asyncio
 async def test_step_happy(monkeypatch):
     # Arrange
-    agent = Agent("task", DummyDisplay())
+    agent = Agent("task", DummyDisplay(), manual_tool_confirmation=False)
     agent.messages = [{"role": "user", "content": "hi"}]
     fake_response = types.SimpleNamespace()
     fake_msg = types.SimpleNamespace()
@@ -283,7 +283,7 @@ async def test_step_happy(monkeypatch):
 @pytest.mark.asyncio
 async def test_step_llm_error(monkeypatch):
     # Arrange
-    agent = Agent("task", DummyDisplay())
+    agent = Agent("task", DummyDisplay(), manual_tool_confirmation=False)
     agent.messages = [{"role": "user", "content": "hi"}]
     agent.client.chat.completions.create = MagicMock(side_effect=Exception("fail"))
     agent.display = DummyDisplay()
@@ -300,7 +300,7 @@ async def test_step_llm_error(monkeypatch):
 @pytest.mark.asyncio
 async def test_step_with_tool_calls(monkeypatch):
     # Arrange
-    agent = Agent("task", DummyDisplay())
+    agent = Agent("task", DummyDisplay(), manual_tool_confirmation=False)
     agent.messages = [{"role": "user", "content": "hi"}]
     fake_tc = types.SimpleNamespace()
     fake_tc.function = types.SimpleNamespace()
@@ -332,7 +332,7 @@ async def test_step_with_tool_calls(monkeypatch):
 @pytest.mark.asyncio
 async def test_step_with_tool_calls_no_content(monkeypatch):
     # Arrange
-    agent = Agent("task", DummyDisplay())
+    agent = Agent("task", DummyDisplay(), manual_tool_confirmation=False)
     agent.messages = [{"role": "user", "content": "hi"}]
     fake_tc = types.SimpleNamespace()
     fake_tc.function = types.SimpleNamespace()
@@ -364,7 +364,7 @@ async def test_step_with_tool_calls_no_content(monkeypatch):
 @pytest.mark.asyncio
 async def test_step_no_tool_calls_user_exit(monkeypatch):
     # Arrange
-    agent = Agent("task", DummyDisplay())
+    agent = Agent("task", DummyDisplay(), manual_tool_confirmation=False)
     agent.messages = [{"role": "user", "content": "hi"}]
     fake_response = types.SimpleNamespace()
     fake_msg = types.SimpleNamespace()
@@ -384,7 +384,7 @@ async def test_step_no_tool_calls_user_exit(monkeypatch):
 @pytest.mark.asyncio
 async def test_step_no_tool_calls_user_continue(monkeypatch):
     # Arrange
-    agent = Agent("task", DummyDisplay())
+    agent = Agent("task", DummyDisplay(), manual_tool_confirmation=False)
     agent.messages = [{"role": "user", "content": "hi"}]
     fake_response = types.SimpleNamespace()
     fake_msg = types.SimpleNamespace()

@@ -162,7 +162,7 @@ class Agent:
         logger.info("TASK constant updated with revised task.")
         return revised_task_from_llm
 
-    def __init__(self, task: str, display: Union[WebUI, AgentDisplayConsole]):
+    def __init__(self, task: str, display: Union[WebUI, AgentDisplayConsole], manual_tool_confirmation: bool = False):
         self.task = task
         # Set initial task constant
         set_constant("TASK", self.task)
@@ -175,6 +175,7 @@ class Agent:
         )
 
         self.display = display
+        self.manual_tool_confirmation = manual_tool_confirmation
         self.context_recently_refreshed = False
         self.refresh_count = 45
         self.refresh_increment = 15  # the number     to increase the refresh count by
@@ -405,9 +406,14 @@ class Agent:
                 )
                 for arg in args.values():
                     rr(arg)
-                tool_result = await self.run_tool(
-                    {"name": tc.function.name, "id": tc.id, "input": args}
-                )
+                if self.manual_tool_confirmation and hasattr(self.display, "confirm_tool_call"):
+                    schema = self.tool_collection.tools.get(tc.function.name).to_params()["function"]["parameters"]
+                    new_args = await self.display.confirm_tool_call(tc.function.name, args, schema)
+                    if new_args is None:
+                        self.messages.append({"role": "tool", "tool_call_id": tc.id, "content": "Tool execution cancelled"})
+                        continue
+                    args = new_args
+                tool_result = await self.run_tool({"name": tc.function.name, "id": tc.id, "input": args})
                 result_text_parts = []
                 if isinstance(tool_result.get("content"), list):
                     for content_item in tool_result["content"]:
