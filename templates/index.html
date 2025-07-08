@@ -125,21 +125,310 @@
             font-weight: 500;
         }
 
+        /* Enhanced Modal Styles */
         #tool_prompt_modal {
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0,0,0,0.5);
+            background: rgba(0, 0, 0, 0.6);
             display: none;
+            z-index: 1000;
+            backdrop-filter: blur(2px);
+            animation: fadeIn 0.2s ease-out;
         }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes slideUp {
+            from { 
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to { 
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
         #tool_prompt_modal .modal-content {
             background: white;
-            padding: 20px;
-            margin: 10% auto;
-            max-width: 500px;
+            margin: 8% auto;
+            max-width: 600px;
+            border-radius: 12px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+            max-height: 80vh;
+            overflow-y: auto;
+            animation: slideUp 0.3s ease-out;
+        }
+
+        .modal-header {
+            padding: 24px 24px 16px;
+            border-bottom: 1px solid #e9ecef;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 12px 12px 0 0;
+            position: relative;
+        }
+
+        .modal-header h3 {
+            margin: 0;
+            font-size: 20px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .tool-icon {
+            width: 24px;
+            height: 24px;
+            background: rgba(255, 255, 255, 0.2);
             border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+        }
+
+        .modal-description {
+            margin-top: 8px;
+            opacity: 0.9;
+            font-size: 14px;
+        }
+
+        .modal-body {
+            padding: 24px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group:last-of-type {
+            margin-bottom: 0;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 600;
+            color: #374151;
+            font-size: 14px;
+        }
+
+        .form-label .required {
+            color: #dc3545;
+            margin-left: 2px;
+        }
+
+        .form-label .optional {
+            color: #6b7280;
+            font-weight: 400;
+            font-size: 12px;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.2s ease;
+            font-family: inherit;
+            box-sizing: border-box;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .form-control.error {
+            border-color: #dc3545;
+            box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.1);
+        }
+
+        .form-control[readonly] {
+            background-color: #f8f9fa;
+            color: #6c757d;
+        }
+
+        .form-help {
+            margin-top: 4px;
+            font-size: 12px;
+            color: #6b7280;
+        }
+
+        .form-error {
+            margin-top: 4px;
+            font-size: 12px;
+            color: #dc3545;
+            display: none;
+        }
+
+        .form-control.error + .form-error {
+            display: block;
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .checkbox-group input[type="checkbox"] {
+            width: auto;
+            margin: 0;
+        }
+
+        .array-input {
+            position: relative;
+        }
+
+        .array-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-bottom: 8px;
+            min-height: 32px;
+            align-items: center;
+        }
+
+        .array-tag {
+            background: #e3f2fd;
+            color: #1565c0;
+            padding: 4px 8px;
+            border-radius: 16px;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .array-tag .remove {
+            cursor: pointer;
+            font-weight: bold;
+            opacity: 0.7;
+        }
+
+        .array-tag .remove:hover {
+            opacity: 1;
+        }
+
+        .modal-footer {
+            padding: 16px 24px 24px;
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+            border-top: 1px solid #e9ecef;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            text-decoration: none;
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            background: #5a6268;
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 2px solid #e5e7eb;
+            color: #374151;
+        }
+
+        .btn-outline:hover:not(:disabled) {
+            border-color: #d1d5db;
+            background: #f9fafb;
+        }
+
+        .loading-spinner {
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .parameter-preview {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 20px;
+        }
+
+        .parameter-preview h4 {
+            margin: 0 0 12px 0;
+            color: #495057;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .parameter-preview pre {
+            margin: 0;
+            font-size: 12px;
+            color: #6c757d;
+            white-space: pre-wrap;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+
+        @media (max-width: 768px) {
+            #tool_prompt_modal .modal-content {
+                margin: 4% 16px;
+                max-width: none;
+            }
+            
+            .modal-footer {
+                flex-direction: column;
+            }
+            
+            .btn {
+                width: 100%;
+                justify-content: center;
+            }
         }
     </style>
 </head>
@@ -187,8 +476,31 @@
 
         <div id="tool_prompt_modal">
             <div class="modal-content">
-                <h3 id="tool_prompt_title"></h3>
-                <form id="tool_prompt_form"></form>
+                <div class="modal-header">
+                    <h3 id="tool_prompt_title">
+                        <span class="tool-icon">🔧</span>
+                        <span id="tool_name_text">Confirm Tool</span>
+                    </h3>
+                    <div class="modal-description" id="tool_description">
+                        Review and modify the parameters before executing this tool.
+                    </div>
+                </div>
+                <div class="modal-body">
+                    <div class="parameter-preview" id="parameter_preview" style="display: none;">
+                        <h4>Current Parameters:</h4>
+                        <pre id="parameter_preview_content"></pre>
+                    </div>
+                    <form id="tool_prompt_form"></form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline" onclick="cancelToolCall()">
+                        Cancel
+                    </button>
+                    <button type="button" class="btn btn-primary" onclick="executeToolCall()" id="execute_btn">
+                        <span id="execute_text">Execute Tool</span>
+                        <span class="loading-spinner" id="loading_spinner" style="display: none;"></span>
+                    </button>
+                </div>
             </div>
         </div>
         
@@ -202,6 +514,7 @@
     <script>
         var socket = io();
         var currentTab = 'user';
+        var currentToolData = null;
 
         socket.on('connect', function() {
             console.log('Connected to SocketIO');
@@ -308,65 +621,345 @@
         });
 
         socket.on('tool_prompt_clear', function() {
-            document.getElementById('tool_prompt_modal').style.display = 'none';
+            hideToolPrompt();
         });
 
-        function showToolPrompt(data) {
-            var modal = document.getElementById('tool_prompt_modal');
-            var form = document.getElementById('tool_prompt_form');
-            var title = document.getElementById('tool_prompt_title');
-            title.textContent = 'Confirm ' + data.tool;
-            form.innerHTML = '';
-            var props = (data.schema && data.schema.properties) || {};
-            for (var param in props) {
-                var info = props[param];
-                var value = data.values && data.values[param] !== undefined ? data.values[param] : '';
-                var label = document.createElement('label');
-                label.textContent = param;
-                form.appendChild(label);
-                var input;
-                if (info.enum) {
-                    input = document.createElement('select');
-                    info.enum.forEach(function(opt) {
-                        var o = document.createElement('option');
-                        o.value = opt;
-                        o.textContent = opt;
-                        if (opt == value) o.selected = true;
-                        input.appendChild(o);
-                    });
-                } else if (info.type === 'array') {
-                    input = document.createElement('textarea');
-                    input.value = Array.isArray(value) ? JSON.stringify(value) : value;
-                } else {
-                    input = document.createElement('input');
-                    input.type = 'text';
-                    input.value = value;
-                }
-                input.name = param;
-                form.appendChild(input);
-            }
-            var submit = document.createElement('button');
-            submit.type = 'submit';
-            submit.textContent = 'Run';
-            form.appendChild(submit);
-            form.onsubmit = function(e) {
-                e.preventDefault();
-                var result = {};
-                for (var param in props) {
-                    var el = form.querySelector('[name="' + param + '"]');
-                    var val = el.value;
-                    if (props[param].type === 'integer') {
-                        var parsed = parseInt(val);
-                        if (!isNaN(parsed)) val = parsed;
-                    } else if (props[param].type === 'array') {
-                        try { val = JSON.parse(val); } catch (err) { val = val.split(',').map(function(v){return v.trim();}).filter(function(v){return v;}); }
-                    }
-                    result[param] = val;
-                }
-                socket.emit('tool_response', { input: result });
-                modal.style.display = 'none';
+        function getToolIcon(toolName) {
+            const icons = {
+                'bash': '💻',
+                'write_code': '📝',
+                'edit': '✏️',
+                'project_setup': '🏗️',
+                'picture_generation': '🎨',
+                'file_operations': '📁',
+                'search': '🔍',
+                'default': '🔧'
             };
+            return icons[toolName] || icons.default;
+        }
+
+        function getToolDescription(toolName, schema) {
+            if (schema && schema.description) {
+                return schema.description;
+            }
+            
+            const descriptions = {
+                'bash': 'Execute shell commands in the terminal',
+                'write_code': 'Create or modify code files',
+                'edit': 'Edit existing files with specific changes',
+                'project_setup': 'Set up project structure and dependencies',
+                'picture_generation': 'Generate images using AI',
+                'default': 'Review and modify the parameters before executing this tool.'
+            };
+            return descriptions[toolName] || descriptions.default;
+        }
+
+        function createFormField(param, info, value) {
+            const group = document.createElement('div');
+            group.className = 'form-group';
+            
+            const label = document.createElement('label');
+            label.className = 'form-label';
+            label.textContent = param;
+            
+            if (info.required) {
+                const required = document.createElement('span');
+                required.className = 'required';
+                required.textContent = '*';
+                label.appendChild(required);
+            } else {
+                const optional = document.createElement('span');
+                optional.className = 'optional';
+                optional.textContent = ' (optional)';
+                label.appendChild(optional);
+            }
+            
+            group.appendChild(label);
+            
+            let input;
+            
+            if (info.enum) {
+                input = document.createElement('select');
+                input.className = 'form-control';
+                
+                // Add empty option for optional fields
+                if (!info.required) {
+                    const emptyOption = document.createElement('option');
+                    emptyOption.value = '';
+                    emptyOption.textContent = '-- Select --';
+                    input.appendChild(emptyOption);
+                }
+                
+                info.enum.forEach(function(opt) {
+                    const option = document.createElement('option');
+                    option.value = opt;
+                    option.textContent = opt;
+                    if (opt == value) option.selected = true;
+                    input.appendChild(option);
+                });
+            } else if (info.type === 'boolean') {
+                const checkboxGroup = document.createElement('div');
+                checkboxGroup.className = 'checkbox-group';
+                
+                input = document.createElement('input');
+                input.type = 'checkbox';
+                input.checked = value === true || value === 'true';
+                
+                const checkboxLabel = document.createElement('label');
+                checkboxLabel.textContent = 'Enable';
+                
+                checkboxGroup.appendChild(input);
+                checkboxGroup.appendChild(checkboxLabel);
+                group.appendChild(checkboxGroup);
+            } else if (info.type === 'array') {
+                const arrayContainer = document.createElement('div');
+                arrayContainer.className = 'array-input';
+                
+                const tagsContainer = document.createElement('div');
+                tagsContainer.className = 'array-tags';
+                
+                input = document.createElement('input');
+                input.type = 'text';
+                input.className = 'form-control';
+                input.placeholder = 'Type and press Enter to add items';
+                
+                // Initialize with existing values
+                let arrayValue = Array.isArray(value) ? value : (value ? [value] : []);
+                
+                function updateTags() {
+                    tagsContainer.innerHTML = '';
+                    arrayValue.forEach(function(item, index) {
+                        const tag = document.createElement('span');
+                        tag.className = 'array-tag';
+                        tag.innerHTML = escapeHtml(item) + '<span class="remove" onclick="removeArrayItem(' + index + ')">×</span>';
+                        tagsContainer.appendChild(tag);
+                    });
+                }
+                
+                window.removeArrayItem = function(index) {
+                    arrayValue.splice(index, 1);
+                    updateTags();
+                };
+                
+                input.addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter' && this.value.trim()) {
+                        e.preventDefault();
+                        arrayValue.push(this.value.trim());
+                        this.value = '';
+                        updateTags();
+                    }
+                });
+                
+                // Store array value accessor
+                input.getArrayValue = function() { return arrayValue; };
+                
+                updateTags();
+                arrayContainer.appendChild(tagsContainer);
+                arrayContainer.appendChild(input);
+                group.appendChild(arrayContainer);
+            } else if (info.type === 'integer') {
+                input = document.createElement('input');
+                input.type = 'number';
+                input.className = 'form-control';
+                input.value = value || '';
+                input.step = '1';
+            } else {
+                input = document.createElement('textarea');
+                input.className = 'form-control';
+                input.value = value || '';
+                input.rows = info.type === 'string' && (value || '').length > 100 ? 4 : 2;
+            }
+            
+            if (input && !info.type === 'boolean') {
+                input.name = param;
+                if (info.type !== 'array') {
+                    group.appendChild(input);
+                }
+            }
+            
+            // Add help text if available
+            if (info.description) {
+                const help = document.createElement('div');
+                help.className = 'form-help';
+                help.textContent = info.description;
+                group.appendChild(help);
+            }
+            
+            // Add error container
+            const error = document.createElement('div');
+            error.className = 'form-error';
+            group.appendChild(error);
+            
+            return group;
+        }
+
+        function validateForm() {
+            const form = document.getElementById('tool_prompt_form');
+            let isValid = true;
+            
+            // Clear previous errors
+            document.querySelectorAll('.form-control').forEach(function(control) {
+                control.classList.remove('error');
+            });
+            document.querySelectorAll('.form-error').forEach(function(error) {
+                error.style.display = 'none';
+            });
+            
+            if (!currentToolData) return false;
+            
+            const props = currentToolData.schema?.properties || {};
+            const required = currentToolData.schema?.required || [];
+            
+            for (let param in props) {
+                const info = props[param];
+                const isRequired = required.includes(param);
+                const control = form.querySelector('[name="' + param + '"]');
+                
+                if (!control) continue;
+                
+                let value = control.value;
+                if (control.getArrayValue) {
+                    value = control.getArrayValue();
+                }
+                
+                // Check required fields
+                if (isRequired && (!value || (Array.isArray(value) && value.length === 0))) {
+                    control.classList.add('error');
+                    const errorDiv = control.closest('.form-group').querySelector('.form-error');
+                    errorDiv.textContent = 'This field is required';
+                    errorDiv.style.display = 'block';
+                    isValid = false;
+                }
+                
+                // Type validation
+                if (value && info.type === 'integer') {
+                    const numValue = parseInt(value);
+                    if (isNaN(numValue)) {
+                        control.classList.add('error');
+                        const errorDiv = control.closest('.form-group').querySelector('.form-error');
+                        errorDiv.textContent = 'Must be a valid number';
+                        errorDiv.style.display = 'block';
+                        isValid = false;
+                    }
+                }
+            }
+            
+            return isValid;
+        }
+
+        function showToolPrompt(data) {
+            currentToolData = data;
+            const modal = document.getElementById('tool_prompt_modal');
+            const form = document.getElementById('tool_prompt_form');
+            const title = document.getElementById('tool_name_text');
+            const description = document.getElementById('tool_description');
+            const preview = document.getElementById('parameter_preview');
+            const previewContent = document.getElementById('parameter_preview_content');
+            
+            // Update header
+            const toolIcon = document.querySelector('.tool-icon');
+            toolIcon.textContent = getToolIcon(data.tool);
+            title.textContent = `Confirm ${data.tool}`;
+            description.textContent = getToolDescription(data.tool, data.schema);
+            
+            // Show parameter preview if there are existing values
+            if (data.values && Object.keys(data.values).length > 0) {
+                previewContent.textContent = JSON.stringify(data.values, null, 2);
+                preview.style.display = 'block';
+            } else {
+                preview.style.display = 'none';
+            }
+            
+            // Clear and rebuild form
+            form.innerHTML = '';
+            
+            const props = data.schema?.properties || {};
+            const required = data.schema?.required || [];
+            
+            for (let param in props) {
+                const info = { ...props[param], required: required.includes(param) };
+                const value = data.values?.[param];
+                const field = createFormField(param, info, value);
+                form.appendChild(field);
+            }
+            
+            // Reset button state
+            const executeBtn = document.getElementById('execute_btn');
+            const executeText = document.getElementById('execute_text');
+            const loadingSpinner = document.getElementById('loading_spinner');
+            
+            executeBtn.disabled = false;
+            executeText.style.display = 'inline';
+            loadingSpinner.style.display = 'none';
+            
             modal.style.display = 'block';
+            
+            // Focus first input
+            const firstInput = form.querySelector('.form-control');
+            if (firstInput) {
+                setTimeout(() => firstInput.focus(), 100);
+            }
+        }
+
+        function hideToolPrompt() {
+            document.getElementById('tool_prompt_modal').style.display = 'none';
+            currentToolData = null;
+        }
+
+        function cancelToolCall() {
+            hideToolPrompt();
+            // Optionally emit cancellation event
+            socket.emit('tool_response', { cancelled: true });
+        }
+
+        function executeToolCall() {
+            if (!validateForm()) {
+                return;
+            }
+            
+            const form = document.getElementById('tool_prompt_form');
+            const executeBtn = document.getElementById('execute_btn');
+            const executeText = document.getElementById('execute_text');
+            const loadingSpinner = document.getElementById('loading_spinner');
+            
+            // Show loading state
+            executeBtn.disabled = true;
+            executeText.style.display = 'none';
+            loadingSpinner.style.display = 'inline-block';
+            
+            const result = {};
+            const props = currentToolData.schema?.properties || {};
+            
+            for (let param in props) {
+                const info = props[param];
+                const control = form.querySelector('[name="' + param + '"]');
+                
+                if (!control) continue;
+                
+                let value = control.value;
+                
+                // Handle different input types
+                if (control.type === 'checkbox') {
+                    value = control.checked;
+                } else if (control.getArrayValue) {
+                    value = control.getArrayValue();
+                } else if (info.type === 'integer') {
+                    const parsed = parseInt(value);
+                    if (!isNaN(parsed)) value = parsed;
+                } else if (info.type === 'array' && typeof value === 'string') {
+                    try {
+                        value = JSON.parse(value);
+                    } catch (err) {
+                        value = value.split(',').map(v => v.trim()).filter(v => v);
+                    }
+                }
+                
+                result[param] = value;
+            }
+            
+            socket.emit('tool_response', { input: result });
+            
+            // Modal will be hidden by the tool_prompt_clear event
         }
 
         function sendMessage() {
@@ -388,6 +981,20 @@
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
                 sendMessage();
+            }
+        });
+
+        // Handle Escape key to close modal
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && document.getElementById('tool_prompt_modal').style.display === 'block') {
+                cancelToolCall();
+            }
+        });
+
+        // Handle click outside modal to close
+        document.getElementById('tool_prompt_modal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                cancelToolCall();
             }
         });
 
