@@ -770,7 +770,7 @@
                 input.rows = info.type === 'string' && (value || '').length > 100 ? 4 : 2;
             }
             
-            if (input && !info.type === 'boolean') {
+            if (input && info.type !== 'boolean') {
                 input.name = param;
                 if (info.type !== 'array') {
                     group.appendChild(input);
@@ -894,11 +894,19 @@
             
             modal.style.display = 'block';
             
-            // Focus first input
-            const firstInput = form.querySelector('.form-control');
-            if (firstInput) {
-                setTimeout(() => firstInput.focus(), 100);
-            }
+            // Focus the first interactive input (text, checkbox, radio, select, textarea)
+            setTimeout(() => {
+                const focusable = form.querySelectorAll(
+                    'input:not([type=hidden]):not([disabled]), select:not([disabled]), textarea:not([disabled])'
+                );
+                for (const el of focusable) {
+                    // Skip elements that are not visible
+                    if (el.offsetParent !== null) {
+                        el.focus();
+                        break;
+                    }
+                }
+            }, 100);
         }
 
         function hideToolPrompt() {
