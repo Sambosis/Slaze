@@ -585,6 +585,17 @@
         }
 
         function escapeHtml(text) {
+            // Convert non-string values to string first
+            if (typeof text !== 'string') {
+                if (text === null || text === undefined) {
+                    text = '';
+                } else if (typeof text === 'object') {
+                    text = JSON.stringify(text);
+                } else {
+                    text = String(text);
+                }
+            }
+            
             var map = {
                 '&': '&amp;',
                 '<': '&lt;',
