@@ -785,9 +785,9 @@
                 input.rows = info.type === 'string' && (value || '').length > 100 ? 4 : 2;
             }
             
-            if (input && info.type !== 'array') {
+            if (input) {
                 input.name = param;
-                if (info.type !== 'boolean') {
+                if (info.type !== 'boolean' && info.type !== 'array') {
                     group.appendChild(input);
                 }
             }
