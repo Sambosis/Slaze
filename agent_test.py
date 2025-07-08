@@ -9,10 +9,15 @@ from agent import Agent
 
 # Dummy classes to mock dependencies
 class DummyDisplay:
-    def __init__(self):
+    def __init__(self, interactive_tool_calls=False): # Added interactive_tool_calls
         self.messages = []
+        self.interactive_tool_calls = interactive_tool_calls # Store the flag
+        # Add mockable prompt_for_tool_call_approval
+        self.prompt_for_tool_call_approval = AsyncMock(return_value={"approved": True, "name": "dummy_tool", "args": {}})
+
     def add_message(self, role, content):
         self.messages.append((role, content))
+
     async def wait_for_user_input(self, prompt):
         return "continue"
 
@@ -402,3 +407,178 @@ async def test_step_no_tool_calls_user_continue(monkeypatch):
     assert result is True
     assert agent.messages[-1]["role"] == "user"
     assert agent.messages[-1]["content"] == "keep going"
+
+
+# --- Tests for Interactive Tool Calls ---
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("interactive_flag_val", [True, False])
+async def test_agent_init_with_interactive_flag(interactive_flag_val):
+    # Arrange & Act
+    agent = Agent("task", DummyDisplay(interactive_tool_calls=interactive_flag_val), interactive_tool_calls=interactive_flag_val)
+    # Assert
+    assert agent.interactive_tool_calls == interactive_flag_val
+    assert agent.display.interactive_tool_calls == interactive_flag_val
+
+
+@pytest.mark.asyncio
+async def test_step_interactive_tool_call_approve_original(monkeypatch):
+    # Arrange
+    mock_display = DummyDisplay(interactive_tool_calls=True)
+    original_args = {"foo": "bar"}
+    mock_display.prompt_for_tool_call_approval = AsyncMock(
+        return_value={"approved": True, "name": "original_tool", "args": original_args}
+    )
+
+    agent = Agent("task", mock_display, interactive_tool_calls=True)
+    agent.messages = [{"role": "user", "content": "hi"}]
+
+    fake_tc = types.SimpleNamespace(id="tid1")
+    fake_tc.function = types.SimpleNamespace(name="original_tool", arguments=json.dumps(original_args))
+
+    fake_response_msg = types.SimpleNamespace(content=None, tool_calls=[fake_tc])
+    fake_llm_response = types.SimpleNamespace(choices=[types.SimpleNamespace(message=fake_response_msg)])
+    agent.client.chat.completions.create = MagicMock(return_value=fake_llm_response)
+
+    agent.run_tool = AsyncMock(return_value={
+        "type": "tool_result", "content": [{"type": "text", "text": "tool success"}],
+        "tool_use_id": "tid1", "is_error": False
+    })
+
+    # Act
+    await agent.step()
+
+    # Assert
+    mock_display.prompt_for_tool_call_approval.assert_called_once_with("original_tool", original_args, "tid1")
+    agent.run_tool.assert_called_once_with({"name": "original_tool", "id": "tid1", "input": original_args})
+    assert agent.messages[-1]["role"] == "tool"
+    assert "tool success" in agent.messages[-1]["content"]
+
+
+@pytest.mark.asyncio
+async def test_step_interactive_tool_call_approve_modified(monkeypatch):
+    # Arrange
+    mock_display = DummyDisplay(interactive_tool_calls=True)
+    original_args = {"foo": "bar"}
+    modified_args = {"foo": "baz", "new_param": 123}
+    mock_display.prompt_for_tool_call_approval = AsyncMock(
+        return_value={"approved": True, "name": "original_tool", "args": modified_args} # User modified args
+    )
+
+    agent = Agent("task", mock_display, interactive_tool_calls=True)
+    agent.messages = [{"role": "user", "content": "hi"}]
+
+    fake_tc = types.SimpleNamespace(id="tid2")
+    fake_tc.function = types.SimpleNamespace(name="original_tool", arguments=json.dumps(original_args))
+
+    fake_response_msg = types.SimpleNamespace(content=None, tool_calls=[fake_tc])
+    fake_llm_response = types.SimpleNamespace(choices=[types.SimpleNamespace(message=fake_response_msg)])
+    agent.client.chat.completions.create = MagicMock(return_value=fake_llm_response)
+
+    agent.run_tool = AsyncMock(return_value={
+        "type": "tool_result", "content": [{"type": "text", "text": "tool success"}],
+        "tool_use_id": "tid2", "is_error": False
+    })
+
+    # Act
+    await agent.step()
+
+    # Assert
+    mock_display.prompt_for_tool_call_approval.assert_called_once_with("original_tool", original_args, "tid2")
+    agent.run_tool.assert_called_once_with({"name": "original_tool", "id": "tid2", "input": modified_args})
+    assert agent.messages[-1]["role"] == "tool"
+    assert "tool success" in agent.messages[-1]["content"]
+
+
+@pytest.mark.asyncio
+async def test_step_interactive_tool_call_cancel(monkeypatch):
+    # Arrange
+    mock_display = DummyDisplay(interactive_tool_calls=True)
+    original_args = {"foo": "bar"}
+    mock_display.prompt_for_tool_call_approval = AsyncMock(
+        return_value={"approved": False, "name": "original_tool", "args": original_args} # User cancelled
+    )
+
+    agent = Agent("task", mock_display, interactive_tool_calls=True)
+    agent.messages = [{"role": "user", "content": "hi"}]
+
+    fake_tc = types.SimpleNamespace(id="tid3")
+    fake_tc.function = types.SimpleNamespace(name="original_tool", arguments=json.dumps(original_args))
+
+    fake_response_msg = types.SimpleNamespace(content=None, tool_calls=[fake_tc])
+    fake_llm_response = types.SimpleNamespace(choices=[types.SimpleNamespace(message=fake_response_msg)])
+    agent.client.chat.completions.create = MagicMock(return_value=fake_llm_response)
+
+    agent.run_tool = AsyncMock() # Should not be called
+
+    # Act
+    await agent.step()
+
+    # Assert
+    mock_display.prompt_for_tool_call_approval.assert_called_once_with("original_tool", original_args, "tid3")
+    agent.run_tool.assert_not_called()
+    assert agent.messages[-1]["role"] == "tool"
+    assert "Tool call cancelled by user." in agent.messages[-1]["content"]
+    assert agent.messages[-1]["tool_call_id"] == "tid3"
+
+
+@pytest.mark.asyncio
+async def test_step_interactive_tool_call_display_returns_none(monkeypatch):
+    # Arrange
+    mock_display = DummyDisplay(interactive_tool_calls=True)
+    original_args = {"foo": "bar"}
+    mock_display.prompt_for_tool_call_approval = AsyncMock(return_value=None) # Display interaction failed
+
+    agent = Agent("task", mock_display, interactive_tool_calls=True)
+    agent.messages = [{"role": "user", "content": "hi"}]
+
+    fake_tc = types.SimpleNamespace(id="tid4")
+    fake_tc.function = types.SimpleNamespace(name="original_tool", arguments=json.dumps(original_args))
+
+    fake_response_msg = types.SimpleNamespace(content=None, tool_calls=[fake_tc])
+    fake_llm_response = types.SimpleNamespace(choices=[types.SimpleNamespace(message=fake_response_msg)])
+    agent.client.chat.completions.create = MagicMock(return_value=fake_llm_response)
+
+    agent.run_tool = AsyncMock() # Should not be called
+
+    # Act
+    await agent.step()
+
+    # Assert
+    mock_display.prompt_for_tool_call_approval.assert_called_once_with("original_tool", original_args, "tid4")
+    agent.run_tool.assert_not_called()
+    assert agent.messages[-1]["role"] == "tool"
+    assert "Tool call cancelled by user." in agent.messages[-1]["content"] # Or some other error indicating cancellation
+    assert agent.messages[-1]["tool_call_id"] == "tid4"
+
+@pytest.mark.asyncio
+async def test_step_interactive_mode_off_behaves_normally(monkeypatch):
+    # Arrange
+    mock_display = DummyDisplay(interactive_tool_calls=False) # Interactive mode OFF
+    # We should not expect prompt_for_tool_call_approval to be called
+    mock_display.prompt_for_tool_call_approval = AsyncMock()
+
+    original_args = {"foo": "bar"}
+    agent = Agent("task", mock_display, interactive_tool_calls=False) # Flag is False
+    agent.messages = [{"role": "user", "content": "hi"}]
+
+    fake_tc = types.SimpleNamespace(id="tid5")
+    fake_tc.function = types.SimpleNamespace(name="original_tool", arguments=json.dumps(original_args))
+
+    fake_response_msg = types.SimpleNamespace(content=None, tool_calls=[fake_tc])
+    fake_llm_response = types.SimpleNamespace(choices=[types.SimpleNamespace(message=fake_response_msg)])
+    agent.client.chat.completions.create = MagicMock(return_value=fake_llm_response)
+
+    agent.run_tool = AsyncMock(return_value={
+        "type": "tool_result", "content": [{"type": "text", "text": "tool success"}],
+        "tool_use_id": "tid5", "is_error": False
+    })
+
+    # Act
+    await agent.step()
+
+    # Assert
+    mock_display.prompt_for_tool_call_approval.assert_not_called() # Key assertion for this test
+    agent.run_tool.assert_called_once_with({"name": "original_tool", "id": "tid5", "input": original_args})
+    assert agent.messages[-1]["role"] == "tool"
+    assert "tool success" in agent.messages[-1]["content"]

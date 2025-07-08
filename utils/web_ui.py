@@ -4,6 +4,7 @@ import threading
 import logging
 import json
 from queue import Queue
+from typing import Optional
 from flask import Flask, render_template, jsonify, request, redirect, url_for, send_from_directory
 from flask_socketio import SocketIO, disconnect
 from config import (
@@ -36,7 +37,7 @@ def log_message(msg_type, message):
         file.write(f"\n{message}\n\n")
 
 class WebUI:
-    def __init__(self, agent_runner):
+    def __init__(self, agent_runner, interactive_tool_calls: bool = False):
         logging.info("Initializing WebUI")
         # More robust path for templates
         template_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'templates'))
@@ -50,6 +51,7 @@ class WebUI:
         # Using a standard Queue for cross-thread communication
         self.input_queue = Queue()
         self.agent_runner = agent_runner
+        self.interactive_tool_calls = interactive_tool_calls
         # Import tools lazily to avoid circular imports
         from tools import (
             BashTool,
@@ -70,6 +72,8 @@ class WebUI:
         )
         self.setup_routes()
         self.setup_socketio_events()
+        self.tool_approval_events = {} # For managing async responses for tool approval
+        self.tool_approval_data = {}   # For storing data from tool approval responses
         logging.info("WebUI initialized")
 
     def setup_routes(self):
@@ -212,7 +216,62 @@ class WebUI:
             logging.info(f"Received user input: {user_input}")
             # Queue is thread-safe; use blocking put to notify waiting tasks
             self.input_queue.put(user_input)
+
+        @self.socketio.on("tool_approval_response")
+        def handle_tool_approval_response(data):
+            request_id = data.get("approval_request_id")
+            logging.info(f"Received tool_approval_response for request_id: {request_id}")
+            if request_id in self.tool_approval_events:
+                self.tool_approval_data[request_id] = {
+                    "name": data.get("name"),
+                    "args": data.get("args"),
+                    "approved": data.get("approved", False)
+                }
+                event = self.tool_approval_events.get(request_id)
+                if event:
+                    event.set() # asyncio.Event.set() is thread-safe
+                else:
+                    logging.warning(f"Event not found for request_id {request_id} in tool_approval_events when handling tool_approval_response.")
+            else:
+                logging.warning(f"Received tool_approval_response for unknown request_id: {request_id}")
+
         logging.info("SocketIO events set up")
+
+    async def prompt_for_tool_call_approval(self, tool_name: str, tool_args: dict, tool_id: str) -> Optional[dict]:
+        import uuid
+        approval_request_id = str(uuid.uuid4())
+        event = asyncio.Event()
+        self.tool_approval_events[approval_request_id] = event
+        self.tool_approval_data.pop(approval_request_id, None) # Clear any old data
+
+        logging.info(f"Emitting 'request_tool_approval' for tool: {tool_name}, request_id: {approval_request_id}")
+        self.socketio.emit("request_tool_approval", {
+            "tool_name": tool_name,
+            "tool_args": tool_args,
+            "tool_id": tool_id,
+            "approval_request_id": approval_request_id
+        })
+
+        try:
+            # Add a timeout to prevent indefinite waiting if client doesn't respond
+            await asyncio.wait_for(event.wait(), timeout=300.0) # 5 minutes timeout
+        except asyncio.TimeoutError:
+            logging.error(f"Timeout waiting for tool approval response for request_id: {approval_request_id}")
+            self.tool_approval_events.pop(approval_request_id, None)
+            self.tool_approval_data.pop(approval_request_id, None)
+            return {"name": tool_name, "args": tool_args, "approved": False, "error": "timeout"} # Indicate timeout and auto-reject
+
+        response_data = self.tool_approval_data.pop(approval_request_id, None)
+        self.tool_approval_events.pop(approval_request_id, None)
+
+        if response_data:
+            logging.info(f"Returning tool approval response for {approval_request_id}: {response_data}")
+            return response_data
+        else:
+            logging.warning(f"No response data found for request_id: {approval_request_id} after event was set.")
+            # This case should ideally not happen if event is set only after data is put
+            return {"name": tool_name, "args": tool_args, "approved": False, "error": "internal_error"}
+
 
     def start_server(self, host="0.0.0.0", port=5000):
         logging.info(f"Starting server on {host}:{port}")

@@ -31,6 +31,20 @@ OPENROUTER_API_KEY=...  # or OPENAI_API_KEY
 OPENAI_BASE_URL=https://openrouter.ai/api/v1  # optional override for OpenRouter
 ```
 
+## Command-Line Options
+
+When running `run.py`, you can use the following command-line options:
+
+*   `--interactive-tool-calls`:
+    *   When this flag is provided, the agent will pause before executing any tool call.
+    *   It will display the tool name and the parameters it intends to use.
+    *   You will be prompted to:
+        *   **Approve** the tool call as is.
+        *   **Edit** the parameters (you'll be asked to provide the new parameters as a JSON string in the console, or through a UI in the web version).
+        *   **Cancel** the tool call.
+    *   This feature is useful for debugging, fine-grained control over tool execution, or guiding the agent more precisely.
+    *   Example: `python run.py --interactive-tool-calls console` or `python run.py --interactive-tool-calls web`.
+
 ## Running the console app
 
 Execute:
