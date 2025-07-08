@@ -13,8 +13,9 @@ from config import (
 )
 
 class AgentDisplayConsole:
-    def __init__(self):
+    def __init__(self, interactive_tool_calls: bool = False):
         self.console = Console()
+        self.interactive_tool_calls = interactive_tool_calls
 
     def add_message(self, msg_type, content):
         if msg_type == "user":
@@ -105,3 +106,59 @@ class AgentDisplayConsole:
         write_constants_to_file()
 
         return task
+
+    async def prompt_for_tool_call_approval(self, tool_name: str, tool_args: dict, tool_id: str) -> dict:
+        self.console.print(Panel(f"🧞 Assistant proposes to call tool: [bold cyan]{tool_name}[/bold cyan]", title="Tool Call Proposed", expand=False))
+
+        current_args_json = json.dumps(tool_args, indent=2)
+        self.console.print("Parameters:")
+        self.console.print(Syntax(current_args_json, "json", theme="dracula", line_numbers=True))
+
+        modified_args = tool_args
+        action = await asyncio.to_thread(
+            Prompt.ask,
+            "Choose action",
+            choices=["approve", "edit", "cancel"],
+            default="approve",
+        )
+
+        if action == "edit":
+            self.console.print("Enter new parameters as a JSON string. Press Ctrl+D or Ctrl+Z (Windows) then Enter to finish.")
+            new_args_lines = []
+            while True:
+                try:
+                    line = await self.wait_for_user_input("") # Assuming wait_for_user_input handles multiline
+                    new_args_lines.append(line)
+                except EOFError:
+                    break
+                except KeyboardInterrupt: # Allow cancelling edit
+                    self.console.print("[yellow]Edit cancelled. Using original parameters.[/yellow]")
+                    return {"name": tool_name, "args": tool_args, "approved": True} # Default to approve original if edit is cancelled mid-way
+
+            new_args_str = "\n".join(new_args_lines)
+            if not new_args_str.strip():
+                self.console.print("[yellow]No input received. Using original parameters.[/yellow]")
+            else:
+                try:
+                    modified_args = json.loads(new_args_str)
+                    self.console.print("[green]Parameters updated.[/green]")
+                    current_args_json = json.dumps(modified_args, indent=2)
+                    self.console.print("New Parameters:")
+                    self.console.print(Syntax(current_args_json, "json", theme="dracula", line_numbers=True))
+                except json.JSONDecodeError as e:
+                    self.console.print(f"[bold red]Invalid JSON. Error: {e}. Using original parameters.[/bold red]")
+                    # Fallback to original args, but still need to confirm approval
+                except Exception as e: # Catch any other unexpected errors during parsing
+                    self.console.print(f"[bold red]Error processing input: {e}. Using original parameters.[/bold red]")
+
+
+        if action == "cancel":
+            self.console.print("[yellow]Tool call cancelled by user.[/yellow]")
+            return {"name": tool_name, "args": modified_args, "approved": False}
+
+        # If 'approve' or 'edit' (and edit was successful or fell-through to original)
+        if await asyncio.to_thread(Confirm.ask, f"Execute tool '{tool_name}' with these parameters?", default=True):
+            return {"name": tool_name, "args": modified_args, "approved": True}
+        else:
+            self.console.print("[yellow]Tool call rejected by user.[/yellow]")
+            return {"name": tool_name, "args": modified_args, "approved": False}

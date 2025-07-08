@@ -162,7 +162,7 @@ class Agent:
         logger.info("TASK constant updated with revised task.")
         return revised_task_from_llm
 
-    def __init__(self, task: str, display: Union[WebUI, AgentDisplayConsole]):
+    def __init__(self, task: str, display: Union[WebUI, AgentDisplayConsole], interactive_tool_calls: bool = False):
         self.task = task
         # Set initial task constant
         set_constant("TASK", self.task)
@@ -175,6 +175,7 @@ class Agent:
         )
 
         self.display = display
+        self.interactive_tool_calls = interactive_tool_calls
         self.context_recently_refreshed = False
         self.refresh_count = 45
         self.refresh_increment = 15  # the number     to increase the refresh count by
@@ -405,9 +406,43 @@ class Agent:
                 )
                 for arg in args.values():
                     rr(arg)
-                tool_result = await self.run_tool(
-                    {"name": tc.function.name, "id": tc.id, "input": args}
-                )
+
+                tool_name_to_run = tc.function.name
+                tool_args_to_run = args
+                tool_id_to_run = tc.id
+                proceed_with_call = True
+
+                if self.interactive_tool_calls:
+                    # Call a new method on the display object to handle interaction
+                    approval_response = await self.display.prompt_for_tool_call_approval(
+                        tool_name_to_run, tool_args_to_run, tool_id_to_run
+                    )
+                    if approval_response:
+                        tool_name_to_run = approval_response.get("name", tool_name_to_run)
+                        tool_args_to_run = approval_response.get("args", tool_args_to_run)
+                        # tool_id doesn't change
+                        if not approval_response.get("approved", False):
+                            proceed_with_call = False
+                    else: # If display returned None, assume cancellation
+                        proceed_with_call = False
+
+                if proceed_with_call:
+                    tool_result = await self.run_tool(
+                        {"name": tool_name_to_run, "id": tool_id_to_run, "input": tool_args_to_run}
+                    )
+                else:
+                    # Simulate a "cancelled by user" tool result
+                    tool_result = self._make_api_tool_result(
+                        ToolResult(output="Tool call cancelled by user.", tool_name=tool_name_to_run),
+                        tool_id_to_run
+                    )
+                    # Ensure 'content' is not None and has a text part
+                    if tool_result.get("content") is None:
+                        tool_result["content"] = [{"type": "text", "text": "Tool call cancelled by user."}]
+                    elif not any(item.get("type") == "text" for item in tool_result.get("content", [])):
+                         tool_result["content"].append({"type": "text", "text": "Tool call cancelled by user."})
+
+
                 result_text_parts = []
                 if isinstance(tool_result.get("content"), list):
                     for content_item in tool_result["content"]:
