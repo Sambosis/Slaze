@@ -574,10 +574,12 @@ class WriteCodeTool(BaseAnthropicTool):
                         # Display generated code (use docker_path_display if needed by UI)
                         if self.display:
                             language = get_language_from_extension(absolute_path.suffix)
-                            formatted_code = html_format_code(fixed_code, language)  # noqa: F841
-                            # Ensure display can handle html format correctly
-                            # self.display.add_message("tool", {"html": formatted_code})
-                            self.display.add_message("tool", fixed_code)
+                            # Determine the language for highlighting.
+                            # The 'language' variable from get_language_from_extension might be simple (e.g., 'py')
+                            # or more specific if html_format_code needs it.
+                            # For pygments, simple extensions usually work.
+                            formatted_code = html_format_code(fixed_code, language or absolute_path.suffix.lstrip('.'))
+                            self.display.add_message("tool", formatted_code)
 
                     except Exception as write_error:
                         logger.error(

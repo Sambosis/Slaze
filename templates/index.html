@@ -568,7 +568,9 @@
                 toolMessagesDiv.innerHTML = '<div class="empty-state">No tool results yet</div>';
             } else {
                 data.tool.forEach(function(msg) {
-                    toolMessagesDiv.innerHTML += '<div class="message tool-message">' + escapeHtml(msg) + '</div>';
+                    // Directly use msg as it's expected to be HTML from tools
+                    // The outer div structure is kept for consistent message styling
+                    toolMessagesDiv.innerHTML += '<div class="message tool-message">' + msg + '</div>';
                 });
             }
             
