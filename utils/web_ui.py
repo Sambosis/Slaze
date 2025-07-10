@@ -2,6 +2,7 @@ import asyncio
 import os
 import threading
 import logging
+import json
 from queue import Queue
 from flask import Flask, render_template, jsonify, request, redirect, url_for, send_from_directory
 from flask_socketio import SocketIO, disconnect
@@ -48,7 +49,26 @@ class WebUI:
         self.tool_results = []
         # Using a standard Queue for cross-thread communication
         self.input_queue = Queue()
+        self.tool_queue = Queue()
         self.agent_runner = agent_runner
+        # Import tools lazily to avoid circular imports
+        from tools import (
+            BashTool,
+            ProjectSetupTool,
+            WriteCodeTool,
+            PictureGenerationTool,
+            EditTool,
+            ToolCollection,
+        )
+
+        self.tool_collection = ToolCollection(
+            WriteCodeTool(display=self),
+            ProjectSetupTool(display=self),
+            BashTool(display=self),
+            PictureGenerationTool(display=self),
+            EditTool(display=self),
+            display=self,
+        )
         self.setup_routes()
         self.setup_socketio_events()
         logging.info("WebUI initialized")
@@ -127,6 +147,53 @@ class WebUI:
             except FileNotFoundError:
                 logging.error(f"Prompt not found: {filename}")
                 return "Prompt not found", 404
+
+        @self.app.route("/tools")
+        def tools_route():
+            """Display available tools."""
+            tool_list = []
+            for tool in self.tool_collection.tools.values():
+                info = tool.to_params()["function"]
+                tool_list.append({"name": info["name"], "description": info["description"]})
+            return render_template("tool_list.html", tools=tool_list)
+
+        @self.app.route("/tools/<tool_name>", methods=["GET", "POST"])
+        def run_tool_route(tool_name):
+            """Run an individual tool from the toolbox."""
+            tool = self.tool_collection.tools.get(tool_name)
+            if not tool:
+                return "Tool not found", 404
+            params = tool.to_params()["function"]["parameters"]
+            result_text = None
+            if request.method == "POST":
+                tool_input = {}
+                for param in params.get("properties", {}):
+                    value = request.form.get(param)
+                    if value:
+                        pinfo = params["properties"].get(param, {})
+                        if pinfo.get("type") == "integer":
+                            try:
+                                tool_input[param] = int(value)
+                            except ValueError:
+                                tool_input[param] = value
+                        elif pinfo.get("type") == "array":
+                            try:
+                                tool_input[param] = json.loads(value)
+                            except Exception:
+                                tool_input[param] = [v.strip() for v in value.split(',') if v.strip()]
+                        else:
+                            tool_input[param] = value
+                try:
+                    result = asyncio.run(self.tool_collection.run(tool_name, tool_input))
+                    result_text = result.output or result.error
+                except Exception as exc:
+                    result_text = str(exc)
+            return render_template(
+                "tool_form.html",
+                tool_name=tool_name,
+                params=params,
+                result=result_text,
+            )
         logging.info("Routes set up")
 
     def setup_socketio_events(self):
@@ -146,6 +213,12 @@ class WebUI:
             logging.info(f"Received user input: {user_input}")
             # Queue is thread-safe; use blocking put to notify waiting tasks
             self.input_queue.put(user_input)
+
+        @self.socketio.on("tool_response")
+        def handle_tool_response(data):
+            params = data.get("input", {})
+            logging.info("Received tool response")
+            self.tool_queue.put(params)
         logging.info("SocketIO events set up")
 
     def start_server(self, host="0.0.0.0", port=5000):
@@ -188,4 +261,15 @@ class WebUI:
         self.socketio.emit("agent_prompt_clear")
 
         return user_response
+
+    async def confirm_tool_call(self, tool_name: str, args: dict, schema: dict) -> dict | None:
+        """Send a tool prompt to the web UI and wait for edited parameters."""
+        self.socketio.emit(
+            "tool_prompt",
+            {"tool": tool_name, "values": args, "schema": schema},
+        )
+        loop = asyncio.get_running_loop()
+        params = await loop.run_in_executor(None, self.tool_queue.get)
+        self.socketio.emit("tool_prompt_clear")
+        return params
 

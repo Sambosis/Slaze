@@ -16,9 +16,9 @@ def cli():
     load_dotenv()
     archive_logs()
 
-async def run_agent_async(task, display):
+async def run_agent_async(task, display, manual_tools=False):
     """Asynchronously runs the agent with a given task and display."""
-    agent = Agent(task=task, display=display)
+    agent = Agent(task=task, display=display, manual_tool_confirmation=manual_tools)
     await agent._revise_and_save_task(agent.task)
     agent.messages.append({"role": "user", "content": agent.task})
     await sampling_loop(agent=agent)
@@ -30,7 +30,8 @@ async def sampling_loop(agent: Agent):
         running = await agent.step()
 
 @cli.command()
-def console():
+@click.option('--manual-tools', is_flag=True, help='Confirm tool parameters before execution')
+def console(manual_tools):
     """Run the agent in console mode."""
     display = AgentDisplayConsole()
     
@@ -38,7 +39,7 @@ def console():
         task = await display.select_prompt_console()
         if task:
             print("\n--- Starting Agent with Task ---")
-            await run_agent_async(task, display)
+            await run_agent_async(task, display, manual_tools)
             print("\n--- Agent finished ---")
         else:
             print("No task selected. Exiting.")
@@ -50,10 +51,11 @@ def console():
 
 @cli.command()
 @click.option('--port', default=5000, help='Port to run the web server on.')
-def web(port):
+@click.option('--manual-tools', is_flag=True, help='Confirm tool parameters before execution')
+def web(port, manual_tools):
     """Run the agent with a web interface."""
 
-    display = WebUI(run_agent_async)
+    display = WebUI(lambda task, disp: run_agent_async(task, disp, manual_tools))
 
     # Determine the local IP address for convenience when accessing from
     # another machine on the network. Fallback to localhost if detection fails.

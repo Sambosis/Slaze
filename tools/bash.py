@@ -157,12 +157,10 @@ class BashTool(BaseTool):
             )
             rr(formatted_output)
             return ToolResult(
-                output=output,
+                output=formatted_output,
                 error=error,
-                #success=success,
                 tool_name=self.name,
                 command=command,
-                #working_directory=cwd,
             )
 
         except Exception as e:

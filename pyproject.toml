@@ -1,3 +1,5 @@
+[tool.mypy]
+disable_error_code = "override"
 [project]
 name = "slazy"
 version = "0.1.0"
@@ -15,7 +17,6 @@ dependencies = [
     "bidict==0.23.1",
     "blinker==1.9.0",
     "bs4==0.0.2",
-    "cadquery>=2.5.2",
     "certifi==2025.1.31",
     "cffi==1.17.1",
     "charset-normalizer==3.4.1",
@@ -37,8 +38,6 @@ dependencies = [
     "greenlet==3.1.1",
     "grpcio==1.70.0",
     "gunicorn==23.0.0",
-    "gym>=0.26.2",
-    "gymnasium>=1.1.1",
     "httpcore==1.0.7",
     "httpx==0.28.1",
     "icecream==2.1.4",
@@ -70,7 +69,6 @@ dependencies = [
     "pyglet==2.1.2",
     "pygments==2.19.1",
     "pymsgbox==1.0.9",
-    "pymunk==6.11.1",
     "pyparsing==3.2.1",
     "pyperclip==1.9.0",
     "pyrect==0.2.0",
@@ -88,21 +86,16 @@ dependencies = [
     "replicate==1.0.4",
     "requests==2.32.3",
     "rich==13.9.4",
-    "scikit-learn>=1.7.0",
     "sendgrid>=6.11.0",
-    "sentence-transformers>=4.1.0",
     "serpapi==0.1.5",
     "setuptools==75.8.0",
     "simple-websocket==1.1.0",
     "six==1.17.0",
     "sniffio==1.3.1",
     "soupsieve==2.6",
-    "stable-baselines3[extra]>=2.6.0",
     "sympy==1.13.1",
     "tenacity==9.0.0",
-    "torch>=2.6.0",
     "tqdm==4.67.1",
-    "transformers>=4.52.4",
     "typing-extensions==4.12.2",
     "tzdata==2025.1",
     "urllib3==2.3.0",
