@@ -415,6 +415,15 @@
             overflow-y: auto;
         }
 
+        /* Code block styling */
+        pre {
+            background-color: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-family: Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', monospace;
+        }
+        
         @media (max-width: 768px) {
             #tool_prompt_modal .modal-content {
                 margin: 4% 16px;
@@ -568,7 +577,24 @@
                 toolMessagesDiv.innerHTML = '<div class="empty-state">No tool results yet</div>';
             } else {
                 data.tool.forEach(function(msg) {
-                    toolMessagesDiv.innerHTML += '<div class="message tool-message">' + escapeHtml(msg) + '</div>';
+                    var contentHtml = '';
+                    // Case 1: Message is an object with explicit HTML provided
+                    if (msg && typeof msg === 'object' && 'html' in msg) {
+                        contentHtml = msg.html;
+                    }
+                    // Case 2: Message is a raw string that already contains <img> or other html tags
+                    else if (typeof msg === 'string' && /<\/?[a-z][\s\S]*>/i.test(msg)) {
+                        contentHtml = msg;
+                    }
+                    // Case 3: Plain string -> treat as code and escape
+                    else if (typeof msg === 'string') {
+                        contentHtml = '<pre><code>' + escapeHtml(msg) + '</code></pre>';
+                    }
+                    // Fallback: stringify unknown types and display as code
+                    else {
+                        contentHtml = '<pre><code>' + escapeHtml(JSON.stringify(msg, null, 2)) + '</code></pre>';
+                    }
+                    toolMessagesDiv.innerHTML += '<div class="message tool-message">' + contentHtml + '</div>';
                 });
             }
             
