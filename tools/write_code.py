@@ -576,8 +576,8 @@ class WriteCodeTool(BaseAnthropicTool):
                             language = get_language_from_extension(absolute_path.suffix)
                             formatted_code = html_format_code(fixed_code, language)  # noqa: F841
                             # Ensure display can handle html format correctly
-                            self.display.add_message("tool", {"html": formatted_code})
-                            # self.display.add_message("tool", fixed_code)
+                            # self.display.add_message("tool", {"html": formatted_code})
+                            self.display.add_message("tool", fixed_code)
 
                     except Exception as write_error:
                         logger.error(
