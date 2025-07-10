@@ -3,9 +3,10 @@
 
 import json
 import os
+import re
+import logging
 from typing import Dict, Union
 from openai import OpenAI
-import logging
 from rich import print as rr
 
 from tools import (
@@ -375,7 +376,7 @@ class Agent:
         self.step_count += 1
         messages = self.messages
         rr(f"Step {self.step_count} with {len(messages)} messages")
-        with open(f"{LOGS_DIR}/messages.log", "w") as f:
+        with open(f"{LOGS_DIR}/messages.log", "w", encoding="utf-8") as f:
             f.write(format_messages_to_string(messages) + "\n"  )
         try:
             response = self.client.chat.completions.create(
