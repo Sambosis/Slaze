@@ -508,6 +508,7 @@
             <textarea id="user_input" placeholder="Type your message here..."></textarea>
             <button onclick="sendMessage()">Send</button>
             <button onclick="interruptAgent()">Interrupt</button>
+            <button onclick="exitAgent()" style="margin-left:10px;">Exit</button>
         </div>
     </div>
 
@@ -633,6 +634,10 @@
 
         socket.on('tool_prompt_clear', function() {
             hideToolPrompt();
+        });
+
+        socket.on('server_shutdown', function(data) {
+            alert(data.message || 'Server is shutting down');
         });
 
         function getToolIcon(toolName) {
@@ -997,6 +1002,27 @@
         function interruptAgent() {
             socket.emit('interrupt');
             alert('Agent interruption requested.');
+        }
+
+        function exitAgent() {
+            if (confirm('Are you sure you want to shut down the server?')) {
+                fetch('/shutdown', { method: 'POST' })
+                    .then(response => {
+                        if (response.ok) {
+                            alert('Server shutting down...');
+                            // Optionally close the page after a short delay
+                            setTimeout(() => {
+                                window.close();
+                            }, 500);
+                        } else {
+                            alert('Failed to shut down the server.');
+                        }
+                    })
+                    .catch(err => {
+                        console.error(err);
+                        alert('Error sending shutdown request.');
+                    });
+            }
         }
 
         // Handle Enter key in textarea

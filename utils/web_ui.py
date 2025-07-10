@@ -194,6 +194,18 @@ class WebUI:
                 params=params,
                 result=result_text,
             )
+        @self.app.route("/shutdown", methods=["POST"])
+        def shutdown_route():
+            """Shut down the SocketIO server and exit the application gracefully."""
+            logging.info("Shutdown requested via /shutdown route")
+            # Notify connected clients first (optional)
+            try:
+                self.socketio.emit("server_shutdown", {"message": "Server is shutting down."})
+            except Exception as exc:
+                logging.error(f"Error emitting shutdown notice: {exc}")
+            # Stop the SocketIO server in a separate thread to avoid blocking the request context
+            threading.Thread(target=self.socketio.stop, daemon=True).start()
+            return "Server shutting down", 200
         logging.info("Routes set up")
 
     def setup_socketio_events(self):
