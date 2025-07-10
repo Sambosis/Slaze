@@ -113,3 +113,6 @@ reportIncompatibleMethodOverride = false
 reportGeneralTypeIssues = false
 reportAttributeAccessIssue = false
 reportArgumentType = false
+
+[tool.uv.workspace]
+members = ["repo/warlearn/war_game_rl", "repo/warlearn/rl_war_game", "repo/warlearn/warlearn/rl_war_game"]

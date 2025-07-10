@@ -21,6 +21,7 @@ from utils.web_ui import WebUI
 from utils.agent_display_console import AgentDisplayConsole
 from unittest.mock import AsyncMock
 import asyncio
+from utils.context_helpers import format_messages_to_string
 from utils.context_helpers import extract_text_from_content, refresh_context_async
 from utils.output_manager import OutputManager
 from config import (
@@ -29,6 +30,7 @@ from config import (
     MAIN_MODEL,
     MAX_SUMMARY_TOKENS,
     reload_system_prompt,
+    LOGS_DIR
 )
 
 from dotenv import load_dotenv
@@ -112,6 +114,7 @@ async def call_llm_for_task_revision(prompt_text: str, client: OpenAI, model: st
             n=1,
             stop=None,
         )
+        
         if response.choices and response.choices[0].message and response.choices[0].message.content:
             revised_task = response.choices[0].message.content.strip()
             # Basic check to ensure LLM didn't just return an empty string or something very short
@@ -157,7 +160,7 @@ class Agent:
         except Exception as e:
             logger.error(f"Error saving revised task to {task_file_path}: {e}", exc_info=True)
             # Continue even if file write fails, but log it.
-
+        self.task = revised_task_from_llm
         set_constant("TASK", revised_task_from_llm)
         logger.info("TASK constant updated with revised task.")
         return revised_task_from_llm
@@ -372,6 +375,8 @@ class Agent:
         self.step_count += 1
         messages = self.messages
         rr(f"Step {self.step_count} with {len(messages)} messages")
+        with open(f"{LOGS_DIR}/messages.log", "w") as f:
+            f.write(format_messages_to_string(messages) + "\n"  )
         try:
             response = self.client.chat.completions.create(
                 model=MAIN_MODEL,

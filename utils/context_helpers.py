@@ -7,7 +7,7 @@ from utils.web_ui import WebUI
 from utils.agent_display_console import AgentDisplayConsole
 # from config import write_to_file # Removed as it was for ic
 # Removed: from load_constants import *
-from config import MAIN_MODEL, get_constant # Import get_constant
+from config import MAIN_MODEL, get_constant, googlepro # Import get_constant
 from utils.file_logger import aggregate_file_states
 from openai import OpenAI
 import logging
@@ -418,9 +418,14 @@ async def refresh_context_async(
 
     # Get code skeletons
     from utils.file_logger import get_all_current_skeleton
-
+    from utils.file_logger import get_all_current_code
     code_skeletons = get_all_current_skeleton()
-    if not code_skeletons or code_skeletons == "No Python files have been tracked yet.":
+    current_code = get_all_current_code()
+    # The logic is if there is code, then supply that, if not then supply the skeletons, if there is no code or skeletons, then say there are no code skeletons
+
+    if current_code:
+        code_skeletons = current_code
+    elif not code_skeletons or code_skeletons == "No Python files have been tracked yet.":
         code_skeletons = "No code skeletons available."
 
     # Extract information about images generated
@@ -448,7 +453,7 @@ async def refresh_context_async(
 
     messages_for_llm = [{"role": "user", "content": prompt}]
     response = client.chat.completions.create(
-        model=get_constant("MAIN_MODEL", "google/gemini-2.5-pro-preview"), # Use get_constant
+        model=googlepro,
         messages=messages_for_llm, # Corrected variable name
         max_tokens=get_constant("MAX_SUMMARY_TOKENS", 20000) # Use get_constant
     )

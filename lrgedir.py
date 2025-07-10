@@ -32,6 +32,6 @@ def find_large_dirs(root_dir, min_size_gb):
         print(f"Directory: {dirpath}, Size: {size_gb:.2f} GB")
 
 # Example usage:
-root_directory = "C:\\"  # Replace with your desired root directory
+root_directory = "."  # Replace with your desired root directory
 minimum_size_gb = 1  # Replace with your desired minimum size in GB
 find_large_dirs(root_directory, minimum_size_gb)

@@ -374,7 +374,7 @@ class WriteCodeTool(BaseAnthropicTool):
             if self.display:
                 self.display.add_message(
                     "assistant",
-                    f"Generating skeletons for {len(file_details)} files...",
+                    f"Generating skeletons for:\n {'\n'.join(file.filename for file in file_details)}",
                 )
 
             # CHANGE: Update the call to pass file_detail and all file_details
@@ -404,19 +404,8 @@ class WriteCodeTool(BaseAnthropicTool):
                     skeletons[filename_key] = (
                         f"# Error generating skeleton: {result}"  # Placeholder
                     )
-                else:
-                    skeletons[filename_key] = result
-                    if self.display:
-                        self.display.add_message(
-                            "assistant", f"Skeleton generated for {filename_key}"
-                        )
 
             # --- Step 2: Generate Full Code Asynchronously ---
-            if self.display:
-                self.display.add_message(
-                    "assistant",
-                    f"Generating full code for {len(file_details)} files using skeletons and specific imports...",
-                )
 
             code_gen_tasks = [
                 self._call_llm_to_generate_code(
@@ -584,15 +573,11 @@ class WriteCodeTool(BaseAnthropicTool):
 
                         # Display generated code (use docker_path_display if needed by UI)
                         if self.display:
-                            self.display.add_message(
-                                "user",
-                                f"Code for {docker_path_display} generated successfully:",
-                            )  # Use display path
                             language = get_language_from_extension(absolute_path.suffix)
                             formatted_code = html_format_code(fixed_code, language)  # noqa: F841
                             # Ensure display can handle html format correctly
-                            # self.display.add_message("tool", {"html": formatted_code})
-                            self.display.add_message("tool", fixed_code)
+                            self.display.add_message("tool", {"html": formatted_code})
+                            # self.display.add_message("tool", fixed_code)
 
                     except Exception as write_error:
                         logger.error(
@@ -773,10 +758,6 @@ class WriteCodeTool(BaseAnthropicTool):
         file_path: Path,
         ) -> str:
         """Generate full file content using provided skeletons."""
-        # if self.display is not None:
-            # self.display.add_message(
-            #     "assistant", f"Generating code for: {file_path.name}"
-            # )
 
         skeleton_context = "\n\n---\n\n".join(
             f"### Skeleton for {fname}:\n```\n{skel}\n```"
@@ -936,10 +917,6 @@ class WriteCodeTool(BaseAnthropicTool):
         ) -> str:
         """Request a skeleton from the LLM for the target file."""
         target_file_name = file_path.name
-        # if self.display:
-        #     self.display.add_message(
-        #         "assistant", f"Generating skeleton for {target_file_name}"
-        #     )
 
         log_content = self._get_file_creation_log_content()
         agent_task = self._get_task_description()

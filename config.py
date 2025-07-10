@@ -61,9 +61,11 @@ openaio3pro = "openai/o3-pro"
 googlepro = "google/gemini-2.5-pro-preview"
 googleflash = "google/gemini-2.5-flash-preview"
 googleflashlite = "google/gemini-2.5-flash-lite-preview-06-17"
+grok4 = "x-ai/grok-4"
 SUMMARY_MODEL = googleflashlite  # Model for summaries
-MAIN_MODEL = openai41  # Primary model for main agent operations
-CODE_MODEL = googlepro  # Model for code generation tasks
+MAIN_MODEL = grok4  # Primary model for main agent operations
+CODE_MODEL = googleflash  # Model for code generation tasks
+
 # Feature flag constants
 COMPUTER_USE_BETA_FLAG = "computer-use-2024-10-22"
 PROMPT_CACHING_BETA_FLAG = "prompt-caching-2024-07-31"
@@ -190,15 +192,17 @@ def get_constant(name: str, default: Any = None) -> Any:
     constants = get_constants()
     value = constants.get(name, default)
 
-    # Convert path strings to Path objects if applicable
-    if value is not None and isinstance(value, str):
-        if "PATH" in name.upper() or "DIR" in name.upper() or "FILE" in name.upper():
-            # Check for specific string values that shouldn't become paths (e.g. model names)
-            if not any(x in name for x in ["MODEL", "FLAG", "LEVEL", "TASK", "NAME"]): # Add more keywords if needed
-                try:
-                    return Path(value)
-                except TypeError: # Handle cases where value might not be a valid path string
-                    return value
+    # Convert path strings to Path objects if applicable, with exclusions
+    if (
+        value is not None
+        and isinstance(value, str)
+        and ("PATH" in name.upper() or "DIR" in name.upper() or "FILE" in name.upper())
+        and not any(x in name for x in ["MODEL", "FLAG", "LEVEL", "TASK", "NAME"])
+    ):
+        try:
+            return Path(value)
+        except TypeError:  # Handle cases where value might not be a valid path string
+            return value
     return value
 
 # Function to set a constant and persist it
