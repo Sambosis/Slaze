@@ -115,4 +115,4 @@ reportAttributeAccessIssue = false
 reportArgumentType = false
 
 [tool.uv.workspace]
-members = ["repo/warlearn/war_game_rl", "repo/warlearn/rl_war_game", "repo/warlearn/warlearn/rl_war_game", "repo/diffus/diffusion_lm", "repo/diffus/diffusion_lm_project", "repo/pics/duck_pics"]
+members = ["repo/warlearn/war_game_rl", "repo/warlearn/rl_war_game", "repo/warlearn/warlearn/rl_war_game", "repo/stategygame/war_game", "repo/stategygame/project_root"]
