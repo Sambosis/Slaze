@@ -121,9 +121,9 @@ class BashTool(BaseTool):
         success = False
         cwd = None
         try:
-            # Execute the command locally relative to PROJECT_DIR if set
-            project_dir = get_constant("PROJECT_DIR")
-            cwd = str(project_dir) if project_dir else None
+            # Execute the command locally relative to REPO_DIR if set
+            repo_dir = get_constant("REPO_DIR")
+            cwd = str(repo_dir) if repo_dir else None
             terminal_display = f"terminal {cwd}>  {command}"
             if self.display is not None:
                 self.display.add_message("assistant", terminal_display)
