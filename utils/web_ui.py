@@ -51,6 +51,7 @@ class WebUI:
         self.input_queue = Queue()
         self.tool_queue = Queue()
         self.agent_runner = agent_runner
+        self.shutdown_requested = False
         # Import tools lazily to avoid circular imports
         from tools import (
             BashTool,
@@ -219,11 +220,53 @@ class WebUI:
             params = data.get("input", {})
             logging.info("Received tool response")
             self.tool_queue.put(params)
+
+        @self.socketio.on("shutdown")
+        def handle_shutdown():
+            if self.shutdown_requested:
+                logging.info("Shutdown already in progress")
+                return
+            
+            self.shutdown_requested = True
+            logging.info("Shutdown request received from client")
+            # Send shutdown signal to all connected clients
+            self.socketio.emit("shutdown_confirmed")
+            # Schedule shutdown after a brief delay to allow clients to receive the message
+            def delayed_shutdown():
+                import time
+                time.sleep(1)
+                logging.info("Initiating graceful shutdown...")
+                self.shutdown_server()
+            
+            import threading
+            threading.Thread(target=delayed_shutdown, daemon=True).start()
+        
         logging.info("SocketIO events set up")
 
     def start_server(self, host="0.0.0.0", port=5000):
         logging.info(f"Starting server on {host}:{port}")
         self.socketio.run(self.app, host=host, port=port, use_reloader=False, allow_unsafe_werkzeug=True)
+    
+    def shutdown_server(self):
+        """Gracefully shutdown the Flask-SocketIO server"""
+        if self.shutdown_requested:
+            logging.info("Shutdown already in progress")
+            return
+        
+        self.shutdown_requested = True
+        logging.info("Graceful shutdown initiated")
+        try:
+            # Stop the SocketIO server
+            self.socketio.stop()
+            logging.info("SocketIO server stopped successfully")
+        except Exception as e:
+            logging.error(f"Error stopping SocketIO server: {e}")
+        
+        # Force exit the application
+        import os
+        import signal
+        logging.info("Forcing application exit...")
+        os.kill(os.getpid(), signal.SIGTERM)
 
     def add_message(self, msg_type, content):
         logging.info(f"Adding message of type {msg_type}")

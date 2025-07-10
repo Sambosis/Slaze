@@ -1,5 +1,7 @@
 import asyncio
 import click
+import signal
+import sys
 
 from dotenv import load_dotenv
 import webbrowser
@@ -57,6 +59,15 @@ def web(port, manual_tools):
 
     display = WebUI(lambda task, disp: run_agent_async(task, disp, manual_tools))
 
+    # Set up signal handlers for graceful shutdown
+    def signal_handler(signum, frame):
+        print(f"\nReceived signal {signum}. Shutting down gracefully...")
+        display.shutdown_server()
+        sys.exit(0)
+
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+
     # Determine the local IP address for convenience when accessing from
     # another machine on the network. Fallback to localhost if detection fails.
     try:
@@ -70,8 +81,13 @@ def web(port, manual_tools):
     print(f"Web server started on port {port}. Opening your browser to {url}")
     webbrowser.open(url)
     print("Waiting for user to start a task from the web interface.")
+    print("Press Ctrl+C to shutdown gracefully or use the Exit button in the web interface.")
     
-    display.start_server(port=port)
+    try:
+        display.start_server(port=port)
+    except KeyboardInterrupt:
+        print("\nShutdown requested. Cleaning up...")
+        display.shutdown_server()
     
     # The Flask-SocketIO server is a blocking call that will keep the application
     # alive. It's started in display.start_server().

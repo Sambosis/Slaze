@@ -451,7 +451,9 @@ class Agent:
                         "No tool calls. Enter instructions or type 'exit' to quit: "
                     )
                     if user_input:
-                        if user_input.strip().lower() in {"exit", "quit"}:
+                        if user_input.strip().lower() in {"exit", "quit", "shutdown"}:
+                            logger.info("User requested shutdown")
+                            self.display.add_message("assistant", "Shutting down gracefully...")
                             return False
                         self.messages.append(
                             {"role": "user", "content": user_input}

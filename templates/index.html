@@ -108,6 +108,16 @@
         .input-area button:hover { background-color: #0056b3; }
         .input-area button:last-child { background-color: #dc3545; }
         .input-area button:last-child:hover { background-color: #c82333; }
+        .exit-button { 
+            background-color: #dc3545 !important; 
+            border-color: #dc3545 !important; 
+            font-weight: bold !important;
+        }
+        .exit-button:hover { 
+            background-color: #c82333 !important; 
+            border-color: #bd2130 !important; 
+            transform: scale(1.05);
+        }
         
         .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
         .header h1 { margin: 0; color: #333; }
@@ -508,6 +518,7 @@
             <textarea id="user_input" placeholder="Type your message here..."></textarea>
             <button onclick="sendMessage()">Send</button>
             <button onclick="interruptAgent()">Interrupt</button>
+            <button onclick="exitApplication()" class="exit-button">🚪 Exit</button>
         </div>
     </div>
 
@@ -633,6 +644,11 @@
 
         socket.on('tool_prompt_clear', function() {
             hideToolPrompt();
+        });
+
+        socket.on('shutdown_confirmed', function() {
+            alert('Server is shutting down...');
+            window.location.href = '/';
         });
 
         function getToolIcon(toolName) {
@@ -997,6 +1013,17 @@
         function interruptAgent() {
             socket.emit('interrupt');
             alert('Agent interruption requested.');
+        }
+
+        function exitApplication() {
+            if (confirm('Are you sure you want to exit the application?')) {
+                socket.emit('shutdown');
+                alert('Application shutting down...');
+                // Optionally redirect after a brief delay
+                setTimeout(function() {
+                    window.location.href = '/';
+                }, 2000);
+            }
         }
 
         // Handle Enter key in textarea
