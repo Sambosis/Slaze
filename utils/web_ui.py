@@ -115,7 +115,6 @@ class WebUI:
             repo_dir = base_repo_dir / prompt_name
             repo_dir.mkdir(parents=True, exist_ok=True)
             set_prompt_name(prompt_name)
-            set_constant("PROJECT_DIR", repo_dir)
             set_constant("REPO_DIR", repo_dir)
             write_constants_to_file()
             

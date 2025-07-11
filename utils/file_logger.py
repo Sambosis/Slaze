@@ -39,7 +39,6 @@ except ImportError:
     def get_constant(name):
         # Default values for essential constants
         defaults = {
-            "PROJECT_DIR": os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
             "LOG_FILE": os.path.join(
                 os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                 "logs",

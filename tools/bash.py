@@ -3,6 +3,7 @@ import subprocess
 import re
 from dotenv import load_dotenv
 from regex import T
+from pathlib import Path
 from config import get_constant # check_docker_available removed
 from .base import BaseTool, ToolError, ToolResult
 from utils.web_ui import WebUI
@@ -24,9 +25,8 @@ class BashTool(BaseTool):
 
     description = """
         A tool that allows the agent to run bash commands directly on the host system.
-        All commands are executed relative to the current project directory if one
-        has been set via the configuration. The tool parameters follow the OpenAI
-        function calling format.
+        All commands are executed relative to the configured repository directory (REPO_DIR).
+        The tool parameters follow the OpenAI function calling format.
         """
 
     name: ClassVar[Literal["bash"]] = "bash"
@@ -34,12 +34,14 @@ class BashTool(BaseTool):
 
     async def __call__(self, command: str | None = None, **kwargs):
         if command is not None:
-
+            if self.display is not None:
+                try:
+                    self.display.add_message("user", f"Executing command: {command}")
+                except Exception as display_error:
+                    return ToolResult(error=str(display_error), tool_name=self.name, command=command)
 
             # Convert command using LLM for current system
             modified_command = await self._convert_command_for_system(command)
-            if self.display is not None:
-                self.display.add_message("assistant", f"Modified command: {modified_command}")
             return await self._run_command(modified_command)
         raise ToolError("no command provided.")
 
@@ -50,7 +52,11 @@ class BashTool(BaseTool):
         """
         try:
             # Try LLM-based conversion first
-            return await convert_command_for_system(command)
+            converted = await convert_command_for_system(command)
+            if converted.strip() == command.strip():
+                legacy = self._legacy_modify_command(command)
+                return legacy if legacy != command else command
+            return converted
         except Exception as e:
             logger.warning(f"LLM command conversion failed, using fallback: {e}")
             # Fallback to legacy regex-based modification
@@ -121,12 +127,13 @@ class BashTool(BaseTool):
         success = False
         cwd = None
         try:
-            # Execute the command locally relative to PROJECT_DIR if set
-            project_dir = get_constant("PROJECT_DIR")
-            cwd = str(project_dir) if project_dir else None
+            # Execute the command relative to REPO_DIR if configured
+            repo_dir = get_constant("REPO_DIR")
+            if repo_dir and Path(repo_dir).exists():
+                cwd = str(repo_dir)
+            else:
+                cwd = None
             terminal_display = f"terminal {cwd}>  {command}"
-            if self.display is not None:
-                self.display.add_message("assistant", terminal_display)
             result = subprocess.run(
                 command,
                 shell=True,
@@ -141,8 +148,6 @@ class BashTool(BaseTool):
             error = result.stderr
             success = result.returncode == 0
             terminal_display = f"{output}\n{error}"
-            if self.display is not None:
-                self.display.add_message("assistant", terminal_display)
             if len(output) > 200000:
                 output = f"{output[:100000]} ... [TRUNCATED] ... {output[-100000:]}"
             if len(error) > 200000:
@@ -163,15 +168,40 @@ class BashTool(BaseTool):
                 command=command,
             )
 
+        except subprocess.TimeoutExpired as e:
+            error = f"Command '{command}' timed out after {e.timeout} seconds"
+            output = e.output or ""
+            error_output = e.stderr or ""
+            formatted_output = (
+                f"command: {command}\n"
+                f"working_directory: {cwd}\n"
+                f"success: false\n"
+                f"output: {output}\n"
+                f"error: {error_output if error_output else error}"
+            )
+            rr(error)
+            return ToolResult(
+                output=formatted_output,
+                error=error,
+                tool_name=self.name,
+                command=command,
+            )
         except Exception as e:
             error = str(e)
             rr(error)
-            if self.display is not None:
-                try:
-                    self.display.add_message("assistant", f"Error: {error}")
-                except Exception as display_error:
-                    logger.error(f"Error displaying message: {display_error}", exc_info=True)
-            return ToolResult(error=error, tool_name=self.name, command=command)
+            formatted_output = (
+                f"command: {command}\n"
+                f"working_directory: {cwd}\n"
+                f"success: false\n"
+                f"output: \n"
+                f"error: {error}"
+            )
+            return ToolResult(
+                output=formatted_output,
+                error=error,
+                tool_name=self.name,
+                command=command,
+            )
 
     def to_params(self) -> dict:
         logger.debug(f"BashTool.to_params called with api_type: {self.api_type}")

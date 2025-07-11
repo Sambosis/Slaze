@@ -15,7 +15,7 @@ from openai import (
     InternalServerError,
     RateLimitError,
 )
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 import logging
 # from rich import print as rr # Removed
 from tenacity import (
@@ -109,6 +109,8 @@ class FileDetail(BaseModel):
     code_description: str
     external_imports: Optional[List[str]] = None
     internal_imports: Optional[List[str]] = None
+
+    model_config = ConfigDict(extra="forbid")
 
 
 class WriteCodeTool(BaseAnthropicTool):
@@ -1092,6 +1094,8 @@ class WriteCodeTool(BaseAnthropicTool):
             # No backticks, try guessing language from content
             try:
                 language = guess_lexer(text).aliases[0]
+                if language == "text":
+                    language = "unknown"
                 # Return the whole text as the code block
                 return text.strip(), language
             except Exception:  # pygments.util.ClassNotFound or others
