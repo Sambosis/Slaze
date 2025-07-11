@@ -78,14 +78,21 @@ class WebUI:
 
         @self.app.route("/")
         def select_prompt_route():
-            logging.info("Serving prompt selection page")
+            logging.info("Serving modern prompt selection page (default)")
+            prompt_files = list(PROMPTS_DIR.glob("*.md"))
+            options = [file.name for file in prompt_files]
+            return render_template("select_prompt_modern.html", options=options)
+
+        @self.app.route("/classic")
+        def select_prompt_classic_route():
+            logging.info("Serving classic prompt selection page")
             prompt_files = list(PROMPTS_DIR.glob("*.md"))
             options = [file.name for file in prompt_files]
             return render_template("select_prompt.html", options=options)
 
         @self.app.route("/modern")
         def select_prompt_modern_route():
-            logging.info("Serving modern prompt selection page")
+            logging.info("Serving modern prompt selection page (redirect)")
             prompt_files = list(PROMPTS_DIR.glob("*.md"))
             options = [file.name for file in prompt_files]
             return render_template("select_prompt_modern.html", options=options)
