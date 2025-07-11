@@ -24,3 +24,6 @@ venv/
 stls/3d_lspo/
 *.safetensors
 *.pt*
+tests/
+#ignore all files that end in test.py in all subdirectories
+**/*test.py

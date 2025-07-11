@@ -1,9 +1,8 @@
 import pytest
 import subprocess
 import tempfile
-import os
 from pathlib import Path
-from unittest.mock import patch, MagicMock, AsyncMock
+from unittest.mock import patch, MagicMock
 from tools.bash import BashTool
 from tools.base import ToolResult, ToolError
 

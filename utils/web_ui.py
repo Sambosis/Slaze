@@ -1,11 +1,10 @@
 import asyncio
 import os
-import threading
 import logging
 import json
 from queue import Queue
-from flask import Flask, render_template, jsonify, request, redirect, url_for, send_from_directory
-from flask_socketio import SocketIO, disconnect
+from flask import Flask, render_template, jsonify, request
+from flask_socketio import SocketIO
 from config import (
     LOGS_DIR,
     PROMPTS_DIR,
@@ -15,8 +14,6 @@ from config import (
     write_constants_to_file,
 )
 from pathlib import Path
-from openai import OpenAI
-import ftfy
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -115,7 +112,6 @@ class WebUI:
             repo_dir = base_repo_dir / prompt_name
             repo_dir.mkdir(parents=True, exist_ok=True)
             set_prompt_name(prompt_name)
-            set_constant("PROJECT_DIR", repo_dir)
             set_constant("REPO_DIR", repo_dir)
             write_constants_to_file()
             

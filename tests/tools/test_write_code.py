@@ -1,11 +1,9 @@
 import pytest
-import asyncio
 import tempfile
-import os
 from pathlib import Path
 from unittest.mock import patch, MagicMock, AsyncMock
 from tools.write_code import WriteCodeTool, CodeCommand, FileDetail, LLMResponseError
-from tools.base import ToolResult, ToolError
+from tools.base import ToolResult
 
 
 @pytest.fixture
