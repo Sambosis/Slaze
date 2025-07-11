@@ -119,4 +119,7 @@ reportAttributeAccessIssue = false
 reportArgumentType = false
 
 [tool.uv.workspace]
-members = ["repo/warlearn/war_game_rl", "repo/warlearn/rl_war_game", "repo/warlearn/warlearn/rl_war_game", "repo/stategygame/war_game", "repo/stategygame/project_root", "repo/sol/solitaire_web_app", "repo/sol/solitaire-game", "repo/stategygame/strategy_war_game", "repo/pics/project_root", "repo/shoppingsite/preowned-shop", "repo/battleship/project_root", "repo/battleshiprl/battleshiprl", "repo/battleshiprl/battleship_rl", "repo/warlearn", "repo/robo", "repo/3dsim", "repo/abacus", "repo/harco.md", "repo/calendar", "repo/test_prompt"]
+members = [
+    "repo/draggableDashboard",
+]
+
