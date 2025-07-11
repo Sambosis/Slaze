@@ -1,5 +1,6 @@
 from pathlib import Path
 import json
+import os
 from dotenv import load_dotenv
 from typing import Optional, Any
 import logging.handlers
@@ -14,6 +15,20 @@ try:
     sys.stdout.reconfigure(encoding="utf-8")  # type: ignore
 except Exception:
     pass
+
+# Configure UTF-8 for Windows console and subprocess environments
+if platform.system() == "Windows":
+    # Set UTF-8 environment variables for subprocess calls
+    os.environ.setdefault('PYTHONIOENCODING', 'utf-8')
+    os.environ.setdefault('PYTHONLEGACYWINDOWSFSENCODING', '0')
+    os.environ.setdefault('PYTHONUTF8', '1')
+    
+    # Try to set Windows console to UTF-8 mode
+    try:
+        import subprocess
+        subprocess.run(['chcp', '65001'], capture_output=True, check=False)
+    except Exception:
+        pass
 
 # Logging constants
 LOG_LEVEL_CONSOLE = "INFO"

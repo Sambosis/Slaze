@@ -1,5 +1,7 @@
 import asyncio
 import json
+import os
+import sys
 from rich.console import Console
 from rich.panel import Panel
 from rich.prompt import Prompt, Confirm, IntPrompt
@@ -15,19 +17,44 @@ from config import (
 
 class AgentDisplayConsole:
     def __init__(self):
-        self.console = Console()
+        # Configure console for Windows Unicode support
+        if os.name == 'nt':  # Windows
+            # Set environment variables for UTF-8 support
+            os.environ['PYTHONIOENCODING'] = 'utf-8'
+            # Try to set Windows console to UTF-8 mode
+            try:
+                # Enable UTF-8 mode on Windows
+                os.system('chcp 65001 > nul')
+                # Reconfigure stdout/stderr for UTF-8 (Python 3.7+)
+                if hasattr(sys.stdout, 'reconfigure') and callable(getattr(sys.stdout, 'reconfigure', None)):
+                    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+                if hasattr(sys.stderr, 'reconfigure') and callable(getattr(sys.stderr, 'reconfigure', None)):
+                    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+            except Exception:
+                pass
+        
+        # Initialize Rich console with safe settings for Windows
+        self.console = Console(
+            force_terminal=True,
+            legacy_windows=False,
+            file=sys.stdout,
+            width=120,
+            safe_box=True,
+            highlight=False
+        )
 
     def add_message(self, msg_type, content):
+        # Use safer characters for Windows compatibility
         if msg_type == "user":
-            self.console.print(f"👤 User: {content}")
+            self.console.print(f"[User]: {content}")
         elif msg_type == "assistant":
-            self.console.print(f"🧞 Assistant: {content}")
+            self.console.print(f"[Assistant]: {content}")
         elif msg_type == "tool":
-            self.console.print(f"🛠️ Tool: {content}")
+            self.console.print(f"[Tool]: {content}")
         else:
-            self.console.print(f"{msg_type}: {content}")
+            self.console.print(f"[{msg_type}]: {content}")
 
-    async def wait_for_user_input(self, prompt_message="➡️ Your input: "):
+    async def wait_for_user_input(self, prompt_message=">> Your input: "):
         return await asyncio.to_thread(input, prompt_message)
 
     async def select_prompt_console(self):

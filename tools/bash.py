@@ -132,6 +132,14 @@ class BashTool(BaseTool):
             repo_dir = get_constant("REPO_DIR")
             cwd = str(repo_dir) if repo_dir and Path(repo_dir).exists() else None
             terminal_display = f"terminal {cwd}>  {command}"
+            
+            # Set up environment for UTF-8 support on Windows
+            env = os.environ.copy()
+            if os.name == 'nt':  # Windows
+                env['PYTHONIOENCODING'] = 'utf-8'
+                env['PYTHONLEGACYWINDOWSFSENCODING'] = '0'
+                env['PYTHONUTF8'] = '1'
+            
             result = subprocess.run(
                 command,
                 shell=True,
@@ -141,6 +149,7 @@ class BashTool(BaseTool):
                 errors="replace",
                 check=False,
                 cwd=cwd,
+                env=env,
                 )
             output = result.stdout
             error = result.stderr
