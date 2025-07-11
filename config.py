@@ -54,6 +54,8 @@ ASSISTANT_LOG_FILE = LOGS_DIR / "assistant_messages.log"
 TOOL_LOG_FILE = LOGS_DIR / "tool_messages.log"
 
 
+openai41mini = "openai/gpt-4.1-mini"
+gemma3n4b = "google/gemma-3n-e4b-it"
 sonnet4 = "anthropic/claude-sonnet-4"
 openai41 = "openai/gpt-4.1"
 openaio3 = "openai/o3"
@@ -62,9 +64,9 @@ googlepro = "google/gemini-2.5-pro-preview"
 googleflash = "google/gemini-2.5-flash-preview"
 googleflashlite = "google/gemini-2.5-flash-lite-preview-06-17"
 grok4 = "x-ai/grok-4"
-SUMMARY_MODEL = openai41  # Model for summaries
-MAIN_MODEL = grok4  # Primary model for main agent operations
-CODE_MODEL = grok4  # Model for code generation tasks
+SUMMARY_MODEL = openai41mini  # Model for summaries
+MAIN_MODEL = openai41mini  # Primary model for main agent operations
+CODE_MODEL = openaio3  # Model for code generation tasks
 
 # Feature flag constants
 COMPUTER_USE_BETA_FLAG = "computer-use-2024-10-22"

@@ -221,7 +221,7 @@ class WebUI:
             self.tool_queue.put(params)
         logging.info("SocketIO events set up")
 
-    def start_server(self, host="0.0.0.0", port=5000):
+    def start_server(self, host="0.0.0.0", port=5002):
         logging.info(f"Starting server on {host}:{port}")
         self.socketio.run(self.app, host=host, port=port, use_reloader=False, allow_unsafe_werkzeug=True)
 

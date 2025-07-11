@@ -47,9 +47,9 @@ To use the interactive web interface, run:
 python run.py web
 ```
 
-By default the server starts on port 5000. The CLI attempts to detect your
+By default the server starts on port 5002. The CLI attempts to detect your
 machine's LAN IP so you can open a browser on another device if needed.
-Open your browser to the printed address (e.g. `http://192.168.x.x:5000/`).
+Open your browser to the printed address (e.g. `http://192.168.x.x:5002/`).
 
 For a detailed walkthrough see [docs/web_interface_guide.md](docs/web_interface_guide.md).
 
@@ -139,10 +139,10 @@ docker build -t slaze .
 Run the container, supplying your API key:
 
 ```bash
-docker run -e OPENROUTER_API_KEY=YOUR_KEY -p 5000:5000 slaze
+docker run -e OPENROUTER_API_KEY=YOUR_KEY -p 5002:5002 slaze
 ```
 
 You may also use `OPENAI_API_KEY` and optionally `OPENAI_BASE_URL` instead of
 `OPENROUTER_API_KEY`. The web interface will then be available at
-`http://localhost:5000/`.
+`http://localhost:5002/`.
 
