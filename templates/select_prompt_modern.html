@@ -702,10 +702,16 @@
             })
             .then(response => {
                 if (response.ok) {
-                    window.location.href = '/';
+                    return response.text();
                 } else {
-                    alert('Error creating task');
+                    throw new Error('Error creating task');
                 }
+            })
+            .then(html => {
+                // Replace the current page content with the agent execution interface
+                document.open();
+                document.write(html);
+                document.close();
             })
             .catch(error => {
                 console.error('Error submitting task:', error);
@@ -725,10 +731,16 @@
             })
             .then(response => {
                 if (response.ok) {
-                    window.location.href = '/';
+                    return response.text();
                 } else {
-                    alert('Error running task');
+                    throw new Error('Error running task');
                 }
+            })
+            .then(html => {
+                // Replace the current page content with the agent execution interface
+                document.open();
+                document.write(html);
+                document.close();
             })
             .catch(error => {
                 console.error('Error running task:', error);
