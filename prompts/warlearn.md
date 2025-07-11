@@ -2,7 +2,15 @@ Create a reinforcement learning model for a Strategy Based War Game where 2 agen
 
 
 
+
+
+
+
 It should periodically show the wargame play out so a user/developer can watch it learn and play. 
+
+
+
+
 
 
 
@@ -10,7 +18,15 @@ You no not need to create the option for the human to control the game besides i
 
 
 
+
+
+
+
 Please do not have it create or play any sound. 
+
+
+
+
 
 
 
