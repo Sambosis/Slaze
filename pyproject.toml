@@ -66,6 +66,7 @@ dependencies = [
     "pydantic-core==2.27.2",
     "pydantic==2.10.6",
     "pyee==12.1.1",
+    "pygame>=2.6.1",
     "pygetwindow==0.0.9",
     "pyglet==2.1.2",
     "pygments==2.19.1",
@@ -97,6 +98,7 @@ dependencies = [
     "symbex>=2.0",
     "sympy==1.13.1",
     "tenacity==9.0.0",
+    "torch>=2.6.0",
     "tqdm==4.67.1",
     "typing-extensions==4.12.2",
     "tzdata==2025.1",
@@ -117,4 +119,4 @@ reportAttributeAccessIssue = false
 reportArgumentType = false
 
 [tool.uv.workspace]
-members = ["repo/warlearn/war_game_rl", "repo/warlearn/rl_war_game", "repo/warlearn/warlearn/rl_war_game", "repo/stategygame/war_game", "repo/stategygame/project_root", "repo/sol/solitaire_web_app", "repo/sol/solitaire-game", "repo/stategygame/strategy_war_game", "repo/pics/project_root", "repo/shoppingsite/preowned-shop", "repo/battleship/project_root", "repo/battleshiprl/battleshiprl", "repo/battleshiprl/battleship_rl"]
+members = ["repo/warlearn/war_game_rl", "repo/warlearn/rl_war_game", "repo/warlearn/warlearn/rl_war_game", "repo/stategygame/war_game", "repo/stategygame/project_root", "repo/sol/solitaire_web_app", "repo/sol/solitaire-game", "repo/stategygame/strategy_war_game", "repo/pics/project_root", "repo/shoppingsite/preowned-shop", "repo/battleship/project_root", "repo/battleshiprl/battleshiprl", "repo/battleshiprl/battleship_rl", "repo/warlearn"]
