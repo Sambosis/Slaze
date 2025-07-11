@@ -173,12 +173,8 @@ class WriteCodeTool(BaseAnthropicTool):
                             },
                             "description": "List of files to generate, each with a filename, description, and optional specific imports.",
                         },
-                        "repo_path": {
-                            "type": "string",
-                            "description": "Path relative to REPO_DIR where files will be created (e.g., 'my_app' or 'subfolder/my_app').",
-                        },
                     },
-                    "required": ["command", "files", "repo_path"],
+                    "required": ["command", "files"],
                 },
             },
         }
@@ -286,7 +282,6 @@ class WriteCodeTool(BaseAnthropicTool):
         *,
         command: CodeCommand,
         files: List[Dict[str, Any]],
-        repo_path: str,  # Path relative to REPO_DIR
         **kwargs,
         ) -> ToolResult:
         """
@@ -295,7 +290,6 @@ class WriteCodeTool(BaseAnthropicTool):
         Args:
             command: The command to execute (should always be WRITE_CODEBASE).
             files: List of file details (filename, code_description, optional external_imports, optional internal_imports).
-            repo_path: Path relative to REPO_DIR where files will be created.
             **kwargs: Additional parameters (ignored).
 
         Returns:
@@ -311,46 +305,24 @@ class WriteCodeTool(BaseAnthropicTool):
         host_repo_path_obj = None  # Initialize to None
 
         try:
-            # --- START: Path Correction Logic ---
-            # Ensure REPO_DIR is imported/available, e.g., from config import REPO_DIR
+            # --- START: Path Logic ---
+            # Use REPO_DIR directly as the target location
             host_repo_dir = get_constant("REPO_DIR")
             if not host_repo_dir:
                 raise ValueError(
                     "REPO_DIR is not configured in config.py. Cannot determine host write path."
                 )
-            host_repo_path = Path(host_repo_dir)
-            if not host_repo_path.is_dir():
+            host_repo_path_obj = Path(host_repo_dir).resolve()
+            
+            if not host_repo_path_obj.is_dir():
                 logger.warning(
                     f"Configured REPO_DIR '{host_repo_dir}' does not exist or is not a directory."
                 )
-                # Decide if you want to raise an error or attempt to create it
-                # For now, let's proceed and let mkdir handle creation/errors later
-
-            # repo_path may include additional subdirectories. Preserve any
-            # path components inside the repository directory so generated files
-            # end up in e.g. repo/<prompt>/<app_name>/ rather than being
-            # flattened.
-            repo_path_obj = Path(repo_path)
-            if repo_path_obj.is_absolute():
-                # If the absolute path contains the repo directory, strip that
-                # portion so we keep the relative path under repo.
-                if "repo" in repo_path_obj.parts:
-                    repo_index = repo_path_obj.parts.index("repo")
-                    relative_subpath = Path(*repo_path_obj.parts[repo_index + 1 :])
-                else:
-                    # Fallback to just using the last component
-                    relative_subpath = Path(repo_path_obj.name)
-            else:
-                relative_subpath = repo_path_obj
-
-            # Construct the ACTUAL host path where files should be written
-            host_repo_path_obj = (host_repo_path / relative_subpath).resolve()
-            logger.info(f"Resolved HOST repo path for writing: {host_repo_path_obj}")
 
             # Ensure the HOST directory exists
             host_repo_path_obj.mkdir(parents=True, exist_ok=True)
-            logger.info(f"Ensured host repo directory exists: {host_repo_path_obj}")
-            # --- END: Path Correction Logic ---
+            logger.info(f"Using REPO_DIR for writing: {host_repo_path_obj}")
+            # --- END: Path Logic ---
 
             # Validate files input
             try:

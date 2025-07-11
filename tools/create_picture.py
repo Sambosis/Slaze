@@ -43,13 +43,10 @@ class PictureGenerationTool(BaseAnthropicTool):
                             "type": "string",
                             "description": "Text description of the image to generate",
                         },
-                        "repo_path": {
-                            "type": "string",
-                            "description": "Path relative to REPO_DIR where the image will be saved (e.g., 'my_app').",
-                        },
+
                         "output_path": {
                             "type": "string",
-                            "description": "Path where the generated image will be saved, relative to the repo_path (e.g., 'images/my_pic.png').",
+                            "description": "Path where the generated image will be saved within REPO_DIR (e.g., 'images/my_pic.png').",
                         },
                         "width": {
                             "type": "integer",
@@ -60,7 +57,7 @@ class PictureGenerationTool(BaseAnthropicTool):
                             "description": "Height to resize the image (required)",
                         },
                     },
-                    "required": ["command", "prompt", "repo_path", "output_path", "width", "height"],
+                    "required": ["command", "prompt", "output_path", "width", "height"],
                 },
             },
         }
@@ -68,16 +65,15 @@ class PictureGenerationTool(BaseAnthropicTool):
         return params
 
     async def generate_picture(
-        self, prompt: str, repo_path: str, output_path: str, width: int, height: int
+        self, prompt: str, output_path: str, width: int, height: int
     ) -> dict:
         """
         Generates an image based on the prompt using the specified width and height,
-        and saves it to the output path relative to the repo_path within REPO_DIR.
+        and saves it to the output path within REPO_DIR.
 
         Args:
             prompt: Text description of the image to generate
-            repo_path: Path relative to REPO_DIR where the image will be saved.
-            output_path: Path where the image should be saved, relative to repo_path.
+            output_path: Path where the image should be saved within REPO_DIR.
             width: Width to resize the image to (required)
             height: Height to resize the image to (required)
 
@@ -97,8 +93,7 @@ class PictureGenerationTool(BaseAnthropicTool):
             if not host_repo_dir:
                 raise ValueError("REPO_DIR is not configured in config.py.")
 
-            base_save_path = Path(host_repo_dir) / repo_path
-            output_path_obj = (base_save_path / output_path).resolve()
+            output_path_obj = (Path(host_repo_dir) / output_path).resolve()
 
             # Ensure the parent directory exists
             output_path_obj.parent.mkdir(parents=True, exist_ok=True)
@@ -221,7 +216,6 @@ class PictureGenerationTool(BaseAnthropicTool):
         *,
         command: PictureCommand,
         prompt: str,
-        repo_path: str, # Path relative to REPO_DIR
         output_path: str,  # Removed default, now required
         width: int,
         height: int,
@@ -233,8 +227,7 @@ class PictureGenerationTool(BaseAnthropicTool):
         Args:
             command: The command to execute
             prompt: The text prompt to generate the image from
-            repo_path: Path relative to REPO_DIR where the image will be saved.
-            output_path: The path to save the image to, relative to repo_path.
+            output_path: The path to save the image to within REPO_DIR.
             width: Width to resize the image (required)
             height: Height to resize the image (required)
             **kwargs: Additional parameters
@@ -244,8 +237,8 @@ class PictureGenerationTool(BaseAnthropicTool):
         """
         try:
             if command == PictureCommand.CREATE:
-                # Pass repo_path to generate_picture
-                result = await self.generate_picture(prompt, repo_path, output_path, width, height)
+                # Generate picture using REPO_DIR directly
+                result = await self.generate_picture(prompt, output_path, width, height)
 
                 if "error" in result and result["error"]:
                     return ToolResult(
