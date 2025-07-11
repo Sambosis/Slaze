@@ -58,6 +58,7 @@ class WebUI:
             WriteCodeTool,
             PictureGenerationTool,
             EditTool,
+            OpenInterpreterTool,
             ToolCollection,
         )
 
@@ -67,6 +68,7 @@ class WebUI:
             BashTool(display=self),
             PictureGenerationTool(display=self),
             EditTool(display=self),
+            OpenInterpreterTool(display=self),
             display=self,
         )
         self.setup_routes()
