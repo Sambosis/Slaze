@@ -11,8 +11,8 @@ Slaze is an experimental agent that can generate code, set up projects and execu
 - Interactive prompt creation: you can edit existing prompt files or create a new one on launch.
 - New prompts may be sent to the LLM for analysis to generate an expanded task definition when an
   `OPENROUTER_API_KEY` is available.
-- Tools include `WriteCodeTool`, `ProjectSetupTool`, `BashTool`, `DockerEditTool` and
-  `PictureGenerationTool` for generating files and images inside a Docker container.
+- Tools include `WriteCodeTool`, `ProjectSetupTool`, `BashTool`, `DockerEditTool`,
+  `OpenInterpreterTool` and `PictureGenerationTool` for generating files and images inside a Docker container.
 - Tool execution results are logged to `logs/tool.log` and `logs/tool.txt` for later review.
 
 ## Installation

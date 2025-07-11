@@ -13,9 +13,20 @@ def test_tools_page(client):
     assert resp.status_code == 200
     # basic check for at least one tool name in response
     assert b'bash' in resp.data
+    assert b'open_interpreter' in resp.data
 
 
 def test_run_bash_tool(client):
     resp = client.post('/tools/bash', data={'command': 'echo test'})
     assert resp.status_code == 200
     assert b'test' in resp.data
+
+
+def test_run_open_interpreter_tool(client, monkeypatch):
+    monkeypatch.setattr(
+        'tools.open_interpreter_tool.interpreter.chat',
+        lambda instruction: 'oi_result',
+    )
+    resp = client.post('/tools/open_interpreter', data={'instruction': 'list'})
+    assert resp.status_code == 200
+    assert b'oi_result' in resp.data
