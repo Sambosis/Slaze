@@ -51,12 +51,12 @@ class EditTool(BaseTool):
         self._file_history = defaultdict(list)
 
     def _resolve_path(self, path: str | Path) -> Path:
-        """Resolve a given path relative to PROJECT_DIR if not absolute, and normalize it."""
+        """Resolve a given path relative to REPO_DIR if not absolute, and normalize it."""
         p = Path(path)
         if not p.is_absolute():
-            project_dir = get_constant("PROJECT_DIR")
-            if project_dir:
-                p = Path(project_dir) / p
+            repo_dir = get_constant("REPO_DIR")
+            if repo_dir and Path(repo_dir).exists():
+                p = Path(repo_dir) / p
         return p.resolve()
 
     def to_params(self) -> dict:
@@ -143,7 +143,7 @@ class EditTool(BaseTool):
                     "user", f"EditTool Executing Command: {command} on path: {path}"
                 )
 
-            # Normalize the path first relative to PROJECT_DIR
+            # Normalize the path first relative to REPO_DIR
             _path = self._resolve_path(path)
             if command == "create":
                 if not file_text:
