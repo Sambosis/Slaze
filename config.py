@@ -64,7 +64,7 @@ googleflashlite = "google/gemini-2.5-flash-lite-preview-06-17"
 grok4 = "x-ai/grok-4"
 SUMMARY_MODEL = openai41mini  # Model for summaries
 MAIN_MODEL = openai41mini  # Primary model for main agent operations
-CODE_MODEL = openaio3  # Model for code generation tasks
+CODE_MODEL = openai41mini  # Model for code generation tasks
 
 # Feature flag constants
 COMPUTER_USE_BETA_FLAG = "computer-use-2024-10-22"

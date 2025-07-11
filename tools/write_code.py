@@ -41,8 +41,6 @@ from system_prompt.code_prompts import code_prompt_generate, code_skeleton_promp
 import ftfy
 
 
-
-
 MODEL_STRING = CODE_MODEL  # Default model string, can be overridden in config
 
 logger = logging.getLogger(__name__)
@@ -150,7 +148,7 @@ class WriteCodeTool(BaseAnthropicTool):
                                 "properties": {
                                     "filename": {
                                         "type": "string",
-                                        "description": "Name/path of the file relative to the project path.",
+                                        "description": " The relative path for the file. The main entry point to the code should NOT have a directory structure, e.g., just `main.py`. Any other files that you would like to be in a directory structure should be specified with their relative paths, e.g., `/utils/helpers.py`.",
                                     },
                                     "code_description": {
                                         "type": "string",
@@ -678,17 +676,17 @@ class WriteCodeTool(BaseAnthropicTool):
         Returns the task description or a default message if not found.
         """
         possible_paths = []
-        
+
         # Primary location: Use LOGS_DIR constant
         logs_dir = get_constant("LOGS_DIR")
         if logs_dir:
             possible_paths.append(os.path.join(str(logs_dir), "task.txt"))
-        
+
         # Fallback for backward compatibility: repo/logs/task.txt
         repo_dir = get_constant("REPO_DIR")
         if repo_dir:
             possible_paths.append(os.path.join(str(repo_dir), "logs", "task.txt"))
-        
+
         # Additional fallbacks for backward compatibility
         possible_paths.extend([
             os.path.join("logs", "task.txt"),  # Relative logs directory
@@ -1035,7 +1033,6 @@ class WriteCodeTool(BaseAnthropicTool):
 
         skeleton_string = ftfy.fix_text(skeleton_string)  # Apply ftfy only on success
         return skeleton_string
-
 
     def extract_code_block(
         self, text: str, file_path: Optional[Path] = None

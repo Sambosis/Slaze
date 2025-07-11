@@ -69,31 +69,28 @@ async def call_llm_for_task_revision(prompt_text: str, client: OpenAI, model: st
         "3.  **For Programming Projects - Define File Tree:**\n"
         "    *   After the expanded description, provide a file tree for the program. This tree should list ALL necessary code files and any crucial asset files (e.g., `main.py`, `utils/helper.py`, `assets/icon.png`).\n"
         "    *   For each file in the tree, you MUST provide:\n"
-        "        *   The full path relative to the project root (e.g., `src/app.py`, `tests/test_module.py`).\n"
+        "        *   The filename relative to the project root which will be your current working directory(e.g., `main.py`, `utils/helper.py`, `assets/icon.png`).\n"
         "        *   A brief, clear statement about the purpose of that specific file.\n"
         "        *   Explicitly state the correct way to import the file/module using absolute imports from the project root (e.g., `from src import app`, `import src.models.user`). Assume the project root is the primary location for running the code or is added to PYTHONPATH.\n"
         "    *   **Important Considerations for File Tree:**\n"
         "        *   Lean towards creating FEWER files and folders while maintaining organization and manageability. Avoid overly nested structures unless strictly necessary.\n"
         "        *   Focus on simplicity.\n"
-        "        *   Do NOT create or list non-code project management files like `pyproject.toml`, `.gitignore`, `README.md`, `LICENSE`, etc. Only list files that are part of the application's codebase or directly used assets.\n\n"
         "4.  **Output Format:**\n"
         "    *   The output should start with the expanded description (if a programming project) or the direct task (if non-coding).\n"
         "    *   This should be followed by the file tree section (if a programming project), clearly delineated.\n"
         "    *   Do NOT include any conversational preamble, your own comments about the process, or any text beyond the structured task definition itself.\n"
         "    *   Example structure for a programming project:\n"
-        "        \"\"\"\n"
+        '        """\n'
         "        [Expanded Description of the project, including decisions made...]\n\n"
         "        File Tree:\n"
-        "        - project_root/\n"
-        "          - src/\n"
-        "            - __init__.py (Purpose: Marks 'src' as a package. Import: `import src`)\n"
-        "            - main.py (Purpose: Main entry point of the application. Import: `from src import main` or `import src.main`)\n"
-        "            - module_one/\n"
-        "              - __init__.py (Purpose: Marks 'module_one' as a sub-package. Import: `from src import module_one`)\n"
-        "              - functions.py (Purpose: Contains utility functions for module_one. Import: `from src.module_one import functions`)\n"
+        "        - ./\n"
+        "        - main.py (Purpose: Main entry point of the application. Import: `from src import main` or `import src.main`)\n"
+        "          - module_one/\n"
+        "            - __init__.py (Purpose: Marks 'module_one' as a sub-package. Import: `from src import module_one`)\n"
+        "            - functions.py (Purpose: Contains utility functions for module_one. Import: `from module_one import functions`)\n"
         "          - assets/\n"
         "            - image.png (Purpose: An image asset for the UI.)\n"
-        "        \"\"\"\n\n"
+        '        """\n\n'
         "Now, process the user's original request based on these instructions."
     )
 
@@ -115,13 +112,13 @@ async def call_llm_for_task_revision(prompt_text: str, client: OpenAI, model: st
             n=1,
             stop=None,
         )
-        
+
         if response.choices and response.choices[0].message and response.choices[0].message.content:
             revised_task = response.choices[0].message.content.strip()
             # Basic check to ensure LLM didn't just return an empty string or something very short
             if len(revised_task) < 0.5 * len(prompt_text) and len(prompt_text) > 50 : # Heuristic: if significantly shorter
-                 logger.warning(f"LLM task revision is much shorter than original. Original: '{prompt_text[:100]}...', Revised: '{revised_task[:100]}...'. Using original.")
-                 return prompt_text
+                logger.warning(f"LLM task revision is much shorter than original. Original: '{prompt_text[:100]}...', Revised: '{revised_task[:100]}...'. Using original.")
+                return prompt_text
 
             logger.info(f"Task successfully revised by LLM ({model}): '{revised_task[:100]}...'")
             return revised_task
