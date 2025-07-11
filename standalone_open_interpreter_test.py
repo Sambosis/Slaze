@@ -66,27 +66,28 @@ class OpenInterpreterTool(MockBaseTool):
         error = ""
         success = False
         cwd = None
-        
+
         try:
             # Get the current working directory
             cwd = os.getcwd()
-            
+
             # Try to import and use open-interpreter
             try:
                 import interpreter
-                
+                from interpreter import interpreter
+
                 # Configure interpreter settings
                 interpreter.offline = False  # Allow online operations
                 interpreter.auto_run = True  # Auto-run commands
                 interpreter.verbose = False  # Reduce verbosity for tool usage
-                
+
                 # Create system information context
                 system_info = self._get_system_info()
                 full_task = f"{task_description}\n\nSystem Information: {system_info}"
-                
+
                 # Execute the task using interpreter.chat()
                 result = interpreter.chat(full_task)
-                
+
                 # Extract output from the result
                 if hasattr(result, 'messages'):
                     # Get the last assistant message which should contain the execution result
@@ -96,13 +97,13 @@ class OpenInterpreterTool(MockBaseTool):
                             break
                 else:
                     output = str(result)
-                
+
                 success = True
-                
+
             except ImportError:
                 error = "open-interpreter package is not installed. Please install it with: pip install open-interpreter"
                 success = False
-                
+
         except Exception as e:
             error = str(e)
             success = False
@@ -127,16 +128,16 @@ class OpenInterpreterTool(MockBaseTool):
         Get system information to provide context to the interpreter.
         """
         system_info = []
-        
+
         # Basic system info
         system_info.append(f"OS: {platform.system()} {platform.release()}")
         system_info.append(f"Architecture: {platform.machine()}")
         system_info.append(f"Python: {platform.python_version()}")
-        
+
         # Current working directory
         cwd = os.getcwd()
         system_info.append(f"Current Directory: {cwd}")
-        
+
         # Available commands
         try:
             # Check for common commands
@@ -151,7 +152,7 @@ class OpenInterpreterTool(MockBaseTool):
             system_info.append(f"Available Commands: {', '.join(available_commands)}")
         except Exception:
             system_info.append("Available Commands: Unable to determine")
-        
+
         return "\n".join(system_info)
 
     def to_params(self) -> dict:
@@ -202,7 +203,7 @@ def test_open_interpreter_tool():
     print("\n=== Test 4: Call method ===")
     try:
         import asyncio
-        result = asyncio.run(tool(task_description="List the current directory contents"))
+        result = asyncio.run(tool("list my recent commits"))
         print(f"Result: {result}")
     except Exception as e:
         print(f"Expected error (open-interpreter not installed): {e}")

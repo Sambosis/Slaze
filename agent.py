@@ -17,6 +17,7 @@ from tools import (
     EditTool,
     ToolCollection,
     ToolResult,
+    OpenInterpreterTool
 )
 from utils.web_ui import WebUI
 from utils.agent_display_console import AgentDisplayConsole
@@ -185,6 +186,7 @@ class Agent:
             ProjectSetupTool(display=self.display),
             BashTool(display=self.display),
             PictureGenerationTool(display=self.display),
+            OpenInterpreterTool(display=self.display),  # Uncommented and enabled for testing
             EditTool(display=self.display),  # Uncommented and enabled for testing
             display=self.display,
         )
