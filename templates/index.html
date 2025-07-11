@@ -6,123 +6,276 @@
     <title>Slazy Agent</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.0/socket.io.js"></script>
     <style>
-        body { font-family: sans-serif; margin: 0; padding: 20px; background-color: #f4f4f4; }
-        .container { max-width: 900px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        * {
+            box-sizing: border-box;
+        }
+
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+            margin: 0; 
+            padding: 20px; 
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+        }
+
+        .container { 
+            max-width: 1000px; 
+            margin: auto; 
+            background: white; 
+            padding: 24px; 
+            border-radius: 16px; 
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        }
+        
+        /* Header styles */
+        .header { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            margin-bottom: 32px; 
+            padding-bottom: 20px;
+            border-bottom: 2px solid #e9ecef;
+        }
+        
+        .header h1 { 
+            margin: 0; 
+            color: #2d3748; 
+            font-size: 32px; 
+            font-weight: 700;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .header a { 
+            text-decoration: none; 
+            color: #667eea; 
+            font-weight: 600; 
+            padding: 12px 20px;
+            border: 2px solid #667eea;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .header a:hover { 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(102, 126, 234, 0.3);
+        }
         
         /* Tab styles */
-        .tab-container { margin-bottom: 20px; }
-        .tab-buttons { display: flex; border-bottom: 2px solid #ddd; margin-bottom: 0; }
+        .tab-container { 
+            margin-bottom: 32px; 
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            overflow: hidden;
+        }
+        
+        .tab-buttons { 
+            display: flex; 
+            margin: 0; 
+            background: #f8f9fa;
+        }
+        
         .tab-button { 
             flex: 1; 
-            padding: 12px 20px; 
-            background-color: #f8f9fa; 
+            padding: 16px 24px; 
+            background: transparent; 
             border: none; 
             border-bottom: 3px solid transparent;
             cursor: pointer; 
-            font-size: 14px; 
-            font-weight: 500;
+            font-size: 15px; 
+            font-weight: 600;
             transition: all 0.3s ease;
             position: relative;
+            color: #6c757d;
         }
-        .tab-button:hover { background-color: #e9ecef; }
+        
+        .tab-button:hover { 
+            background: rgba(102, 126, 234, 0.1); 
+            color: #667eea;
+        }
+        
         .tab-button.active { 
-            background-color: white; 
-            border-bottom-color: #007bff; 
-            color: #007bff;
-        }
-        .tab-button .badge {
-            background-color: #6c757d;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
-            border-radius: 12px;
-            padding: 2px 8px;
-            font-size: 11px;
+            border-bottom-color: transparent;
+        }
+        
+        .tab-button .badge {
+            background: rgba(255, 255, 255, 0.3);
+            color: white;
+            border-radius: 16px;
+            padding: 4px 10px;
+            font-size: 12px;
             margin-left: 8px;
-            min-width: 20px;
+            min-width: 24px;
             text-align: center;
             display: inline-block;
+            font-weight: 600;
         }
-        .tab-button.active .badge { background-color: #007bff; }
         
-        .tab-content { display: none; }
-        .tab-content.active { display: block; }
+        .tab-button:not(.active) .badge { 
+            background: #6c757d;
+            color: white;
+        }
+        
+        .tab-content { 
+            display: none; 
+        }
+        
+        .tab-content.active { 
+            display: block; 
+        }
         
         .messages { 
-            border: 1px solid #ddd; 
-            padding: 15px; 
-            min-height: 300px; 
+            border: 2px solid #e9ecef; 
+            padding: 20px; 
+            min-height: 350px; 
             max-height: 600px; 
             overflow-y: auto; 
-            background-color: #fafafa; 
-            border-radius: 4px; 
+            background: #fafbfc; 
+            border-radius: 12px;
+            position: relative;
         }
+        
         .message { 
-            margin-bottom: 15px; 
-            padding: 12px; 
-            border-radius: 8px; 
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            margin-bottom: 16px; 
+            padding: 16px 20px; 
+            border-radius: 12px; 
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            position: relative;
+            animation: slideIn 0.3s ease-out;
         }
+        
+        @keyframes slideIn {
+            from { 
+                opacity: 0; 
+                transform: translateY(10px); 
+            }
+            to { 
+                opacity: 1; 
+                transform: translateY(0); 
+            }
+        }
+        
         .user-message { 
-            background-color: #dcf8c6; 
+            background: linear-gradient(135deg, #a8e6cf 0%, #88d8a3 100%);
+            color: #2d5a3d;
             text-align: right; 
             margin-left: 20%;
+            border-left: 4px solid #66bb6a;
         }
+        
         .assistant-message { 
-            background-color: #e3f2fd; 
+            background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+            color: #1565c0;
             text-align: left; 
             margin-right: 20%;
+            border-left: 4px solid #42a5f5;
         }
+        
         .tool-message { 
-            background-color: #fff3e0; 
+            background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%);
+            color: #e65100;
             text-align: left; 
-            font-family: 'Courier New', monospace; 
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace; 
             white-space: pre-wrap; 
             font-size: 13px;
             margin-right: 10%;
+            border-left: 4px solid #ff9800;
         }
+        
         .empty-state {
             text-align: center;
             color: #6c757d;
             font-style: italic;
-            padding: 40px 20px;
+            padding: 60px 20px;
+            font-size: 16px;
         }
         
-        .input-area { display: flex; gap: 10px; margin-top: 15px; }
+        /* Input area styles */
+        .input-area { 
+            display: flex; 
+            gap: 16px; 
+            margin-top: 24px; 
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 12px;
+            border: 2px solid #e9ecef;
+        }
+        
         .input-area textarea { 
             flex-grow: 1; 
-            padding: 12px; 
-            border: 1px solid #ddd; 
-            border-radius: 6px; 
+            padding: 16px 20px; 
+            border: 2px solid #e5e7eb; 
+            border-radius: 12px; 
             resize: vertical; 
-            min-height: 50px; 
+            min-height: 60px; 
             font-family: inherit;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            background: white;
         }
-        .input-area button { 
-            padding: 12px 20px; 
-            background-color: #007bff; 
-            color: white; 
-            border: none; 
-            border-radius: 6px; 
-            cursor: pointer; 
-            font-weight: 500;
-        }
-        .input-area button:hover { background-color: #0056b3; }
-        .input-area button:last-child { background-color: #dc3545; }
-        .input-area button:last-child:hover { background-color: #c82333; }
         
-        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-        .header h1 { margin: 0; color: #333; }
-        .header a { text-decoration: none; color: #007bff; font-weight: 500; }
-        .header a:hover { text-decoration: underline; }
+        .input-area textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .input-area button { 
+            padding: 16px 24px; 
+            border: none; 
+            border-radius: 12px; 
+            cursor: pointer; 
+            font-weight: 600;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            min-width: 100px;
+            justify-content: center;
+        }
+        
+        .input-area button:first-of-type { 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .input-area button:first-of-type:hover { 
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4);
+        }
+        
+        .input-area button:last-child { 
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%);
+            color: white;
+        }
+        
+        .input-area button:last-child:hover { 
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(255, 107, 107, 0.4);
+        }
         
         #agent_prompt_area {
-            margin: 15px 0;
-            padding: 12px;
-            background-color: #fff3cd;
-            border: 1px solid #ffeaa7;
-            border-radius: 6px;
+            margin: 20px 0;
+            padding: 16px 20px;
+            background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+            border: 2px solid #ffc107;
+            border-radius: 12px;
             text-align: center;
             display: none;
-            font-weight: 500;
+            font-weight: 600;
+            color: #856404;
+            box-shadow: 0 4px 12px rgba(255, 193, 7, 0.2);
         }
 
         /* Enhanced Modal Styles */
@@ -415,7 +568,48 @@
             overflow-y: auto;
         }
 
+        /* Responsive design */
         @media (max-width: 768px) {
+            body {
+                padding: 12px;
+            }
+            
+            .container {
+                padding: 16px;
+            }
+            
+            .header {
+                flex-direction: column;
+                gap: 16px;
+                text-align: center;
+            }
+            
+            .header h1 {
+                font-size: 28px;
+            }
+            
+            .tab-buttons {
+                flex-direction: column;
+            }
+            
+            .tab-button {
+                padding: 12px 16px;
+            }
+            
+            .input-area {
+                flex-direction: column;
+                gap: 12px;
+            }
+            
+            .input-area button {
+                width: 100%;
+            }
+            
+            .message {
+                margin-left: 0 !important;
+                margin-right: 0 !important;
+            }
+            
             #tool_prompt_modal .modal-content {
                 margin: 4% 16px;
                 max-width: none;
