@@ -83,6 +83,13 @@ class WebUI:
             options = [file.name for file in prompt_files]
             return render_template("select_prompt.html", options=options)
 
+        @self.app.route("/modern")
+        def select_prompt_modern_route():
+            logging.info("Serving modern prompt selection page")
+            prompt_files = list(PROMPTS_DIR.glob("*.md"))
+            options = [file.name for file in prompt_files]
+            return render_template("select_prompt_modern.html", options=options)
+
         @self.app.route("/run_agent", methods=["POST"])
         def run_agent_route():
             logging.info("Received request to run agent")
@@ -146,6 +153,18 @@ class WebUI:
             except FileNotFoundError:
                 logging.error(f"Prompt not found: {filename}")
                 return "Prompt not found", 404
+
+        @self.app.route("/api/tasks")
+        def api_get_tasks():
+            """Return the list of available tasks."""
+            logging.info("Serving tasks list")
+            try:
+                prompt_files = list(PROMPTS_DIR.glob("*.md"))
+                tasks = [file.name for file in prompt_files]
+                return jsonify(tasks)
+            except Exception as e:
+                logging.error(f"Error loading tasks: {e}")
+                return jsonify([]), 500
 
         @self.app.route("/tools")
         def tools_route():
