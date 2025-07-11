@@ -375,14 +375,18 @@ class Agent:
         self.step_count += 1
         messages = self.messages
         rr(f"Step {self.step_count} with {len(messages)} messages")
-        with open(f"{LOGS_DIR}/messages.log", "w", encoding="utf-8") as f:
+        with open(f"{LOGS_DIR}/messages.md", "w", encoding="utf-8") as f:
             f.write(format_messages_to_string(messages) + "\n"  )
+        if self.step_count > 20:
+            tool_choice = "auto"
+        else:
+            tool_choice = "required"
         try:
             response = self.client.chat.completions.create(
                 model=MAIN_MODEL,
                 messages=messages,
                 tools=self.tool_params,
-                tool_choice="auto",
+                tool_choice=tool_choice,
                 max_tokens=MAX_SUMMARY_TOKENS,
             )
         except Exception as llm_error:

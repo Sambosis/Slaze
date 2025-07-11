@@ -50,7 +50,7 @@ def console(manual_tools):
         print("\nApplication interrupted by user. Exiting.")
 
 @cli.command()
-@click.option('--port', default=5000, help='Port to run the web server on.')
+@click.option('--port', default=5002, help='Port to run the web server on.')
 @click.option('--manual-tools', is_flag=True, help='Confirm tool parameters before execution')
 def web(port, manual_tools):
     """Run the agent with a web interface."""

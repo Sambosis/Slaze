@@ -15,6 +15,6 @@ RUN pip install uv --no-cache-dir
 
 WORKDIR /app
 
-EXPOSE 5000
+EXPOSE 5002
 # CMD ["python", "run.py", "web"]
 USER user
