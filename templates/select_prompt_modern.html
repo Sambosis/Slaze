@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Select Task - Slazy Agent</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+            margin: 0; 
+            padding: 20px; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+
+        .container { 
+            max-width: 1200px; 
+            margin: auto; 
+            background: rgba(255, 255, 255, 0.95); 
+            padding: 32px; 
+            border-radius: 20px; 
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.2);
+            backdrop-filter: blur(10px);
+        }
+
+        h1 { 
+            color: #2d3748; 
+            margin: 0 0 32px 0; 
+            font-size: 36px; 
+            font-weight: 700;
+            text-align: center;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .search-container {
+            position: relative;
+            margin-bottom: 32px;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 16px 24px 16px 60px;
+            border: 2px solid #e5e7eb;
+            border-radius: 16px;
+            font-size: 16px;
+            background: white;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.15), 0 8px 16px rgba(0, 0, 0, 0.1);
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #6b7280;
+            font-size: 20px;
+        }
+
+        .filters {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 32px;
+            flex-wrap: wrap;
+        }
+
+        .filter-chip {
+            padding: 8px 16px;
+            border: 2px solid #e5e7eb;
+            border-radius: 20px;
+            background: white;
+            color: #6b7280;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .filter-chip:hover {
+            border-color: #667eea;
+            color: #667eea;
+        }
+
+        .filter-chip.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-color: transparent;
+        }
+
+        .tasks-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 24px;
+            margin-bottom: 32px;
+        }
+
+        .task-card {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+            cursor: pointer;
+            border: 2px solid transparent;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .task-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 16px 32px rgba(0, 0, 0, 0.15);
+            border-color: #667eea;
+        }
+
+        .task-card.selected {
+            border-color: #667eea;
+            background: linear-gradient(135deg, #f0f4ff 0%, #e6f2ff 100%);
+            box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.15);
+        }
+
+        .task-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            margin-bottom: 16px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .task-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #2d3748;
+            margin-bottom: 8px;
+            text-transform: capitalize;
+        }
+
+        .task-description {
+            color: #6b7280;
+            font-size: 14px;
+            line-height: 1.5;
+            margin-bottom: 16px;
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .task-meta {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            font-size: 12px;
+            color: #9ca3af;
+        }
+
+        .task-category {
+            padding: 4px 8px;
+            background: #f3f4f6;
+            border-radius: 6px;
+            font-weight: 500;
+            text-transform: uppercase;
+            font-size: 10px;
+            letter-spacing: 0.5px;
+        }
+
+        .create-new-card {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            min-height: 200px;
+            border: 2px dashed rgba(255, 255, 255, 0.3);
+        }
+
+        .create-new-card:hover {
+            border-color: rgba(255, 255, 255, 0.6);
+        }
+
+        .create-new-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+
+        .create-new-text {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .selected-task-panel {
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 32px;
+            border: 2px solid #e5e7eb;
+            display: none;
+        }
+
+        .selected-task-panel.visible {
+            display: block;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .selected-task-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: #2d3748;
+            margin-bottom: 12px;
+        }
+
+        .selected-task-content {
+            background: white;
+            border-radius: 12px;
+            padding: 16px;
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+            font-size: 13px;
+            line-height: 1.5;
+            max-height: 200px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            color: #374151;
+            border: 1px solid #e5e7eb;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 16px;
+            margin-top: 16px;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-secondary {
+            background: #f3f4f6;
+            color: #6b7280;
+            border: 2px solid #e5e7eb;
+        }
+
+        .btn-secondary:hover {
+            background: #e5e7eb;
+            color: #374151;
+        }
+
+        .new-task-form {
+            background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 32px;
+            border: 2px solid #42a5f5;
+            display: none;
+        }
+
+        .new-task-form.visible {
+            display: block;
+            animation: slideIn 0.3s ease;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #1565c0;
+        }
+
+        .form-group input,
+        .form-group textarea {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e3f2fd;
+            border-radius: 8px;
+            font-size: 14px;
+            background: white;
+            transition: border-color 0.2s ease;
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #42a5f5;
+        }
+
+        .form-group textarea {
+            min-height: 120px;
+            resize: vertical;
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 64px 32px;
+            color: #6b7280;
+            display: none;
+        }
+
+        .empty-state.visible {
+            display: block;
+        }
+
+        .empty-state-icon {
+            font-size: 64px;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+
+        .navigation {
+            display: flex;
+            gap: 16px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-top: 32px;
+        }
+
+        .nav-link {
+            text-decoration: none;
+            color: #667eea;
+            font-weight: 600;
+            padding: 12px 24px;
+            border: 2px solid #667eea;
+            border-radius: 12px;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .nav-link:hover {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(102, 126, 234, 0.3);
+        }
+
+        @media (max-width: 768px) {
+            .tasks-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .filters {
+                justify-content: center;
+            }
+            
+            .action-buttons {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 Select Your Task</h1>
+        
+        <div class="search-container">
+            <span class="search-icon">🔍</span>
+            <input type="text" class="search-input" id="searchInput" placeholder="Search tasks...">
+        </div>
+
+        <div class="filters">
+            <div class="filter-chip active" data-category="all">All Tasks</div>
+            <div class="filter-chip" data-category="game">🎮 Games</div>
+            <div class="filter-chip" data-category="web">🌐 Web</div>
+            <div class="filter-chip" data-category="tool">🔧 Tools</div>
+            <div class="filter-chip" data-category="simulation">📊 Simulation</div>
+            <div class="filter-chip" data-category="creative">🎨 Creative</div>
+        </div>
+
+        <div class="selected-task-panel" id="selectedTaskPanel">
+            <div class="selected-task-title" id="selectedTaskTitle">Selected Task</div>
+            <div class="selected-task-content" id="selectedTaskContent"></div>
+            <div class="action-buttons">
+                <button class="btn btn-primary" onclick="runSelectedTask()">
+                    🚀 Run Task
+                </button>
+                <button class="btn btn-secondary" onclick="editSelectedTask()">
+                    ✏️ Edit
+                </button>
+                <button class="btn btn-secondary" onclick="clearSelection()">
+                    ❌ Clear
+                </button>
+            </div>
+        </div>
+
+        <div class="new-task-form" id="newTaskForm">
+            <h3 style="margin-top: 0; color: #1565c0;">✨ Create New Task</h3>
+            <form id="newTaskFormElement">
+                <div class="form-group">
+                    <label for="newTaskName">Task Name:</label>
+                    <input type="text" id="newTaskName" name="filename" placeholder="my_awesome_task">
+                </div>
+                <div class="form-group">
+                    <label for="newTaskContent">Task Content:</label>
+                    <textarea id="newTaskContent" name="prompt_text" placeholder="Describe your task here..."></textarea>
+                </div>
+                <div class="action-buttons">
+                    <button type="button" class="btn btn-primary" onclick="submitNewTask()">
+                        💾 Create & Run
+                    </button>
+                    <button type="button" class="btn btn-secondary" onclick="cancelNewTask()">
+                        ❌ Cancel
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <div class="tasks-grid" id="tasksGrid">
+            <!-- Tasks will be populated here -->
+        </div>
+
+        <div class="empty-state" id="emptyState">
+            <div class="empty-state-icon">📝</div>
+            <h3>No tasks found</h3>
+            <p>Try adjusting your search or filters</p>
+        </div>
+        
+        <div class="navigation">
+            <a href="/classic" class="nav-link">📝 Classic Interface</a>
+            <a href="/tools" class="nav-link">🔧 Toolbox</a>
+        </div>
+    </div>
+
+    <script>
+        let tasks = [];
+        let selectedTask = null;
+        let currentFilter = 'all';
+
+        // Task icons and categories mapping
+        const taskIcons = {
+            'game': '🎮',
+            'web': '🌐',
+            'tool': '🔧',
+            'simulation': '📊',
+            'creative': '🎨',
+            'default': '📝'
+        };
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            loadTasks();
+            setupEventListeners();
+        });
+
+        function setupEventListeners() {
+            // Search functionality
+            document.getElementById('searchInput').addEventListener('input', filterTasks);
+
+            // Filter chips
+            document.querySelectorAll('.filter-chip').forEach(chip => {
+                chip.addEventListener('click', function() {
+                    // Update active state
+                    document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+                    this.classList.add('active');
+                    
+                    // Update current filter
+                    currentFilter = this.dataset.category;
+                    filterTasks();
+                });
+            });
+        }
+
+                                   function loadTasks() {
+             // Get tasks from the server via API
+             fetch('/api/tasks')
+                 .then(response => response.json())
+                 .then(taskOptions => {
+                     tasks = taskOptions.map(option => ({
+                         filename: option,
+                         name: option.replace('.md', '').replace(/[_-]/g, ' '),
+                         category: categorizeTask(option),
+                         icon: getTaskIcon(option)
+                     }));
+                     renderTasks();
+                 })
+                 .catch(error => {
+                     console.error('Error loading tasks:', error);
+                     // Show empty state on error
+                     tasks = [];
+                     renderTasks();
+                 });
+         }
+
+        function categorizeTask(filename) {
+            const name = filename.toLowerCase();
+            
+            if (name.includes('game') || name.includes('pong') || name.includes('ball') || 
+                name.includes('battleship') || name.includes('tic') || name.includes('maze')) {
+                return 'game';
+            }
+            if (name.includes('web') || name.includes('site') || name.includes('shop') || 
+                name.includes('calendar') || name.includes('dashboard')) {
+                return 'web';
+            }
+            if (name.includes('tool') || name.includes('calc') || name.includes('assistant') || 
+                name.includes('code') || name.includes('manage')) {
+                return 'tool';
+            }
+            if (name.includes('sim') || name.includes('3d') || name.includes('model') || 
+                name.includes('train') || name.includes('learn')) {
+                return 'simulation';
+            }
+            if (name.includes('pic') || name.includes('art') || name.includes('draw') || 
+                name.includes('design') || name.includes('creative')) {
+                return 'creative';
+            }
+            
+            return 'default';
+        }
+
+        function getTaskIcon(filename) {
+            const category = categorizeTask(filename);
+            return taskIcons[category] || taskIcons['default'];
+        }
+
+        function renderTasks() {
+            const grid = document.getElementById('tasksGrid');
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            
+            // Filter tasks
+            const filteredTasks = tasks.filter(task => {
+                const matchesSearch = task.name.toLowerCase().includes(searchTerm) || 
+                                    task.filename.toLowerCase().includes(searchTerm);
+                const matchesCategory = currentFilter === 'all' || task.category === currentFilter;
+                return matchesSearch && matchesCategory;
+            });
+
+            // Clear grid
+            grid.innerHTML = '';
+
+            // Add create new task card
+            const createCard = document.createElement('div');
+            createCard.className = 'task-card create-new-card';
+            createCard.innerHTML = `
+                <div class="create-new-icon">➕</div>
+                <div class="create-new-text">Create New Task</div>
+            `;
+            createCard.addEventListener('click', showNewTaskForm);
+            grid.appendChild(createCard);
+
+            // Add task cards
+            filteredTasks.forEach(task => {
+                const card = document.createElement('div');
+                card.className = 'task-card';
+                card.dataset.filename = task.filename;
+                
+                card.innerHTML = `
+                    <div class="task-icon">${task.icon}</div>
+                    <div class="task-title">${task.name}</div>
+                    <div class="task-description" id="desc-${task.filename}">Loading...</div>
+                    <div class="task-meta">
+                        <div class="task-category">${task.category}</div>
+                        <div>📄 ${task.filename}</div>
+                    </div>
+                `;
+                
+                card.addEventListener('click', () => selectTask(task));
+                grid.appendChild(card);
+                
+                // Load task description
+                loadTaskDescription(task.filename);
+            });
+
+            // Show empty state if no tasks
+            const emptyState = document.getElementById('emptyState');
+            if (filteredTasks.length === 0) {
+                emptyState.classList.add('visible');
+            } else {
+                emptyState.classList.remove('visible');
+            }
+        }
+
+        function loadTaskDescription(filename) {
+            fetch('/api/prompts/' + filename)
+                .then(response => response.text())
+                .then(data => {
+                    const desc = data.substring(0, 120) + (data.length > 120 ? '...' : '');
+                    const element = document.getElementById('desc-' + filename);
+                    if (element) {
+                        element.textContent = desc;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading task description:', error);
+                    const element = document.getElementById('desc-' + filename);
+                    if (element) {
+                        element.textContent = 'Error loading description';
+                    }
+                });
+        }
+
+        function selectTask(task) {
+            // Update selected task
+            selectedTask = task;
+            
+            // Update UI
+            document.querySelectorAll('.task-card').forEach(card => {
+                card.classList.remove('selected');
+            });
+            
+            const selectedCard = document.querySelector(`[data-filename="${task.filename}"]`);
+            if (selectedCard) {
+                selectedCard.classList.add('selected');
+            }
+            
+            // Load and show task content
+            loadTaskContent(task);
+        }
+
+        function loadTaskContent(task) {
+            fetch('/api/prompts/' + task.filename)
+                .then(response => response.text())
+                .then(data => {
+                    const panel = document.getElementById('selectedTaskPanel');
+                    const title = document.getElementById('selectedTaskTitle');
+                    const content = document.getElementById('selectedTaskContent');
+                    
+                    title.textContent = `${task.icon} ${task.name}`;
+                    content.textContent = data;
+                    panel.classList.add('visible');
+                })
+                .catch(error => {
+                    console.error('Error loading task content:', error);
+                });
+        }
+
+        function filterTasks() {
+            renderTasks();
+        }
+
+        function showNewTaskForm() {
+            document.getElementById('newTaskForm').classList.add('visible');
+            document.getElementById('newTaskName').focus();
+        }
+
+        function cancelNewTask() {
+            document.getElementById('newTaskForm').classList.remove('visible');
+            document.getElementById('newTaskFormElement').reset();
+        }
+
+        function submitNewTask() {
+            const form = document.getElementById('newTaskFormElement');
+            const formData = new FormData(form);
+            formData.append('choice', 'new');
+            
+            // Submit to server
+            fetch('/run_agent', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                if (response.ok) {
+                    return response.text();
+                } else {
+                    throw new Error('Error creating task');
+                }
+            })
+            .then(html => {
+                // Replace the current page content with the agent execution interface
+                document.open();
+                document.write(html);
+                document.close();
+            })
+            .catch(error => {
+                console.error('Error submitting task:', error);
+                alert('Error submitting task');
+            });
+        }
+
+        function runSelectedTask() {
+            if (!selectedTask) return;
+            
+            const formData = new FormData();
+            formData.append('choice', selectedTask.filename);
+            
+            fetch('/run_agent', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                if (response.ok) {
+                    return response.text();
+                } else {
+                    throw new Error('Error running task');
+                }
+            })
+            .then(html => {
+                // Replace the current page content with the agent execution interface
+                document.open();
+                document.write(html);
+                document.close();
+            })
+            .catch(error => {
+                console.error('Error running task:', error);
+                alert('Error running task');
+            });
+        }
+
+        function editSelectedTask() {
+            if (!selectedTask) return;
+            
+            // Pre-populate the new task form with selected task data
+            fetch('/api/prompts/' + selectedTask.filename)
+                .then(response => response.text())
+                .then(data => {
+                    document.getElementById('newTaskName').value = selectedTask.filename.replace('.md', '');
+                    document.getElementById('newTaskContent').value = data;
+                    showNewTaskForm();
+                })
+                .catch(error => {
+                    console.error('Error loading task for editing:', error);
+                });
+        }
+
+        function clearSelection() {
+            selectedTask = null;
+            document.querySelectorAll('.task-card').forEach(card => {
+                card.classList.remove('selected');
+            });
+            document.getElementById('selectedTaskPanel').classList.remove('visible');
+        }
+    </script>
+</body>
+</html>
