@@ -74,13 +74,11 @@ class TestWriteCodeTool:
         required_fields = params["function"]["parameters"]["required"]
         assert "command" in required_fields
         assert "files" in required_fields
-        assert "project_path" in required_fields
         
         # Check properties structure
         properties = params["function"]["parameters"]["properties"]
         assert "command" in properties
         assert "files" in properties
-        assert "project_path" in properties
         
         # Check command enum
         assert properties["command"]["enum"] == [CodeCommand.WRITE_CODEBASE.value]
@@ -91,7 +89,6 @@ class TestWriteCodeTool:
         result = await write_code_tool(
             command="invalid_command",  # type: ignore
             files=[],
-            project_path="test_project"
         )
         
         assert isinstance(result, ToolResult)
@@ -105,7 +102,6 @@ class TestWriteCodeTool:
         result = await write_code_tool(
             command=CodeCommand.WRITE_CODEBASE,
             files=[],
-            project_path="test_project"
         )
         
         assert isinstance(result, ToolResult)
@@ -123,7 +119,6 @@ class TestWriteCodeTool:
         result_1 = await write_code_tool(
             command=CodeCommand.WRITE_CODEBASE,
             files=invalid_files_1,
-            project_path="test_project"
         )
         assert isinstance(result_1, ToolResult)
         assert result_1.error is not None
@@ -136,7 +131,6 @@ class TestWriteCodeTool:
         result_2 = await write_code_tool(
             command=CodeCommand.WRITE_CODEBASE,
             files=invalid_files_2,
-            project_path="test_project"
         )
         assert isinstance(result_2, ToolResult)
         assert result_2.error is not None
@@ -153,7 +147,6 @@ class TestWriteCodeTool:
         result_3 = await write_code_tool(
             command=CodeCommand.WRITE_CODEBASE,
             files=invalid_files_3,
-            project_path="test_project"
         )
         assert isinstance(result_3, ToolResult)
         assert result_3.error is not None
@@ -170,7 +163,6 @@ class TestWriteCodeTool:
         result_4 = await write_code_tool(
             command=CodeCommand.WRITE_CODEBASE,
             files=invalid_files_4,
-            project_path="test_project"
         )
         assert isinstance(result_4, ToolResult)
         assert result_4.error is not None
@@ -187,7 +179,6 @@ class TestWriteCodeTool:
         result_5 = await write_code_tool(
             command=CodeCommand.WRITE_CODEBASE,
             files=invalid_files_5,
-            project_path="test_project"
         )
         assert isinstance(result_5, ToolResult)
         assert result_5.error is not None
@@ -202,7 +193,6 @@ class TestWriteCodeTool:
         result = await write_code_tool(
             command=CodeCommand.WRITE_CODEBASE,
             files=sample_files,
-            project_path="test_project"
         )
         
         assert isinstance(result, ToolResult)
@@ -225,7 +215,6 @@ class TestWriteCodeTool:
             result = await write_code_tool(
                 command=CodeCommand.WRITE_CODEBASE,
                 files=sample_files,
-                project_path="test_project"
             )
             
             assert isinstance(result, ToolResult)
@@ -235,9 +224,8 @@ class TestWriteCodeTool:
                     "successfully" in result.output.lower())
             
             # Check that files were created
-            project_path = Path(temp_dir) / "test_project"
-            assert (project_path / "main.py").exists()
-            assert (project_path / "config.py").exists()
+            assert (Path(temp_dir) / "main.py").exists()
+            assert (Path(temp_dir) / "config.py").exists()
             
             # Check display interactions
             mock_display.add_message.assert_called()
@@ -259,7 +247,6 @@ class TestWriteCodeTool:
             result = await write_code_tool(
                 command=CodeCommand.WRITE_CODEBASE,
                 files=sample_files,
-                project_path="test_project"
             )
             
             assert isinstance(result, ToolResult)
@@ -319,23 +306,13 @@ class TestWriteCodeTool:
             mock_get_constant.return_value = temp_dir
             mock_openai_class.return_value = mock_openai_client
             
-            # Test with different path formats
-            test_cases = [
-                "simple_project",
-                "nested/project/path",
-                f"{temp_dir}/repo/absolute_path"
-            ]
-            
-            for project_path in test_cases:
-                result = await write_code_tool(
-                    command=CodeCommand.WRITE_CODEBASE,
-                    files=sample_files[:1],  # Use only one file for faster testing
-                    project_path=project_path
-                )
-                
-                assert isinstance(result, ToolResult)
-                # Should succeed regardless of path format
-                assert result.error is None or "error" not in result.error.lower()
+            result = await write_code_tool(
+                command=CodeCommand.WRITE_CODEBASE,
+                files=sample_files[:1],
+            )
+
+            assert isinstance(result, ToolResult)
+            assert result.error is None or "error" not in result.error.lower()
 
     @pytest.mark.asyncio
     @patch('tools.write_code.get_constant')
@@ -345,8 +322,6 @@ class TestWriteCodeTool:
             mock_get_constant.return_value = temp_dir
             
             # Use a nested project path that doesn't exist
-            project_path = "deeply/nested/project/structure"
-            
             with patch('tools.write_code.AsyncOpenAI') as mock_openai_class:
                 mock_client = AsyncMock()
                 mock_response = MagicMock()
@@ -358,13 +333,9 @@ class TestWriteCodeTool:
                 result = await write_code_tool(
                     command=CodeCommand.WRITE_CODEBASE,
                     files=sample_files[:1],
-                    project_path=project_path
                 )
-                
-                # Check that the nested directory was created
-                expected_path = Path(temp_dir) / project_path
-                assert expected_path.exists()
-                assert expected_path.is_dir()
+
+                assert isinstance(result, ToolResult)
 
     def test_extract_code_block(self, write_code_tool: WriteCodeTool):
         """Test the extract_code_block method."""
@@ -406,7 +377,6 @@ Some additional text.
             await write_code_tool(
                 command=CodeCommand.WRITE_CODEBASE,
                 files=sample_files,
-                project_path="test_project"
             )
             
             # Verify display was called with appropriate messages

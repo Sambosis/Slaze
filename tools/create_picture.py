@@ -43,13 +43,9 @@ class PictureGenerationTool(BaseAnthropicTool):
                             "type": "string",
                             "description": "Text description of the image to generate",
                         },
-                        "project_path": {
-                            "type": "string",
-                            "description": "Path to the project directory (e.g., 'my_app'). Files will be saved relative to REPO_DIR/project_path.",
-                        },
                         "output_path": {
                             "type": "string",
-                            "description": "Path where the generated image will be saved, relative to the project_path (e.g., 'images/my_pic.png').",
+                            "description": "Path where the generated image will be saved, relative to REPO_DIR (e.g., 'images/my_pic.png').",
                         },
                         "width": {
                             "type": "integer",
@@ -60,7 +56,7 @@ class PictureGenerationTool(BaseAnthropicTool):
                             "description": "Height to resize the image (required)",
                         },
                     },
-                    "required": ["command", "prompt", "project_path", "output_path", "width", "height"],
+                    "required": ["command", "prompt", "output_path", "width", "height"],
                 },
             },
         }
@@ -68,16 +64,15 @@ class PictureGenerationTool(BaseAnthropicTool):
         return params
 
     async def generate_picture(
-        self, prompt: str, project_path: str, output_path: str, width: int, height: int
+        self, prompt: str, output_path: str, width: int, height: int
     ) -> dict:
         """
         Generates an image based on the prompt using the specified width and height,
-        and saves it to the output path relative to the project_path within REPO_DIR.
+        and saves it to the output path relative to REPO_DIR.
 
         Args:
             prompt: Text description of the image to generate
-            project_path: Path to the project directory.
-            output_path: Path where the image should be saved, relative to project_path.
+            output_path: Path where the image should be saved, relative to REPO_DIR.
             width: Width to resize the image to (required)
             height: Height to resize the image to (required)
 
@@ -97,7 +92,7 @@ class PictureGenerationTool(BaseAnthropicTool):
             if not host_repo_dir:
                 raise ValueError("REPO_DIR is not configured in config.py.")
 
-            base_save_path = Path(host_repo_dir) / project_path
+            base_save_path = Path(host_repo_dir)
             output_path_obj = (base_save_path / output_path).resolve()
 
             # Ensure the parent directory exists
@@ -221,7 +216,6 @@ class PictureGenerationTool(BaseAnthropicTool):
         *,
         command: PictureCommand,
         prompt: str,
-        project_path: str, # Added project_path
         output_path: str,  # Removed default, now required
         width: int,
         height: int,
@@ -233,8 +227,7 @@ class PictureGenerationTool(BaseAnthropicTool):
         Args:
             command: The command to execute
             prompt: The text prompt to generate the image from
-            project_path: Path to the project directory.
-            output_path: The path to save the image to, relative to project_path.
+            output_path: The path to save the image to, relative to REPO_DIR.
             width: Width to resize the image (required)
             height: Height to resize the image (required)
             **kwargs: Additional parameters
@@ -244,8 +237,7 @@ class PictureGenerationTool(BaseAnthropicTool):
         """
         try:
             if command == PictureCommand.CREATE:
-                # Pass project_path to generate_picture
-                result = await self.generate_picture(prompt, project_path, output_path, width, height)
+                result = await self.generate_picture(prompt, output_path, width, height)
 
                 if "error" in result and result["error"]:
                     return ToolResult(

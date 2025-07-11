@@ -65,10 +65,6 @@ class ProjectSetupTool(BaseAnthropicTool):
                             "enum": [cmd.value for cmd in ProjectCommand],
                             "description": "Command to execute",
                         },
-                        "project_path": {
-                            "type": "string",
-                            "description": "Path to the project directory",
-                        },
                         "environment": {
                             "type": "string",
                             "enum": ["python"],
@@ -86,7 +82,7 @@ class ProjectSetupTool(BaseAnthropicTool):
                             "default": "app.py",
                         },
                     },
-                    "required": ["command", "project_path"],
+                    "required": ["command"],
                 },
             },
         }
@@ -121,16 +117,14 @@ class ProjectSetupTool(BaseAnthropicTool):
         else:  # POSIX (Linux, macOS)
             return venv_dir_path / "bin" / executable_name
 
-    async def setup_project(self, project_path: Path, packages: List[str]) -> ToolResult:
+    async def setup_project(self, packages: List[str]) -> ToolResult:
         """Set up a local Python project."""
         host_repo_dir = get_constant("REPO_DIR")
+        if not host_repo_dir:
+            return ToolResult(error="REPO_DIR is not configured", tool_name=self.name)
 
-        host_repo_path = Path(host_repo_dir)
+        project_path = Path(host_repo_dir)
         installed_packages = []
-        project_path_obj = Path(project_path)
-
-        relative_subpath = project_path_obj
-        project_path = (host_repo_path / relative_subpath).resolve()
 
         project_path.mkdir(parents=True, exist_ok=True)
         venv_dir = project_path / ".venv"
@@ -253,8 +247,12 @@ class ProjectSetupTool(BaseAnthropicTool):
                 tool_name=self.name
             )
 
-    async def add_dependencies(self, project_path: Path, packages: List[str]) -> ToolResult:
+    async def add_dependencies(self, packages: List[str]) -> ToolResult:
         installed_packages = []
+        repo_dir = get_constant("REPO_DIR")
+        if not repo_dir:
+            return ToolResult(error="REPO_DIR is not configured", tool_name=self.name)
+        project_path = Path(repo_dir)
 
         try:
             for i, package_item in enumerate(packages, 1):
@@ -335,13 +333,15 @@ class ProjectSetupTool(BaseAnthropicTool):
                 tool_name=self.name
             )
 
-    async def run_app(self, project_path: Path, filename: str) -> ToolResult:
+    async def run_app(self, filename: str) -> ToolResult:
         """Runs a Python application locally."""
         try:
+            host_repo_dir = get_constant("REPO_DIR")
+            if not host_repo_dir:
+                return ToolResult(error="REPO_DIR is not configured", tool_name=self.name)
+            project_path = Path(host_repo_dir)
             print(f"Running app at {project_path} with filename {filename}")
             file_path = project_path / filename
-            # get the REPO_DIR constant
-            host_repo_dir = get_constant("REPO_DIR")
             cmd = ["uv", "run", str(file_path)]
             print(f"Running command: {' '.join(cmd)} in {host_repo_dir}")
             try:
@@ -378,10 +378,14 @@ class ProjectSetupTool(BaseAnthropicTool):
             )
 
     async def run_project(
-        self, project_path: Path, entry_filename: str = "app.py"
+        self, entry_filename: str = "app.py"
         ) -> ToolResult:
         """Runs a Python project locally."""
         try:
+            repo_dir = get_constant("REPO_DIR")
+            if not repo_dir:
+                return ToolResult(error="REPO_DIR is not configured", tool_name=self.name)
+            project_path = Path(repo_dir)
             print(f"Running project at {project_path} with entry file {entry_filename}")
             entry_file = project_path / entry_filename
             if not entry_file.exists():
@@ -431,7 +435,6 @@ class ProjectSetupTool(BaseAnthropicTool):
         self,
         *,
         command: ProjectCommand,
-        project_path: str,
         environment: str = "python",
         packages: List[str] | None = None,
         entry_filename: str = "app.py",
@@ -455,27 +458,29 @@ class ProjectSetupTool(BaseAnthropicTool):
 
             if self.display is not None:
                 self.display.add_message(
-                    "user", f"ProjectSetupTool Command: {command_value}\nProject Path: {project_path}, Environment: {environment}, Packages: {packages}, Entry Filename: {entry_filename}"
+                    "user",
+                    f"ProjectSetupTool Command: {command_value} Environment: {environment}, Packages: {packages}, Entry Filename: {entry_filename}",
                 )
 
             # Set default packages if not provided
             if packages is None:
                 packages = []
 
-            # Convert string path to Path object
-            project_path_obj = Path(project_path)
-
+            # Use repository directory as project path
+            repo_dir = get_constant("REPO_DIR")
+            if not repo_dir:
+                return ToolResult(error="REPO_DIR is not configured", tool_name=self.name)
             if command == ProjectCommand.SETUP_PROJECT:
-                result = await self.setup_project(project_path_obj, packages)
+                result = await self.setup_project(packages)
 
             elif command == ProjectCommand.ADD_DEPENDENCIES:
-                result = await self.add_dependencies(project_path_obj, packages)
+                result = await self.add_dependencies(packages)
 
             elif command == ProjectCommand.RUN_APP:
-                result = await self.run_app(project_path_obj, entry_filename)
+                result = await self.run_app(entry_filename)
 
             elif command == ProjectCommand.RUN_PROJECT:
-                result = await self.run_project(project_path_obj, entry_filename)
+                result = await self.run_project(entry_filename)
 
             else:
                 return ToolResult(error=f"Unknown command: {command_value}", tool_name=self.name)

@@ -3,6 +3,7 @@ import subprocess
 import re
 from dotenv import load_dotenv
 from regex import T
+from pathlib import Path
 from config import get_constant # check_docker_available removed
 from .base import BaseTool, ToolError, ToolResult
 from utils.web_ui import WebUI
@@ -34,12 +35,14 @@ class BashTool(BaseTool):
 
     async def __call__(self, command: str | None = None, **kwargs):
         if command is not None:
-
+            if self.display is not None:
+                try:
+                    self.display.add_message("user", f"Executing command: {command}")
+                except Exception as e:
+                    return ToolResult(error=str(e), tool_name=self.name, command=command)
 
             # Convert command using LLM for current system
             modified_command = await self._convert_command_for_system(command)
-            if self.display is not None:
-                self.display.add_message("assistant", f"Modified command: {modified_command}")
             return await self._run_command(modified_command)
         raise ToolError("no command provided.")
 
@@ -50,7 +53,11 @@ class BashTool(BaseTool):
         """
         try:
             # Try LLM-based conversion first
-            return await convert_command_for_system(command)
+            converted = await convert_command_for_system(command)
+            # If no conversion happened, attempt legacy modification
+            if converted == command:
+                return self._legacy_modify_command(command)
+            return converted
         except Exception as e:
             logger.warning(f"LLM command conversion failed, using fallback: {e}")
             # Fallback to legacy regex-based modification
@@ -121,12 +128,10 @@ class BashTool(BaseTool):
         success = False
         cwd = None
         try:
-            # Execute the command locally relative to PROJECT_DIR if set
-            project_dir = get_constant("PROJECT_DIR")
-            cwd = str(project_dir) if project_dir else None
+            # Execute the command locally relative to REPO_DIR if set
+            repo_dir = get_constant("REPO_DIR")
+            cwd = str(repo_dir) if repo_dir and Path(repo_dir).exists() else None
             terminal_display = f"terminal {cwd}>  {command}"
-            if self.display is not None:
-                self.display.add_message("assistant", terminal_display)
             result = subprocess.run(
                 command,
                 shell=True,
@@ -141,8 +146,6 @@ class BashTool(BaseTool):
             error = result.stderr
             success = result.returncode == 0
             terminal_display = f"{output}\n{error}"
-            if self.display is not None:
-                self.display.add_message("assistant", terminal_display)
             if len(output) > 200000:
                 output = f"{output[:100000]} ... [TRUNCATED] ... {output[-100000:]}"
             if len(error) > 200000:
@@ -166,12 +169,26 @@ class BashTool(BaseTool):
         except Exception as e:
             error = str(e)
             rr(error)
-            if self.display is not None:
-                try:
-                    self.display.add_message("assistant", f"Error: {error}")
-                except Exception as display_error:
-                    logger.error(f"Error displaying message: {display_error}", exc_info=True)
-            return ToolResult(error=error, tool_name=self.name, command=command)
+            output = ""
+            stderr = ""
+            if isinstance(e, subprocess.TimeoutExpired):
+                output = e.output or ""
+                stderr = e.stderr or ""
+
+
+            formatted_output = (
+                f"command: {command}\n"
+                f"working_directory: {cwd}\n"
+                f"success: false\n"
+                f"output: {output}\n"
+                f"error: {stderr or error}"
+            )
+            return ToolResult(
+                output=formatted_output,
+                error=error,
+                tool_name=self.name,
+                command=command,
+            )
 
     def to_params(self) -> dict:
         logger.debug(f"BashTool.to_params called with api_type: {self.api_type}")
