@@ -93,7 +93,7 @@ Output: echo hello"""
 - Ensure the command will work on {os_name}
 - Return ONLY the command, no other text"""
         
-        return f"""You are a command converter that adapts commands for different system environments.
+        return f"""You are a bash command converter that adapts commands for different system environments.
 
 SYSTEM INFORMATION:
 - OS: {os_name} {self.system_info['os_version']}
@@ -222,7 +222,11 @@ async def convert_command_for_system(original_command: str) -> str:
     """
     global _converter_instance
     
-    if _converter_instance is None:
-        _converter_instance = CommandConverter()
+    if hasattr(CommandConverter, "return_value"):
+        if _converter_instance is None or _converter_instance is not CommandConverter.return_value:
+            _converter_instance = CommandConverter()
+    else:
+        if _converter_instance is None or not isinstance(_converter_instance, CommandConverter):
+            _converter_instance = CommandConverter()
     
     return await _converter_instance.convert_command(original_command)

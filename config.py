@@ -6,9 +6,6 @@ import logging.handlers
 import sys
 import platform
 
-global PROJECT_DIR
-PROJECT_DIR = None
-
 # Load environment variables from .env file
 load_dotenv()
 
@@ -29,10 +26,10 @@ OS_NAME = platform.system()
 TOP_LEVEL_DIR = Path.cwd()
 WORKER_DIR = TOP_LEVEL_DIR # For worker processes, from load_constants.py
 
-# Define the repository directory based on PROJECT_DIR
+# Define the repository directory
 REPO_DIR = TOP_LEVEL_DIR / "repo"
 
-# Define other relevant paths based on PROJECT_DIR
+# Define other relevant paths
 SYSTEM_PROMPT_DIR = TOP_LEVEL_DIR / "system_prompt"
 SYSTEM_PROMPT_FILE = SYSTEM_PROMPT_DIR / "system_prompt.md"
 BASH_PROMPT_DIR = TOP_LEVEL_DIR / "tools"
@@ -163,7 +160,6 @@ def write_constants_to_file():
         "PROMPT_CACHING_BETA_FLAG": PROMPT_CACHING_BETA_FLAG,
         "MAX_SUMMARY_MESSAGES": MAX_SUMMARY_MESSAGES,
         "MAX_SUMMARY_TOKENS": MAX_SUMMARY_TOKENS,
-        "PROJECT_DIR": str(PROJECT_DIR) if PROJECT_DIR else "",
         "PROMPT_NAME": PROMPT_NAME if PROMPT_NAME else "",
         "TASK": "NOT YET CREATED", # Default task, can be updated by set_constant
     }
@@ -222,7 +218,7 @@ def set_constant(name: str, value: Any):
     # So, if we want set_constant to be robust for *any* key, we might need to update globals first,
     # or make write_constants_to_file accept a dictionary.
 
-    # Update the global variable if it exists (e.g. PROJECT_DIR, MAIN_MODEL etc.)
+    # Update the global variable if it exists (e.g. MAIN_MODEL etc.)
     # This makes the change immediately available to the current session.
     if name in globals():
         globals()[name] = value
@@ -231,11 +227,6 @@ def set_constant(name: str, value: Any):
         json.dump(constants, f, indent=4)
     logging.info(f"Constant '{name}' set to '{value}' and persisted.")
     return True
-
-
-# Function to get the project directory
-def get_project_dir():
-    return PROJECT_DIR
 
 
 def write_to_file(s: str, file_path: Path): # Modified to take Path object
