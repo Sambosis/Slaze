@@ -24,3 +24,6 @@ venv/
 stls/3d_lspo/
 *.safetensors
 *.pt*
+# Ignore test files
+tests/
+**/*test.py

@@ -2,14 +2,12 @@ from typing import ClassVar, Literal, Union
 import subprocess
 import re
 from dotenv import load_dotenv
-from regex import T
 from config import get_constant # check_docker_available removed
 from .base import BaseTool, ToolError, ToolResult
 from utils.web_ui import WebUI
 from utils.agent_display_console import AgentDisplayConsole
 from utils.command_converter import convert_command_for_system
 import logging
-import os
 from rich import print as rr
 
 load_dotenv()

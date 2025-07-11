@@ -1,8 +1,7 @@
 import logging
 import os
 import aiohttp
-import json
-from typing import Dict, List, Any, Optional
+from typing import Dict, List
 from abc import ABC, abstractmethod
 
 logger = logging.getLogger(__name__)
