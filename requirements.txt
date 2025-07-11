@@ -55,6 +55,7 @@ multidict==6.6.3
 networkx==3.4.2
 numpy==2.2.3
 openai==1.63.2
+open-interpreter==0.4.3 # Updated open-interpreter version
 packaging==24.2
 pandas==2.2.3
 pillow==11.1.0

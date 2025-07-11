@@ -10,7 +10,7 @@ from openai import OpenAI
 from rich import print as rr
 
 from tools import (
-    BashTool,
+    InterpreterTool,  # Changed from BashTool
     ProjectSetupTool,
     WriteCodeTool,
     PictureGenerationTool,
@@ -183,7 +183,7 @@ class Agent:
         self.tool_collection = ToolCollection(
             WriteCodeTool(display=self.display),
             ProjectSetupTool(display=self.display),
-            BashTool(display=self.display),
+            InterpreterTool(display=self.display),  # Changed from BashTool
             PictureGenerationTool(display=self.display),
             EditTool(display=self.display),  # Uncommented and enabled for testing
             display=self.display,
