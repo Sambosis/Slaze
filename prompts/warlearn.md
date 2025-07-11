@@ -6,4 +6,28 @@ Create a reinforcement learning model for a Strategy Based War Game where 2 agen
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 the wargame play out so a user/developer can watch it learn and play. You no not need to create the option for the human to control the game besides if you need to add an exit or save functionality. Please do not have it create or play any sound. It should be capable of running on a cpu ( which is how you will need to test it ) or with a gpu.  Use a novel approach to the learning process. 

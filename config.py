@@ -60,9 +60,9 @@ googlepro = "google/gemini-2.5-pro-preview"
 googleflash = "google/gemini-2.5-flash-preview"
 googleflashlite = "google/gemini-2.5-flash-lite-preview-06-17"
 grok4 = "x-ai/grok-4"
-SUMMARY_MODEL = openai41  # Model for summaries
-MAIN_MODEL = grok4  # Primary model for main agent operations
-CODE_MODEL = grok4  # Model for code generation tasks
+SUMMARY_MODEL = openaio3  # Model for summaries
+MAIN_MODEL = openai41  # Primary model for main agent operations
+CODE_MODEL = openaio3  # Model for code generation tasks
 
 # Feature flag constants
 COMPUTER_USE_BETA_FLAG = "computer-use-2024-10-22"
@@ -228,8 +228,6 @@ def set_constant(name: str, value: Any):
         json.dump(constants, f, indent=4)
     logging.info(f"Constant '{name}' set to '{value}' and persisted.")
     return True
-
-
 
 
 def write_to_file(s: str, file_path: Path): # Modified to take Path object
