@@ -4,6 +4,7 @@
 import sys
 import os
 import asyncio
+import pytest
 from tools.bash import BashTool
 
 def test_unicode_output():
@@ -23,6 +24,7 @@ def test_unicode_output():
     
     return True
 
+@pytest.mark.asyncio
 async def test_bash_tool_unicode():
     """Test BashTool with Unicode output."""
     print("\n=== BashTool Unicode Test ===")
