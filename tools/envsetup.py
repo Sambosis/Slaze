@@ -65,9 +65,9 @@ class ProjectSetupTool(BaseAnthropicTool):
                             "enum": [cmd.value for cmd in ProjectCommand],
                             "description": "Command to execute",
                         },
-                        "project_path": {
+                        "repo_path": {
                             "type": "string",
-                            "description": "Path to the project directory",
+                            "description": "Path relative to REPO_DIR where the project will be created",
                         },
                         "environment": {
                             "type": "string",
@@ -86,7 +86,7 @@ class ProjectSetupTool(BaseAnthropicTool):
                             "default": "app.py",
                         },
                     },
-                    "required": ["command", "project_path"],
+                    "required": ["command", "repo_path"],
                 },
             },
         }
@@ -121,33 +121,33 @@ class ProjectSetupTool(BaseAnthropicTool):
         else:  # POSIX (Linux, macOS)
             return venv_dir_path / "bin" / executable_name
 
-    async def setup_project(self, project_path: Path, packages: List[str]) -> ToolResult:
+    async def setup_project(self, repo_path: Path, packages: List[str]) -> ToolResult:
         """Set up a local Python project."""
         host_repo_dir = get_constant("REPO_DIR")
 
         host_repo_path = Path(host_repo_dir)
         installed_packages = []
-        project_path_obj = Path(project_path)
+        repo_path_obj = Path(repo_path)
 
-        relative_subpath = project_path_obj
-        project_path = (host_repo_path / relative_subpath).resolve()
+        relative_subpath = repo_path_obj
+        repo_path = (host_repo_path / relative_subpath).resolve()
 
-        project_path.mkdir(parents=True, exist_ok=True)
-        venv_dir = project_path / ".venv"
+        repo_path.mkdir(parents=True, exist_ok=True)
+        venv_dir = repo_path / ".venv"
 
         try:
             if self.display is not None:
-                self.display.add_message("user", f"Creating virtual environment in {project_path}")
+                self.display.add_message("user", f"Creating virtual environment in {repo_path}")
 
             if not venv_dir.exists():
                 try:
-                    subprocess.run(["uv", "venv", str(venv_dir)], check=True, cwd=project_path, capture_output=True)
+                    subprocess.run(["uv", "venv", str(venv_dir)], check=True, cwd=repo_path, capture_output=True)
                 except subprocess.CalledProcessError as e:
                     error_result = {
                         "command": "setup_project",
                         "status": "error",
                         "error": f"Failed to create virtual environment: {e.stderr if e.stderr else str(e)}",
-                        "project_path": str(project_path),
+                        "repo_path": str(repo_path),
                     }
                     return ToolResult(
                         error=f"Failed to create virtual environment: {e.stderr if e.stderr else str(e)}",
@@ -158,14 +158,14 @@ class ProjectSetupTool(BaseAnthropicTool):
 
             # Run 'uv init' directly in the project directory; no venv activation is performed here
             try:
-                subprocess.run(args=["uv", "init"], cwd=project_path, check=True)
-                logger.info(f"Project initialized at {project_path}")
+                subprocess.run(args=["uv", "init"], cwd=repo_path, check=True)
+                logger.info(f"Project initialized at {repo_path}")
             except subprocess.CalledProcessError as e:
                 error_result = {
                     "command": "setup_project", 
                     "status": "error",
                     "error": f"Failed to initialize project: {e.stderr if e.stderr else str(e)}",
-                    "project_path": str(project_path),
+                    "repo_path": str(repo_path),
                 }
                 return ToolResult(
                     error=f"Failed to initialize project: {e.stderr if e.stderr else str(e)}",
@@ -206,7 +206,7 @@ class ProjectSetupTool(BaseAnthropicTool):
                             continue
                         logger.info(f"Attempting to install package: {clean_pkg} using uv")
                         try:
-                            result = subprocess.run(["uv", "add", clean_pkg], capture_output=True, text=True, cwd=project_path, check=True)
+                            result = subprocess.run(["uv", "add", clean_pkg], capture_output=True, text=True, cwd=repo_path, check=True)
                             installed_packages.append(clean_pkg)
                             logger.info(f"Successfully installed {clean_pkg}")
                         except subprocess.CalledProcessError as e:
@@ -215,7 +215,7 @@ class ProjectSetupTool(BaseAnthropicTool):
                                 "command": "setup_project",
                                 "status": "error",
                                 "error": f"uv add {clean_pkg} failed: {e.stderr if e.stderr else str(e)}",
-                                "project_path": str(project_path),
+                                "repo_path": str(repo_path),
                             }
                             return ToolResult(
                                 error=f"uv add {clean_pkg} failed: {e.stderr if e.stderr else str(e)}",
@@ -223,13 +223,14 @@ class ProjectSetupTool(BaseAnthropicTool):
                                 command="setup_project",
                                 tool_name=self.name
                             )
-                if self.display is not None:
-                    self.display.add_message("user", f"Project setup complete in {project_path}")
-            rr(result)
+
+            if self.display is not None:
+                self.display.add_message("user", f"Project setup complete in {repo_path}")
+
             success_result = {
                 "command": "setup_project",
                 "status": "success",
-                "project_path": str(project_path),
+                "repo_path": str(repo_path),
                 "packages_installed": installed_packages,
             }
             return ToolResult(
@@ -238,13 +239,14 @@ class ProjectSetupTool(BaseAnthropicTool):
                 command="setup_project",
                 tool_name=self.name
             )
+
         except Exception as e:
             error_message = str(e)
             error_result = {
                 "command": "setup_project",
                 "status": "error",
                 "error": f"Failed to set up project: {error_message}",
-                "project_path": str(project_path),
+                "repo_path": str(repo_path),
             }
             return ToolResult(
                 error=f"Failed to set up project: {error_message}",
@@ -253,7 +255,7 @@ class ProjectSetupTool(BaseAnthropicTool):
                 tool_name=self.name
             )
 
-    async def add_dependencies(self, project_path: Path, packages: List[str]) -> ToolResult:
+    async def add_dependencies(self, repo_path: Path, packages: List[str]) -> ToolResult:
         installed_packages = []
 
         try:
@@ -284,7 +286,7 @@ class ProjectSetupTool(BaseAnthropicTool):
                         "uv",
                         "add",
                         package,
-                    ], capture_output=True, text=True, cwd=project_path)
+                    ], capture_output=True, text=True, cwd=repo_path)
                     if result.returncode == 0:
                         installed_packages.append(package)
                         if self.display is not None:
@@ -294,7 +296,7 @@ class ProjectSetupTool(BaseAnthropicTool):
                             "command": "add_additional_depends",
                             "status": "error",
                             "error": result.stderr,
-                            "project_path": str(project_path),
+                            "repo_path": str(repo_path),
                             "packages_installed": installed_packages,
                             "packages_failed": packages[i - 1 :],
                             "failed_at": package,
@@ -309,7 +311,7 @@ class ProjectSetupTool(BaseAnthropicTool):
             success_result = {
                 "command": "add_additional_depends",
                 "status": "success",
-                "project_path": str(project_path),
+                "repo_path": str(repo_path),
                 "packages_installed": installed_packages,
             }
             return ToolResult(
@@ -324,7 +326,7 @@ class ProjectSetupTool(BaseAnthropicTool):
                 "command": "add_additional_depends",
                 "status": "error",
                 "error": str(e),
-                "project_path": str(project_path),
+                "repo_path": str(repo_path),
                 "packages_attempted": packages,
                 "packages_installed": installed_packages,
             }
@@ -335,11 +337,11 @@ class ProjectSetupTool(BaseAnthropicTool):
                 tool_name=self.name
             )
 
-    async def run_app(self, project_path: Path, filename: str) -> ToolResult:
+    async def run_app(self, repo_path: Path, filename: str) -> ToolResult:
         """Runs a Python application locally."""
         try:
-            print(f"Running app at {project_path} with filename {filename}")
-            file_path = project_path / filename
+            print(f"Running app at {repo_path} with filename {filename}")
+            file_path = repo_path / filename
             # get the REPO_DIR constant
             host_repo_dir = get_constant("REPO_DIR")
             cmd = ["uv", "run", str(file_path)]
@@ -355,7 +357,7 @@ class ProjectSetupTool(BaseAnthropicTool):
                 return ToolResult(
                     output=result.stdout,
                     error=result.stderr if result.stderr else None,
-                    message=f"App executed successfully at {project_path}",
+                    message=f"App executed successfully at {repo_path}",
                     command="run_app",
                     tool_name=self.name
                 )
@@ -365,29 +367,29 @@ class ProjectSetupTool(BaseAnthropicTool):
                 return ToolResult(
                     output=e.stdout,
                     error=e.stderr,
-                    message=f"App execution failed at {project_path}",
+                    message=f"App execution failed at {repo_path}",
                     command="run_app",
                     tool_name=self.name
                 )
         except Exception as e:
             return ToolResult(
                 error=str(e),
-                message=f"Unexpected error running app at {project_path}",
+                message=f"Unexpected error running app at {repo_path}",
                 command="run_app",
                 tool_name=self.name
             )
 
     async def run_project(
-        self, project_path: Path, entry_filename: str = "app.py"
+        self, repo_path: Path, entry_filename: str = "app.py"
         ) -> ToolResult:
         """Runs a Python project locally."""
         try:
-            print(f"Running project at {project_path} with entry file {entry_filename}")
-            entry_file = project_path / entry_filename
+            print(f"Running project at {repo_path} with entry file {entry_filename}")
+            entry_file = repo_path / entry_filename
             if not entry_file.exists():
                 return ToolResult(
                     error=f"Entry file {entry_filename} does not exist",
-                    message=f"Entry file {entry_filename} not found in {project_path}",
+                    message=f"Entry file {entry_filename} not found in {repo_path}",
                     command="run_project",
                     tool_name=self.name
                 )
@@ -402,7 +404,7 @@ class ProjectSetupTool(BaseAnthropicTool):
                 return ToolResult(
                     output=result.stdout,
                     error=result.stderr if result.stderr else None,
-                    message=f"Project executed successfully at {project_path}",
+                    message=f"Project executed successfully at {repo_path}",
                     command="run_project",
                     tool_name=self.name
                 )
@@ -410,7 +412,7 @@ class ProjectSetupTool(BaseAnthropicTool):
                 return ToolResult(
                     output=e.stdout,
                     error=e.stderr,
-                    message=f"Project execution failed at {project_path}",
+                    message=f"Project execution failed at {repo_path}",
                     command="run_project",
                     tool_name=self.name
                 )
@@ -422,7 +424,7 @@ class ProjectSetupTool(BaseAnthropicTool):
                 )
             return ToolResult(
                 error=f"Failed to execute run_project: {str(e)}",
-                message=f"Unexpected error running project at {project_path}",
+                message=f"Unexpected error running project at {repo_path}",
                 command="run_project",
                 tool_name=self.name
             )
@@ -431,7 +433,7 @@ class ProjectSetupTool(BaseAnthropicTool):
         self,
         *,
         command: ProjectCommand,
-        project_path: str,
+        repo_path: str,
         environment: str = "python",
         packages: List[str] | None = None,
         entry_filename: str = "app.py",
@@ -455,7 +457,7 @@ class ProjectSetupTool(BaseAnthropicTool):
 
             if self.display is not None:
                 self.display.add_message(
-                    "user", f"ProjectSetupTool Command: {command_value}\nProject Path: {project_path}, Environment: {environment}, Packages: {packages}, Entry Filename: {entry_filename}"
+                    "user", f"ProjectSetupTool Command: {command_value}\nRepo Path: {repo_path}, Environment: {environment}, Packages: {packages}, Entry Filename: {entry_filename}"
                 )
 
             # Set default packages if not provided
@@ -463,19 +465,19 @@ class ProjectSetupTool(BaseAnthropicTool):
                 packages = []
 
             # Convert string path to Path object
-            project_path_obj = Path(project_path)
+            repo_path_obj = Path(repo_path)
 
             if command == ProjectCommand.SETUP_PROJECT:
-                result = await self.setup_project(project_path_obj, packages)
+                result = await self.setup_project(repo_path_obj, packages)
 
             elif command == ProjectCommand.ADD_DEPENDENCIES:
-                result = await self.add_dependencies(project_path_obj, packages)
+                result = await self.add_dependencies(repo_path_obj, packages)
 
             elif command == ProjectCommand.RUN_APP:
-                result = await self.run_app(project_path_obj, entry_filename)
+                result = await self.run_app(repo_path_obj, entry_filename)
 
             elif command == ProjectCommand.RUN_PROJECT:
-                result = await self.run_project(project_path_obj, entry_filename)
+                result = await self.run_project(repo_path_obj, entry_filename)
 
             else:
                 return ToolResult(error=f"Unknown command: {command_value}", tool_name=self.name)

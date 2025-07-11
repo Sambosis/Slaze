@@ -173,12 +173,12 @@ class WriteCodeTool(BaseAnthropicTool):
                             },
                             "description": "List of files to generate, each with a filename, description, and optional specific imports.",
                         },
-                        "project_path": {
+                        "repo_path": {
                             "type": "string",
-                            "description": "Path to the project directory (can be Docker-style or just project name). The actual write path will be resolved relative to the configured REPO_DIR on the host.",
+                            "description": "Path relative to REPO_DIR where files will be created (e.g., 'my_app' or 'subfolder/my_app').",
                         },
                     },
-                    "required": ["command", "files", "project_path"],
+                    "required": ["command", "files", "repo_path"],
                 },
             },
         }
@@ -286,7 +286,7 @@ class WriteCodeTool(BaseAnthropicTool):
         *,
         command: CodeCommand,
         files: List[Dict[str, Any]],
-        project_path: str,  # This might be a docker-style path or just a project name
+        repo_path: str,  # Path relative to REPO_DIR
         **kwargs,
         ) -> ToolResult:
         """
@@ -295,7 +295,7 @@ class WriteCodeTool(BaseAnthropicTool):
         Args:
             command: The command to execute (should always be WRITE_CODEBASE).
             files: List of file details (filename, code_description, optional external_imports, optional internal_imports).
-            project_path: Path/name identifier for the project.
+            repo_path: Path relative to REPO_DIR where files will be created.
             **kwargs: Additional parameters (ignored).
 
         Returns:
@@ -308,7 +308,7 @@ class WriteCodeTool(BaseAnthropicTool):
                 command=command,
             )
 
-        host_project_path_obj = None  # Initialize to None
+        host_repo_path_obj = None  # Initialize to None
 
         try:
             # --- START: Path Correction Logic ---
@@ -326,30 +326,30 @@ class WriteCodeTool(BaseAnthropicTool):
                 # Decide if you want to raise an error or attempt to create it
                 # For now, let's proceed and let mkdir handle creation/errors later
 
-            # project_path may include additional subdirectories. Preserve any
+            # repo_path may include additional subdirectories. Preserve any
             # path components inside the repository directory so generated files
             # end up in e.g. repo/<prompt>/<app_name>/ rather than being
             # flattened.
-            project_path_obj = Path(project_path)
-            if project_path_obj.is_absolute():
+            repo_path_obj = Path(repo_path)
+            if repo_path_obj.is_absolute():
                 # If the absolute path contains the repo directory, strip that
                 # portion so we keep the relative path under repo.
-                if "repo" in project_path_obj.parts:
-                    repo_index = project_path_obj.parts.index("repo")
-                    relative_subpath = Path(*project_path_obj.parts[repo_index + 1 :])
+                if "repo" in repo_path_obj.parts:
+                    repo_index = repo_path_obj.parts.index("repo")
+                    relative_subpath = Path(*repo_path_obj.parts[repo_index + 1 :])
                 else:
                     # Fallback to just using the last component
-                    relative_subpath = Path(project_path_obj.name)
+                    relative_subpath = Path(repo_path_obj.name)
             else:
-                relative_subpath = project_path_obj
+                relative_subpath = repo_path_obj
 
             # Construct the ACTUAL host path where files should be written
-            host_project_path_obj = (host_repo_path / relative_subpath).resolve()
-            logger.info(f"Resolved HOST project path for writing: {host_project_path_obj}")
+            host_repo_path_obj = (host_repo_path / relative_subpath).resolve()
+            logger.info(f"Resolved HOST repo path for writing: {host_repo_path_obj}")
 
             # Ensure the HOST directory exists
-            host_project_path_obj.mkdir(parents=True, exist_ok=True)
-            logger.info(f"Ensured host project directory exists: {host_project_path_obj}")
+            host_repo_path_obj.mkdir(parents=True, exist_ok=True)
+            logger.info(f"Ensured host repo directory exists: {host_repo_path_obj}")
             # --- END: Path Correction Logic ---
 
             # Validate files input
@@ -381,7 +381,7 @@ class WriteCodeTool(BaseAnthropicTool):
             skeleton_tasks = [
                 self._call_llm_for_code_skeleton(
                     file,  # Pass the FileDetail object for the current file
-                    host_project_path_obj
+                    host_repo_path_obj
                     / file.filename,  # Pass the intended final host path
                     file_details,  # Pass the list of ALL FileDetail objects
                 )
@@ -414,7 +414,7 @@ class WriteCodeTool(BaseAnthropicTool):
                     file.external_imports or [],
                     file.internal_imports or [],
                     # Pass the intended final host path to the code generator for context
-                    host_project_path_obj / file.filename,
+                    host_repo_path_obj / file.filename,
                 )
                 for file in file_details
             ]
@@ -427,7 +427,7 @@ class WriteCodeTool(BaseAnthropicTool):
             success_count = 0
 
             logger.info(
-                f"Starting file writing phase for {len(code_results)} results to HOST path: {host_project_path_obj}"
+                f"Starting file writing phase for {len(code_results)} results to HOST path: {host_repo_path_obj}"
             )
 
             for i, result in enumerate(code_results):
@@ -435,7 +435,7 @@ class WriteCodeTool(BaseAnthropicTool):
                 filename = file_detail.filename  # Relative filename
                 # >>> USE THE CORRECTED HOST PATH FOR WRITING <<<
                 absolute_path = (
-                    host_project_path_obj / filename
+                    host_repo_path_obj / filename
                 ).resolve()  # Ensure absolute path
                 logger.info(f"Processing result for: {filename} (Host Path: {absolute_path})")
 
@@ -602,7 +602,7 @@ class WriteCodeTool(BaseAnthropicTool):
                 final_status = "partial_success" if success_count > 0 else "error"
 
             # Use the resolved host path in the final message
-            output_message = f"Codebase generation finished. Status: {final_status}. {success_count}/{len(file_details)} files written successfully to HOST path '{host_project_path_obj}'."
+            output_message = f"Codebase generation finished. Status: {final_status}. {success_count}/{len(file_details)} files written successfully to HOST path '{host_repo_path_obj}'."
             if errors_skeleton:
                 output_message += f"\nSkeleton Errors: {len(errors_skeleton)}"
             if errors_code_gen:
@@ -615,8 +615,8 @@ class WriteCodeTool(BaseAnthropicTool):
                 "message": output_message,
                 "files_processed": len(file_details),
                 "files_successful": success_count,
-                "project_path": str(
-                    host_project_path_obj
+                "repo_path": str(
+                    host_repo_path_obj
                 ),  # Report the actual host path used
                 "results": write_results,
                 "errors": errors_skeleton + errors_code_gen + errors_write,
@@ -635,9 +635,9 @@ class WriteCodeTool(BaseAnthropicTool):
         except Exception as e:
             error_message = f"Critical Error in WriteCodeTool __call__: {str(e)}"
             logger.critical("Critical error during codebase generation", exc_info=True)
-            # Optionally include host_project_path_obj if it was set
-            if host_project_path_obj:
-                error_message += f"\nAttempted Host Path: {host_project_path_obj}"
+            # Optionally include host_repo_path_obj if it was set
+            if host_repo_path_obj:
+                error_message += f"\nAttempted Host Path: {host_repo_path_obj}"
             # print(error_message) # Replaced by logger
             return ToolResult(error=error_message, tool_name=self.name, command=command)
 
@@ -687,7 +687,7 @@ class WriteCodeTool(BaseAnthropicTool):
 
         elif command == "write_code_multiple_files":
             if data.get("status") in ["success", "partial_success"]:
-                return f"Wrote {data.get('files_processed', 0)} files to {data.get('project_path', 'unknown path')}\n{data.get('files_results', '')}"
+                return f"Wrote {data.get('files_processed', 0)} files to {data.get('repo_path', 'unknown path')}\n{data.get('files_results', '')}"
             else:
                 return f"Failed to write files: {data.get('errors', 'Unknown error')}"
 
