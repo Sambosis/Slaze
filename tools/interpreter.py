@@ -1,5 +1,5 @@
 from typing import ClassVar, Literal, Union
-from interpreter import Interpreter
+from interpreter import interpreter
 from .base import BaseTool, ToolResult
 from utils.web_ui import WebUI
 from utils.agent_display_console import AgentDisplayConsole
@@ -15,7 +15,7 @@ class InterpreterTool(BaseTool):
     def __init__(self, display: Union[WebUI, AgentDisplayConsole] = None):
         self.display = display
         # Initialize open-interpreter
-        self.interpreter = Interpreter()
+        self.interpreter = interpreter
         # Configure settings for open-interpreter
         self.interpreter.auto_run = True  # Automatically run code
         self.interpreter.llm.model = "gpt-4-turbo" # Example model, can be configured
