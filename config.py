@@ -25,7 +25,7 @@ OS_NAME = platform.system()
 
 # Define the top-level directory
 TOP_LEVEL_DIR = Path.cwd()
-WORKER_DIR = TOP_LEVEL_DIR # For worker processes, from load_constants.py
+WORKER_DIR = TOP_LEVEL_DIR  # For worker processes, from load_constants.py
 
 # Define the repository directory
 REPO_DIR = TOP_LEVEL_DIR / "repo"
@@ -43,10 +43,12 @@ LOGS_DIR = TOP_LEVEL_DIR / "logs"
 PROMPTS_DIR = TOP_LEVEL_DIR / "prompts"
 
 LOGS_DIR.mkdir(parents=True, exist_ok=True)
-LOG_FILE = LOGS_DIR / "file_creation_log.json" # For file operations audit
-MESSAGES_FILE = LOGS_DIR / "messages.md" # For conversation history
-SUMMARY_FILE = LOGS_DIR / "summaries/summary.md" # For storing summaries, from load_constants.py
-CODE_FILE = LOGS_DIR / "code_messages.py" # For WriteCodeTool code logging
+LOG_FILE = LOGS_DIR / "file_creation_log.json"  # For file operations audit
+MESSAGES_FILE = LOGS_DIR / "messages.md"  # For conversation history
+SUMMARY_FILE = (
+    LOGS_DIR / "summaries/summary.md"
+)  # For storing summaries, from load_constants.py
+CODE_FILE = LOGS_DIR / "code_messages.py"  # For WriteCodeTool code logging
 USER_LOG_FILE = LOGS_DIR / "user_messages.log"
 ASSISTANT_LOG_FILE = LOGS_DIR / "assistant_messages.log"
 TOOL_LOG_FILE = LOGS_DIR / "tool_messages.log"
@@ -62,15 +64,15 @@ googleflashlite = "google/gemini-2.5-flash-lite-preview-06-17"
 grok4 = "x-ai/grok-4"
 SUMMARY_MODEL = openaio3  # Model for summaries
 MAIN_MODEL = openai41  # Primary model for main agent operations
-CODE_MODEL = openaio3  # Model for code generation tasks
+CODE_MODEL = openai41  # Model for code generation tasks
 
 # Feature flag constants
 COMPUTER_USE_BETA_FLAG = "computer-use-2024-10-22"
 PROMPT_CACHING_BETA_FLAG = "prompt-caching-2024-07-31"
 
 # Limits
-MAX_SUMMARY_MESSAGES = 40 # Max messages for context summarization input
-MAX_SUMMARY_TOKENS = 120000 # Max tokens for context summarization output (aligning with config.py's original value)
+MAX_SUMMARY_MESSAGES = 40  # Max messages for context summarization input
+MAX_SUMMARY_TOKENS = 120000  # Max tokens for context summarization output (aligning with config.py's original value)
 
 # Create a cache directory if it does not exist
 CACHE_DIR = TOP_LEVEL_DIR / "cache"
@@ -79,12 +81,14 @@ CACHE_DIR.mkdir(parents=True, exist_ok=True)
 # --- Global variable for current prompt name (if needed by any module) ---
 PROMPT_NAME: Optional[str] = None
 
+
 def set_prompt_name(name: str):
     """Sets the global PROMPT_NAME."""
     global PROMPT_NAME
     PROMPT_NAME = name
     # Optionally, also save to constants.json if it needs to be persisted across sessions/restarts
     # set_constant("PROMPT_NAME", name)
+
 
 # --- System Prompt Loading ---
 try:
@@ -100,6 +104,7 @@ try:
 except FileNotFoundError:
     SYSTEM_PROMPT = "System prompt file not found. Please ensure 'system_prompt/system_prompt.md' exists."
     logging.error(f"CRITICAL: System prompt file not found at {SYSTEM_PROMPT_FILE}")
+
 
 def reload_system_prompt() -> str:
     """
@@ -120,9 +125,12 @@ def reload_system_prompt() -> str:
         logging.info(f"System prompt reloaded from {SYSTEM_PROMPT_FILE}")
         return SYSTEM_PROMPT
     except FileNotFoundError:
-        logging.error(f"Failed to reload system prompt: File not found at {SYSTEM_PROMPT_FILE}")
+        logging.error(
+            f"Failed to reload system prompt: File not found at {SYSTEM_PROMPT_FILE}"
+        )
         # Keep the old SYSTEM_PROMPT if reload fails
         return SYSTEM_PROMPT
+
 
 # --- Constants Management (using JSON cache file) ---
 def write_constants_to_file():
@@ -162,14 +170,15 @@ def write_constants_to_file():
         "MAX_SUMMARY_MESSAGES": MAX_SUMMARY_MESSAGES,
         "MAX_SUMMARY_TOKENS": MAX_SUMMARY_TOKENS,
         "PROMPT_NAME": PROMPT_NAME if PROMPT_NAME else "",
-        "TASK": "NOT YET CREATED", # Default task, can be updated by set_constant
+        "TASK": "NOT YET CREATED",  # Default task, can be updated by set_constant
     }
     # Ensure CACHE_DIR exists before writing
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
     with open(CACHE_DIR / "constants.json", "w") as f:
         json.dump(constants, f, indent=4)
 
-def get_constants(): # Renamed from original get_constants to avoid conflict during transition
+
+def get_constants():  # Renamed from original get_constants to avoid conflict during transition
     """Loads all constants from the JSON cache file."""
     # Ensure the constants file exists by calling write_constants_to_file if it doesn't.
     # This also ensures that if new constants are added to `write_constants_to_file`,
@@ -202,9 +211,10 @@ def get_constant(name: str, default: Any = None) -> Any:
             return value
     return value
 
+
 # Function to set a constant and persist it
 def set_constant(name: str, value: Any):
-    constants = get_constants() # Load current constants
+    constants = get_constants()  # Load current constants
 
     # Convert Path objects to strings for JSON serialization
     if isinstance(value, Path):
@@ -230,7 +240,7 @@ def set_constant(name: str, value: Any):
     return True
 
 
-def write_to_file(s: str, file_path: Path): # Modified to take Path object
+def write_to_file(s: str, file_path: Path):  # Modified to take Path object
     """Write debug output to a file in a compact, VS Code collapsible format."""
     # datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f") # Removed as it's not used
     lines = s.split("\n")
@@ -288,6 +298,7 @@ def write_to_file(s: str, file_path: Path): # Modified to take Path object
 # with defaults if it doesn't exist or is empty.
 write_constants_to_file()
 
+
 # Function to load the constants from a file (original name, now calls the new get_constants)
 def load_constants():
     return get_constants()
@@ -297,12 +308,15 @@ def load_constants():
 # This setup needs to happen after basic constants like LOG_LEVEL_CONSOLE are defined.
 # The temporary override mechanism for get_constant during logging setup is kept.
 
+
 def setup_logging():
     """Set up logging for the application."""
     logger = logging.getLogger()  # Root logger
     logger.setLevel(logging.DEBUG)  # Set root logger level
 
-    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(module)s - %(funcName)s - %(lineno)d - %(message)s')
+    formatter = logging.Formatter(
+        "%(asctime)s - %(levelname)s - %(module)s - %(funcName)s - %(lineno)d - %(message)s"
+    )
 
     # Console Handler
     # console_handler = logging.StreamHandler()
@@ -313,7 +327,9 @@ def setup_logging():
     # File Handler
     # Use _get_constant_for_logging_setup for LOGS_DIR during setup
     logs_dir_for_setup = _get_constant_for_logging_setup("LOGS_DIR")
-    logs_dir_for_setup.mkdir(parents=True, exist_ok=True) # Ensure logs directory exists
+    logs_dir_for_setup.mkdir(
+        parents=True, exist_ok=True
+    )  # Ensure logs directory exists
 
     log_file_app_str = _get_constant_for_logging_setup("LOG_FILE_APP")
     log_file_path = Path(log_file_app_str)
@@ -327,27 +343,39 @@ def setup_logging():
 
     file_handler = logging.handlers.RotatingFileHandler(
         log_file_path,
-        maxBytes=_get_constant_for_logging_setup("LOG_MAX_BYTES"), # Use overridden getter
-        backupCount=_get_constant_for_logging_setup("LOG_BACKUP_COUNT"), # Use overridden getter
-        encoding='utf-8'
+        maxBytes=_get_constant_for_logging_setup(
+            "LOG_MAX_BYTES"
+        ),  # Use overridden getter
+        backupCount=_get_constant_for_logging_setup(
+            "LOG_BACKUP_COUNT"
+        ),  # Use overridden getter
+        encoding="utf-8",
     )
-    file_handler.setLevel(getattr(logging, _get_constant_for_logging_setup("LOG_LEVEL_FILE").upper(), logging.DEBUG))
+    file_handler.setLevel(
+        getattr(
+            logging,
+            _get_constant_for_logging_setup("LOG_LEVEL_FILE").upper(),
+            logging.DEBUG,
+        )
+    )
     file_handler.setFormatter(formatter)
     logger.addHandler(file_handler)
+
 
 # Define these specific constants directly for setup_logging to use initially.
 # These are the Python global variables defined at the top of config.py
 _initial_constants_for_logging_setup = {
-    "LOG_LEVEL_CONSOLE": LOG_LEVEL_CONSOLE, # String
-    "LOG_LEVEL_FILE": LOG_LEVEL_FILE,       # String
-    "LOG_FILE_APP": LOG_FILE_APP,           # String (path relative to LOGS_DIR or absolute)
-    "LOG_MAX_BYTES": LOG_MAX_BYTES,         # Integer
-    "LOG_BACKUP_COUNT": LOG_BACKUP_COUNT,   # Integer
-    "LOGS_DIR": LOGS_DIR,                   # Path object
-    "TOP_LEVEL_DIR": TOP_LEVEL_DIR          # Path object
+    "LOG_LEVEL_CONSOLE": LOG_LEVEL_CONSOLE,  # String
+    "LOG_LEVEL_FILE": LOG_LEVEL_FILE,  # String
+    "LOG_FILE_APP": LOG_FILE_APP,  # String (path relative to LOGS_DIR or absolute)
+    "LOG_MAX_BYTES": LOG_MAX_BYTES,  # Integer
+    "LOG_BACKUP_COUNT": LOG_BACKUP_COUNT,  # Integer
+    "LOGS_DIR": LOGS_DIR,  # Path object
+    "TOP_LEVEL_DIR": TOP_LEVEL_DIR,  # Path object
 }
 
-_original_get_constant_func = get_constant # Store original get_constant
+_original_get_constant_func = get_constant  # Store original get_constant
+
 
 def _get_constant_for_logging_setup(name: str) -> Any:
     """Special getter for logging setup to use direct global vars instead of JSON file."""
@@ -358,6 +386,7 @@ def _get_constant_for_logging_setup(name: str) -> Any:
         return val
     # Fallback to original get_constant if not in initial set (should not happen for logging keys)
     return _original_get_constant_func(name)
+
 
 # Temporarily override get_constant for the duration of setup_logging
 _config_get_constant_backup = get_constant

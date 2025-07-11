@@ -150,7 +150,7 @@ class WriteCodeTool(BaseAnthropicTool):
                                 "properties": {
                                     "filename": {
                                         "type": "string",
-                                        "description": "Name/path of the file relative to the project path.",
+                                        "description": "Relative path for the file to be created. The main entry point should not have a directory structure, e.g., just 'main.py'. Other files can include their relative paths, e.g., 'utils/helpers.py'.",
                                     },
                                     "code_description": {
                                         "type": "string",
@@ -173,12 +173,8 @@ class WriteCodeTool(BaseAnthropicTool):
                             },
                             "description": "List of files to generate, each with a filename, description, and optional specific imports.",
                         },
-                        "project_path": {
-                            "type": "string",
-                            "description": "Path to the project directory (can be Docker-style or just project name). The actual write path will be resolved relative to the configured REPO_DIR on the host.",
-                        },
                     },
-                    "required": ["command", "files", "project_path"],
+                    "required": ["command", "files"],
                 },
             },
         }
@@ -286,7 +282,6 @@ class WriteCodeTool(BaseAnthropicTool):
         *,
         command: CodeCommand,
         files: List[Dict[str, Any]],
-        project_path: str,  # This might be a docker-style path or just a project name
         **kwargs,
         ) -> ToolResult:
         """
@@ -295,7 +290,6 @@ class WriteCodeTool(BaseAnthropicTool):
         Args:
             command: The command to execute (should always be WRITE_CODEBASE).
             files: List of file details (filename, code_description, optional external_imports, optional internal_imports).
-            project_path: Path/name identifier for the project.
             **kwargs: Additional parameters (ignored).
 
         Returns:
