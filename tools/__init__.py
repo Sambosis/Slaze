@@ -13,6 +13,7 @@ from .envsetup import ProjectSetupTool
 # from .test_navigation_tool import windows_navigate
 from .write_code import WriteCodeTool
 from .create_picture import PictureGenerationTool
+from .open_interpreter_tool import OpenInterpreterTool
 # from .file_editor import FileEditorTool # Removed
 
 __all__ = [
@@ -30,6 +31,7 @@ __all__ = [
     # "WindowsNavigationTool", # Removed
     "WriteCodeTool",
     "PictureGenerationTool",
+    "OpenInterpreterTool",
     # "windows_navigate",
     # "FileEditorTool", # Removed
 ]
