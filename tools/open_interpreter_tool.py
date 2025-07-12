@@ -14,9 +14,7 @@ class OpenInterpreterTool(BaseTool):
         self.display = display
         super().__init__(input_schema=None, display=display)
 
-    @property
-    def description(self) -> str:
-        return """
+    description = """
         A tool that uses open-interpreter's interpreter.chat() method to execute commands
         and tasks. This provides an alternative to direct bash execution with enhanced
         AI-powered command interpretation and execution.
