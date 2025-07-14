@@ -119,11 +119,5 @@ reportGeneralTypeIssues = false
 reportAttributeAccessIssue = false
 reportArgumentType = false
 
-[tool.uv.workspace]
-members = [
-    "repo/draggableDashboard",
-    "repo",
-    "repo/grokgame",
-    "repo/warlearn",
-]
 
+# do not add workspace members

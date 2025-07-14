@@ -1,11 +1,15 @@
 # ignore: type
 """Utility tool for generating codebases via LLM calls."""
 import asyncio
+import logging
 import os
 import time
 from enum import Enum
 from pathlib import Path
-from typing import Any, Literal, Optional, List, Dict
+from typing import Any, Dict, List, Literal, Optional
+
+import ftfy
+
 # pyright: ignore[reportMissingImports]
 from openai import (
     APIConnectionError,
@@ -16,7 +20,12 @@ from openai import (
     RateLimitError,
 )
 from pydantic import BaseModel
-import logging
+
+# from icecream import ic  # type: ignore # Removed
+from pygments import highlight  # type: ignore
+from pygments.formatters import HtmlFormatter  # type: ignore
+from pygments.lexers import get_lexer_by_name, guess_lexer  # type: ignore
+
 # from rich import print as rr # Removed
 from tenacity import (
     RetryCallState,
@@ -26,22 +35,17 @@ from tenacity import (
     wait_exponential,
 )
 
-from tools.base import BaseAnthropicTool, ToolResult
 from config import CODE_MODEL, get_constant
-# from icecream import ic  # type: ignore # Removed
-from pygments import highlight  # type: ignore
-from pygments.formatters import HtmlFormatter  # type: ignore
-from pygments.lexers import get_lexer_by_name, guess_lexer  # type: ignore
-from utils.file_logger import (
-    convert_to_docker_path,
-    log_file_operation,
-    get_language_from_extension,
-)
 from system_prompt.code_prompts import code_prompt_generate, code_skeleton_prompt
-import ftfy
+from tools.base import BaseAnthropicTool, ToolResult
 
 # Import PictureGenerationTool for handling image files
-from tools.create_picture import PictureGenerationTool, PictureCommand
+from tools.create_picture import PictureCommand, PictureGenerationTool
+from utils.file_logger import (
+    convert_to_docker_path,
+    get_language_from_extension,
+    log_file_operation,
+)
 
 MODEL_STRING = CODE_MODEL  # Default model string, can be overridden in config
 
@@ -194,9 +198,10 @@ class WriteCodeTool(BaseAnthropicTool):
 
     def _get_file_creation_log_content(self) -> str:
         """Reads the file creation log and returns its content."""
-        from config import get_constant
-        from pathlib import Path
         import logging
+        from pathlib import Path
+
+        from config import get_constant
 
         logger = logging.getLogger(__name__)
 
@@ -509,152 +514,152 @@ class WriteCodeTool(BaseAnthropicTool):
                         # Attempt to write error file to the resolved host path
                         try:
                             logger.info(
-                            f"Attempting to write error file for {filename} to {absolute_path}"
-                        )
-                        absolute_path.parent.mkdir(parents=True, exist_ok=True)
-                        error_content = f"# Code generation failed: {result}\n\n# Skeleton:\n{skeletons.get(filename, '# Skeleton not available')}"
-                        absolute_path.write_text(
-                            error_content, encoding="utf-8", errors="replace"
-                        )
-                        logger.info(
-                            f"Successfully wrote error file for {filename} to {absolute_path}"
-                        )
-                    except Exception as write_err:
-                        logger.error(
-                            f"Failed to write error file for {filename} to {absolute_path}: {write_err}", exc_info=True
-                        )
-
-                else:  # Code generation successful
-                    code_content = result
-                    logger.info(
-                        f"Code generation successful for {filename}. Attempting to write to absolute host path: {absolute_path}"
-                    )
-
-                    if not code_content or not code_content.strip():
-                        logger.warning(
-                            f"Generated code content for {filename} is empty or whitespace only. Skipping write."
-                        )
-                        write_results.append(
-                            {
-                                "filename": filename,
-                                "status": "error",
-                                "message": "Generated code was empty",
-                            }
-                        )
-                        continue  # Skip to next file
-
-                    try:
-                        logger.debug(f"Ensuring directory exists: {absolute_path.parent}")
-                        absolute_path.parent.mkdir(parents=True, exist_ok=True)
-                        operation = "modify" if absolute_path.exists() else "create"
-                        logger.debug(f"Operation type for {filename}: {operation}")
-
-                        fixed_code = ftfy.fix_text(code_content)
-                        logger.debug(
-                            f"Code content length for {filename} (after ftfy): {len(fixed_code)}"
-                        )
-
-                        # >>> THE WRITE CALL to the HOST path <<<
-                        logger.debug(f"Executing write_text for: {absolute_path}")
-                        absolute_path.write_text(
-                            fixed_code, encoding="utf-8", errors="replace"
-                        )
-                        logger.info(f"Successfully executed write_text for: {absolute_path}")
-
-                        # File existence and size check
-                        if absolute_path.exists():
+                                f"Attempting to write error file for {filename} to {absolute_path}"
+                            )
+                            absolute_path.parent.mkdir(parents=True, exist_ok=True)
+                            error_content = f"# Code generation failed: {result}\n\n# Skeleton:\n{skeletons.get(filename, '# Skeleton not available')}"
+                            absolute_path.write_text(
+                                error_content, encoding="utf-8", errors="replace"
+                            )
                             logger.info(
-                                f"CONFIRMED: File exists at {absolute_path} after write."
+                                f"Successfully wrote error file for {filename} to {absolute_path}"
                             )
-                            try:
-                                size = absolute_path.stat().st_size
-                                logger.info(f"CONFIRMED: File size is {size} bytes.")
-                                if size == 0 and len(fixed_code) > 0:
-                                    logger.warning(
-                                        "File size is 0 despite non-empty content being written!"
-                                    )
-                            except Exception as stat_err:
-                                logger.warning(
-                                    f"Could not get file stats for {absolute_path}: {stat_err}"
-                                )
-                        else:
+                        except Exception as write_err:
                             logger.error(
-                                f"FAILED: File DOES NOT exist at {absolute_path} immediately after write_text call!"
+                                f"Failed to write error file for {filename} to {absolute_path}: {write_err}", exc_info=True
                             )
 
-                        # Convert to Docker path FOR DISPLAY/LOGGING PURPOSES ONLY
-                        docker_path_display = str(
-                            absolute_path
-                        )  # Default to host path if conversion fails
-                        try:
-                            # Ensure convert_to_docker_path can handle the absolute host path
-                            docker_path_display = convert_to_docker_path(absolute_path)
-                            logger.debug(
-                                f"Converted host path {absolute_path} to display path {docker_path_display}"
-                            )
-                        except Exception as conv_err:
-                            logger.warning(
-                                f"Could not convert host path {absolute_path} to docker path for display: {conv_err}. Using host path for display."
-                            )
-
-                        # Log operation (using absolute_path for logging context)
-                        try:
-                            log_file_operation(
-                                file_path=absolute_path,  # Log using the actual host path written to
-                                operation=operation,
-                                content=fixed_code,
-                                metadata={
-                                    "code_description": file_detail.code_description,
-                                    "skeleton": skeletons.get(
-                                        filename
-                                    ),  # Use relative filename key
-                                },
-                            )
-                            logger.debug(f"Logged file operation for {absolute_path}")
-                        except Exception as log_error:
-                            logger.error(
-                                f"Failed to log code writing for {filename} ({absolute_path}): {log_error}", exc_info=True
-                            )
-
-                        # Use docker_path_display in the results if that's what the UI expects
-                        write_results.append(
-                            {
-                                "filename": str(docker_path_display),
-                                "status": "success",
-                                "operation": operation,
-                                # Add the generated code here
-                                "code": fixed_code,
-                            }
-                        )
-                        success_count += 1
+                    else:  # Code generation successful
+                        code_content = result
                         logger.info(
-                            f"Successfully processed and wrote {filename} to {absolute_path}"
+                            f"Code generation successful for {filename}. Attempting to write to absolute host path: {absolute_path}"
                         )
 
-                        # Display generated code (use docker_path_display if needed by UI)
-                        if self.display:
-                            language = get_language_from_extension(absolute_path.suffix)
-                            # Determine the language for highlighting.
-                            # The 'language' variable from get_language_from_extension might be simple (e.g., 'py')
-                            # or more specific if html_format_code needs it.
-                            # For pygments, simple extensions usually work.
-                            formatted_code = html_format_code(fixed_code, language or absolute_path.suffix.lstrip('.'))
-                            self.display.add_message("tool", formatted_code)
+                        if not code_content or not code_content.strip():
+                            logger.warning(
+                                f"Generated code content for {filename} is empty or whitespace only. Skipping write."
+                            )
+                            write_results.append(
+                                {
+                                    "filename": filename,
+                                    "status": "error",
+                                    "message": "Generated code was empty",
+                                }
+                            )
+                            continue  # Skip to next file
 
-                    except Exception as write_error:
-                        logger.error(
-                            f"Caught exception during write operation for {filename} at path {absolute_path}", exc_info=True
-                        )
-                        errors_write.append(
-                            f"Error writing file {filename}: {write_error}"
-                        )
-                        write_results.append(
-                            {
-                                "filename": filename,
-                                "status": "error",
-                                "message": f"Error writing file {filename}: {write_error}",
-                            }
-                        )
+                        try:
+                            logger.debug(f"Ensuring directory exists: {absolute_path.parent}")
+                            absolute_path.parent.mkdir(parents=True, exist_ok=True)
+                            operation = "modify" if absolute_path.exists() else "create"
+                            logger.debug(f"Operation type for {filename}: {operation}")
+
+                            fixed_code = ftfy.fix_text(code_content)
+                            logger.debug(
+                                f"Code content length for {filename} (after ftfy): {len(fixed_code)}"
+                            )
+
+                            # >>> THE WRITE CALL to the HOST path <<<
+                            logger.debug(f"Executing write_text for: {absolute_path}")
+                            absolute_path.write_text(
+                                fixed_code, encoding="utf-8", errors="replace"
+                            )
+                            logger.info(f"Successfully executed write_text for: {absolute_path}")
+
+                            # File existence and size check
+                            if absolute_path.exists():
+                                logger.info(
+                                    f"CONFIRMED: File exists at {absolute_path} after write."
+                                )
+                                try:
+                                    size = absolute_path.stat().st_size
+                                    logger.info(f"CONFIRMED: File size is {size} bytes.")
+                                    if size == 0 and len(fixed_code) > 0:
+                                        logger.warning(
+                                            "File size is 0 despite non-empty content being written!"
+                                        )
+                                except Exception as stat_err:
+                                    logger.warning(
+                                        f"Could not get file stats for {absolute_path}: {stat_err}"
+                                    )
+                            else:
+                                logger.error(
+                                    f"FAILED: File DOES NOT exist at {absolute_path} immediately after write_text call!"
+                                )
+
+                            # Convert to Docker path FOR DISPLAY/LOGGING PURPOSES ONLY
+                            docker_path_display = str(
+                                absolute_path
+                            )  # Default to host path if conversion fails
+                            try:
+                                # Ensure convert_to_docker_path can handle the absolute host path
+                                docker_path_display = convert_to_docker_path(absolute_path)
+                                logger.debug(
+                                    f"Converted host path {absolute_path} to display path {docker_path_display}"
+                                )
+                            except Exception as conv_err:
+                                logger.warning(
+                                    f"Could not convert host path {absolute_path} to docker path for display: {conv_err}. Using host path for display."
+                                )
+
+                            # Log operation (using absolute_path for logging context)
+                            try:
+                                log_file_operation(
+                                    file_path=absolute_path,  # Log using the actual host path written to
+                                    operation=operation,
+                                    content=fixed_code,
+                                    metadata={
+                                        "code_description": file_detail.code_description,
+                                        "skeleton": skeletons.get(
+                                            filename
+                                        ),  # Use relative filename key
+                                    },
+                                )
+                                logger.debug(f"Logged file operation for {absolute_path}")
+                            except Exception as log_error:
+                                logger.error(
+                                    f"Failed to log code writing for {filename} ({absolute_path}): {log_error}", exc_info=True
+                                )
+
+                            # Use docker_path_display in the results if that's what the UI expects
+                            write_results.append(
+                                {
+                                    "filename": str(docker_path_display),
+                                    "status": "success",
+                                    "operation": operation,
+                                    # Add the generated code here
+                                    "code": fixed_code,
+                                }
+                            )
+                            success_count += 1
+                            logger.info(
+                                f"Successfully processed and wrote {filename} to {absolute_path}"
+                            )
+
+                            # Display generated code (use docker_path_display if needed by UI)
+                            if self.display:
+                                language = get_language_from_extension(absolute_path.suffix)
+                                # Determine the language for highlighting.
+                                # The 'language' variable from get_language_from_extension might be simple (e.g., 'py')
+                                # or more specific if html_format_code needs it.
+                                # For pygments, simple extensions usually work.
+                                formatted_code = html_format_code(fixed_code, language or absolute_path.suffix.lstrip('.'))
+                                self.display.add_message("tool", formatted_code)
+
+                        except Exception as write_error:
+                            logger.error(
+                                f"Caught exception during write operation for {filename} at path {absolute_path}", exc_info=True
+                            )
+                            errors_write.append(
+                                f"Error writing file {filename}: {write_error}"
+                            )
+                            write_results.append(
+                                {
+                                    "filename": filename,
+                                    "status": "error",
+                                    "message": f"Error writing file {filename}: {write_error}",
+                                }
+                            )
 
             # --- Step 4: Format and Return Result ---
             final_status = "success"
