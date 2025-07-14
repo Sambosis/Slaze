@@ -44,12 +44,11 @@
         
         .header h1 { 
             margin: 0; 
-            color: #2d3748; 
+            color: #ffffffff; 
             font-size: 32px; 
             font-weight: 700;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
             background-clip: text;
         }
         
@@ -179,11 +178,10 @@
         }
         
         .assistant-message { 
-            background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
-            color: #1565c0;
+            background: linear-gradient(135deg, #9bc9eaff 0%, #245780ff 100%);
+            color: #ffffffff;
             text-align: left; 
             margin-right: 20%;
-            border-left: 4px solid #42a5f5;
         }
         
         .tool-message { 
@@ -227,20 +225,81 @@
         /* Console/shell syntax highlighting */
         .message pre[class*="language-"] {
             background: #2d3748;
-            color: #e2e8f0;
+            color: #ffffff;
             border: none;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            text-rendering: optimizeLegibility;
+            font-variant-ligatures: none;
+            font-weight: 400;
+            text-shadow: none;
+            box-shadow: none;
         }
         
         .message pre[class*="language-console"],
         .message pre[class*="language-shell-session"],
         .message pre[class*="language-bash"] {
             background: #1a202c;
-            color: #e2e8f0;
+            color: #ffffff;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            text-rendering: optimizeLegibility;
+            font-variant-ligatures: none;
+            font-weight: 400;
+            text-shadow: none;
+            box-shadow: none;
+        }
+        
+        /* Override any Prism.js text shadows */
+        .message pre[class*="language-"] * {
+            text-shadow: none !important;
+            color: #ffffff !important;
+        }
+        
+        /* Force all console text to be white */
+        .message pre[class*="language-"] .token,
+        .message pre[class*="language-console"] .token,
+        .message pre[class*="language-shell-session"] .token,
+        .message pre[class*="language-bash"] .token {
+            color: #ffffff !important;
+            text-shadow: none !important;
+        }
+        
+        /* Override specific Prism token types */
+        .message pre[class*="language-"] .token.comment,
+        .message pre[class*="language-"] .token.prolog,
+        .message pre[class*="language-"] .token.doctype,
+        .message pre[class*="language-"] .token.cdata,
+        .message pre[class*="language-"] .token.punctuation,
+        .message pre[class*="language-"] .token.property,
+        .message pre[class*="language-"] .token.tag,
+        .message pre[class*="language-"] .token.boolean,
+        .message pre[class*="language-"] .token.number,
+        .message pre[class*="language-"] .token.constant,
+        .message pre[class*="language-"] .token.symbol,
+        .message pre[class*="language-"] .token.deleted,
+        .message pre[class*="language-"] .token.selector,
+        .message pre[class*="language-"] .token.attr-name,
+        .message pre[class*="language-"] .token.string,
+        .message pre[class*="language-"] .token.char,
+        .message pre[class*="language-"] .token.builtin,
+        .message pre[class*="language-"] .token.inserted,
+        .message pre[class*="language-"] .token.operator,
+        .message pre[class*="language-"] .token.entity,
+        .message pre[class*="language-"] .token.url,
+        .message pre[class*="language-"] .token.variable,
+        .message pre[class*="language-"] .token.atrule,
+        .message pre[class*="language-"] .token.attr-value,
+        .message pre[class*="language-"] .token.function,
+        .message pre[class*="language-"] .token.class-name,
+        .message pre[class*="language-"] .token.keyword {
+            color: #ffffff !important;
+            text-shadow: none !important;
         }
         
         .empty-state {
             text-align: center;
-            color: #6c757d;
+            color: #ffffffff;
             font-style: italic;
             padding: 60px 20px;
             font-size: 16px;
@@ -416,7 +475,7 @@
             display: block;
             margin-bottom: 6px;
             font-weight: 600;
-            color: #374151;
+            color: #ffffffff;
             font-size: 14px;
         }
 
@@ -426,7 +485,7 @@
         }
 
         .form-label .optional {
-            color: #6b7280;
+            color: #ffffffff;
             font-weight: 400;
             font-size: 12px;
         }
