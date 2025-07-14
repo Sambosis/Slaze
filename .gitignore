@@ -26,3 +26,6 @@ stls/3d_lspo/
 *.pt*
 # ignore node_modules
 node_modules/
+repo/
+# Additional files to ignore
+*.db
