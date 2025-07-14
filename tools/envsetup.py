@@ -185,7 +185,6 @@ class ProjectSetupTool(BaseAnthropicTool):
             if not venv_dir.exists():
                 try:
                     self._run_subprocess_with_display(["uv", "venv"], cwd=str(repo_path))
-                    self._run_subprocess_with_display(["uv", "venv"], cwd=str(repo_path))
                 except subprocess.CalledProcessError as e:
                     error_result = {
                         "command": "setup_project",
@@ -206,9 +205,7 @@ class ProjectSetupTool(BaseAnthropicTool):
                 # run uv init if there is no pyproject.toml and uv sync if there is
                 if not (repo_path / "pyproject.toml").exists():
                     self._run_subprocess_with_display(["uv", "init"], cwd=str(repo_path))
-                    self._run_subprocess_with_display(["uv", "init"], cwd=str(repo_path))
                 else:
-                    self._run_subprocess_with_display(["uv", "sync"], cwd=str(repo_path))
                     self._run_subprocess_with_display(["uv", "sync"], cwd=str(repo_path))
                 logger.info(f"Project initialized at {repo_path}")
             except subprocess.CalledProcessError as e:
@@ -336,17 +333,13 @@ class ProjectSetupTool(BaseAnthropicTool):
                         )
                     try:
                         result = self._run_subprocess_with_display(["uv", "add", package], cwd=str(repo_path))
-                    try:
-                        result = self._run_subprocess_with_display(["uv", "add", package], cwd=str(repo_path))
                         installed_packages.append(package)
                         if self.display is not None:
                             self.display.add_message("assistant", f"Successfully installed {package}")
                     except subprocess.CalledProcessError as e:
-                    except subprocess.CalledProcessError as e:
                         error_result = {
                             "command": "add_additional_depends",
                             "status": "error",
-                            "error": e.stderr if e.stderr else str(e),
                             "error": e.stderr if e.stderr else str(e),
                             "repo_path": str(repo_path),
                             "packages_installed": installed_packages,
@@ -354,7 +347,6 @@ class ProjectSetupTool(BaseAnthropicTool):
                             "failed_at": package,
                         }
                         return ToolResult(
-                            error=e.stderr if e.stderr else str(e),
                             error=e.stderr if e.stderr else str(e),
                             message=self.format_output(error_result),
                             command="add_additional_depends",
@@ -401,7 +393,6 @@ class ProjectSetupTool(BaseAnthropicTool):
             print(f"Running command: {' '.join(cmd)} in {repo_dir}")
             try:
                 result = self._run_subprocess_with_display(cmd, cwd=repo_dir, check=False)
-                result = self._run_subprocess_with_display(cmd, cwd=repo_dir, check=False)
                 run_output = f"stdout: {result.stdout}\nstderr: {result.stderr}"
                 logger.info(f"Run app output for {filename}:\n{run_output}")
                 rr(f"Run app output for {filename}:\n{run_output}")  # Using rich print for better formatting
@@ -446,7 +437,6 @@ class ProjectSetupTool(BaseAnthropicTool):
             print(f"Running command: {' '.join(cmd)} in {repo_dir}")
             # Use subprocess to run the command in the repo_dir
             try:
-                result = self._run_subprocess_with_display(cmd, cwd=repo_dir)
                 result = self._run_subprocess_with_display(cmd, cwd=repo_dir)
                 return ToolResult(
                     output=result.stdout,
