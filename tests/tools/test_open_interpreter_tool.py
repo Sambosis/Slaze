@@ -50,3 +50,4 @@ def test_to_params(interpreter_tool):
     assert params["function"]["parameters"]["required"] == ["instructions"]
     props = params["function"]["parameters"]["properties"]
     assert "instructions" in props
+

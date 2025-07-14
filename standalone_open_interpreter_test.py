@@ -1,75 +1,51 @@
-from typing import ClassVar, Literal, Union
-import logging
+#!/usr/bin/env python3
+"""
+Standalone test for the OpenInterpreterTool functionality
+"""
 
-try:
-    from interpreter import interpreter
-except Exception:  # pragma: no cover - optional dependency
-    interpreter = None
-
-
+import sys
 import os
-from pathlib import Path
-from config import get_constant
-from .base import BaseTool, ToolError, ToolResult
-from utils.web_ui import WebUI
-from utils.agent_display_console import AgentDisplayConsole
+import platform
+import subprocess
 
-logger = logging.getLogger(__name__)
+# Mock classes for testing
+class MockDisplay:
+    def add_message(self, role, content):
+        print(f"[{role}] {content}")
 
-class OpenInterpreterTool(BaseTool):
-    """Execute commands using the open-interpreter package."""
+class MockToolResult:
+    def __init__(self, output=None, error=None, tool_name=None, command=None):
+        self.output = output
+        self.error = error
+        self.tool_name = tool_name
+        self.command = command
 
-    name: ClassVar[Literal["open_interpreter"]] = "open_interpreter"
-    api_type: ClassVar[Literal["open_interpreter_20250124"]] = "open_interpreter_20250124"
-    description: str = (
-        "Runs instructions using open-interpreter's interpreter.chat function."
-    )
+class MockBaseTool:
+    def __init__(self, input_schema=None, display=None):
+        self.input_schema = input_schema
+        self.display = display
 
-    def __init__(self, display: Union[WebUI, AgentDisplayConsole] = None):
-        super().__init__(input_schema=None, display=display)
+class MockToolError(Exception):
+    def __init__(self, message):
+        self.message = message
+        super().__init__(message)
 
-    async def __call__(self, message: str | None = None, **kwargs):
-        if message is None:
-            raise ToolError("no message provided")
-
-        if self.display is not None:
-            try:
-                self.display.add_message("user", f"Interpreter request: {message}")
-            except Exception as e:
-                return ToolResult(error=str(e), tool_name=self.name, command=message)
-
-        try:
-            global interpreter
-            if interpreter is None:
-                from interpreter import interpreter as _interp
-                interpreter = _interp
-
-            result = interpreter.chat(message, display=False, stream=False, blocking=True)
-            return ToolResult(
-                output=str(result),
-                tool_name=self.name,
-                command=message,
-            )
-        except Exception as e:
-            logger.error("Interpreter execution failed", exc_info=True)
-            return ToolResult(
-                output="",
-                error=str(e),
-                tool_name=self.name,
-                command=message,
-            )
-    def __init__(self, display: Union[WebUI, AgentDisplayConsole] = None):
+# Create a simplified version of the OpenInterpreterTool for testing
+class OpenInterpreterTool(MockBaseTool):
+    def __init__(self, display=None):
         self.display = display
         super().__init__(input_schema=None, display=display)
 
-    description = """
+    @property
+    def description(self) -> str:
+        return """
         A tool that uses open-interpreter's interpreter.chat() method to execute commands
         and tasks. This provides an alternative to direct bash execution with enhanced
         AI-powered command interpretation and execution.
         """
 
-    name: ClassVar[Literal["open_interpreter"]] = "open_interpreter"
-    api_type: ClassVar[Literal["open_interpreter_20250124"]] = "open_interpreter_20250124"
+    name = "open_interpreter"
+    api_type = "open_interpreter_20250124"
 
     async def __call__(self, task_description: str | None = None, **kwargs):
         if task_description is not None:
@@ -77,10 +53,10 @@ class OpenInterpreterTool(BaseTool):
                 try:
                     self.display.add_message("user", f"Executing task with open-interpreter: {task_description}")
                 except Exception as e:
-                    return ToolResult(error=str(e), tool_name=self.name, command=task_description)
+                    return MockToolResult(error=str(e), tool_name=self.name, command=task_description)
 
             return await self._execute_with_interpreter(task_description)
-        raise ToolError("no task description provided.")
+        raise MockToolError("no task description provided.")
 
     async def _execute_with_interpreter(self, task_description: str):
         """
@@ -90,28 +66,28 @@ class OpenInterpreterTool(BaseTool):
         error = ""
         success = False
         cwd = None
-        
+
         try:
             # Get the current working directory
-            repo_dir = get_constant("REPO_DIR")
-            cwd = str(repo_dir) if repo_dir and Path(repo_dir).exists() else None
-            
+            cwd = os.getcwd()
+
             # Try to import and use open-interpreter
             try:
                 import interpreter
-                
+                from interpreter import interpreter
+
                 # Configure interpreter settings
                 interpreter.offline = False  # Allow online operations
                 interpreter.auto_run = True  # Auto-run commands
                 interpreter.verbose = False  # Reduce verbosity for tool usage
-                
+
                 # Create system information context
                 system_info = self._get_system_info()
                 full_task = f"{task_description}\n\nSystem Information: {system_info}"
-                
+
                 # Execute the task using interpreter.chat()
                 result = interpreter.chat(full_task)
-                
+
                 # Extract output from the result
                 if hasattr(result, 'messages'):
                     # Get the last assistant message which should contain the execution result
@@ -121,13 +97,13 @@ class OpenInterpreterTool(BaseTool):
                             break
                 else:
                     output = str(result)
-                
+
                 success = True
-                
+
             except ImportError:
                 error = "open-interpreter package is not installed. Please install it with: pip install open-interpreter"
                 success = False
-                
+
         except Exception as e:
             error = str(e)
             success = False
@@ -140,7 +116,7 @@ class OpenInterpreterTool(BaseTool):
             f"error: {error}"
         )
         print(formatted_output)
-        return ToolResult(
+        return MockToolResult(
             output=formatted_output,
             error=error,
             tool_name=self.name,
@@ -151,20 +127,17 @@ class OpenInterpreterTool(BaseTool):
         """
         Get system information to provide context to the interpreter.
         """
-        import platform
-        import subprocess
-        
         system_info = []
-        
+
         # Basic system info
         system_info.append(f"OS: {platform.system()} {platform.release()}")
         system_info.append(f"Architecture: {platform.machine()}")
         system_info.append(f"Python: {platform.python_version()}")
-        
+
         # Current working directory
         cwd = os.getcwd()
         system_info.append(f"Current Directory: {cwd}")
-        
+
         # Available commands
         try:
             # Check for common commands
@@ -179,11 +152,10 @@ class OpenInterpreterTool(BaseTool):
             system_info.append(f"Available Commands: {', '.join(available_commands)}")
         except Exception:
             system_info.append("Available Commands: Unable to determine")
-        
+
         return "\n".join(system_info)
 
     def to_params(self) -> dict:
-        logger.debug(f"OpenInterpreterTool.to_params called with api_type: {self.api_type}")
         params = {
             "type": "function",
             "function": {
@@ -201,6 +173,42 @@ class OpenInterpreterTool(BaseTool):
                 },
             },
         }
-        logger.debug(f"OpenInterpreterTool params: {params}")
         return params
 
+def test_open_interpreter_tool():
+    """Test the OpenInterpreterTool functionality"""
+    
+    print("Testing OpenInterpreterTool...")
+    
+    # Create an instance of the tool
+    tool = OpenInterpreterTool()
+    
+    # Test 1: Tool properties
+    print("\n=== Test 1: Tool properties ===")
+    print(f"Tool name: {tool.name}")
+    print(f"API type: {tool.api_type}")
+    print(f"Description: {tool.description}")
+    
+    # Test 2: System information
+    print("\n=== Test 2: System information ===")
+    system_info = tool._get_system_info()
+    print(f"System Info: {system_info}")
+    
+    # Test 3: Tool parameters
+    print("\n=== Test 3: Tool parameters ===")
+    params = tool.to_params()
+    print(f"Tool parameters: {params}")
+    
+    # Test 4: Call method (will fail without open-interpreter installed)
+    print("\n=== Test 4: Call method ===")
+    try:
+        import asyncio
+        result = asyncio.run(tool("list my recent commits"))
+        print(f"Result: {result}")
+    except Exception as e:
+        print(f"Expected error (open-interpreter not installed): {e}")
+    
+    print("\n=== Test completed ===")
+
+if __name__ == "__main__":
+    test_open_interpreter_tool()
