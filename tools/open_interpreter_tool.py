@@ -17,7 +17,6 @@ from utils.agent_display_console import AgentDisplayConsole
 logger = logging.getLogger(__name__)
 
 class OpenInterpreterTool(BaseTool):
-
     """Execute commands using the open-interpreter package."""
 
     name: ClassVar[Literal["open_interpreter"]] = "open_interpreter"
@@ -44,6 +43,7 @@ class OpenInterpreterTool(BaseTool):
             if interpreter is None:
                 from interpreter import interpreter as _interp
                 interpreter = _interp
+
             result = interpreter.chat(message, display=False, stream=False, blocking=True)
             return ToolResult(
                 output=str(result),
@@ -58,7 +58,6 @@ class OpenInterpreterTool(BaseTool):
                 tool_name=self.name,
                 command=message,
             )
-=======
     def __init__(self, display: Union[WebUI, AgentDisplayConsole] = None):
         self.display = display
         super().__init__(input_schema=None, display=display)

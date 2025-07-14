@@ -41,3 +41,13 @@ async def test_chat_exception(interpreter_tool):
         mock_interp.chat.side_effect = Exception('boom')
         result = await interpreter_tool('cmd')
     assert result.error == 'boom'
+
+
+def test_to_params(interpreter_tool):
+    params = interpreter_tool.to_params()
+    assert params["type"] == "function"
+    assert params["function"]["name"] == "open_interpreter"
+    assert params["function"]["parameters"]["required"] == ["instructions"]
+    props = params["function"]["parameters"]["properties"]
+    assert "instructions" in props
+
