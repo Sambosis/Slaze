@@ -108,7 +108,7 @@ class OpenInterpreterTool(BaseTool):
                 # Configure interpreter settings
                 self.interpreter.offline = False  # Allow online operations
                 self.interpreter.auto_run = True  # Auto-run commands
-                self.interpreter.verbose = False_  # Reduce verbosity for tool usage
+                self.interpreter.verbose = False  # Reduce verbosity for tool usage
                 self.interpreter.llm.model = openai41
                 self.interpreter.llm.supports_functions = True  # Enable function calling
                 self.interpreter.loop = True
