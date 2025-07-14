@@ -22,65 +22,26 @@ class OpenInterpreterTool(BaseTool):
     name: ClassVar[Literal["open_interpreter"]] = "open_interpreter"
     api_type: ClassVar[Literal["open_interpreter_20250124"]] = "open_interpreter_20250124"
     description: str = (
-        "Runs instructions using open-interpreter's interpreter.chat function."
+        "A tool that uses open-interpreter's interpreter.chat() method to execute commands "
+        "and tasks. This provides an alternative to direct bash execution with enhanced "
+        "AI-powered command interpretation and execution."
     )
 
-    def __init__(self, display: Union[WebUI, AgentDisplayConsole] = None):
-        super().__init__(input_schema=None, display=display)
-
-    async def __call__(self, message: str | None = None, **kwargs):
-        if message is None:
-            raise ToolError("no message provided")
-
-        if self.display is not None:
-            try:
-                self.display.add_message("user", f"Interpreter request: {message}")
-            except Exception as e:
-                return ToolResult(error=str(e), tool_name=self.name, command=message)
-
-        try:
-            global interpreter
-            if interpreter is None:
-                from interpreter import interpreter as _interp
-                interpreter = _interp
-
-            result = interpreter.chat(message, display=False, stream=False, blocking=True)
-            return ToolResult(
-                output=str(result),
-                tool_name=self.name,
-                command=message,
-            )
-        except Exception as e:
-            logger.error("Interpreter execution failed", exc_info=True)
-            return ToolResult(
-                output="",
-                error=str(e),
-                tool_name=self.name,
-                command=message,
-            )
     def __init__(self, display: Union[WebUI, AgentDisplayConsole] = None):
         self.display = display
         super().__init__(input_schema=None, display=display)
 
-    description = """
-        A tool that uses open-interpreter's interpreter.chat() method to execute commands
-        and tasks. This provides an alternative to direct bash execution with enhanced
-        AI-powered command interpretation and execution.
-        """
-
-    name: ClassVar[Literal["open_interpreter"]] = "open_interpreter"
-    api_type: ClassVar[Literal["open_interpreter_20250124"]] = "open_interpreter_20250124"
-
     async def __call__(self, task_description: str | None = None, **kwargs):
-        if task_description is not None:
-            if self.display is not None:
-                try:
-                    self.display.add_message("user", f"Executing task with open-interpreter: {task_description}")
-                except Exception as e:
-                    return ToolResult(error=str(e), tool_name=self.name, command=task_description)
+        if task_description is None:
+            raise ToolError("no task description provided.")
 
-            return await self._execute_with_interpreter(task_description)
-        raise ToolError("no task description provided.")
+        if self.display is not None:
+            try:
+                self.display.add_message("user", f"Executing task with open-interpreter: {task_description}")
+            except Exception as e:
+                return ToolResult(error=str(e), tool_name=self.name, command=task_description)
+
+        return await self._execute_with_interpreter(task_description)
 
     async def _execute_with_interpreter(self, task_description: str):
         """
