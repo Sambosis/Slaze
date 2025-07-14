@@ -5,6 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Slazy Agent</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.0/socket.io.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/4.3.0/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-shell-session.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css" rel="stylesheet" />
     <style>
         * {
             box-sizing: border-box;
@@ -190,6 +195,47 @@
             font-size: 13px;
             margin-right: 10%;
             border-left: 4px solid #ff9800;
+        }
+        
+        /* Code block styles for markdown rendering */
+        .message pre {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 12px;
+            overflow-x: auto;
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.4;
+            margin: 12px 0;
+        }
+        
+        .message code {
+            background: #f8f9fa;
+            border-radius: 4px;
+            padding: 2px 6px;
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+            font-size: 13px;
+        }
+        
+        .message pre code {
+            background: transparent;
+            padding: 0;
+            border-radius: 0;
+        }
+        
+        /* Console/shell syntax highlighting */
+        .message pre[class*="language-"] {
+            background: #2d3748;
+            color: #e2e8f0;
+            border: none;
+        }
+        
+        .message pre[class*="language-console"],
+        .message pre[class*="language-shell-session"],
+        .message pre[class*="language-bash"] {
+            background: #1a202c;
+            color: #e2e8f0;
         }
         
         .empty-state {
@@ -752,7 +798,7 @@
                 assistantMessagesDiv.innerHTML = '<div class="empty-state">No assistant messages yet</div>';
             } else {
                 data.assistant.forEach(function(msg) {
-                    assistantMessagesDiv.innerHTML += '<div class="message assistant-message">' + escapeHtml(msg) + '</div>';
+                    assistantMessagesDiv.innerHTML += '<div class="message assistant-message">' + parseMarkdown(msg) + '</div>';
                 });
             }
             
@@ -779,6 +825,11 @@
             if (currentMessagesDiv) {
                 currentMessagesDiv.scrollTop = currentMessagesDiv.scrollHeight;
             }
+            
+            // Re-highlight code blocks
+            if (typeof Prism !== 'undefined') {
+                Prism.highlightAll();
+            }
         }
 
         function escapeHtml(text) {
@@ -801,6 +852,39 @@
                 "'": '&#039;'
             };
             return text.replace(/[&<>"']/g, function(m) { return map[m]; });
+        }
+
+        function parseMarkdown(text) {
+            // Convert non-string values to string first
+            if (typeof text !== 'string') {
+                if (text === null || text === undefined) {
+                    text = '';
+                } else if (typeof text === 'object') {
+                    text = JSON.stringify(text);
+                } else {
+                    text = String(text);
+                }
+            }
+            
+            // Configure marked to support console language highlighting
+            marked.setOptions({
+                highlight: function(code, lang) {
+                    if (lang && Prism.languages[lang]) {
+                        return Prism.highlight(code, Prism.languages[lang], lang);
+                    }
+                    // For console blocks, use shell-session highlighting if available
+                    if (lang === 'console' && Prism.languages['shell-session']) {
+                        return Prism.highlight(code, Prism.languages['shell-session'], 'shell-session');
+                    }
+                    // Fall back to bash highlighting for console blocks
+                    if (lang === 'console' && Prism.languages['bash']) {
+                        return Prism.highlight(code, Prism.languages['bash'], 'bash');
+                    }
+                    return code;
+                }
+            });
+            
+            return marked.parse(text);
         }
 
         socket.on('update', function(data) {
