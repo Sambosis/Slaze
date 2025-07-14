@@ -24,3 +24,7 @@ venv/
 stls/3d_lspo/
 *.safetensors
 *.pt*
+# ignore node_modules
+node_modules/   
+# Ignore Python bytecode files
+*.pyc
