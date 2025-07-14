@@ -1,3 +1,3 @@
-# utils/__init__.py
+"""Utility functions and classes used throughout Slaze."""
 
-# __all__ = ["OutputManager"]
+__all__ = []
