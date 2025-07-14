@@ -6,6 +6,8 @@ import os
 import re
 import logging
 from typing import Dict, Union
+
+from utils.json_utils import safe_json_loads
 from openai import OpenAI
 from rich import print as rr
 
@@ -413,7 +415,7 @@ class Agent:
         if msg.tool_calls:
             for tc in msg.tool_calls:
                 args = (
-                    json.loads(tc.function.arguments) if tc.function.arguments else {}
+                    safe_json_loads(tc.function.arguments) if tc.function.arguments else {}
                 )
                 for arg in args.values():
                     rr(arg)
