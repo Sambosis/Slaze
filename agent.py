@@ -11,6 +11,7 @@ from rich import print as rr
 
 from tools import (
     BashTool,
+    OpenInterpreterTool,
     ProjectSetupTool,
     WriteCodeTool,
     PictureGenerationTool,
@@ -184,6 +185,7 @@ class Agent:
             WriteCodeTool(display=self.display),
             ProjectSetupTool(display=self.display),
             BashTool(display=self.display),
+            OpenInterpreterTool(display=self.display),
             PictureGenerationTool(display=self.display),
             EditTool(display=self.display),  # Uncommented and enabled for testing
             display=self.display,
