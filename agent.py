@@ -10,8 +10,8 @@ from openai import OpenAI
 from rich import print as rr
 
 from tools import (
-    BashTool,
-    OpenInterpreterTool,
+    # BashTool,
+
     ProjectSetupTool,
     WriteCodeTool,
     PictureGenerationTool,
@@ -185,8 +185,7 @@ class Agent:
         self.tool_collection = ToolCollection(
             WriteCodeTool(display=self.display),
             ProjectSetupTool(display=self.display),
-            BashTool(display=self.display),
-            OpenInterpreterTool(display=self.display),
+            # BashTool(display=self.display),
             PictureGenerationTool(display=self.display),
             OpenInterpreterTool(display=self.display),  # Uncommented and enabled for testing
             EditTool(display=self.display),  # Uncommented and enabled for testing
@@ -408,7 +407,23 @@ class Agent:
                 for tc in msg.tool_calls
             ]
         self.messages.append(assistant_msg)
+        tool_messages = self.messages[:-1]  # All messages except the last assistant message
+        # prompt creation that gives all but the last message , then a new user message that explains that given the context so far,
+        # Give a couple sentences explanation that you are going to do the actions in assistant_msg["tool_calls"]
+        tool_prompt = f"""Given the context so far, We will be performing the following actions: 
+        {assistant_msg['tool_calls'] if 'tool_calls' in assistant_msg else []}
+        Please respond with an explanation of what action will be taken.
+        It should be no more than 2 sentences long and you should use first person phrasing such as I will create the code for main.py so I can do a test run of the app."""
+        tool_messages.append({"role": "user", "content": tool_prompt})
+        tool_response = self.client.chat.completions.create(
+            model=MAIN_MODEL,
+            messages=tool_messages,
+            max_tokens=MAX_SUMMARY_TOKENS,
+        )
+        tool_msg = tool_response.choices[0].message
 
+        if tool_msg:
+            self.display.add_message("user", tool_msg.content or "")
 
         if msg.tool_calls:
             for tc in msg.tool_calls:

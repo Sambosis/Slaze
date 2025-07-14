@@ -18,6 +18,7 @@ from pathlib import Path
 from openai import OpenAI
 import ftfy
 
+
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 def log_message(msg_type, message):
@@ -53,7 +54,8 @@ class WebUI:
         self.agent_runner = agent_runner
         # Import tools lazily to avoid circular imports
         from tools import (
-            BashTool,
+            # BashTool,
+            OpenInterpreterTool,
             ProjectSetupTool,
             WriteCodeTool,
             PictureGenerationTool,
@@ -64,7 +66,8 @@ class WebUI:
         self.tool_collection = ToolCollection(
             WriteCodeTool(display=self),
             ProjectSetupTool(display=self),
-            BashTool(display=self),
+            # BashTool(display=self),
+            OpenInterpreterTool(display=self),  # Uncommented and enabled for testing
             PictureGenerationTool(display=self),
             EditTool(display=self),
             display=self,

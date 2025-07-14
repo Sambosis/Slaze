@@ -51,7 +51,7 @@ class OpenInterpreterTool(MockBaseTool):
         if task_description is not None:
             if self.display is not None:
                 try:
-                    self.display.add_message("user", f"Executing task with open-interpreter: {task_description}")
+                    self.display.add_message("assistant", f"Executing task with open-interpreter: {task_description}")
                 except Exception as e:
                     return MockToolResult(error=str(e), tool_name=self.name, command=task_description)
 

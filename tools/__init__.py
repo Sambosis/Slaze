@@ -1,5 +1,5 @@
 from .base import BaseAnthropicTool, ToolError, ToolResult
-from .bash import BashTool
+# from .bash import BashTool
 from .edit import EditTool
 from .collection import ToolCollection
 # from .expert import GetExpertOpinionTool
@@ -20,7 +20,7 @@ __all__ = [
     "BaseAnthropicTool",
     "ToolError",
     "ToolResult",
-    "BashTool",
+    # "BashTool",
     "EditTool",
     "ToolCollection",
     # "GetExpertOpinionTool",
