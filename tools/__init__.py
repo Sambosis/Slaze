@@ -5,7 +5,7 @@ from .collection import ToolCollection
 # from .expert import GetExpertOpinionTool
 # from .playwright import WebNavigatorTool # Removed
 from .envsetup import ProjectSetupTool
-
+from .interpreter import InterpreterTool
 # from .gotourl_reports import GoToURLReportsTool
 # from .get_serp import GoogleSearchTool # Remains commented
 # from .windows_navigation import WindowsNavigationTool # Removed
@@ -26,6 +26,7 @@ __all__ = [
     # "GetExpertOpinionTool",
     # "WebNavigatorTool", # Removed
     "ProjectSetupTool",
+    "OpenInterpreterTool",
     # "GoToURLReportsTool",
     # "GoogleSearchTool", # Remains commented
     # "WindowsNavigationTool", # Removed
