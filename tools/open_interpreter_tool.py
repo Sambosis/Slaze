@@ -2,17 +2,23 @@ from typing import ClassVar, Literal, Union
 import logging
 import os
 from pathlib import Path
-from config import get_constant
-from .base import BaseTool, ToolError, ToolResult
+import subprocess   
+from numpy import False_
+from regex import F
+from config import get_constant, openai41
+from tools.base import BaseTool, ToolError, ToolResult
 from utils.web_ui import WebUI
 from utils.agent_display_console import AgentDisplayConsole
+from interpreter import OpenInterpreter
 
 logger = logging.getLogger(__name__)
 
 class OpenInterpreterTool(BaseTool):
     def __init__(self, display: Union[WebUI, AgentDisplayConsole] = None):
-        self.display = display
         super().__init__(input_schema=None, display=display)
+        self.display = display
+
+        self.interpreter = OpenInterpreter(in_terminal_interface=True)
 
     description = """
         A tool that uses open-interpreter's interpreter.chat() method to execute commands
@@ -27,7 +33,7 @@ class OpenInterpreterTool(BaseTool):
         if task_description is not None:
             if self.display is not None:
                 try:
-                    self.display.add_message("user", f"Executing task with open-interpreter: {task_description}")
+                    self.display.add_message("assistant", f"Executing task with open-interpreter: {task_description}")
                 except Exception as e:
                     return ToolResult(error=str(e), tool_name=self.name, command=task_description)
 
@@ -42,44 +48,44 @@ class OpenInterpreterTool(BaseTool):
         error = ""
         success = False
         cwd = None
-        
+
         try:
             # Get the current working directory
             repo_dir = get_constant("REPO_DIR")
             cwd = str(repo_dir) if repo_dir and Path(repo_dir).exists() else None
-            
+
             # Try to import and use open-interpreter
             try:
-                import interpreter
-                
+
                 # Configure interpreter settings
-                interpreter.offline = False  # Allow online operations
-                interpreter.auto_run = True  # Auto-run commands
-                interpreter.verbose = False  # Reduce verbosity for tool usage
-                
+                self.interpreter.offline = False  # Allow online operations
+                self.interpreter.auto_run = True  # Auto-run commands
+                self.interpreter.verbose = False_  # Reduce verbosity for tool usage
+                self.interpreter.llm.model = openai41
+                self.interpreter.llm.supports_functions = True  # Enable function calling
+                self.interpreter.loop = True
+                self.interpreter.computer.verbose = False  # Reduce verbosity for tool usage
+                self.interpreter.computer.import_computer_api = True
+                self.interpreter.disable_telemetry = True
+
                 # Create system information context
                 system_info = self._get_system_info()
                 full_task = f"{task_description}\n\nSystem Information: {system_info}"
-                
+
                 # Execute the task using interpreter.chat()
-                result = interpreter.chat(full_task)
-                
+                result = self.interpreter.chat(message=full_task, display=True)
+
                 # Extract output from the result
                 if hasattr(result, 'messages'):
-                    # Get the last assistant message which should contain the execution result
-                    for message in reversed(result.messages):
-                        if message.get('role') == 'assistant':
-                            output = message.get('content', '')
-                            break
-                else:
-                    output = str(result)
-                
+                    lastmessage = result.messages[-1]
+                    output = lastmessage.get('content', '')
                 success = True
-                
+                if self.display is not None:
+                    self.display.add_message("assistant", output)   
             except ImportError:
                 error = "open-interpreter package is not installed. Please install it with: pip install open-interpreter"
                 success = False
-                
+
         except Exception as e:
             error = str(e)
             success = False
@@ -91,7 +97,8 @@ class OpenInterpreterTool(BaseTool):
             f"output: {output}\n"
             f"error: {error}"
         )
-        print(formatted_output)
+        if self.display is not None:
+            self.display.add_message("assistant", formatted_output)
         return ToolResult(
             output=formatted_output,
             error=error,
@@ -105,18 +112,18 @@ class OpenInterpreterTool(BaseTool):
         """
         import platform
         import subprocess
-        
+
         system_info = []
-        
+
         # Basic system info
         system_info.append(f"OS: {platform.system()} {platform.release()}")
         system_info.append(f"Architecture: {platform.machine()}")
         system_info.append(f"Python: {platform.python_version()}")
-        
+
         # Current working directory
         cwd = os.getcwd()
         system_info.append(f"Current Directory: {cwd}")
-        
+
         # Available commands
         try:
             # Check for common commands
@@ -131,7 +138,7 @@ class OpenInterpreterTool(BaseTool):
             system_info.append(f"Available Commands: {', '.join(available_commands)}")
         except Exception:
             system_info.append("Available Commands: Unable to determine")
-        
+
         return "\n".join(system_info)
 
     def to_params(self) -> dict:
