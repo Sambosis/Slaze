@@ -114,6 +114,9 @@ class ProjectSetupTool(BaseAnthropicTool):
         """Format subprocess call and response to look like terminal output."""
         output_lines = []
         
+        # Start with console formatting
+        output_lines.append("```console")
+        
         # Format the command with current directory if provided
         if cwd:
             output_lines.append(f"$ cd {cwd}")
@@ -125,11 +128,18 @@ class ProjectSetupTool(BaseAnthropicTool):
         # Add the response if provided
         if result is not None:
             if result.stdout:
-                output_lines.append(result.stdout.strip())
+                # Split stdout into lines and preserve formatting
+                stdout_lines = result.stdout.rstrip().split('\n')
+                output_lines.extend(stdout_lines)
             if result.stderr:
-                output_lines.append(result.stderr.strip())
+                # Split stderr into lines and preserve formatting
+                stderr_lines = result.stderr.rstrip().split('\n')
+                output_lines.extend(stderr_lines)
             if result.returncode != 0:
                 output_lines.append(f"[Exit code: {result.returncode}]")
+        
+        # End console formatting
+        output_lines.append("```")
         
         return "\n".join(output_lines)
 
