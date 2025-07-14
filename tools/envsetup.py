@@ -110,6 +110,55 @@ class ProjectSetupTool(BaseAnthropicTool):
 
         return "\n".join(output_lines)
 
+    def _format_terminal_output(self, cmd: list, result: subprocess.CompletedProcess = None, cwd: str = None) -> str:
+        """Format subprocess call and response to look like terminal output."""
+        output_lines = []
+        
+        # Start with console formatting
+        output_lines.append("```console")
+        
+        # Format the command with current directory if provided
+        if cwd:
+            output_lines.append(f"$ cd {cwd}")
+        
+        # Format the command
+        cmd_str = " ".join(cmd)
+        output_lines.append(f"$ {cmd_str}")
+        
+        # Add the response if provided
+        if result is not None:
+            if result.stdout:
+                # Split stdout into lines and preserve formatting
+                stdout_lines = result.stdout.rstrip().split('\n')
+                output_lines.extend(stdout_lines)
+            if result.stderr:
+                # Split stderr into lines and preserve formatting
+                stderr_lines = result.stderr.rstrip().split('\n')
+                output_lines.extend(stderr_lines)
+            if result.returncode != 0:
+                output_lines.append(f"[Exit code: {result.returncode}]")
+        
+        # End console formatting
+        output_lines.append("```")
+        
+        return "\n".join(output_lines)
+
+    def _run_subprocess_with_display(self, cmd: list, cwd: str = None, check: bool = True, capture_output: bool = True, text: bool = True) -> subprocess.CompletedProcess:
+        """Run subprocess and display terminal-like output if display is available."""
+        try:
+            result = subprocess.run(cmd, cwd=cwd, check=check, capture_output=capture_output, text=text)
+            
+            if self.display is not None:
+                formatted_output = self._format_terminal_output(cmd, result, cwd)
+                self.display.add_message("assistant", formatted_output)
+            
+            return result
+        except subprocess.CalledProcessError as e:
+            if self.display is not None:
+                formatted_output = self._format_terminal_output(cmd, e, cwd)
+                self.display.add_message("assistant", formatted_output)
+            raise
+
     def _get_venv_executable(self, venv_dir_path: Path, executable_name: str) -> Path:
         """Gets the path to an executable in the venv's scripts/bin directory."""
         if os.name == 'nt':  # Windows
@@ -135,7 +184,7 @@ class ProjectSetupTool(BaseAnthropicTool):
 
             if not venv_dir.exists():
                 try:
-                    subprocess.run(["uv", "venv"], check=True, cwd=repo_path, capture_output=True)
+                    self._run_subprocess_with_display(["uv", "venv"], cwd=str(repo_path))
                 except subprocess.CalledProcessError as e:
                     error_result = {
                         "command": "setup_project",
@@ -155,9 +204,9 @@ class ProjectSetupTool(BaseAnthropicTool):
 
                 # run uv init if there is no pyproject.toml and uv sync if there is
                 if not (repo_path / "pyproject.toml").exists():
-                    subprocess.run(args=["uv", "init"], cwd=repo_path, check=True, capture_output=True, text=True)
+                    self._run_subprocess_with_display(["uv", "init"], cwd=str(repo_path))
                 else:
-                    subprocess.run(args=["uv", "sync"], cwd=repo_path, check=True, capture_output=True, text=True)
+                    self._run_subprocess_with_display(["uv", "sync"], cwd=str(repo_path))
                 logger.info(f"Project initialized at {repo_path}")
             except subprocess.CalledProcessError as e:
                 error_result = {
@@ -205,7 +254,7 @@ class ProjectSetupTool(BaseAnthropicTool):
                             continue
                         logger.info(f"Attempting to install package: {clean_pkg} using uv")
                         try:
-                            result = subprocess.run(["uv", "add", clean_pkg], capture_output=True, text=True, cwd=repo_path, check=True)
+                            result = self._run_subprocess_with_display(["uv", "add", clean_pkg], cwd=str(repo_path))
                             installed_packages.append(clean_pkg)
                             logger.info(f"Successfully installed {clean_pkg}")
                         except subprocess.CalledProcessError as e:
@@ -282,27 +331,23 @@ class ProjectSetupTool(BaseAnthropicTool):
                         self.display.add_message(
                             "assistant", f"Installing package {i}/{len(packages)}: {package} using uv"
                         )
-                    result = subprocess.run([
-                        "uv",
-                        "add",
-                        package,
-                    ], capture_output=True, text=True, cwd=repo_path, check=True)
-                    if result.returncode == 0:
+                    try:
+                        result = self._run_subprocess_with_display(["uv", "add", package], cwd=str(repo_path))
                         installed_packages.append(package)
                         if self.display is not None:
                             self.display.add_message("assistant", f"Successfully installed {package}")
-                    else:
+                    except subprocess.CalledProcessError as e:
                         error_result = {
                             "command": "add_additional_depends",
                             "status": "error",
-                            "error": result.stderr,
+                            "error": e.stderr if e.stderr else str(e),
                             "repo_path": str(repo_path),
                             "packages_installed": installed_packages,
                             "packages_failed": packages[i - 1 :],
                             "failed_at": package,
                         }
                         return ToolResult(
-                            error=result.stderr,
+                            error=e.stderr if e.stderr else str(e),
                             message=self.format_output(error_result),
                             command="add_additional_depends",
                             tool_name=self.name
@@ -347,13 +392,8 @@ class ProjectSetupTool(BaseAnthropicTool):
             cmd = ["uv", "run", str(filename)]
             print(f"Running command: {' '.join(cmd)} in {repo_dir}")
             try:
-                result = subprocess.run(
-                    cmd, capture_output=True, text=True, check=False, cwd=repo_dir
-                )
-                rr(result)
+                result = self._run_subprocess_with_display(cmd, cwd=repo_dir, check=False)
                 run_output = f"stdout: {result.stdout}\nstderr: {result.stderr}"
-                if self.display is not None:
-                    self.display.add_message("assistant", run_output)
                 logger.info(f"Run app output for {filename}:\n{run_output}")
                 rr(f"Run app output for {filename}:\n{run_output}")  # Using rich print for better formatting
                 return ToolResult(
@@ -397,8 +437,7 @@ class ProjectSetupTool(BaseAnthropicTool):
             print(f"Running command: {' '.join(cmd)} in {repo_dir}")
             # Use subprocess to run the command in the repo_dir
             try:
-                result = subprocess.run(cmd, capture_output=True, text=True, check=True, cwd=repo_dir)
-                rr(result)
+                result = self._run_subprocess_with_display(cmd, cwd=repo_dir)
                 return ToolResult(
                     output=result.stdout,
                     error=result.stderr if result.stderr else None,
