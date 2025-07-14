@@ -145,7 +145,7 @@ class EditTool(BaseTool):
             # Add display messages
             if self.display is not None:
                 self.display.add_message(
-                    "user", f"EditTool Executing Command: {command} on path: {path}"
+                    "assistant", f"EditTool Executing Command: {command} on path: {path}"
                 )
 
             # Normalize the path first relative to REPO_DIR

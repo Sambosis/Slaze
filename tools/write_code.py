@@ -40,10 +40,22 @@ from utils.file_logger import (
 from system_prompt.code_prompts import code_prompt_generate, code_skeleton_prompt
 import ftfy
 
+# Import PictureGenerationTool for handling image files
+from tools.create_picture import PictureGenerationTool, PictureCommand
 
 MODEL_STRING = CODE_MODEL  # Default model string, can be overridden in config
 
 logger = logging.getLogger(__name__)
+
+# Common image file extensions
+IMAGE_EXTENSIONS = {
+    '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.tif', 
+    '.webp', '.svg', '.ico', '.psd', '.raw', '.heic', '.heif'
+}
+
+def is_image_file(filename: str) -> bool:
+    """Check if a file is an image based on its extension."""
+    return Path(filename).suffix.lower() in IMAGE_EXTENSIONS
 
 # --- Retry Predicate Function ---
 def should_retry_llm_call(exception: Exception) -> bool:
@@ -120,11 +132,10 @@ class WriteCodeTool(BaseAnthropicTool):
         )
 
     def __init__(self, display=None):
-        super().__init__(
-            input_schema=None, display=display
-        )  # Assuming BaseAnthropicTool takes these
-        self.display = display
+        super().__init__(input_schema=None, display=display)
         logger.debug("Initializing WriteCodeTool")
+        # Initialize PictureGenerationTool for handling image files
+        self.picture_tool = PictureGenerationTool(display=display)
 
     def to_params(self) -> dict:
         logger.debug(f"WriteCodeTool.to_params called with api_type: {self.api_type}")
@@ -336,85 +347,168 @@ class WriteCodeTool(BaseAnthropicTool):
                     command=command,
                 )
 
-            # --- Step 1: Generate Skeletons Asynchronously ---
-            if self.display:
-                self.display.add_message(
-                    "assistant",
-                    f"Generating skeletons for:\n {'\n'.join(file.filename for file in file_details)}",
-                )
-
-            # CHANGE: Update the call to pass file_detail and all file_details
-            skeleton_tasks = [
-                self._call_llm_for_code_skeleton(
-                    file,  # Pass the FileDetail object for the current file
-                    repo_path_obj
-                    / file.filename,  # Pass the intended final host path
-                    file_details,  # Pass the list of ALL FileDetail objects
-                )
-                for file in file_details  # Iterate through the validated FileDetail objects
-            ]
-            skeleton_results = await asyncio.gather(
-                *skeleton_tasks, return_exceptions=True
-            )
-
-            skeletons: Dict[str, str] = {}
-            errors_skeleton = []
-            for i, result in enumerate(skeleton_results):
-                filename_key = file_details[i].filename  # Use the relative filename
-                if isinstance(result, Exception):
-                    error_msg = (
-                        f"Error generating skeleton for {filename_key}: {result}"
+            # --- Check for image files and handle them with PictureGenerationTool ---
+            image_files = []
+            code_files = []
+            image_results = []
+            
+            for file_detail in file_details:
+                if is_image_file(file_detail.filename):
+                    image_files.append(file_detail)
+                else:
+                    code_files.append(file_detail)
+            
+            # Handle image files with PictureGenerationTool
+            if image_files:
+                if self.display:
+                    self.display.add_message(
+                        "assistant",
+                        f"Detected image files, using PictureGenerationTool for:\n {'\n'.join(file.filename for file in image_files)}",
                     )
-                    logger.error(error_msg, exc_info=True)
-                    errors_skeleton.append(error_msg)
-                    skeletons[filename_key] = (
-                        f"# Error generating skeleton: {result}"  # Placeholder
-                    )
-
-            # --- Step 2: Generate Full Code Asynchronously ---
-
-            code_gen_tasks = [
-                self._call_llm_to_generate_code(
-                    file.code_description,
-                    skeletons,
-                    file.external_imports or [],
-                    file.internal_imports or [],
-                    # Pass the intended final host path to the code generator for context
-                    repo_path_obj / file.filename,
-                )
-                for file in file_details
-            ]
-            code_results = await asyncio.gather(*code_gen_tasks, return_exceptions=True)
-
-            # --- Step 3: Write Files ---
-            write_results = []
-            errors_code_gen = []
-            errors_write = []
-            success_count = 0
-
-            logger.info(
-                f"Starting file writing phase for {len(code_results)} results to HOST path: {repo_path_obj}"
-            )
-
-            for i, result in enumerate(code_results):
-                file_detail = file_details[i]
-                filename = file_detail.filename  # Relative filename
-                # >>> USE THE CORRECTED HOST PATH FOR WRITING <<<
-                absolute_path = (
-                    repo_path_obj / filename
-                ).resolve()  # Ensure absolute path
-                logger.info(f"Processing result for: {filename} (Host Path: {absolute_path})")
-
-                if isinstance(result, Exception):
-                    error_msg = f"Error generating code for {filename}: {result}"
-                    logger.error(error_msg, exc_info=True)
-                    errors_code_gen.append(error_msg)
-                    write_results.append(
-                        {"filename": filename, "status": "error", "message": error_msg}
-                    )
-                    # Attempt to write error file to the resolved host path
+                
+                for image_file in image_files:
                     try:
-                        logger.info(
+                        # Use the code_description as the prompt for image generation
+                        # Set default dimensions if not specified
+                        width = 1024
+                        height = 1024
+                        
+                        result = await self.picture_tool(
+                            command=PictureCommand.CREATE,
+                            prompt=image_file.code_description,
+                            output_path=image_file.filename,
+                            width=width,
+                            height=height
+                        )
+                        image_results.append(result)
+                        
+                        if self.display:
+                            self.display.add_message(
+                                "assistant",
+                                f"Generated image: {image_file.filename}",
+                            )
+                    except Exception as e:
+                        error_msg = f"Error generating image {image_file.filename}: {str(e)}"
+                        logger.error(error_msg)
+                        image_results.append(ToolResult(
+                            error=error_msg,
+                            tool_name=self.name,
+                            command=command,
+                        ))
+            
+            # If only image files were requested, return the image results
+            if not code_files:
+                if len(image_results) == 1:
+                    return image_results[0]
+                else:
+                    # Combine multiple image results
+                    success_count = sum(1 for r in image_results if not r.error)
+                    error_count = len(image_results) - success_count
+                    
+                    output_messages = []
+                    for i, result in enumerate(image_results):
+                        if result.error:
+                            output_messages.append(f"Error with {image_files[i].filename}: {result.error}")
+                        else:
+                            output_messages.append(f"Successfully generated {image_files[i].filename}")
+                    
+                    return ToolResult(
+                        output=f"Generated {success_count} images successfully, {error_count} errors.\n" + "\n".join(output_messages),
+                        tool_name=self.name,
+                        command=command,
+                    )
+            
+            # Update file_details to only include code files for the rest of the process
+            file_details = code_files
+
+            # --- Step 1: Generate Skeletons Asynchronously ---
+            if file_details:  # Only proceed if there are code files to process
+                if self.display:
+                    self.display.add_message(
+                        "assistant",
+                        f"Generating skeletons for:\n {'\n'.join(file.filename for file in file_details)}",
+                    )
+
+                # CHANGE: Update the call to pass file_detail and all file_details
+                skeleton_tasks = [
+                    self._call_llm_for_code_skeleton(
+                        file,  # Pass the FileDetail object for the current file
+                        repo_path_obj
+                        / file.filename,  # Pass the intended final host path
+                        file_details,  # Pass the list of ALL FileDetail objects
+                    )
+                    for file in file_details  # Iterate through the validated FileDetail objects
+                ]
+                skeleton_results = await asyncio.gather(
+                    *skeleton_tasks, return_exceptions=True
+                )
+
+                skeletons: Dict[str, str] = {}
+                errors_skeleton = []
+                for i, result in enumerate(skeleton_results):
+                    filename_key = file_details[i].filename  # Use the relative filename
+                    if isinstance(result, Exception):
+                        error_msg = (
+                            f"Error generating skeleton for {filename_key}: {result}"
+                        )
+                        logger.error(error_msg, exc_info=True)
+                        errors_skeleton.append(error_msg)
+                        skeletons[filename_key] = (
+                            f"# Error generating skeleton: {result}"  # Placeholder
+                        )
+
+                # --- Step 2: Generate Full Code Asynchronously ---
+
+                code_gen_tasks = [
+                    self._call_llm_to_generate_code(
+                        file.code_description,
+                        skeletons,
+                        file.external_imports or [],
+                        file.internal_imports or [],
+                        # Pass the intended final host path to the code generator for context
+                        repo_path_obj / file.filename,
+                    )
+                    for file in file_details
+                ]
+                code_results = await asyncio.gather(*code_gen_tasks, return_exceptions=True)
+
+                # --- Step 3: Write Files ---
+                write_results = []
+                errors_code_gen = []
+                errors_write = []
+                success_count = 0
+            else:
+                # Initialize variables when there are no code files to process
+                write_results = []
+                errors_skeleton = []
+                errors_code_gen = []
+                errors_write = []
+                success_count = 0
+
+            if file_details:  # Only process code results if there are code files
+                logger.info(
+                    f"Starting file writing phase for {len(code_results)} results to HOST path: {repo_path_obj}"
+                )
+
+                for i, result in enumerate(code_results):
+                    file_detail = file_details[i]
+                    filename = file_detail.filename  # Relative filename
+                    # >>> USE THE CORRECTED HOST PATH FOR WRITING <<<
+                    absolute_path = (
+                        repo_path_obj / filename
+                    ).resolve()  # Ensure absolute path
+                    logger.info(f"Processing result for: {filename} (Host Path: {absolute_path})")
+
+                    if isinstance(result, Exception):
+                        error_msg = f"Error generating code for {filename}: {result}"
+                        logger.error(error_msg, exc_info=True)
+                        errors_code_gen.append(error_msg)
+                        write_results.append(
+                            {"filename": filename, "status": "error", "message": error_msg}
+                        )
+                        # Attempt to write error file to the resolved host path
+                        try:
+                            logger.info(
                             f"Attempting to write error file for {filename} to {absolute_path}"
                         )
                         absolute_path.parent.mkdir(parents=True, exist_ok=True)
@@ -567,20 +661,54 @@ class WriteCodeTool(BaseAnthropicTool):
             if errors_skeleton or errors_code_gen or errors_write:
                 final_status = "partial_success" if success_count > 0 else "error"
 
+            # Calculate image generation results
+            image_success_count = sum(1 for r in image_results if not r.error)
+            image_error_count = len(image_results) - image_success_count
+            total_files = len(file_details) + len(image_files)
+            total_success = success_count + image_success_count
+            
             # Use the resolved host path in the final message
-            output_message = f"Codebase generation finished. Status: {final_status}. {success_count}/{len(file_details)} files written successfully to HOST path '{repo_path_obj}'."
+            if image_files:
+                output_message = f"File generation finished. Status: {final_status}. {total_success}/{total_files} files created successfully to HOST path '{repo_path_obj}'."
+                output_message += f"\n  - Code files: {success_count}/{len(file_details)} successful"
+                output_message += f"\n  - Image files: {image_success_count}/{len(image_files)} successful"
+            else:
+                output_message = f"Codebase generation finished. Status: {final_status}. {success_count}/{len(file_details)} files written successfully to HOST path '{repo_path_obj}'."
+                
             if errors_skeleton:
                 output_message += f"\nSkeleton Errors: {len(errors_skeleton)}"
             if errors_code_gen:
                 output_message += f"\nCode Generation Errors: {len(errors_code_gen)}"
             if errors_write:
                 output_message += f"\nFile Write Errors: {len(errors_write)}"
+            if image_error_count > 0:
+                output_message += f"\nImage Generation Errors: {image_error_count}"
+
+            # Add image results to write_results
+            for i, image_result in enumerate(image_results):
+                if image_result.error:
+                    write_results.append({
+                        "filename": image_files[i].filename,
+                        "status": "error",
+                        "message": f"Error generating image: {image_result.error}",
+                    })
+                else:
+                    write_results.append({
+                        "filename": image_files[i].filename,
+                        "status": "success",
+                        "operation": "image_generation",
+                        "message": f"Successfully generated image: {image_files[i].filename}",
+                    })
 
             result_data = {
                 "status": final_status,
                 "message": output_message,
-                "files_processed": len(file_details),
-                "files_successful": success_count,
+                "files_processed": total_files,
+                "files_successful": total_success,
+                "code_files_processed": len(file_details),
+                "code_files_successful": success_count,
+                "image_files_processed": len(image_files),
+                "image_files_successful": image_success_count,
                 "write_path": str(repo_path_obj),
                 "results": write_results,
                 "errors": errors_skeleton + errors_code_gen + errors_write,

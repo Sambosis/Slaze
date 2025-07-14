@@ -131,7 +131,7 @@ class ProjectSetupTool(BaseAnthropicTool):
 
         try:
             if self.display is not None:
-                self.display.add_message("user", f"Creating virtual environment in {repo_path}")
+                self.display.add_message("assistant", f"Creating virtual environment in {repo_path}")
 
             if not venv_dir.exists():
                 try:
@@ -152,7 +152,12 @@ class ProjectSetupTool(BaseAnthropicTool):
 
             # Run 'uv init' directly in the project directory; no venv activation is performed here
             try:
-                subprocess.run(args=["uv", "init"], cwd=repo_path, check=True)
+
+                # run uv init if there is no pyproject.toml and uv sync if there is
+                if not (repo_path / "pyproject.toml").exists():
+                    subprocess.run(args=["uv", "init"], cwd=repo_path, check=True, capture_output=True, text=True)
+                else:
+                    subprocess.run(args=["uv", "sync"], cwd=repo_path, check=True, capture_output=True, text=True)
                 logger.info(f"Project initialized at {repo_path}")
             except subprocess.CalledProcessError as e:
                 error_result = {
@@ -217,8 +222,7 @@ class ProjectSetupTool(BaseAnthropicTool):
                                 command="setup_project",
                                 tool_name=self.name
                             )
-                if self.display is not None:
-                    self.display.add_message("user", f"Project setup complete in {repo_path}")
+
             rr(result)
             success_result = {
                 "command": "setup_project",
@@ -276,7 +280,7 @@ class ProjectSetupTool(BaseAnthropicTool):
                         continue
                     if self.display is not None:
                         self.display.add_message(
-                            "user", f"Installing package {i}/{len(packages)}: {package} using uv"
+                            "assistant", f"Installing package {i}/{len(packages)}: {package} using uv"
                         )
                     result = subprocess.run([
                         "uv",
@@ -286,7 +290,7 @@ class ProjectSetupTool(BaseAnthropicTool):
                     if result.returncode == 0:
                         installed_packages.append(package)
                         if self.display is not None:
-                            self.display.add_message("user", f"Successfully installed {package}")
+                            self.display.add_message("assistant", f"Successfully installed {package}")
                     else:
                         error_result = {
                             "command": "add_additional_depends",
@@ -344,10 +348,12 @@ class ProjectSetupTool(BaseAnthropicTool):
             print(f"Running command: {' '.join(cmd)} in {repo_dir}")
             try:
                 result = subprocess.run(
-                    cmd, capture_output=True, text=True, check=True, cwd=repo_dir
+                    cmd, capture_output=True, text=True, check=False, cwd=repo_dir
                 )
                 rr(result)
                 run_output = f"stdout: {result.stdout}\nstderr: {result.stderr}"
+                if self.display is not None:
+                    self.display.add_message("assistant", run_output)
                 logger.info(f"Run app output for {filename}:\n{run_output}")
                 rr(f"Run app output for {filename}:\n{run_output}")  # Using rich print for better formatting
                 return ToolResult(
@@ -445,12 +451,6 @@ class ProjectSetupTool(BaseAnthropicTool):
                     return ToolResult(
                         error=f"Unknown command: {command}", tool_name=self.name
                     )
-
-            if self.display is not None:
-                self.display.add_message(
-                    "user",
-                    f"ProjectSetupTool Command: {command_value} Environment: {environment}, Packages: {packages}, Entry Filename: {entry_filename}",
-                )
 
             # Set default packages if not provided
             if packages is None:
