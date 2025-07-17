@@ -164,14 +164,13 @@ class EditTool(BaseTool):
                         f"EditTool Command: {command} successfully created file {_path} !",
                     )
                     self.display.add_message("tool", file_text)
-                output_data = {
-                    "command": "create",
-                    "status": "success",
-                    "file_path": str(_path),
-                    "operation_details": "File created successfully",
-                }
+                # Return detailed result with file creation confirmation
+                success_msg = f"File {_path} has been created successfully.\n"
+                success_msg += f"Content length: {len(file_text)} characters\n"
+                success_msg += f"File path: {str(_path)}"
+                
                 return ToolResult(
-                    output=self.format_output(output_data),
+                    output=success_msg,
                     tool_name=self.name,
                     command="create",
                 )
@@ -183,16 +182,10 @@ class EditTool(BaseTool):
                         "assistant",
                         f"EditTool Command: {command} successfully viewed file\n {str(result.output[:100])} !",
                     )
-                output_data = {
-                    "command": "view",
-                    "status": "success",
-                    "file_path": str(_path),
-                    "operation_details": result.output
-                    if result.output
-                    else "No content to display",
-                }
+                # Return the detailed result from view method with proper metadata
                 return ToolResult(
-                    output=self.format_output(output_data),
+                    output=result.output,
+                    error=result.error,
                     tool_name=self.name,
                     command="view",
                 )
@@ -216,14 +209,11 @@ class EditTool(BaseTool):
                         "assistant",
                         f"End of New Text: {new_str[-200:] if new_str and len(new_str) > 200 else new_str}",
                     )
-                output_data = {
-                    "command": "str_replace",
-                    "status": "success",
-                    "file_path": str(_path),
-                    "operation_details": "Replaced text in file",
-                }
+                
+                # Return the detailed result from str_replace method with proper metadata
                 return ToolResult(
-                    output=self.format_output(output_data),
+                    output=result.output,
+                    error=result.error,
                     tool_name=self.name,
                     command="str_replace",
                 )
@@ -238,28 +228,32 @@ class EditTool(BaseTool):
                         "Parameter `new_str` is required for command: insert"
                     )
                 result = self.insert(_path, insert_line, new_str)
-                output_data = {
-                    "command": "insert",
-                    "status": "success",
-                    "file_path": str(_path),
-                    "operation_details": f"Inserted text at line {insert_line}",
-                }
+                if self.display is not None:
+                    self.display.add_message(
+                        "assistant",
+                        f"EditTool Command: {command} successfully inserted text at line {insert_line} in file {str(_path)} !",
+                    )
+                
+                # Return the detailed result from insert method with proper metadata
                 return ToolResult(
-                    output=self.format_output(output_data),
+                    output=result.output,
+                    error=result.error,
                     tool_name=self.name,
                     command="insert",
                 )
 
             elif command == "undo_edit":
                 result = self.undo_edit(_path)
-                output_data = {
-                    "command": "undo_edit",
-                    "status": "success",
-                    "file_path": str(_path),
-                    "operation_details": "Last edit undone successfully",
-                }
+                if self.display is not None:
+                    self.display.add_message(
+                        "assistant",
+                        f"EditTool Command: {command} successfully undone last edit in file {str(_path)} !",
+                    )
+                
+                # Return the detailed result from undo_edit method with proper metadata
                 return ToolResult(
-                    output=self.format_output(output_data),
+                    output=result.output,
+                    error=result.error,
                     tool_name=self.name,
                     command="undo_edit",
                 )
@@ -272,14 +266,14 @@ class EditTool(BaseTool):
         except Exception as e:
             if self.display is not None:
                 self.display.add_message("assistant", f"EditTool error: {str(e)}")
-            error_data = {
-                "command": command,
-                "status": "error",
-                "file_path": str(_path) if "_path" in locals() else path,
-                "operation_details": f"Error: {str(e)}",
-            }
+            
+            # Return detailed error information
+            error_msg = f"EditTool {command} command failed.\n"
+            error_msg += f"File path: {str(_path) if '_path' in locals() else path}\n"
+            error_msg += f"Error: {str(e)}"
+            
             return ToolResult(
-                output=self.format_output(error_data),
+                output=error_msg,
                 error=str(e),
                 tool_name=self.name,
                 command=str(command),
