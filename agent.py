@@ -38,7 +38,7 @@ from config import (
 
 from dotenv import load_dotenv
 from pathlib import Path
-from config import set_constant, get_constant, MAIN_MODEL
+from config import set_constant, get_constant
 
 load_dotenv()
 
@@ -362,7 +362,6 @@ class Agent:
 
     def _sanitize_tool_name(self, name: str) -> str:
         """Sanitize tool name to match pattern '^[a-zA-Z0-9_-]{1,64}$'"""
-        import re
 
         # Keep only alphanumeric chars, underscores and hyphens
         sanitized = re.sub(r"[^a-zA-Z0-9_-]", "_", name)

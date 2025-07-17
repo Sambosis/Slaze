@@ -9,6 +9,7 @@ from utils.agent_display_console import AgentDisplayConsole
 
 logger = logging.getLogger(__name__)
 
+
 @dataclass(kw_only=True, frozen=True)
 class ToolResult:
     """
@@ -37,9 +38,10 @@ class ToolResult:
         return any(getattr(self, field.name) for field in fields(self))
 
     def __add__(self, other: "ToolResult"):
-        def combine_fields(
-            field: str | None, other_field: str | None, concatenate: bool = True
-        ):
+
+        def combine_fields(field: str | None,
+                           other_field: str | None,
+                           concatenate: bool = True):
             if field and other_field:
                 if concatenate:
                     return field + other_field
@@ -49,7 +51,8 @@ class ToolResult:
         return ToolResult(
             output=combine_fields(self.output, other.output),
             error=combine_fields(self.error, other.error),
-            base64_image=combine_fields(self.base64_image, other.base64_image, False),
+            base64_image=combine_fields(self.base64_image, other.base64_image,
+                                        False),
             system=combine_fields(self.system, other.system),
             tool_name=self.tool_name or other.tool_name,
             command=self.command or other.command,
@@ -88,7 +91,8 @@ class BaseTool(metaclass=ABCMeta):
         }
         self.display = display
 
-    def set_display(self, display: Optional[Union[WebUI, AgentDisplayConsole]]):
+    def set_display(self, display: Optional[Union[WebUI,
+                                                  AgentDisplayConsole]]):
         """Set the display instance for the tool."""
         self.display = display
 
@@ -134,6 +138,7 @@ class ToolFailure(ToolResult):
     """A ToolResult that represents a failure."""
 
     pass
+
 
 # Backwards compatibility alias
 BaseAnthropicTool = BaseTool

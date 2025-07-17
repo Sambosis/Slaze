@@ -11,6 +11,7 @@ from .base import (
 
 logger = logging.getLogger(__name__)
 
+
 class ToolCollection:
     """Collection of tools for the agent to use."""
 
@@ -58,14 +59,19 @@ class ToolCollection:
             try:
                 params = tool.to_params()
                 logger.debug(f"Tool params for {tool_name}:")
-                logger.debug(params) # Assuming params is a dict/object that can be logged
+                logger.debug(
+                    params
+                )  # Assuming params is a dict/object that can be logged
                 tool_params.append(params)
             except Exception as e:
-                logger.error(f"Error getting params for tool {tool_name}: {str(e)}", exc_info=True)
+                logger.error(
+                    f"Error getting params for tool {tool_name}: {str(e)}",
+                    exc_info=True)
 
         logger.debug(f"Total tools collected: {len(tool_params)}")
         logger.debug("---- END COLLECTING TOOL PARAMS ----")
         return tool_params
+
     async def run(self, name: str, tool_input: Dict[str, Any]) -> ToolResult:
         """
         Run a tool with the given name and input.
@@ -82,7 +88,8 @@ class ToolCollection:
         """
         if name not in self.tools:
             return ToolResult(
-                error=f"Tool '{name}' not found. Available tools: {', '.join(self.tools.keys())}",
+                error=
+                f"Tool '{name}' not found. Available tools: {', '.join(self.tools.keys())}",
                 tool_name=name,
                 command=tool_input.get("command", "unknown"),
             )
@@ -94,7 +101,8 @@ class ToolCollection:
             # Log the exact contents of tool_input in a more readable format
             formatted_input = json.dumps(tool_input, indent=2)
 
-            logger.debug(f"EXACT TOOL INPUT: \n{formatted_input}") # Replaced self.t_log with logger
+            logger.debug(f"EXACT TOOL INPUT: \n{formatted_input}"
+                         )  # Replaced self.t_log with logger
 
             result = await tool(**tool_input)
             # This unpacks tool_input as keyword arguments to the tool's __call__ method
@@ -126,9 +134,8 @@ class ToolCollection:
             # If the result is None or not a ToolResult, create a proper one
             if result is None:
                 command = tool_input.get("command", "unknown")
-                command_str = (
-                    command.value if hasattr(command, "value") else str(command)
-                )
+                command_str = (command.value
+                               if hasattr(command, "value") else str(command))
                 return ToolResult(
                     error="Tool execution returned None",
                     tool_name=name,
@@ -138,30 +145,34 @@ class ToolCollection:
             # If it's already a ToolResult but missing attributes, add them
             if not hasattr(result, "tool_name") or result.tool_name is None:
                 result = ToolResult(
-                    output=result.output if hasattr(result, "output") else None,
+                    output=result.output
+                    if hasattr(result, "output") else None,
                     error=result.error if hasattr(result, "error") else None,
-                    base64_image=result.base64_image
-                    if hasattr(result, "base64_image")
-                    else None,
-                    system=result.system if hasattr(result, "system") else None,
-                    message=result.message if hasattr(result, "message") else None,
+                    base64_image=result.base64_image if hasattr(
+                        result, "base64_image") else None,
+                    system=result.system
+                    if hasattr(result, "system") else None,
+                    message=result.message
+                    if hasattr(result, "message") else None,
                     tool_name=name,
-                    command=result.command
-                    if hasattr(result, "command")
-                    else tool_input.get("command", "unknown"),
+                    command=result.command if hasattr(result, "command") else
+                    tool_input.get("command", "unknown"),
                 )
 
             if not hasattr(result, "command") or result.command is None:
                 command = tool_input.get("command", "unknown")
-                command_str = (
-                    command.value if hasattr(command, "value") else str(command)
-                )
+                command_str = (command.value
+                               if hasattr(command, "value") else str(command))
                 result = ToolResult(
-                    output=result.output if hasattr(result, 'output') else None,
+                    output=result.output
+                    if hasattr(result, 'output') else None,
                     error=result.error if hasattr(result, 'error') else None,
-                    base64_image=result.base64_image if hasattr(result, 'base64_image') else None,
-                    system=result.system if hasattr(result, 'system') else None,
-                    message=result.message if hasattr(result, 'message') else None,
+                    base64_image=result.base64_image if hasattr(
+                        result, 'base64_image') else None,
+                    system=result.system
+                    if hasattr(result, 'system') else None,
+                    message=result.message
+                    if hasattr(result, 'message') else None,
                     tool_name=result.tool_name,
                     command=command_str,
                 )
@@ -171,7 +182,8 @@ class ToolCollection:
         except Exception as e:
             # Return ToolResult with error message
             command = tool_input.get("command", "unknown")
-            command_str = command.value if hasattr(command, "value") else str(command)
+            command_str = command.value if hasattr(command,
+                                                   "value") else str(command)
             return ToolResult(
                 error=f"Error executing tool '{name}': {str(e)}",
                 tool_name=name,

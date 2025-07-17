@@ -10,7 +10,7 @@ import logging
 from config import get_constant
 
 # from loguru import logger as ll # Removed loguru
-from rich import print as rr # Removed rich print
+from rich import print as rr  # Removed rich print
 
 # Configure logging to a file # Removed loguru configuration
 # ll.add(
@@ -21,6 +21,7 @@ from rich import print as rr # Removed rich print
 # )
 
 logger = logging.getLogger(__name__)
+
 
 class ProjectCommand(str, Enum):
     """Commands supported by the ProjectSetupTool."""
@@ -43,8 +44,7 @@ class ProjectSetupTool(BaseAnthropicTool):
         "setup_project: create a uv virtual environment and install packages. "
         "add_dependencies: install additional packages. "
         "run_app: execute a Python file using uv. "
-        "run_project: run the project entry file."
-    )
+        "run_project: run the project entry file.")
 
     def __init__(self, display=None):
         """Initialize the ProjectSetupTool instance."""
@@ -73,9 +73,13 @@ class ProjectSetupTool(BaseAnthropicTool):
                             "default": "python",
                         },
                         "packages": {
-                            "type": "array",
-                            "items": {"type": "string"},
-                            "description": "List of packages to install, This can be used during the setup_project command or the add_dependencies command. this should be a list of strings with each package in quotes and separated by commas, with the list enclosed in square brackets. Example: ['package1', 'package2', 'package3']",
+                            "type":
+                            "array",
+                            "items": {
+                                "type": "string"
+                            },
+                            "description":
+                            "List of packages to install, This can be used during the setup_project command or the add_dependencies command. this should be a list of strings with each package in quotes and separated by commas, with the list enclosed in square brackets. Example: ['package1', 'package2', 'package3']",
                         },
                         "entry_filename": {
                             "type": "string",
@@ -110,21 +114,24 @@ class ProjectSetupTool(BaseAnthropicTool):
 
         return "\n".join(output_lines)
 
-    def _format_terminal_output(self, cmd: list, result: subprocess.CompletedProcess = None, cwd: str = None) -> str:
+    def _format_terminal_output(self,
+                                cmd: list,
+                                result: subprocess.CompletedProcess = None,
+                                cwd: str = None) -> str:
         """Format subprocess call and response to look like terminal output."""
         output_lines = []
-        
+
         # Start with console formatting
         output_lines.append("```console")
-        
+
         # Format the command with current directory if provided
         if cwd:
             output_lines.append(f"$ cd {cwd}")
-        
+
         # Format the command
         cmd_str = " ".join(cmd)
         output_lines.append(f"$ {cmd_str}")
-        
+
         # Add the response if provided
         if result is not None:
             if result.stdout:
@@ -137,21 +144,32 @@ class ProjectSetupTool(BaseAnthropicTool):
                 output_lines.extend(stderr_lines)
             if result.returncode != 0:
                 output_lines.append(f"[Exit code: {result.returncode}]")
-        
+
         # End console formatting
         output_lines.append("```")
-        
+
         return "\n".join(output_lines)
 
-    def _run_subprocess_with_display(self, cmd: list, cwd: str = None, check: bool = True, capture_output: bool = True, text: bool = True) -> subprocess.CompletedProcess:
+    def _run_subprocess_with_display(
+            self,
+            cmd: list,
+            cwd: str = None,
+            check: bool = True,
+            capture_output: bool = True,
+            text: bool = True) -> subprocess.CompletedProcess:
         """Run subprocess and display terminal-like output if display is available."""
         try:
-            result = subprocess.run(cmd, cwd=cwd, check=check, capture_output=capture_output, text=text)
-            
+            result = subprocess.run(cmd,
+                                    cwd=cwd,
+                                    check=check,
+                                    capture_output=capture_output,
+                                    text=text)
+
             if self.display is not None:
-                formatted_output = self._format_terminal_output(cmd, result, cwd)
+                formatted_output = self._format_terminal_output(
+                    cmd, result, cwd)
                 self.display.add_message("assistant", formatted_output)
-            
+
             return result
         except subprocess.CalledProcessError as e:
             if self.display is not None:
@@ -159,7 +177,8 @@ class ProjectSetupTool(BaseAnthropicTool):
                 self.display.add_message("assistant", formatted_output)
             raise
 
-    def _get_venv_executable(self, venv_dir_path: Path, executable_name: str) -> Path:
+    def _get_venv_executable(self, venv_dir_path: Path,
+                             executable_name: str) -> Path:
         """Gets the path to an executable in the venv's scripts/bin directory."""
         if os.name == 'nt':  # Windows
             return venv_dir_path / "Scripts" / f"{executable_name}.exe"
@@ -170,7 +189,8 @@ class ProjectSetupTool(BaseAnthropicTool):
         """Set up a local Python project."""
         host_repo_dir = get_constant("REPO_DIR")
         if not host_repo_dir:
-            return ToolResult(error="REPO_DIR is not configured", tool_name=self.name)
+            return ToolResult(error="REPO_DIR is not configured",
+                              tool_name=self.name)
 
         repo_path = Path(host_repo_dir)
         installed_packages = []
@@ -180,97 +200,120 @@ class ProjectSetupTool(BaseAnthropicTool):
 
         try:
             if self.display is not None:
-                self.display.add_message("assistant", f"Creating virtual environment in {repo_path}")
+                self.display.add_message(
+                    "assistant",
+                    f"Creating virtual environment in {repo_path}")
 
             if not venv_dir.exists():
                 try:
-                    self._run_subprocess_with_display(["uv", "venv"], cwd=str(repo_path))
+                    self._run_subprocess_with_display(["uv", "venv"],
+                                                      cwd=str(repo_path))
                 except subprocess.CalledProcessError as e:
                     error_result = {
                         "command": "setup_project",
                         "status": "error",
-                        "error": f"Failed to create virtual environment: {e.stderr if e.stderr else str(e)}",
+                        "error":
+                        f"Failed to create virtual environment: {e.stderr if e.stderr else str(e)}",
                         "repo_path": str(repo_path),
                     }
                     return ToolResult(
-                        error=f"Failed to create virtual environment: {e.stderr if e.stderr else str(e)}",
+                        error=
+                        f"Failed to create virtual environment: {e.stderr if e.stderr else str(e)}",
                         message=self.format_output(error_result),
                         command="setup_project",
-                        tool_name=self.name
-                    )
+                        tool_name=self.name)
 
             # Run 'uv init' directly in the project directory; no venv activation is performed here
             try:
 
                 # run uv init if there is no pyproject.toml and uv sync if there is
                 if not (repo_path / "pyproject.toml").exists():
-                    self._run_subprocess_with_display(["uv", "init"], cwd=str(repo_path))
+                    self._run_subprocess_with_display(["uv", "init"],
+                                                      cwd=str(repo_path))
                 else:
-                    self._run_subprocess_with_display(["uv", "sync"], cwd=str(repo_path))
+                    self._run_subprocess_with_display(["uv", "sync"],
+                                                      cwd=str(repo_path))
                 logger.info(f"Project initialized at {repo_path}")
             except subprocess.CalledProcessError as e:
                 error_result = {
-                    "command": "setup_project", 
+                    "command": "setup_project",
                     "status": "error",
-                    "error": f"Failed to initialize project: {e.stderr if e.stderr else str(e)}",
+                    "error":
+                    f"Failed to initialize project: {e.stderr if e.stderr else str(e)}",
                     "repo_path": str(repo_path),
                 }
                 return ToolResult(
-                    error=f"Failed to initialize project: {e.stderr if e.stderr else str(e)}",
+                    error=
+                    f"Failed to initialize project: {e.stderr if e.stderr else str(e)}",
                     message=self.format_output(error_result),
                     command="setup_project",
-                    tool_name=self.name
-                )
+                    tool_name=self.name)
 
             if packages:
                 if isinstance(packages, str):
                     # Attempt to handle simple string list if accidentally passed
-                    packages = [p.strip() for p in packages.split(',') if p.strip()]
+                    packages = [
+                        p.strip() for p in packages.split(',') if p.strip()
+                    ]
 
-                for package_group in packages: # packages could be a list of strings, where each string is a list of packages
+                for package_group in packages:  # packages could be a list of strings, where each string is a list of packages
                     actual_packages_to_install = []
                     if isinstance(package_group, str):
                         # Further split if a single string in the list contains multiple packages
                         # e.g. "packageA packageB" or "['packageA', 'packageB']"
-                        if '[' in package_group and ']' in package_group: # Looks like a stringified list
+                        if '[' in package_group and ']' in package_group:  # Looks like a stringified list
                             try:
                                 # This is a basic attempt, for more complex strings, json.loads might be better
                                 # but pip install can often handle multiple package names in one command.
                                 # For simplicity, we'll assume packages are space-separated if not proper list items.
                                 cleaned_str = package_group.strip("[]'\" ")
-                                actual_packages_to_install.extend([p.strip(" '\"") for p in cleaned_str.split(',') if p.strip(" '\"")])
+                                actual_packages_to_install.extend([
+                                    p.strip(" '\"")
+                                    for p in cleaned_str.split(',')
+                                    if p.strip(" '\"")
+                                ])
                             except Exception:
                                 # If parsing fails, treat the whole string as one package (or rely on pip to split)
-                                actual_packages_to_install.append(package_group.strip())
-                        else: # Space separated or single package
-                            actual_packages_to_install.extend(package_group.split())
-                    elif isinstance(package_group, list): # if it's already a list of packages
+                                actual_packages_to_install.append(
+                                    package_group.strip())
+                        else:  # Space separated or single package
+                            actual_packages_to_install.extend(
+                                package_group.split())
+                    elif isinstance(
+                            package_group,
+                            list):  # if it's already a list of packages
                         actual_packages_to_install.extend(package_group)
-                    else: # Assuming it's a single package name
+                    else:  # Assuming it's a single package name
                         actual_packages_to_install.append(str(package_group))
 
                     for clean_pkg in actual_packages_to_install:
                         if not clean_pkg:
                             continue
-                        logger.info(f"Attempting to install package: {clean_pkg} using uv")
+                        logger.info(
+                            f"Attempting to install package: {clean_pkg} using uv"
+                        )
                         try:
-                            result = self._run_subprocess_with_display(["uv", "add", clean_pkg], cwd=str(repo_path))
+                            result = self._run_subprocess_with_display(
+                                ["uv", "add", clean_pkg], cwd=str(repo_path))
                             installed_packages.append(clean_pkg)
                             logger.info(f"Successfully installed {clean_pkg}")
                         except subprocess.CalledProcessError as e:
-                            logger.error(f"Failed to install {clean_pkg}: {e.stderr if e.stderr else str(e)}")
+                            logger.error(
+                                f"Failed to install {clean_pkg}: {e.stderr if e.stderr else str(e)}"
+                            )
                             error_result = {
                                 "command": "setup_project",
                                 "status": "error",
-                                "error": f"uv add {clean_pkg} failed: {e.stderr if e.stderr else str(e)}",
+                                "error":
+                                f"uv add {clean_pkg} failed: {e.stderr if e.stderr else str(e)}",
                                 "repo_path": str(repo_path),
                             }
                             return ToolResult(
-                                error=f"uv add {clean_pkg} failed: {e.stderr if e.stderr else str(e)}",
+                                error=
+                                f"uv add {clean_pkg} failed: {e.stderr if e.stderr else str(e)}",
                                 message=self.format_output(error_result),
                                 command="setup_project",
-                                tool_name=self.name
-                            )
+                                tool_name=self.name)
 
             rr(result)
             success_result = {
@@ -279,12 +322,10 @@ class ProjectSetupTool(BaseAnthropicTool):
                 "repo_path": str(repo_path),
                 "packages_installed": installed_packages,
             }
-            return ToolResult(
-                output="Project setup completed successfully",
-                message=self.format_output(success_result),
-                command="setup_project",
-                tool_name=self.name
-            )
+            return ToolResult(output="Project setup completed successfully",
+                              message=self.format_output(success_result),
+                              command="setup_project",
+                              tool_name=self.name)
         except Exception as e:
             error_message = str(e)
             error_result = {
@@ -297,14 +338,14 @@ class ProjectSetupTool(BaseAnthropicTool):
                 error=f"Failed to set up project: {error_message}",
                 message=self.format_output(error_result),
                 command="setup_project",
-                tool_name=self.name
-            )
+                tool_name=self.name)
 
     async def add_dependencies(self, packages: List[str]) -> ToolResult:
         installed_packages = []
         repo_dir = get_constant("REPO_DIR")
         if not repo_dir:
-            return ToolResult(error="REPO_DIR is not configured", tool_name=self.name)
+            return ToolResult(error="REPO_DIR is not configured",
+                              tool_name=self.name)
         repo_path = Path(repo_dir)
 
         try:
@@ -314,9 +355,13 @@ class ProjectSetupTool(BaseAnthropicTool):
                     if '[' in package_item and ']' in package_item:
                         try:
                             cleaned_str = package_item.strip("[]'\" ")
-                            pkgs_to_install_this_round.extend([p.strip(" '\"") for p in cleaned_str.split(',') if p.strip(" '\"")])
+                            pkgs_to_install_this_round.extend([
+                                p.strip(" '\"") for p in cleaned_str.split(',')
+                                if p.strip(" '\"")
+                            ])
                         except Exception:
-                            pkgs_to_install_this_round.append(package_item.strip())
+                            pkgs_to_install_this_round.append(
+                                package_item.strip())
                     else:
                         pkgs_to_install_this_round.extend(package_item.split())
                 elif isinstance(package_item, list):
@@ -329,13 +374,17 @@ class ProjectSetupTool(BaseAnthropicTool):
                         continue
                     if self.display is not None:
                         self.display.add_message(
-                            "assistant", f"Installing package {i}/{len(packages)}: {package} using uv"
+                            "assistant",
+                            f"Installing package {i}/{len(packages)}: {package} using uv"
                         )
                     try:
-                        result = self._run_subprocess_with_display(["uv", "add", package], cwd=str(repo_path))
+                        result = self._run_subprocess_with_display(
+                            ["uv", "add", package], cwd=str(repo_path))
                         installed_packages.append(package)
                         if self.display is not None:
-                            self.display.add_message("assistant", f"Successfully installed {package}")
+                            self.display.add_message(
+                                "assistant",
+                                f"Successfully installed {package}")
                     except subprocess.CalledProcessError as e:
                         error_result = {
                             "command": "add_additional_depends",
@@ -343,15 +392,14 @@ class ProjectSetupTool(BaseAnthropicTool):
                             "error": e.stderr if e.stderr else str(e),
                             "repo_path": str(repo_path),
                             "packages_installed": installed_packages,
-                            "packages_failed": packages[i - 1 :],
+                            "packages_failed": packages[i - 1:],
                             "failed_at": package,
                         }
                         return ToolResult(
                             error=e.stderr if e.stderr else str(e),
                             message=self.format_output(error_result),
                             command="add_additional_depends",
-                            tool_name=self.name
-                        )
+                            tool_name=self.name)
 
             success_result = {
                 "command": "add_additional_depends",
@@ -359,12 +407,10 @@ class ProjectSetupTool(BaseAnthropicTool):
                 "repo_path": str(repo_path),
                 "packages_installed": installed_packages,
             }
-            return ToolResult(
-                output="Dependencies added successfully",
-                message=self.format_output(success_result),
-                command="add_additional_depends", 
-                tool_name=self.name
-            )
+            return ToolResult(output="Dependencies added successfully",
+                              message=self.format_output(success_result),
+                              command="add_additional_depends",
+                              tool_name=self.name)
 
         except Exception as e:
             error_result = {
@@ -375,34 +421,35 @@ class ProjectSetupTool(BaseAnthropicTool):
                 "packages_attempted": packages,
                 "packages_installed": installed_packages,
             }
-            return ToolResult(
-                error=str(e),
-                message=self.format_output(error_result),
-                command="add_additional_depends",
-                tool_name=self.name
-            )
+            return ToolResult(error=str(e),
+                              message=self.format_output(error_result),
+                              command="add_additional_depends",
+                              tool_name=self.name)
 
     async def run_app(self, filename: str) -> ToolResult:
         """Runs a Python application locally."""
         try:
             repo_dir = get_constant("REPO_DIR")
             if not repo_dir:
-                return ToolResult(error="REPO_DIR is not configured", tool_name=self.name)
+                return ToolResult(error="REPO_DIR is not configured",
+                                  tool_name=self.name)
             print(f"Running app at {repo_dir} with filename {filename}")
             cmd = ["uv", "run", str(filename)]
             print(f"Running command: {' '.join(cmd)} in {repo_dir}")
             try:
-                result = self._run_subprocess_with_display(cmd, cwd=repo_dir, check=False)
+                result = self._run_subprocess_with_display(cmd,
+                                                           cwd=repo_dir,
+                                                           check=False)
                 run_output = f"stdout: {result.stdout}\nstderr: {result.stderr}"
                 logger.info(f"Run app output for {filename}:\n{run_output}")
-                rr(f"Run app output for {filename}:\n{run_output}")  # Using rich print for better formatting
+                rr(f"Run app output for {filename}:\n{run_output}"
+                   )  # Using rich print for better formatting
                 return ToolResult(
                     output=result.stdout,
                     error=result.stderr if result.stderr else None,
                     message=f"App executed successfully at {repo_dir}",
                     command="run_app",
-                    tool_name=self.name
-                )
+                    tool_name=self.name)
             except subprocess.CalledProcessError as e:
                 run_output = f"stdout: {e.stdout}\nstderr: {e.stderr}"
                 logger.error(f"Run app failed for {filename}:\n{run_output}")
@@ -411,26 +458,25 @@ class ProjectSetupTool(BaseAnthropicTool):
                     error=e.stderr,
                     message=f"App execution failed at {repo_dir}",
                     command="run_app",
-                    tool_name=self.name
-                )
+                    tool_name=self.name)
         except Exception as e:
             return ToolResult(
                 error=str(e),
                 message=f"Unexpected error running app at {repo_dir}",
                 command="run_app",
-                tool_name=self.name
-            )
+                tool_name=self.name)
 
-    async def run_project(
-        self, entry_filename: str = "app.py"
-        ) -> ToolResult:
+    async def run_project(self, entry_filename: str = "app.py") -> ToolResult:
         """Runs a Python project locally."""
         try:
             repo_dir = get_constant("REPO_DIR")
             if not repo_dir:
-                return ToolResult(error="REPO_DIR is not configured", tool_name=self.name)
+                return ToolResult(error="REPO_DIR is not configured",
+                                  tool_name=self.name)
             # repo_path = _resolve_map_path(repo_dir)
-            print(f"Running project at {repo_dir} with entry file {entry_filename}")
+            print(
+                f"Running project at {repo_dir} with entry file {entry_filename}"
+            )
 
             # get the REPO_DIR constant
             cmd = ["uv", "run", str(entry_filename)]
@@ -443,28 +489,24 @@ class ProjectSetupTool(BaseAnthropicTool):
                     error=result.stderr if result.stderr else None,
                     message=f"Project executed successfully at {repo_dir}",
                     command="run_project",
-                    tool_name=self.name
-                )
+                    tool_name=self.name)
             except subprocess.CalledProcessError as e:
                 return ToolResult(
                     output=e.stdout,
                     error=e.stderr,
                     message=f"Project execution failed at {repo_dir}",
                     command="run_project",
-                    tool_name=self.name
-                )
+                    tool_name=self.name)
 
         except Exception as e:
             if self.display is not None:
-                self.display.add_message(
-                    "assistant", f"ProjectSetupTool error: {str(e)}"
-                )
+                self.display.add_message("assistant",
+                                         f"ProjectSetupTool error: {str(e)}")
             return ToolResult(
                 error=f"Failed to execute run_project: {str(e)}",
                 message=f"Unexpected error running project at {repo_dir}",
                 command="run_project",
-                tool_name=self.name
-            )
+                tool_name=self.name)
 
     async def __call__(
         self,
@@ -487,9 +529,8 @@ class ProjectSetupTool(BaseAnthropicTool):
                     command_value = command.value
                 except ValueError:
                     # If conversion fails, return an error
-                    return ToolResult(
-                        error=f"Unknown command: {command}", tool_name=self.name
-                    )
+                    return ToolResult(error=f"Unknown command: {command}",
+                                      tool_name=self.name)
 
             # Set default packages if not provided
             if packages is None:
@@ -498,7 +539,8 @@ class ProjectSetupTool(BaseAnthropicTool):
             # Use repository directory as project path
             repo_dir = get_constant("REPO_DIR")
             if not repo_dir:
-                return ToolResult(error="REPO_DIR is not configured", tool_name=self.name)
+                return ToolResult(error="REPO_DIR is not configured",
+                                  tool_name=self.name)
             if command == ProjectCommand.SETUP_PROJECT:
                 result = await self.setup_project(packages)
 
@@ -512,15 +554,17 @@ class ProjectSetupTool(BaseAnthropicTool):
                 result = await self.run_project(entry_filename)
 
             else:
-                return ToolResult(error=f"Unknown command: {command_value}", tool_name=self.name)
+                return ToolResult(error=f"Unknown command: {command_value}",
+                                  tool_name=self.name)
 
             return result
 
         except Exception as e:
-            logger.exception(f"Exception in ProjectSetupTool __call__ for command {command if 'command' in locals() else 'unknown'}")
+            logger.exception(
+                f"Exception in ProjectSetupTool __call__ for command {command if 'command' in locals() else 'unknown'}"
+            )
             err_msg = f"Failed to execute {command.value if hasattr(command, 'value') else command}: {str(e)}"
             if self.display is not None:
-                self.display.add_message(
-                    "assistant", f"ProjectSetupTool error: {err_msg}"
-                )
+                self.display.add_message("assistant",
+                                         f"ProjectSetupTool error: {err_msg}")
             return ToolResult(error=err_msg, tool_name=self.name)

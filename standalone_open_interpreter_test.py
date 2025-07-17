@@ -3,7 +3,6 @@
 Standalone test for the OpenInterpreterTool functionality
 """
 
-import sys
 import os
 import platform
 import subprocess

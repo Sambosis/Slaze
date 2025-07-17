@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 """Test script to verify Unicode/emoji support in both console and web modes."""
 
-import sys
-import os
 import asyncio
 import pytest
 from tools.bash import BashTool
@@ -54,7 +52,7 @@ def main():
     # Test 2: BashTool with Unicode
     test2_success = asyncio.run(test_bash_tool_unicode())
     
-    print(f"\n=== Test Results ===")
+    print("\n=== Test Results ===")
     print(f"Basic Unicode test: {'PASS' if test1_success else 'FAIL'}")
     print(f"BashTool Unicode test: {'PASS' if test2_success else 'FAIL'}")
     

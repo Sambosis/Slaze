@@ -9,6 +9,7 @@ load_dotenv()
 
 logger = logging.getLogger(__name__)
 
+
 class PictureCommand(str, Enum):
     CREATE = "create"
 
@@ -25,14 +26,17 @@ class PictureGenerationTool(BaseAnthropicTool):
         self.display = display  # Explicitly set self.display
 
     def to_params(self) -> dict:
-        logger.debug(f"PictureGenerationTool.to_params called with api_type: {self.api_type}")
+        logger.debug(
+            f"PictureGenerationTool.to_params called with api_type: {self.api_type}"
+        )
         params = {
             "type": "function",
             "function": {
                 "name": self.name,
                 "description": self.description,
                 "parameters": {
-                    "type": "object",
+                    "type":
+                    "object",
                     "properties": {
                         "command": {
                             "type": "string",
@@ -40,32 +44,38 @@ class PictureGenerationTool(BaseAnthropicTool):
                             "description": "Command to execute: create",
                         },
                         "prompt": {
-                            "type": "string",
-                            "description": "Text description of the image to generate",
+                            "type":
+                            "string",
+                            "description":
+                            "Text description of the image to generate",
                         },
                         "output_path": {
-                            "type": "string",
-                            "description": "Path where the generated image will be saved, relative to REPO_DIR (e.g., 'images/my_pic.png').",
+                            "type":
+                            "string",
+                            "description":
+                            "Path where the generated image will be saved, relative to REPO_DIR (e.g., 'images/my_pic.png').",
                         },
                         "width": {
                             "type": "integer",
-                            "description": "Width to resize the image (required)",
+                            "description":
+                            "Width to resize the image (required)",
                         },
                         "height": {
                             "type": "integer",
-                            "description": "Height to resize the image (required)",
+                            "description":
+                            "Height to resize the image (required)",
                         },
                     },
-                    "required": ["command", "prompt", "output_path", "width", "height"],
+                    "required":
+                    ["command", "prompt", "output_path", "width", "height"],
                 },
             },
         }
         logger.debug(f"PictureGenerationTool params: {params}")
         return params
 
-    async def generate_picture(
-        self, prompt: str, output_path: str, width: int, height: int
-    ) -> dict:
+    async def generate_picture(self, prompt: str, output_path: str, width: int,
+                               height: int) -> dict:
         """
         Generates an image based on the prompt using the specified width and height,
         and saves it to the output path relative to REPO_DIR.
@@ -85,7 +95,7 @@ class PictureGenerationTool(BaseAnthropicTool):
             import base64
             from PIL import Image
             from pathlib import Path
-            from config import get_constant # Added import
+            from config import get_constant  # Added import
 
             # --- Path Construction ---
             host_repo_dir = get_constant("REPO_DIR")
@@ -122,7 +132,8 @@ class PictureGenerationTool(BaseAnthropicTool):
             # Log the file creation with metadata
             metadata = {
                 "prompt": prompt,
-                "dimensions": f"{width}x{height}" if width and height else "original",
+                "dimensions":
+                f"{width}x{height}" if width and height else "original",
                 "model": "google/imagen-3-fast",
                 "generation_params": input_data,
             }
@@ -130,11 +141,12 @@ class PictureGenerationTool(BaseAnthropicTool):
             try:
                 from utils.file_logger import log_file_operation
 
-                log_file_operation(
-                    file_path=output_path_obj, operation="create", metadata=metadata
-                )
+                log_file_operation(file_path=output_path_obj,
+                                   operation="create",
+                                   metadata=metadata)
             except Exception as log_error:
-                logger.warning(f"Failed to log image creation: {log_error}", exc_info=True)
+                logger.warning(f"Failed to log image creation: {log_error}",
+                               exc_info=True)
                 # Continue anyway - don't let logging failure prevent success
 
             # Create base64 for display
@@ -158,9 +170,12 @@ class PictureGenerationTool(BaseAnthropicTool):
                 # Update metadata with new dimensions
                 metadata["dimensions"] = f"{new_size[0]}x{new_size[1]}"
                 try:
-                    log_file_operation(output_path_obj, "update", metadata=metadata)
+                    log_file_operation(output_path_obj,
+                                       "update",
+                                       metadata=metadata)
                 except Exception as log_error:
-                    logger.warning(f"Failed to log image resize: {log_error}", exc_info=True)
+                    logger.warning(f"Failed to log image resize: {log_error}",
+                                   exc_info=True)
                     # Continue anyway - don't let logging failure prevent success
 
                 # Update base64 data
@@ -185,7 +200,8 @@ class PictureGenerationTool(BaseAnthropicTool):
 
             error_stack = traceback.format_exc()
             error_message = f"Error generating image: {str(e)}"
-            logger.error(f"Error generating image: {str(e)}\n{error_stack}", exc_info=True)
+            logger.error(f"Error generating image: {str(e)}\n{error_stack}",
+                         exc_info=True)
             return {"status": "error", "message": error_message}
 
     def format_output(self, data: dict) -> str:
@@ -237,15 +253,17 @@ class PictureGenerationTool(BaseAnthropicTool):
         """
         try:
             if command == PictureCommand.CREATE:
-                result = await self.generate_picture(prompt, output_path, width, height)
+                result = await self.generate_picture(prompt, output_path,
+                                                     width, height)
 
                 if "error" in result and result["error"]:
-                    return ToolResult(
-                        error=result["error"], tool_name=self.name, command=command
-                    )
+                    return ToolResult(error=result["error"],
+                                      tool_name=self.name,
+                                      command=command)
 
                 return ToolResult(
-                    output=result.get("output", "Image generated successfully"),
+                    output=result.get("output",
+                                      "Image generated successfully"),
                     base64_image=result.get("base64_image"),
                     message=result.get("message"),
                     tool_name=self.name,
@@ -263,4 +281,6 @@ class PictureGenerationTool(BaseAnthropicTool):
             error_message = (
                 f"Error in PictureGenerationTool: {str(e)}\n{traceback.format_exc()}"
             )
-            return ToolResult(error=error_message, tool_name=self.name, command=command)
+            return ToolResult(error=error_message,
+                              tool_name=self.name,
+                              command=command)

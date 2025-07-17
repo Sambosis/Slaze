@@ -6,7 +6,6 @@ try:
 except Exception:  # pragma: no cover - optional dependency
     interpreter = None
 
-
 import os
 import subprocess
 from pathlib import Path
@@ -20,11 +19,13 @@ from utils.web_ui import WebUI
 
 logger = logging.getLogger(__name__)
 
+
 class OpenInterpreterTool(BaseTool):
     """Execute commands using the open-interpreter package."""
 
     name: ClassVar[Literal["open_interpreter"]] = "open_interpreter"
-    api_type: ClassVar[Literal["open_interpreter_20250124"]] = "open_interpreter_20250124"
+    api_type: ClassVar[
+        Literal["open_interpreter_20250124"]] = "open_interpreter_20250124"
     description: str = (
         "Runs instructions using open-interpreter's interpreter.chat function."
     )
@@ -40,18 +41,21 @@ class OpenInterpreterTool(BaseTool):
         # that are used by open-interpreter
         litellm_logger = logging.getLogger('litellm')
         litellm_logger.setLevel(logging.WARNING)
-        
+
         httpx_logger = logging.getLogger('httpx')
         httpx_logger.setLevel(logging.WARNING)
-        
+
         openai_logger = logging.getLogger('openai')
         openai_logger.setLevel(logging.WARNING)
 
         if self.display is not None:
             try:
-                self.display.add_message("user", f"Interpreter request: {message}")
+                self.display.add_message("user",
+                                         f"Interpreter request: {message}")
             except Exception as e:
-                return ToolResult(error=str(e), tool_name=self.name, command=message)
+                return ToolResult(error=str(e),
+                                  tool_name=self.name,
+                                  command=message)
 
         try:
             global interpreter
@@ -59,7 +63,10 @@ class OpenInterpreterTool(BaseTool):
                 from interpreter import interpreter as _interp
                 interpreter = _interp
 
-            result = interpreter.chat(message, display=True, stream=False, blocking=True)
+            result = interpreter.chat(message,
+                                      display=True,
+                                      stream=False,
+                                      blocking=True)
             return ToolResult(
                 output=str(result),
                 tool_name=self.name,
@@ -73,21 +80,22 @@ class OpenInterpreterTool(BaseTool):
                 tool_name=self.name,
                 command=message,
             )
+
     def __init__(self, display: Union[WebUI, AgentDisplayConsole] = None):
         super().__init__(input_schema=None, display=display)
         self.display = display
 
         self.interpreter = OpenInterpreter(in_terminal_interface=True)
-        
+
         # Suppress verbose debug logging from LiteLLM and related libraries
         # that are used by open-interpreter
         import logging
         litellm_logger = logging.getLogger('litellm')
         litellm_logger.setLevel(logging.WARNING)
-        
+
         httpx_logger = logging.getLogger('httpx')
         httpx_logger.setLevel(logging.WARNING)
-        
+
         openai_logger = logging.getLogger('openai')
         openai_logger.setLevel(logging.WARNING)
 
@@ -98,15 +106,21 @@ class OpenInterpreterTool(BaseTool):
         """
 
     name: ClassVar[Literal["open_interpreter"]] = "open_interpreter"
-    api_type: ClassVar[Literal["open_interpreter_20250124"]] = "open_interpreter_20250124"
+    api_type: ClassVar[
+        Literal["open_interpreter_20250124"]] = "open_interpreter_20250124"
 
     async def __call__(self, task_description: str | None = None, **kwargs):
         if task_description is not None:
             if self.display is not None:
                 try:
-                    self.display.add_message("assistant", f"Executing task with open-interpreter: {task_description}")
+                    self.display.add_message(
+                        "assistant",
+                        f"Executing task with open-interpreter: {task_description}"
+                    )
                 except Exception as e:
-                    return ToolResult(error=str(e), tool_name=self.name, command=task_description)
+                    return ToolResult(error=str(e),
+                                      tool_name=self.name,
+                                      command=task_description)
 
             return await self._execute_with_interpreter(task_description)
         raise ToolError("no task description provided.")
@@ -123,7 +137,8 @@ class OpenInterpreterTool(BaseTool):
         try:
             # Get the current working directory
             repo_dir = get_constant("REPO_DIR")
-            cwd = str(repo_dir) if repo_dir and Path(repo_dir).exists() else None
+            cwd = str(
+                repo_dir) if repo_dir and Path(repo_dir).exists() else None
 
             # Try to import and use open-interpreter
             try:
@@ -152,7 +167,7 @@ class OpenInterpreterTool(BaseTool):
                     output = lastmessage.get('content', '')
                 success = True
                 if self.display is not None:
-                    self.display.add_message("assistant", output)   
+                    self.display.add_message("assistant", output)
             except ImportError:
                 error = "open-interpreter package is not installed. Please install it with: pip install open-interpreter"
                 success = False
@@ -161,13 +176,11 @@ class OpenInterpreterTool(BaseTool):
             error = str(e)
             success = False
 
-        formatted_output = (
-            f"task_description: {task_description}\n"
-            f"working_directory: {cwd}\n"
-            f"success: {str(success).lower()}\n"
-            f"output: {output}\n"
-            f"error: {error}"
-        )
+        formatted_output = (f"task_description: {task_description}\n"
+                            f"working_directory: {cwd}\n"
+                            f"success: {str(success).lower()}\n"
+                            f"output: {output}\n"
+                            f"error: {error}")
         if self.display is not None:
             self.display.add_message("assistant", formatted_output)
         return ToolResult(
@@ -201,18 +214,23 @@ class OpenInterpreterTool(BaseTool):
             available_commands = []
             for cmd in commands:
                 try:
-                    subprocess.run([cmd, '--version'], capture_output=True, timeout=1)
+                    subprocess.run([cmd, '--version'],
+                                   capture_output=True,
+                                   timeout=1)
                     available_commands.append(cmd)
                 except (subprocess.TimeoutExpired, FileNotFoundError):
                     pass
-            system_info.append(f"Available Commands: {', '.join(available_commands)}")
+            system_info.append(
+                f"Available Commands: {', '.join(available_commands)}")
         except Exception:
             system_info.append("Available Commands: Unable to determine")
 
         return "\n".join(system_info)
 
     def to_params(self) -> dict:
-        logger.debug(f"OpenInterpreterTool.to_params called with api_type: {self.api_type}")
+        logger.debug(
+            f"OpenInterpreterTool.to_params called with api_type: {self.api_type}"
+        )
         params = {
             "type": "function",
             "function": {
@@ -222,8 +240,10 @@ class OpenInterpreterTool(BaseTool):
                     "type": "object",
                     "properties": {
                         "task_description": {
-                            "type": "string",
-                            "description": "A description of the task to be executed using open-interpreter. This should include what needs to be done and any relevant context about the system it will run on.",
+                            "type":
+                            "string",
+                            "description":
+                            "A description of the task to be executed using open-interpreter. This should include what needs to be done and any relevant context about the system it will run on.",
                         }
                     },
                     "required": ["task_description"],
@@ -232,4 +252,3 @@ class OpenInterpreterTool(BaseTool):
         }
         logger.debug(f"OpenInterpreterTool params: {params}")
         return params
-

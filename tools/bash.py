@@ -2,9 +2,8 @@ from typing import ClassVar, Literal, Union
 import subprocess
 import re
 from dotenv import load_dotenv
-from regex import T
 from pathlib import Path
-from config import get_constant # check_docker_available removed
+from config import get_constant  # check_docker_available removed
 from .base import BaseTool, ToolError, ToolResult
 from utils.web_ui import WebUI
 from utils.agent_display_console import AgentDisplayConsole
@@ -18,7 +17,9 @@ load_dotenv()
 
 logger = logging.getLogger(__name__)
 
+
 class BashTool(BaseTool):
+
     def __init__(self, display: Union[WebUI, AgentDisplayConsole] = None):
         self.display = display
         super().__init__(input_schema=None, display=display)
@@ -37,9 +38,12 @@ class BashTool(BaseTool):
         if command is not None:
             if self.display is not None:
                 try:
-                    self.display.add_message("user", f"Executing command: {command}")
+                    self.display.add_message("user",
+                                             f"Executing command: {command}")
                 except Exception as e:
-                    return ToolResult(error=str(e), tool_name=self.name, command=command)
+                    return ToolResult(error=str(e),
+                                      tool_name=self.name,
+                                      command=command)
 
             # Convert command using LLM for current system
             modified_command = await self._convert_command_for_system(command)
@@ -59,20 +63,21 @@ class BashTool(BaseTool):
                 return self._legacy_modify_command(command)
             return converted
         except Exception as e:
-            logger.warning(f"LLM command conversion failed, using fallback: {e}")
+            logger.warning(
+                f"LLM command conversion failed, using fallback: {e}")
             # Fallback to legacy regex-based modification
             return self._legacy_modify_command(command)
-    
+
     def _legacy_modify_command(self, command: str) -> str:
         """Legacy fallback method for command modification using regex patterns."""
         import platform
         os_name = platform.system()
-        
+
         if os_name == "Windows":
             # On Windows, keep Windows commands as-is
             if command.startswith("dir"):
                 return command  # dir is correct for Windows
-            
+
             # Convert Linux commands to Windows equivalents
             if command.startswith("ls"):
                 ls_pattern = r"^ls\s*(-\w+)?\s*(.*)"
@@ -80,7 +85,7 @@ class BashTool(BaseTool):
                 if ls_match:
                     path = ls_match.group(2) if ls_match.group(2) else ""
                     return f"dir {path}".strip()
-            
+
             # Convert find to Windows equivalent
             find_pattern = r"^find\s+(\S+)\s+-type\s+f"
             find_match = re.match(find_pattern, command)
@@ -89,7 +94,7 @@ class BashTool(BaseTool):
                 # Convert Unix path to Windows style
                 win_path = path.replace("/", "\\")
                 return f'dir /s /b {win_path}\\*'
-        
+
         else:
             # On Linux/Unix systems
             # Handle find command
@@ -98,7 +103,7 @@ class BashTool(BaseTool):
             if find_match:
                 path = find_match.group(1)
                 # Extract the part after the path and -type f
-                rest_of_command = command[find_match.end() :]
+                rest_of_command = command[find_match.end():]
                 # Add the exclusion for hidden files/paths
                 return f'find {path} -type f -not -path "*/\\.*"{rest_of_command}'
 
@@ -109,7 +114,7 @@ class BashTool(BaseTool):
                 path = ls_match.group(1)
                 # Use ls with grep to filter out hidden entries - improved pattern
                 return f'ls -la {path} | grep -v "^\\."'
-            
+
             # Convert Windows dir to Linux ls
             if command.startswith("dir"):
                 dir_pattern = r"^dir\s*(.*)"
@@ -130,16 +135,17 @@ class BashTool(BaseTool):
         try:
             # Execute the command locally relative to REPO_DIR if set
             repo_dir = get_constant("REPO_DIR")
-            cwd = str(repo_dir) if repo_dir and Path(repo_dir).exists() else None
+            cwd = str(
+                repo_dir) if repo_dir and Path(repo_dir).exists() else None
             terminal_display = f"terminal {cwd}>  {command}"
-            
+
             # Set up environment for UTF-8 support on Windows
             env = os.environ.copy()
             if os.name == 'nt':  # Windows
                 env['PYTHONIOENCODING'] = 'utf-8'
                 env['PYTHONLEGACYWINDOWSFSENCODING'] = '0'
                 env['PYTHONUTF8'] = '1'
-            
+
             result = subprocess.run(
                 command,
                 shell=True,
@@ -150,7 +156,7 @@ class BashTool(BaseTool):
                 check=False,
                 cwd=cwd,
                 env=env,
-                )
+            )
             output = result.stdout
             error = result.stderr
             success = result.returncode == 0
@@ -160,13 +166,11 @@ class BashTool(BaseTool):
             if len(error) > 200000:
                 error = f"{error[:100000]} ... [TRUNCATED] ... {error[-100000:]}"
 
-            formatted_output = (
-                f"command: {command}\n"
-                f"working_directory: {cwd}\n"
-                f"success: {str(success).lower()}\n"
-                f"output: {output}\n"
-                f"error: {error}"
-            )
+            formatted_output = (f"command: {command}\n"
+                                f"working_directory: {cwd}\n"
+                                f"success: {str(success).lower()}\n"
+                                f"output: {output}\n"
+                                f"error: {error}")
             rr(formatted_output)
             return ToolResult(
                 output=formatted_output,
@@ -184,14 +188,11 @@ class BashTool(BaseTool):
                 output = e.output or ""
                 stderr = e.stderr or ""
 
-
-            formatted_output = (
-                f"command: {command}\n"
-                f"working_directory: {cwd}\n"
-                f"success: false\n"
-                f"output: {output}\n"
-                f"error: {stderr or error}"
-            )
+            formatted_output = (f"command: {command}\n"
+                                f"working_directory: {cwd}\n"
+                                f"success: false\n"
+                                f"output: {output}\n"
+                                f"error: {stderr or error}")
             return ToolResult(
                 output=formatted_output,
                 error=error,
@@ -200,7 +201,8 @@ class BashTool(BaseTool):
             )
 
     def to_params(self) -> dict:
-        logger.debug(f"BashTool.to_params called with api_type: {self.api_type}")
+        logger.debug(
+            f"BashTool.to_params called with api_type: {self.api_type}")
         params = {
             "type": "function",
             "function": {

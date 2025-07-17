@@ -53,13 +53,15 @@ logger = logging.getLogger(__name__)
 
 # Common image file extensions
 IMAGE_EXTENSIONS = {
-    '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.tif', 
-    '.webp', '.svg', '.ico', '.psd', '.raw', '.heic', '.heif'
+    '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.tif', '.webp', '.svg',
+    '.ico', '.psd', '.raw', '.heic', '.heif'
 }
+
 
 def is_image_file(filename: str) -> bool:
     """Check if a file is an image based on its extension."""
     return Path(filename).suffix.lower() in IMAGE_EXTENSIONS
+
 
 # --- Retry Predicate Function ---
 def should_retry_llm_call(exception: Exception) -> bool:
@@ -68,13 +70,12 @@ def should_retry_llm_call(exception: Exception) -> bool:
     # Always retry on our custom LLMResponseError
     if isinstance(exception, LLMResponseError):
         logger.warning(
-            f"Retry triggered by LLMResponseError: {str(exception)[:200]}"
-        )
+            f"Retry triggered by LLMResponseError: {str(exception)[:200]}")
         return True
 
     # Retry on specific, transient OpenAI/network errors
     if isinstance(
-        exception,
+            exception,
         (
             APIConnectionError,  # Network issues
             RateLimitError,  # Rate limits hit
@@ -90,11 +91,11 @@ def should_retry_llm_call(exception: Exception) -> bool:
         # Retry on general server errors (5xx) and specific client errors like Gateway Timeout (504)
         # or Request Timeout (408). 429 should ideally be RateLimitError.
         if exception.status_code >= 500 or exception.status_code in [
-            408,
-            429,
-            502,
-            503,
-            504,
+                408,
+                429,
+                502,
+                503,
+                504,
         ]:
             logger.warning(
                 f"Retry triggered by OpenAI APIStatusError (status {exception.status_code}): {str(exception)[:200]}"
@@ -133,7 +134,7 @@ class WriteCodeTool(BaseAnthropicTool):
         "This is the tool to use to generate a code files for a codebase, can create up to 5 files at a time. "
         "Use this tool to generate init files."
         "Creates skeletons first, then generates full code asynchronously, writing to the host filesystem."
-        )
+    )
 
     def __init__(self, display=None):
         super().__init__(input_schema=None, display=display)
@@ -142,7 +143,8 @@ class WriteCodeTool(BaseAnthropicTool):
         self.picture_tool = PictureGenerationTool(display=display)
 
     def to_params(self) -> dict:
-        logger.debug(f"WriteCodeTool.to_params called with api_type: {self.api_type}")
+        logger.debug(
+            f"WriteCodeTool.to_params called with api_type: {self.api_type}")
         params = {
             "type": "function",
             "function": {
@@ -152,39 +154,53 @@ class WriteCodeTool(BaseAnthropicTool):
                     "type": "object",
                     "properties": {
                         "command": {
-                            "type": "string",
+                            "type":
+                            "string",
                             "enum": [CodeCommand.WRITE_CODEBASE.value],
-                            "description": "Command to perform. Only 'write_codebase' is supported.",
+                            "description":
+                            "Command to perform. Only 'write_codebase' is supported.",
                         },
                         "files": {
-                            "type": "array",
+                            "type":
+                            "array",
                             "items": {
                                 "type": "object",
                                 "properties": {
                                     "filename": {
-                                        "type": "string",
-                                        "description": " The relative path for the file. The main entry point to the code should NOT have a directory structure, e.g., just `main.py`. Any other files that you would like to be in a directory structure should be specified with their relative paths, e.g., `/utils/helpers.py`.",
+                                        "type":
+                                        "string",
+                                        "description":
+                                        " The relative path for the file. The main entry point to the code should NOT have a directory structure, e.g., just `main.py`. Any other files that you would like to be in a directory structure should be specified with their relative paths, e.g., `/utils/helpers.py`.",
                                     },
                                     "code_description": {
-                                        "type": "string",
-                                        "description": "Detailed description of the code for this file.  This should be a comprehensive overview of the file's purpose, functionality, and any important details. It should include a general overview of the files implementation as well as how it interacts with the rest of the codebase.",
+                                        "type":
+                                        "string",
+                                        "description":
+                                        "Detailed description of the code for this file.  This should be a comprehensive overview of the file's purpose, functionality, and any important details. It should include a general overview of the files implementation as well as how it interacts with the rest of the codebase.",
                                     },
                                     "external_imports": {
                                         "type": "array",
-                                        "items": {"type": "string"},
-                                        "description": "List of external libraries/packages required specifically for this file.",
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "description":
+                                        "List of external libraries/packages required specifically for this file.",
                                         "default": [],
                                     },
                                     "internal_imports": {
                                         "type": "array",
-                                        "items": {"type": "string"},
-                                        "description": "List of internal modules/files within the codebase imported specifically by this file.",
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "description":
+                                        "List of internal modules/files within the codebase imported specifically by this file.",
                                         "default": [],
                                     },
                                 },
                                 "required": ["filename", "code_description"],
                             },
-                            "description": "List of files to generate, each with a filename, description, and optional specific imports.",
+                            "description":
+                            "List of files to generate, each with a filename, description, and optional specific imports.",
                         },
                         # Deprecated project_path removed. Files are now written
                         # directly relative to REPO_DIR.
@@ -233,13 +249,14 @@ class WriteCodeTool(BaseAnthropicTool):
             if LOG_FILE_PATH.exists() and LOG_FILE_PATH.is_file():
                 content = LOG_FILE_PATH.read_text(encoding="utf-8")
                 if not content.strip():
-                    logger.warning("File creation log %s is empty.", LOG_FILE_PATH)
+                    logger.warning("File creation log %s is empty.",
+                                   LOG_FILE_PATH)
                     return "File creation log is empty."
                 return content
             else:
                 logger.warning(
-                    "File creation log not found or is not a file: %s", LOG_FILE_PATH
-                )
+                    "File creation log not found or is not a file: %s",
+                    LOG_FILE_PATH)
                 return "File creation log not found or is not a file."
         except IOError as e:
             logger.error(
@@ -266,9 +283,8 @@ class WriteCodeTool(BaseAnthropicTool):
         file_path_for_log = "unknown_file"
         # Try to get file_path or target_file_path from kwargs for contextual logging
         if retry_state.kwargs:
-            fp_arg = retry_state.kwargs.get("file_path") or retry_state.kwargs.get(
-                "target_file_path"
-            )
+            fp_arg = retry_state.kwargs.get(
+                "file_path") or retry_state.kwargs.get("target_file_path")
             if isinstance(fp_arg, Path):
                 file_path_for_log = fp_arg.name
 
@@ -284,14 +300,13 @@ class WriteCodeTool(BaseAnthropicTool):
             log_msg = (
                 f"{log_prefix}Retrying {fn_name} due to {type(exc).__name__}: {str(exc)[:150]}. "
                 f"Attempt {retry_state.attempt_number} of {max_attempts_str}. "
-                f"Waiting {retry_state.next_action.sleep:.2f}s..."
-            )
+                f"Waiting {retry_state.next_action.sleep:.2f}s...")
         else:
             log_msg = (
                 f"{log_prefix}Retrying {fn_name} (no direct exception, or outcome not yet available). "
                 f"Attempt {retry_state.attempt_number}. Waiting {retry_state.next_action.sleep:.2f}s..."
             )
-        logger.info(log_msg) # Rich text formatting removed
+        logger.info(log_msg)  # Rich text formatting removed
 
     async def __call__(
         self,
@@ -314,7 +329,8 @@ class WriteCodeTool(BaseAnthropicTool):
         """
         if command != CodeCommand.WRITE_CODEBASE:
             return ToolResult(
-                error=f"Unsupported command: {command}. Only 'write_codebase' is supported.",
+                error=
+                f"Unsupported command: {command}. Only 'write_codebase' is supported.",
                 tool_name=self.name,
                 command=command,
             )
@@ -332,15 +348,19 @@ class WriteCodeTool(BaseAnthropicTool):
             repo_path_obj = Path(host_repo_dir).resolve()
             if not repo_path_obj.exists():
                 repo_path_obj.mkdir(parents=True, exist_ok=True)
-            logger.info(f"Resolved repository path for writing: {repo_path_obj}")
+            logger.info(
+                f"Resolved repository path for writing: {repo_path_obj}")
 
             # Validate files input
             try:
                 file_details = [FileDetail(**f) for f in files]
             except Exception as pydantic_error:
-                logger.error(f"Pydantic validation error for 'files': {pydantic_error}", exc_info=True)
+                logger.error(
+                    f"Pydantic validation error for 'files': {pydantic_error}",
+                    exc_info=True)
                 return ToolResult(
-                    error=f"Invalid format for 'files' parameter: {pydantic_error}",
+                    error=
+                    f"Invalid format for 'files' parameter: {pydantic_error}",
                     tool_name=self.name,
                     command=command,
                 )
@@ -356,13 +376,13 @@ class WriteCodeTool(BaseAnthropicTool):
             image_files = []
             code_files = []
             image_results = []
-            
+
             for file_detail in file_details:
                 if is_image_file(file_detail.filename):
                     image_files.append(file_detail)
                 else:
                     code_files.append(file_detail)
-            
+
             # Handle image files with PictureGenerationTool
             if image_files:
                 if self.display:
@@ -370,23 +390,22 @@ class WriteCodeTool(BaseAnthropicTool):
                         "assistant",
                         f"Detected image files, using PictureGenerationTool for:\n {'\n'.join(file.filename for file in image_files)}",
                     )
-                
+
                 for image_file in image_files:
                     try:
                         # Use the code_description as the prompt for image generation
                         # Set default dimensions if not specified
                         width = 1024
                         height = 1024
-                        
+
                         result = await self.picture_tool(
                             command=PictureCommand.CREATE,
                             prompt=image_file.code_description,
                             output_path=image_file.filename,
                             width=width,
-                            height=height
-                        )
+                            height=height)
                         image_results.append(result)
-                        
+
                         if self.display:
                             self.display.add_message(
                                 "assistant",
@@ -395,34 +414,42 @@ class WriteCodeTool(BaseAnthropicTool):
                     except Exception as e:
                         error_msg = f"Error generating image {image_file.filename}: {str(e)}"
                         logger.error(error_msg)
-                        image_results.append(ToolResult(
-                            error=error_msg,
-                            tool_name=self.name,
-                            command=command,
-                        ))
-            
+                        image_results.append(
+                            ToolResult(
+                                error=error_msg,
+                                tool_name=self.name,
+                                command=command,
+                            ))
+
             # If only image files were requested, return the image results
             if not code_files:
                 if len(image_results) == 1:
                     return image_results[0]
                 else:
                     # Combine multiple image results
-                    success_count = sum(1 for r in image_results if not r.error)
+                    success_count = sum(1 for r in image_results
+                                        if not r.error)
                     error_count = len(image_results) - success_count
-                    
+
                     output_messages = []
                     for i, result in enumerate(image_results):
                         if result.error:
-                            output_messages.append(f"Error with {image_files[i].filename}: {result.error}")
+                            output_messages.append(
+                                f"Error with {image_files[i].filename}: {result.error}"
+                            )
                         else:
-                            output_messages.append(f"Successfully generated {image_files[i].filename}")
-                    
+                            output_messages.append(
+                                f"Successfully generated {image_files[i].filename}"
+                            )
+
                     return ToolResult(
-                        output=f"Generated {success_count} images successfully, {error_count} errors.\n" + "\n".join(output_messages),
+                        output=
+                        f"Generated {success_count} images successfully, {error_count} errors.\n"
+                        + "\n".join(output_messages),
                         tool_name=self.name,
                         command=command,
                     )
-            
+
             # Update file_details to only include code files for the rest of the process
             file_details = code_files
 
@@ -438,20 +465,20 @@ class WriteCodeTool(BaseAnthropicTool):
                 skeleton_tasks = [
                     self._call_llm_for_code_skeleton(
                         file,  # Pass the FileDetail object for the current file
-                        repo_path_obj
-                        / file.filename,  # Pass the intended final host path
+                        repo_path_obj /
+                        file.filename,  # Pass the intended final host path
                         file_details,  # Pass the list of ALL FileDetail objects
-                    )
-                    for file in file_details  # Iterate through the validated FileDetail objects
+                    ) for file in
+                    file_details  # Iterate through the validated FileDetail objects
                 ]
-                skeleton_results = await asyncio.gather(
-                    *skeleton_tasks, return_exceptions=True
-                )
+                skeleton_results = await asyncio.gather(*skeleton_tasks,
+                                                        return_exceptions=True)
 
                 skeletons: Dict[str, str] = {}
                 errors_skeleton = []
                 for i, result in enumerate(skeleton_results):
-                    filename_key = file_details[i].filename  # Use the relative filename
+                    filename_key = file_details[
+                        i].filename  # Use the relative filename
                     if isinstance(result, Exception):
                         error_msg = (
                             f"Error generating skeleton for {filename_key}: {result}"
@@ -472,10 +499,10 @@ class WriteCodeTool(BaseAnthropicTool):
                         file.internal_imports or [],
                         # Pass the intended final host path to the code generator for context
                         repo_path_obj / file.filename,
-                    )
-                    for file in file_details
+                    ) for file in file_details
                 ]
-                code_results = await asyncio.gather(*code_gen_tasks, return_exceptions=True)
+                code_results = await asyncio.gather(*code_gen_tasks,
+                                                    return_exceptions=True)
 
                 # --- Step 3: Write Files ---
                 write_results = []
@@ -500,34 +527,39 @@ class WriteCodeTool(BaseAnthropicTool):
                     filename = file_detail.filename  # Relative filename
                     # >>> USE THE CORRECTED HOST PATH FOR WRITING <<<
                     absolute_path = (
-                        repo_path_obj / filename
-                    ).resolve()  # Ensure absolute path
-                    logger.info(f"Processing result for: {filename} (Host Path: {absolute_path})")
+                        repo_path_obj /
+                        filename).resolve()  # Ensure absolute path
+                    logger.info(
+                        f"Processing result for: {filename} (Host Path: {absolute_path})"
+                    )
 
                     if isinstance(result, Exception):
                         error_msg = f"Error generating code for {filename}: {result}"
                         logger.error(error_msg, exc_info=True)
                         errors_code_gen.append(error_msg)
-                        write_results.append(
-                            {"filename": filename, "status": "error", "message": error_msg}
-                        )
+                        write_results.append({
+                            "filename": filename,
+                            "status": "error",
+                            "message": error_msg
+                        })
                         # Attempt to write error file to the resolved host path
                         try:
                             logger.info(
                                 f"Attempting to write error file for {filename} to {absolute_path}"
                             )
-                            absolute_path.parent.mkdir(parents=True, exist_ok=True)
+                            absolute_path.parent.mkdir(parents=True,
+                                                       exist_ok=True)
                             error_content = f"# Code generation failed: {result}\n\n# Skeleton:\n{skeletons.get(filename, '# Skeleton not available')}"
-                            absolute_path.write_text(
-                                error_content, encoding="utf-8", errors="replace"
-                            )
+                            absolute_path.write_text(error_content,
+                                                     encoding="utf-8",
+                                                     errors="replace")
                             logger.info(
                                 f"Successfully wrote error file for {filename} to {absolute_path}"
                             )
                         except Exception as write_err:
                             logger.error(
-                                f"Failed to write error file for {filename} to {absolute_path}: {write_err}", exc_info=True
-                            )
+                                f"Failed to write error file for {filename} to {absolute_path}: {write_err}",
+                                exc_info=True)
 
                     else:  # Code generation successful
                         code_content = result
@@ -539,20 +571,26 @@ class WriteCodeTool(BaseAnthropicTool):
                             logger.warning(
                                 f"Generated code content for {filename} is empty or whitespace only. Skipping write."
                             )
-                            write_results.append(
-                                {
-                                    "filename": filename,
-                                    "status": "error",
-                                    "message": "Generated code was empty",
-                                }
-                            )
+                            write_results.append({
+                                "filename":
+                                filename,
+                                "status":
+                                "error",
+                                "message":
+                                "Generated code was empty",
+                            })
                             continue  # Skip to next file
 
                         try:
-                            logger.debug(f"Ensuring directory exists: {absolute_path.parent}")
-                            absolute_path.parent.mkdir(parents=True, exist_ok=True)
-                            operation = "modify" if absolute_path.exists() else "create"
-                            logger.debug(f"Operation type for {filename}: {operation}")
+                            logger.debug(
+                                f"Ensuring directory exists: {absolute_path.parent}"
+                            )
+                            absolute_path.parent.mkdir(parents=True,
+                                                       exist_ok=True)
+                            operation = "modify" if absolute_path.exists(
+                            ) else "create"
+                            logger.debug(
+                                f"Operation type for {filename}: {operation}")
 
                             fixed_code = ftfy.fix_text(code_content)
                             logger.debug(
@@ -560,11 +598,14 @@ class WriteCodeTool(BaseAnthropicTool):
                             )
 
                             # >>> THE WRITE CALL to the HOST path <<<
-                            logger.debug(f"Executing write_text for: {absolute_path}")
-                            absolute_path.write_text(
-                                fixed_code, encoding="utf-8", errors="replace"
+                            logger.debug(
+                                f"Executing write_text for: {absolute_path}")
+                            absolute_path.write_text(fixed_code,
+                                                     encoding="utf-8",
+                                                     errors="replace")
+                            logger.info(
+                                f"Successfully executed write_text for: {absolute_path}"
                             )
-                            logger.info(f"Successfully executed write_text for: {absolute_path}")
 
                             # File existence and size check
                             if absolute_path.exists():
@@ -573,7 +614,9 @@ class WriteCodeTool(BaseAnthropicTool):
                                 )
                                 try:
                                     size = absolute_path.stat().st_size
-                                    logger.info(f"CONFIRMED: File size is {size} bytes.")
+                                    logger.info(
+                                        f"CONFIRMED: File size is {size} bytes."
+                                    )
                                     if size == 0 and len(fixed_code) > 0:
                                         logger.warning(
                                             "File size is 0 despite non-empty content being written!"
@@ -593,7 +636,8 @@ class WriteCodeTool(BaseAnthropicTool):
                             )  # Default to host path if conversion fails
                             try:
                                 # Ensure convert_to_docker_path can handle the absolute host path
-                                docker_path_display = convert_to_docker_path(absolute_path)
+                                docker_path_display = convert_to_docker_path(
+                                    absolute_path)
                                 logger.debug(
                                     f"Converted host path {absolute_path} to display path {docker_path_display}"
                                 )
@@ -605,32 +649,38 @@ class WriteCodeTool(BaseAnthropicTool):
                             # Log operation (using absolute_path for logging context)
                             try:
                                 log_file_operation(
-                                    file_path=absolute_path,  # Log using the actual host path written to
+                                    file_path=
+                                    absolute_path,  # Log using the actual host path written to
                                     operation=operation,
                                     content=fixed_code,
                                     metadata={
-                                        "code_description": file_detail.code_description,
+                                        "code_description":
+                                        file_detail.code_description,
                                         "skeleton": skeletons.get(
                                             filename
                                         ),  # Use relative filename key
                                     },
                                 )
-                                logger.debug(f"Logged file operation for {absolute_path}")
+                                logger.debug(
+                                    f"Logged file operation for {absolute_path}"
+                                )
                             except Exception as log_error:
                                 logger.error(
-                                    f"Failed to log code writing for {filename} ({absolute_path}): {log_error}", exc_info=True
-                                )
+                                    f"Failed to log code writing for {filename} ({absolute_path}): {log_error}",
+                                    exc_info=True)
 
                             # Use docker_path_display in the results if that's what the UI expects
-                            write_results.append(
-                                {
-                                    "filename": str(docker_path_display),
-                                    "status": "success",
-                                    "operation": operation,
-                                    # Add the generated code here
-                                    "code": fixed_code,
-                                }
-                            )
+                            write_results.append({
+                                "filename":
+                                str(docker_path_display),
+                                "status":
+                                "success",
+                                "operation":
+                                operation,
+                                # Add the generated code here
+                                "code":
+                                fixed_code,
+                            })
                             success_count += 1
                             logger.info(
                                 f"Successfully processed and wrote {filename} to {absolute_path}"
@@ -638,28 +688,33 @@ class WriteCodeTool(BaseAnthropicTool):
 
                             # Display generated code (use docker_path_display if needed by UI)
                             if self.display:
-                                language = get_language_from_extension(absolute_path.suffix)
+                                language = get_language_from_extension(
+                                    absolute_path.suffix)
                                 # Determine the language for highlighting.
                                 # The 'language' variable from get_language_from_extension might be simple (e.g., 'py')
                                 # or more specific if html_format_code needs it.
                                 # For pygments, simple extensions usually work.
-                                formatted_code = html_format_code(fixed_code, language or absolute_path.suffix.lstrip('.'))
-                                self.display.add_message("tool", formatted_code)
+                                formatted_code = html_format_code(
+                                    fixed_code, language
+                                    or absolute_path.suffix.lstrip('.'))
+                                self.display.add_message(
+                                    "tool", formatted_code)
 
                         except Exception as write_error:
                             logger.error(
-                                f"Caught exception during write operation for {filename} at path {absolute_path}", exc_info=True
-                            )
+                                f"Caught exception during write operation for {filename} at path {absolute_path}",
+                                exc_info=True)
                             errors_write.append(
                                 f"Error writing file {filename}: {write_error}"
                             )
-                            write_results.append(
-                                {
-                                    "filename": filename,
-                                    "status": "error",
-                                    "message": f"Error writing file {filename}: {write_error}",
-                                }
-                            )
+                            write_results.append({
+                                "filename":
+                                filename,
+                                "status":
+                                "error",
+                                "message":
+                                f"Error writing file {filename}: {write_error}",
+                            })
 
             # --- Step 4: Format and Return Result ---
             final_status = "success"
@@ -671,7 +726,7 @@ class WriteCodeTool(BaseAnthropicTool):
             image_error_count = len(image_results) - image_success_count
             total_files = len(file_details) + len(image_files)
             total_success = success_count + image_success_count
-            
+
             # Use the resolved host path in the final message
             if image_files:
                 output_message = f"File generation finished. Status: {final_status}. {total_success}/{total_files} files created successfully to HOST path '{repo_path_obj}'."
@@ -679,7 +734,7 @@ class WriteCodeTool(BaseAnthropicTool):
                 output_message += f"\n  - Image files: {image_success_count}/{len(image_files)} successful"
             else:
                 output_message = f"Codebase generation finished. Status: {final_status}. {success_count}/{len(file_details)} files written successfully to HOST path '{repo_path_obj}'."
-                
+
             if errors_skeleton:
                 output_message += f"\nSkeleton Errors: {len(errors_skeleton)}"
             if errors_code_gen:
@@ -693,16 +748,23 @@ class WriteCodeTool(BaseAnthropicTool):
             for i, image_result in enumerate(image_results):
                 if image_result.error:
                     write_results.append({
-                        "filename": image_files[i].filename,
-                        "status": "error",
-                        "message": f"Error generating image: {image_result.error}",
+                        "filename":
+                        image_files[i].filename,
+                        "status":
+                        "error",
+                        "message":
+                        f"Error generating image: {image_result.error}",
                     })
                 else:
                     write_results.append({
-                        "filename": image_files[i].filename,
-                        "status": "success",
-                        "operation": "image_generation",
-                        "message": f"Successfully generated image: {image_files[i].filename}",
+                        "filename":
+                        image_files[i].filename,
+                        "status":
+                        "success",
+                        "operation":
+                        "image_generation",
+                        "message":
+                        f"Successfully generated image: {image_files[i].filename}",
                     })
 
             result_data = {
@@ -728,18 +790,24 @@ class WriteCodeTool(BaseAnthropicTool):
         except ValueError as ve:  # Catch specific config/path errors
             error_message = f"Configuration Error in WriteCodeTool __call__: {str(ve)}"
             logger.critical(error_message, exc_info=True)
-            return ToolResult(error=error_message, tool_name=self.name, command=command)
+            return ToolResult(error=error_message,
+                              tool_name=self.name,
+                              command=command)
         except Exception as e:
             error_message = f"Critical Error in WriteCodeTool __call__: {str(e)}"
-            logger.critical("Critical error during codebase generation", exc_info=True)
+            logger.critical("Critical error during codebase generation",
+                            exc_info=True)
             # Optionally include repo_path_obj if it was set
             if repo_path_obj:
                 error_message += f"\nAttempted Host Path: {repo_path_obj}"
             # print(error_message) # Replaced by logger
-            return ToolResult(error=error_message, tool_name=self.name, command=command)
+            return ToolResult(error=error_message,
+                              tool_name=self.name,
+                              command=command)
 
     # --- Helper for logging final output ---
-    def _log_generated_output(self, content: str, file_path: Path, output_type: str):
+    def _log_generated_output(self, content: str, file_path: Path,
+                              output_type: str):
         """Helper to log the final generated content (code or skeleton) to CODE_FILE."""
         try:
             code_log_file_path_str = get_constant("CODE_FILE")
@@ -751,11 +819,12 @@ class WriteCodeTool(BaseAnthropicTool):
                         f"\n--- Generated {output_type} for: {str(file_path)} ({time.strftime('%Y-%m-%d %H:%M:%S')}) ---\n"
                     )
                     f.write(f"{content}\n")
-                    f.write(f"--- End {output_type} for: {str(file_path)} ---\n")
+                    f.write(
+                        f"--- End {output_type} for: {str(file_path)} ---\n")
         except Exception as file_error:
             logger.error(
-                f"Failed to log generated {output_type} for {file_path.name} to {get_constant('CODE_FILE')}: {file_error}", exc_info=True
-            )
+                f"Failed to log generated {output_type} for {file_path.name} to {get_constant('CODE_FILE')}: {file_error}",
+                exc_info=True)
 
     def format_output(self, data: dict) -> str:
         """
@@ -818,7 +887,8 @@ class WriteCodeTool(BaseAnthropicTool):
         # Fallback for backward compatibility: repo/logs/task.txt
         repo_dir = get_constant("REPO_DIR")
         if repo_dir:
-            possible_paths.append(os.path.join(str(repo_dir), "logs", "task.txt"))
+            possible_paths.append(
+                os.path.join(str(repo_dir), "logs", "task.txt"))
 
         # Additional fallbacks for backward compatibility
         possible_paths.extend([
@@ -835,16 +905,23 @@ class WriteCodeTool(BaseAnthropicTool):
                             logger.info(f"Read task description from: {path}")
                             return task_desc
             except Exception as e:
-                logger.warning(f"Error reading task file {path}: {e}", exc_info=True)
+                logger.warning(f"Error reading task file {path}: {e}",
+                               exc_info=True)
 
-        logger.warning("task.txt not found in any specified location. Trying 'TASK' constant as fallback.")
+        logger.warning(
+            "task.txt not found in any specified location. Trying 'TASK' constant as fallback."
+        )
         # Try to get from "TASK" constant as a last resort if file is not found
         task_from_constant = get_constant("TASK")
-        if task_from_constant and task_from_constant != "NOT YET CREATED" and task_from_constant.strip(): # Check if not default or empty
-            logger.info("Using task description from 'TASK' constant as fallback.")
+        if task_from_constant and task_from_constant != "NOT YET CREATED" and task_from_constant.strip(
+        ):  # Check if not default or empty
+            logger.info(
+                "Using task description from 'TASK' constant as fallback.")
             return task_from_constant
 
-        logger.error("No overall task description provided (task.txt not found and TASK constant not set, default, or empty).")
+        logger.error(
+            "No overall task description provided (task.txt not found and TASK constant not set, default, or empty)."
+        )
         return "No overall task description provided (task.txt not found and TASK constant not set, default, or empty)."
 
     # --- Refactored Code Generation Method ---
@@ -855,20 +932,21 @@ class WriteCodeTool(BaseAnthropicTool):
         external_imports: List[str],
         internal_imports: List[str],
         file_path: Path,
-        ) -> str:
+    ) -> str:
         """Generate full file content using provided skeletons."""
 
         skeleton_context = "\n\n---\n\n".join(
             f"### Skeleton for {fname}:\n```\n{skel}\n```"
-            for fname, skel in all_skeletons.items()
-        )
+            for fname, skel in all_skeletons.items())
         agent_task = self._get_task_description()
         log_content = self._get_file_creation_log_content()
 
         prepared_messages = code_prompt_generate(
-            current_code_base="", # Assuming current_code_base is handled or intentionally empty
+            current_code_base=
+            "",  # Assuming current_code_base is handled or intentionally empty
             code_description=code_description,
-            research_string="", # Assuming research_string is handled or intentionally empty
+            research_string=
+            "",  # Assuming research_string is handled or intentionally empty
             agent_task=agent_task,
             skeletons=skeleton_context,
             external_imports=external_imports,
@@ -889,15 +967,17 @@ class WriteCodeTool(BaseAnthropicTool):
                 model_to_use=model_to_use,
             )
         except LLMResponseError as e:
-            logger.error(f"LLMResponseError for {file_path.name} after all retries: {e}", exc_info=True)
+            logger.error(
+                f"LLMResponseError for {file_path.name} after all retries: {e}",
+                exc_info=True)
             # rr( # Replaced by logger
             #     f"[bold red]LLM generated invalid content for {file_path.name} after retries: {e}[/bold red]"
             # )
             final_code_string = f"# Error generating code for {file_path.name}: LLMResponseError - {str(e)}"
         except APIError as e:  # Catch specific OpenAI errors
             logger.error(
-                f"OpenAI APIError for {file_path.name} after all retries: {type(e).__name__} - {e}", exc_info=True
-            )
+                f"OpenAI APIError for {file_path.name} after all retries: {type(e).__name__} - {e}",
+                exc_info=True)
             # rr( # Replaced by logger
             #     f"[bold red]LLM call failed due to APIError for {file_path.name} after retries: {e}[/bold red]"
             # )
@@ -906,8 +986,8 @@ class WriteCodeTool(BaseAnthropicTool):
             )
         except Exception as e:
             logger.critical(
-                f"Unexpected error during code generation for {file_path.name} after retries: {type(e).__name__} - {e}", exc_info=True
-            )
+                f"Unexpected error during code generation for {file_path.name} after retries: {type(e).__name__} - {e}",
+                exc_info=True)
             # rr( # Replaced by logger
             #     f"[bold red]LLM call ultimately failed for {file_path.name} due to unexpected error: {e}[/bold red]"
             # )
@@ -924,23 +1004,21 @@ class WriteCodeTool(BaseAnthropicTool):
         retry=retry_if_exception(should_retry_llm_call),
         reraise=True,
         before_sleep=_log_llm_retry_attempt,
-        )
+    )
     async def _llm_generate_code_core_with_retry(
         self,
         prepared_messages: List[Dict[str, str]],
         file_path: Path,
         model_to_use: str,
-        ) -> str:
+    ) -> str:
         """Call the LLM to produce final code with retry logic."""
         OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
         if not OPENROUTER_API_KEY:
-            raise ValueError(
-                "OPENROUTER_API_KEY environment variable not set."
-            )  # Should fail fast if not retryable
+            raise ValueError("OPENROUTER_API_KEY environment variable not set."
+                             )  # Should fail fast if not retryable
 
-        client = AsyncOpenAI(
-            base_url="https://openrouter.ai/api/v1", api_key=OPENROUTER_API_KEY
-        )
+        client = AsyncOpenAI(base_url="https://openrouter.ai/api/v1",
+                             api_key=OPENROUTER_API_KEY)
 
         current_attempt = getattr(
             self._llm_generate_code_core_with_retry.retry.statistics,
@@ -952,16 +1030,13 @@ class WriteCodeTool(BaseAnthropicTool):
         )
 
         completion = await client.chat.completions.create(
-            model=model_to_use, messages=prepared_messages
-        )
+            model=model_to_use, messages=prepared_messages)
 
-        if not (
-            completion
-            and completion.choices
-            and completion.choices[0].message
-            and completion.choices[0].message.content
-        ):
-            logger.error(f"No valid completion content received for {file_path.name}")
+        if not (completion and completion.choices
+                and completion.choices[0].message
+                and completion.choices[0].message.content):
+            logger.error(
+                f"No valid completion content received for {file_path.name}")
             logger.error(
                 f"[bold red]Invalid or empty completion content from LLM for {file_path.name}[/bold red]"
             )
@@ -972,8 +1047,7 @@ class WriteCodeTool(BaseAnthropicTool):
         raw_code_string = completion.choices[0].message.content
         # Assuming self.extract_code_block is defined in your class
         code_string, detected_language = self.extract_code_block(
-            raw_code_string, file_path
-        )
+            raw_code_string, file_path)
 
         logger.info(
             f"Extracted code for {file_path.name}. Lang: {detected_language}. Raw len: {len(raw_code_string)}, Extracted len: {len(code_string or '')}"
@@ -996,8 +1070,9 @@ class WriteCodeTool(BaseAnthropicTool):
                 )
 
         if code_string.startswith(
-            f"# Error: Code generation failed for {file_path.name}"
-        ) or code_string.startswith(f"# Failed to generate code for {file_path.name}"):
+                f"# Error: Code generation failed for {file_path.name}"
+        ) or code_string.startswith(
+                f"# Failed to generate code for {file_path.name}"):
             logger.error(
                 f"LLM returned a placeholder error message for {file_path.name}: {code_string[:100]}"
             )
@@ -1012,8 +1087,9 @@ class WriteCodeTool(BaseAnthropicTool):
         self,
         file_detail: FileDetail,
         file_path: Path,
-        all_file_details: List[FileDetail], # This parameter is no longer used directly by code_skeleton_prompt but might be kept for other reasons or future use.
-        ) -> str:
+        all_file_details: List[
+            FileDetail],  # This parameter is no longer used directly by code_skeleton_prompt but might be kept for other reasons or future use.
+    ) -> str:
         """Request a skeleton from the LLM for the target file."""
         target_file_name = file_path.name
 
@@ -1044,21 +1120,21 @@ class WriteCodeTool(BaseAnthropicTool):
             )
         except LLMResponseError as e:
             logger.error(
-                f"LLMResponseError for skeleton {target_file_name} after all retries: {e}", exc_info=True
-            )
+                f"LLMResponseError for skeleton {target_file_name} after all retries: {e}",
+                exc_info=True)
             logger.error(
                 f"[bold red]LLM generated invalid skeleton for {target_file_name} after retries: {e}[/bold red]"
             )
             final_skeleton_string = f"# Error generating skeleton for {target_file_name}: LLMResponseError - {str(e)}"
         except APIError as e:  # Catch specific OpenAI errors
             logger.error(
-                f"OpenAI APIError for skeleton {target_file_name} after all retries: {type(e).__name__} - {e}", exc_info=True
-            )
+                f"OpenAI APIError for skeleton {target_file_name} after all retries: {type(e).__name__} - {e}",
+                exc_info=True)
             final_skeleton_string = f"# Error generating skeleton for {target_file_name}: API Error - {str(e)}"
         except Exception as e:
             logger.critical(
-                f"Unexpected error during skeleton generation for {target_file_name} after retries: {type(e).__name__} - {e}", exc_info=True
-            )
+                f"Unexpected error during skeleton generation for {target_file_name} after retries: {type(e).__name__} - {e}",
+                exc_info=True)
             # rr( # Replaced by logger
             #     f"[bold red]LLM skeleton call ultimately failed for {target_file_name} due to unexpected error: {e}[/bold red]"
             # )
@@ -1066,7 +1142,8 @@ class WriteCodeTool(BaseAnthropicTool):
                 f"# Error generating skeleton for {target_file_name} (final): {str(e)}"
             )
 
-        self._log_generated_output(final_skeleton_string, file_path, "Skeleton")
+        self._log_generated_output(final_skeleton_string, file_path,
+                                   "Skeleton")
         logger.debug(
             f"Final Skeleton for {target_file_name}:\n{final_skeleton_string[:300]}..."
         )  # Log snippet
@@ -1078,21 +1155,21 @@ class WriteCodeTool(BaseAnthropicTool):
         retry=retry_if_exception(should_retry_llm_call),
         reraise=True,
         before_sleep=_log_llm_retry_attempt,
-        )
+    )
     async def _llm_generate_skeleton_core_with_retry(
         self,
         prepared_messages: List[Dict[str, str]],
         target_file_path: Path,
         model_to_use: str,
-        ) -> str:
+    ) -> str:
         """Generate a file skeleton with retry logic."""
         OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
         if not OPENROUTER_API_KEY:
-            raise ValueError("OPENROUTER_API_KEY environment variable not set.")
+            raise ValueError(
+                "OPENROUTER_API_KEY environment variable not set.")
 
-        client = AsyncOpenAI(
-            base_url="https://openrouter.ai/api/v1", api_key=OPENROUTER_API_KEY
-        )
+        client = AsyncOpenAI(base_url="https://openrouter.ai/api/v1",
+                             api_key=OPENROUTER_API_KEY)
 
         current_attempt = getattr(
             self._llm_generate_skeleton_core_with_retry.retry.statistics,
@@ -1104,15 +1181,11 @@ class WriteCodeTool(BaseAnthropicTool):
         )
 
         completion = await client.chat.completions.create(
-            model=model_to_use, messages=prepared_messages
-        )
+            model=model_to_use, messages=prepared_messages)
 
-        if not (
-            completion
-            and completion.choices
-            and completion.choices[0].message
-            and completion.choices[0].message.content
-        ):
+        if not (completion and completion.choices
+                and completion.choices[0].message
+                and completion.choices[0].message.content):
             logger.error(
                 f"No valid skeleton completion content received for {target_file_path.name}"
             )
@@ -1126,8 +1199,7 @@ class WriteCodeTool(BaseAnthropicTool):
         raw_skeleton = completion.choices[0].message.content
         # Assuming self.extract_code_block is defined
         skeleton_string, detected_language = self.extract_code_block(
-            raw_skeleton, target_file_path
-        )
+            raw_skeleton, target_file_path)
 
         logger.info(
             f"Extracted skeleton for {target_file_path.name}. Lang: {detected_language}. Raw len: {len(raw_skeleton)}, Extracted len: {len(skeleton_string or '')}"
@@ -1150,10 +1222,9 @@ class WriteCodeTool(BaseAnthropicTool):
                 )
 
         if skeleton_string.startswith(
-            f"# Error: Skeleton generation failed for {target_file_path.name}"
+                f"# Error: Skeleton generation failed for {target_file_path.name}"
         ) or skeleton_string.startswith(
-            f"# Failed to generate skeleton for {target_file_path.name}"
-        ):
+                f"# Failed to generate skeleton for {target_file_path.name}"):
             logger.error(
                 f"LLM returned a placeholder error for skeleton {target_file_path.name}: {skeleton_string[:100]}"
             )
@@ -1161,20 +1232,21 @@ class WriteCodeTool(BaseAnthropicTool):
                 f"LLM returned placeholder error for skeleton {target_file_path.name}: {skeleton_string[:100]}"
             )
 
-        skeleton_string = ftfy.fix_text(skeleton_string)  # Apply ftfy only on success
+        skeleton_string = ftfy.fix_text(
+            skeleton_string)  # Apply ftfy only on success
         return skeleton_string
 
     def extract_code_block(
-        self, text: str, file_path: Optional[Path] = None
-        ) -> tuple[str, str]:
+            self,
+            text: str,
+            file_path: Optional[Path] = None) -> tuple[str, str]:
         """
         Extracts code based on file type. Special handling for Markdown files.
         Improved language guessing.
         Returns tuple of (content, language).
         """
         if file_path is not None and str(file_path).lower().endswith(
-            (".md", ".markdown")
-        ):
+            (".md", ".markdown")):
             return text, "markdown"
 
         if not text or not text.strip():
@@ -1188,7 +1260,8 @@ class WriteCodeTool(BaseAnthropicTool):
                 # Return the whole text as the code block
                 return text.strip(), language
             except Exception:  # pygments.util.ClassNotFound or others
-                logger.warning("Could not guess language for code without backticks.")
+                logger.warning(
+                    "Could not guess language for code without backticks.")
                 return text.strip(), "unknown"  # Return unknown if guess fails
 
         # Found opening backticks ```
@@ -1196,7 +1269,7 @@ class WriteCodeTool(BaseAnthropicTool):
         if language_line_end == -1:  # Handle case where ``` is at the very end
             language_line_end = len(text)
 
-        language = text[start_marker + 3 : language_line_end].strip().lower()
+        language = text[start_marker + 3:language_line_end].strip().lower()
 
         code_start = language_line_end + 1
         end_marker = text.find("```", code_start)
@@ -1235,7 +1308,9 @@ def html_format_code(code, extension):
             lexer = guess_lexer(code)
 
         # Use a nice style for the highlighting
-        formatter = HtmlFormatter(style="monokai", linenos=True, cssclass="source")
+        formatter = HtmlFormatter(style="monokai",
+                                  linenos=True,
+                                  cssclass="source")
 
         # Highlight the code
         highlighted = highlight(code, lexer, formatter)

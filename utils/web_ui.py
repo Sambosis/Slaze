@@ -1,11 +1,10 @@
 import asyncio
 import os
-import threading
 import logging
 import json
 from queue import Queue
-from flask import Flask, render_template, jsonify, request, redirect, url_for, send_from_directory
-from flask_socketio import SocketIO, disconnect
+from flask import Flask, render_template, jsonify, request
+from flask_socketio import SocketIO
 from config import (
     LOGS_DIR,
     PROMPTS_DIR,
@@ -15,8 +14,6 @@ from config import (
     write_constants_to_file,
 )
 from pathlib import Path
-from openai import OpenAI
-import ftfy
 
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')

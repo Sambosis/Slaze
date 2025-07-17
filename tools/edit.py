@@ -60,7 +60,8 @@ class EditTool(BaseTool):
         return p.resolve()
 
     def to_params(self) -> dict:
-        logger.debug(f"EditTool.to_params called with api_type: {self.api_type}")
+        logger.debug(
+            f"EditTool.to_params called with api_type: {self.api_type}")
         params = {
             "type": "function",
             "function": {
@@ -78,21 +79,33 @@ class EditTool(BaseTool):
                             "type": "string",
                             "description": "The path to file or directory",
                         },
-                        "file_text": {"type": "string"},
+                        "file_text": {
+                            "type": "string"
+                        },
                         "view_range": {
                             "type": "array",
-                            "items": {"type": "integer"},
+                            "items": {
+                                "type": "integer"
+                            },
                             "minItems": 2,
                             "maxItems": 2,
                         },
-                        "old_str": {"type": "string",
+                        "old_str": {
+                            "type": "string",
                             "description": "The old string to replace",
                         },
-                        "new_str": {"type": "string",
-                            "description": "The new string to replace the old one or the new string to add on an insert command",
+                        "new_str": {
+                            "type":
+                            "string",
+                            "description":
+                            "The new string to replace the old one or the new string to add on an insert command",
                         },
-                        "insert_line": {"type": "integer",
-                                        "description": "The line number to insert the new string"},
+                        "insert_line": {
+                            "type":
+                            "integer",
+                            "description":
+                            "The line number to insert the new string"
+                        },
                     },
                     "required": ["command", "path"],
                 },
@@ -108,9 +121,8 @@ class EditTool(BaseTool):
         # Add command type
         output_lines.append(f"Command: {data['command']}")
         if self.display is not None:
-            self.display.add_message(
-                "assistant", f"EditTool Command: {data['command']}"
-            )
+            self.display.add_message("assistant",
+                                     f"EditTool Command: {data['command']}")
         # Add status
         output_lines.append(f"Status: {data['status']}")
 
@@ -145,8 +157,8 @@ class EditTool(BaseTool):
             # Add display messages
             if self.display is not None:
                 self.display.add_message(
-                    "assistant", f"EditTool Executing Command: {command} on path: {path}"
-                )
+                    "assistant",
+                    f"EditTool Executing Command: {command} on path: {path}")
 
             # Normalize the path first relative to REPO_DIR
             _path = self._resolve_path(path)
@@ -168,7 +180,7 @@ class EditTool(BaseTool):
                 success_msg = f"File {_path} has been created successfully.\n"
                 success_msg += f"Content length: {len(file_text)} characters\n"
                 success_msg += f"File path: {str(_path)}"
-                
+
                 return ToolResult(
                     output=success_msg,
                     tool_name=self.name,
@@ -209,7 +221,7 @@ class EditTool(BaseTool):
                         "assistant",
                         f"End of New Text: {new_str[-200:] if new_str and len(new_str) > 200 else new_str}",
                     )
-                
+
                 # Return the detailed result from str_replace method with proper metadata
                 return ToolResult(
                     output=result.output,
@@ -225,15 +237,14 @@ class EditTool(BaseTool):
                     )
                 if not new_str:
                     raise ToolError(
-                        "Parameter `new_str` is required for command: insert"
-                    )
+                        "Parameter `new_str` is required for command: insert")
                 result = self.insert(_path, insert_line, new_str)
                 if self.display is not None:
                     self.display.add_message(
                         "assistant",
                         f"EditTool Command: {command} successfully inserted text at line {insert_line} in file {str(_path)} !",
                     )
-                
+
                 # Return the detailed result from insert method with proper metadata
                 return ToolResult(
                     output=result.output,
@@ -249,7 +260,7 @@ class EditTool(BaseTool):
                         "assistant",
                         f"EditTool Command: {command} successfully undone last edit in file {str(_path)} !",
                     )
-                
+
                 # Return the detailed result from undo_edit method with proper metadata
                 return ToolResult(
                     output=result.output,
@@ -265,13 +276,14 @@ class EditTool(BaseTool):
 
         except Exception as e:
             if self.display is not None:
-                self.display.add_message("assistant", f"EditTool error: {str(e)}")
-            
+                self.display.add_message("assistant",
+                                         f"EditTool error: {str(e)}")
+
             # Return detailed error information
             error_msg = f"EditTool {command} command failed.\n"
             error_msg += f"File path: {str(_path) if '_path' in locals() else path}\n"
             error_msg += f"Error: {str(e)}"
-            
+
             return ToolResult(
                 output=error_msg,
                 error=str(e),
@@ -279,9 +291,9 @@ class EditTool(BaseTool):
                 command=str(command),
             )
 
-    async def view(
-        self, path: Path, view_range: Optional[List[int]] = None
-    ) -> ToolResult:
+    async def view(self,
+                   path: Path,
+                   view_range: Optional[List[int]] = None) -> ToolResult:
         """Implement the view command using cross-platform methods."""
         path = self._resolve_path(path)
         logger.debug(f"Viewing path: {path}")
@@ -297,8 +309,10 @@ class EditTool(BaseTool):
 
                     for item in path.glob(pattern):
                         # Skip hidden files and directories
-                        if not any(part.startswith(".") for part in item.parts):
-                            files.append(str(item.resolve()))  # Ensure absolute paths
+                        if not any(
+                                part.startswith(".") for part in item.parts):
+                            files.append(str(
+                                item.resolve()))  # Ensure absolute paths
 
                 stdout = "\n".join(sorted(files))
                 stdout = f"Here's the files and directories up to 2 levels deep in {path}, excluding hidden items:\n{stdout}\n"
@@ -308,7 +322,8 @@ class EditTool(BaseTool):
                 file_content = self.read_file(path)
                 init_line = 1
                 if view_range:
-                    if len(view_range) != 2 or not all(isinstance(i, int) for i in view_range):
+                    if len(view_range) != 2 or not all(
+                            isinstance(i, int) for i in view_range):
                         raise ToolError(
                             "Invalid `view_range`. It should be a list of two integers."
                         )
@@ -329,22 +344,28 @@ class EditTool(BaseTool):
                         )
 
                     if final_line == -1:
-                        file_content = "\n".join(file_lines[init_line - 1 :])
+                        file_content = "\n".join(file_lines[init_line - 1:])
                     else:
-                        file_content = "\n".join(file_lines[init_line - 1 : final_line])
+                        file_content = "\n".join(file_lines[init_line -
+                                                            1:final_line])
                 return ToolResult(
-                    output=self._make_output(file_content, str(path), init_line=init_line),
+                    output=self._make_output(file_content,
+                                             str(path),
+                                             init_line=init_line),
                     error=None,
                     base64_image=None,
                 )
             else:
-                return ToolResult(output="", error=f"Path not found or is not a file or directory: {path}", base64_image=None)
+                return ToolResult(
+                    output="",
+                    error=
+                    f"Path not found or is not a file or directory: {path}",
+                    base64_image=None)
         except Exception as e:
             return ToolResult(output="", error=str(e), base64_image=None)
 
-    def str_replace(
-        self, path: Path, old_str: str, new_str: Optional[str]
-    ) -> ToolResult:
+    def str_replace(self, path: Path, old_str: str,
+                    new_str: Optional[str]) -> ToolResult:
         """Implement the str_replace command, which replaces old_str with new_str in the file content."""
         try:
             path = self._resolve_path(path)
@@ -363,8 +384,7 @@ class EditTool(BaseTool):
             elif occurrences > 1:
                 file_content_lines = file_content.split("\n")
                 lines = [
-                    idx + 1
-                    for idx, line in enumerate(file_content_lines)
+                    idx + 1 for idx, line in enumerate(file_content_lines)
                     if old_str in line
                 ]
                 raise ToolError(
@@ -384,16 +404,18 @@ class EditTool(BaseTool):
             replacement_line = file_content.split(old_str)[0].count("\n")
             start_line = max(0, replacement_line - SNIPPET_LINES)
             end_line = replacement_line + SNIPPET_LINES + new_str.count("\n")
-            snippet = "\n".join(new_file_content.split("\n")[start_line : end_line + 1])
+            snippet = "\n".join(
+                new_file_content.split("\n")[start_line:end_line + 1])
 
             # Prepare the success message
             success_msg = f"The file {path} has been edited. "
-            success_msg += self._make_output(
-                snippet, f"a snippet of {path}", start_line + 1
-            )
+            success_msg += self._make_output(snippet, f"a snippet of {path}",
+                                             start_line + 1)
             success_msg += "Review the changes and make sure they are as expected. Edit the file again if necessary."
 
-            return ToolResult(output=success_msg, error=None, base64_image=None)
+            return ToolResult(output=success_msg,
+                              error=None,
+                              base64_image=None)
 
         except Exception as e:
             return ToolResult(output=None, error=str(e), base64_image=None)
@@ -412,16 +434,12 @@ class EditTool(BaseTool):
             )
 
         new_str_lines = new_str.split("\n")
-        new_file_text_lines = (
-            file_text_lines[:insert_line]
-            + new_str_lines
-            + file_text_lines[insert_line:]
-        )
+        new_file_text_lines = (file_text_lines[:insert_line] + new_str_lines +
+                               file_text_lines[insert_line:])
         snippet_lines = (
-            file_text_lines[max(0, insert_line - SNIPPET_LINES) : insert_line]
-            + new_str_lines
-            + file_text_lines[insert_line : insert_line + SNIPPET_LINES]
-        )
+            file_text_lines[max(0, insert_line - SNIPPET_LINES):insert_line] +
+            new_str_lines +
+            file_text_lines[insert_line:insert_line + SNIPPET_LINES])
 
         new_file_text = "\n".join(new_file_text_lines)
         snippet = "\n".join(snippet_lines)
@@ -448,20 +466,19 @@ class EditTool(BaseTool):
         self.write_file(path, old_text)
 
         return ToolResult(
-            output=f"Last edit to {path} undone successfully. {self._make_output(old_text, str(path))}"
+            output=
+            f"Last edit to {path} undone successfully. {self._make_output(old_text, str(path))}"
         )
 
     def read_file(self, path: Path) -> str:
         try:
             path = self._resolve_path(path)
-            return (
-                path.read_text(encoding="utf-8")
-                .encode("ascii", errors="replace")
-                .decode("ascii")
-            )
+            return (path.read_text(encoding="utf-8").encode(
+                "ascii", errors="replace").decode("ascii"))
         except Exception as e:
             logger.error(f"Error reading file {path}: {e}", exc_info=True)
-            raise ToolError(f"Ran into {e} while trying to read {path}") from None
+            raise ToolError(
+                f"Ran into {e} while trying to read {path}") from None
 
     def write_file(self, path: Path, file: str):
         """Write file content ensuring correct project directory"""
@@ -472,7 +489,8 @@ class EditTool(BaseTool):
             logger.debug(f"Full path for writing: {full_path}")
             # Create parent directories if needed
             full_path.parent.mkdir(parents=True, exist_ok=True)
-            logger.debug(f"File content to write (first 100 chars): {file[:100]}")
+            logger.debug(
+                f"File content to write (first 100 chars): {file[:100]}")
             # Write the file
             full_path.write_text(file, encoding="utf-8")
             # Log the file operation
@@ -492,14 +510,9 @@ class EditTool(BaseTool):
         # file_content = maybe_truncate(file_content)
         if expand_tabs:
             file_content = file_content.expandtabs()
-        file_content = "\n".join(
-            [
-                f"{i + init_line:6}\t{line}"
-                for i, line in enumerate(file_content.split("\n"))
-            ]
-        )
-        return (
-            f"Here's the result of running ` -n` on {file_descriptor}:\n"
-            + file_content
-            + "\n"
-        )
+        file_content = "\n".join([
+            f"{i + init_line:6}\t{line}"
+            for i, line in enumerate(file_content.split("\n"))
+        ])
+        return (f"Here's the result of running ` -n` on {file_descriptor}:\n" +
+                file_content + "\n")
