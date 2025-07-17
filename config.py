@@ -1,15 +1,12 @@
-from pathlib import Path
 import json
-import os
-from dotenv import load_dotenv
-from typing import Optional, Any
 import logging.handlers
-import sys
+import os
 import platform
+import sys
+from pathlib import Path
+from typing import Any, Optional
 
-from flask import g
-import openai
-
+from dotenv import load_dotenv
 
 # Load environment variables from .env file
 load_dotenv()
@@ -80,9 +77,9 @@ googlepro = "google/gemini-2.5-pro-preview"
 googleflash = "google/gemini-2.5-flash-preview"
 googleflashlite = "google/gemini-2.5-flash-lite-preview-06-17"
 grok4 = "x-ai/grok-4"
-SUMMARY_MODEL = grok4  # Model for summaries
-MAIN_MODEL = f"{grok4}"  # Primary model for main agent operations
-CODE_MODEL = f"{grok4}:web"  # Model for code generation tasks
+SUMMARY_MODEL = googleflashlite  # Model for summaries
+MAIN_MODEL = f"{googleflashlite}"  # Primary model for main agent operations
+CODE_MODEL = f"{googleflashlite}:web"  # Model for code generation tasks
 
 # Feature flag constants
 COMPUTER_USE_BETA_FLAG = "computer-use-2024-10-22"
@@ -354,6 +351,18 @@ def setup_logging():
     file_handler.setLevel(getattr(logging, _get_constant_for_logging_setup("LOG_LEVEL_FILE").upper(), logging.DEBUG))
     file_handler.setFormatter(formatter)
     logger.addHandler(file_handler)
+    
+    # Suppress verbose LiteLLM debug logs from open-interpreter
+    # These logs are very verbose and clutter the console output
+    litellm_logger = logging.getLogger('litellm')
+    litellm_logger.setLevel(logging.WARNING)  # Only show warnings and errors
+    
+    # Also suppress other noisy loggers that might be used by open-interpreter
+    httpx_logger = logging.getLogger('httpx')
+    httpx_logger.setLevel(logging.WARNING)
+    
+    openai_logger = logging.getLogger('openai')
+    openai_logger.setLevel(logging.WARNING)
 
 # Define these specific constants directly for setup_logging to use initially.
 # These are the Python global variables defined at the top of config.py

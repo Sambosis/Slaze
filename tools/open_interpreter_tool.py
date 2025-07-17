@@ -1,5 +1,5 @@
-from typing import ClassVar, Literal, Union
 import logging
+from typing import ClassVar, Literal, Union
 
 try:
     from interpreter import interpreter
@@ -8,15 +8,15 @@ except Exception:  # pragma: no cover - optional dependency
 
 
 import os
+import subprocess
 from pathlib import Path
-import subprocess   
-from numpy import False_
-from regex import F
+
+from interpreter import OpenInterpreter
+
 from config import get_constant, openai41
 from tools.base import BaseTool, ToolError, ToolResult
-from utils.web_ui import WebUI
 from utils.agent_display_console import AgentDisplayConsole
-from interpreter import OpenInterpreter
+from utils.web_ui import WebUI
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +35,17 @@ class OpenInterpreterTool(BaseTool):
     async def __call__(self, message: str | None = None, **kwargs):
         if message is None:
             raise ToolError("no message provided")
+
+        # Suppress verbose debug logging from LiteLLM and related libraries
+        # that are used by open-interpreter
+        litellm_logger = logging.getLogger('litellm')
+        litellm_logger.setLevel(logging.WARNING)
+        
+        httpx_logger = logging.getLogger('httpx')
+        httpx_logger.setLevel(logging.WARNING)
+        
+        openai_logger = logging.getLogger('openai')
+        openai_logger.setLevel(logging.WARNING)
 
         if self.display is not None:
             try:
@@ -67,6 +78,18 @@ class OpenInterpreterTool(BaseTool):
         self.display = display
 
         self.interpreter = OpenInterpreter(in_terminal_interface=True)
+        
+        # Suppress verbose debug logging from LiteLLM and related libraries
+        # that are used by open-interpreter
+        import logging
+        litellm_logger = logging.getLogger('litellm')
+        litellm_logger.setLevel(logging.WARNING)
+        
+        httpx_logger = logging.getLogger('httpx')
+        httpx_logger.setLevel(logging.WARNING)
+        
+        openai_logger = logging.getLogger('openai')
+        openai_logger.setLevel(logging.WARNING)
 
     description = """
         A tool that uses open-interpreter's interpreter.chat() method to execute commands
@@ -159,7 +182,6 @@ class OpenInterpreterTool(BaseTool):
         Get system information to provide context to the interpreter.
         """
         import platform
-        import subprocess
 
         system_info = []
 
