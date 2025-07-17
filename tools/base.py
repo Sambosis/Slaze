@@ -31,6 +31,8 @@ class ToolResult:
     message: Optional[str] = None
     tool_name: Optional[str] = None
     command: Optional[str] = None
+    old_str: Optional[str] = None
+    new_str: Optional[str] = None
 
     def __bool__(self):
         """Returns True if the tool execution was successful."""

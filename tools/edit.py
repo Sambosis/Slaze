@@ -122,6 +122,12 @@ class EditTool(BaseTool):
         if "operation_details" in data:
             output_lines.append(f"Operation: {data['operation_details']}")
 
+        # Add old and new strings if present
+        if "old_str" in data:
+            output_lines.append(f"Old string: {data['old_str']}")
+        if "new_str" in data:
+            output_lines.append(f"New string: {data['new_str']}")
+
         # Join all lines with newlines
         output = "\n".join(output_lines)
         if len(output) > 12000:
@@ -202,7 +208,7 @@ class EditTool(BaseTool):
                     raise ToolError(
                         "Parameter `old_str` is required for command: str_replace"
                     )
-                result = self.str_replace(_path, old_str, new_str)
+                result = await self.str_replace(_path, old_str, new_str)
                 if self.display is not None:
                     self.display.add_message(
                         "assistant",
@@ -220,7 +226,9 @@ class EditTool(BaseTool):
                     "command": "str_replace",
                     "status": "success",
                     "file_path": str(_path),
-                    "operation_details": "Replaced text in file",
+                    "operation_details": result["output"],
+                    "old_str": result["old_str"],
+                    "new_str": result["new_str"],
                 }
                 return ToolResult(
                     output=self.format_output(output_data),
@@ -348,61 +356,59 @@ class EditTool(BaseTool):
         except Exception as e:
             return ToolResult(output="", error=str(e), base64_image=None)
 
-    def str_replace(
+    async def str_replace(
         self, path: Path, old_str: str, new_str: Optional[str]
-    ) -> ToolResult:
+    ) -> dict:
         """Implement the str_replace command, which replaces old_str with new_str in the file content."""
-        try:
-            path = self._resolve_path(path)
-            # Read the file content
-            logger.debug(f"Replacing string in path: {path}")
-            file_content = self.read_file(path).expandtabs()
-            old_str = old_str.expandtabs()
-            new_str = new_str.expandtabs() if new_str is not None else ""
+        path = self._resolve_path(path)
+        # Read the file content
+        logger.debug(f"Replacing string in path: {path}")
+        file_content = self.read_file(path).expandtabs()
+        original_old_str = old_str
+        original_new_str = new_str
+        old_str = old_str.expandtabs()
+        new_str = new_str.expandtabs() if new_str is not None else ""
 
-            # Check if old_str is unique in the file
-            occurrences = file_content.count(old_str)
-            if occurrences == 0:
-                raise ToolError(
-                    f"No replacement was performed, old_str `{old_str}` did not appear verbatim in {path}."
-                )
-            elif occurrences > 1:
-                file_content_lines = file_content.split("\n")
-                lines = [
-                    idx + 1
-                    for idx, line in enumerate(file_content_lines)
-                    if old_str in line
-                ]
-                raise ToolError(
-                    f"No replacement was performed. Multiple occurrences of old_str `{old_str}` in lines {lines}. Please ensure it is unique"
-                )
-
-            # Replace old_str with new_str
-            new_file_content = file_content.replace(old_str, new_str)
-
-            # Write the new content to the file
-            self.write_file(path, new_file_content)
-
-            # Save the content to history
-            self._file_history[path].append(file_content)
-
-            # Create a snippet of the edited section
-            replacement_line = file_content.split(old_str)[0].count("\n")
-            start_line = max(0, replacement_line - SNIPPET_LINES)
-            end_line = replacement_line + SNIPPET_LINES + new_str.count("\n")
-            snippet = "\n".join(new_file_content.split("\n")[start_line : end_line + 1])
-
-            # Prepare the success message
-            success_msg = f"The file {path} has been edited. "
-            success_msg += self._make_output(
-                snippet, f"a snippet of {path}", start_line + 1
+        # Check if old_str is unique in the file
+        occurrences = file_content.count(old_str)
+        if occurrences == 0:
+            raise ToolError(
+                f"No replacement was performed, old_str `{old_str}` did not appear verbatim in {path}."
             )
-            success_msg += "Review the changes and make sure they are as expected. Edit the file again if necessary."
+        elif occurrences > 1:
+            file_content_lines = file_content.split("\n")
+            lines = [
+                idx + 1
+                for idx, line in enumerate(file_content_lines)
+                if old_str in line
+            ]
+            raise ToolError(
+                f"No replacement was performed. Multiple occurrences of old_str `{old_str}` in lines {lines}. Please ensure it is unique"
+            )
 
-            return ToolResult(output=success_msg, error=None, base64_image=None)
+        # Replace old_str with new_str
+        new_file_content = file_content.replace(old_str, new_str)
 
-        except Exception as e:
-            return ToolResult(output=None, error=str(e), base64_image=None)
+        # Write the new content to the file
+        self.write_file(path, new_file_content)
+
+        # Save the content to history
+        self._file_history[path].append(file_content)
+
+        # Create a snippet of the edited section
+        replacement_line = file_content.split(old_str)[0].count("\n")
+        start_line = max(0, replacement_line - SNIPPET_LINES)
+        end_line = replacement_line + SNIPPET_LINES + new_str.count("\n")
+        snippet = "\n".join(new_file_content.split("\n")[start_line : end_line + 1])
+
+        # Prepare the success message
+        success_msg = f"The file {path} has been edited. "
+        success_msg += self._make_output(
+            snippet, f"a snippet of {path}", start_line + 1
+        )
+        success_msg += "Review the changes and make sure they are as expected. Edit the file again if necessary."
+
+        return {"output": success_msg, "old_str": original_old_str, "new_str": original_new_str}
 
     def insert(self, path: Path, insert_line: int, new_str: str) -> ToolResult:
         """Implement the insert command, which inserts new_str at the specified line in the file content."""
