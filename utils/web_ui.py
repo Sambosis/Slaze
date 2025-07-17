@@ -55,19 +55,20 @@ class WebUI:
         # Import tools lazily to avoid circular imports
         from tools import (
             # BashTool,
-            OpenInterpreterTool,
+            # OpenInterpreterTool,
             ProjectSetupTool,
             WriteCodeTool,
             PictureGenerationTool,
             EditTool,
             ToolCollection,
+            BashTool
         )
 
         self.tool_collection = ToolCollection(
             WriteCodeTool(display=self),
             ProjectSetupTool(display=self),
-            # BashTool(display=self),
-            OpenInterpreterTool(display=self),  # Uncommented and enabled for testing
+            BashTool(display=self),
+            # OpenInterpreterTool(display=self),  # Uncommented and enabled for testing
             PictureGenerationTool(display=self),
             EditTool(display=self),
             display=self,

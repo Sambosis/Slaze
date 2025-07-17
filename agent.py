@@ -18,7 +18,7 @@ from tools import (
     EditTool,
     ToolCollection,
     ToolResult,
-    OpenInterpreterTool
+    BashTool
 )
 from utils.web_ui import WebUI
 from utils.agent_display_console import AgentDisplayConsole
@@ -185,9 +185,9 @@ class Agent:
         self.tool_collection = ToolCollection(
             WriteCodeTool(display=self.display),
             ProjectSetupTool(display=self.display),
-            # BashTool(display=self.display),
+            BashTool(display=self.display),
             PictureGenerationTool(display=self.display),
-            OpenInterpreterTool(display=self.display),  # Uncommented and enabled for testing
+            # OpenInterpreterTool(display=self.display),  # Uncommented and enabled for testing
             EditTool(display=self.display),  # Uncommented and enabled for testing
             display=self.display,
         )
@@ -378,10 +378,7 @@ class Agent:
         rr(f"Step {self.step_count} with {len(messages)} messages")
         with open(f"{LOGS_DIR}/messages.md", "w", encoding="utf-8") as f:
             f.write(format_messages_to_string(messages) + "\n"  )
-        if self.step_count > 20:
-            tool_choice = "auto"
-        else:
-            tool_choice = "required"
+        tool_choice = "auto" if self.step_count > 20 else "required"
         try:
             response = self.client.chat.completions.create(
                 model=MAIN_MODEL,
@@ -390,6 +387,7 @@ class Agent:
                 tool_choice=tool_choice,
                 max_tokens=MAX_SUMMARY_TOKENS,
             )
+
         except Exception as llm_error:
             self.display.add_message("assistant", f"LLM call failed: {llm_error}")
             new_context = await refresh_context_async(
@@ -400,6 +398,7 @@ class Agent:
             return True
 
         msg = response.choices[0].message
+        rr(response.choices[0])
         assistant_msg = {"role": "assistant", "content": msg.content or ""}
         if msg.tool_calls:
             assistant_msg["tool_calls"] = [
@@ -426,12 +425,11 @@ class Agent:
             self.display.add_message("user", tool_msg.content or "")
 
         if msg.tool_calls:
+            print(msg)
             for tc in msg.tool_calls:
                 args = (
                     json.loads(tc.function.arguments) if tc.function.arguments else {}
                 )
-                for arg in args.values():
-                    rr(arg)
                 if self.manual_tool_confirmation and hasattr(self.display, "confirm_tool_call"):
                     schema = self.tool_collection.tools.get(tc.function.name).to_params()["function"]["parameters"]
                     new_args = await self.display.confirm_tool_call(tc.function.name, args, schema)

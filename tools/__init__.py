@@ -1,5 +1,5 @@
 from .base import BaseAnthropicTool, ToolError, ToolResult
-# from .bash import BashTool
+from .bash import BashTool
 from .edit import EditTool
 from .collection import ToolCollection
 # from .expert import GetExpertOpinionTool
@@ -13,14 +13,14 @@ from .envsetup import ProjectSetupTool
 # from .test_navigation_tool import windows_navigate
 from .write_code import WriteCodeTool
 from .create_picture import PictureGenerationTool
-from .open_interpreter_tool import OpenInterpreterTool
+# from .open_interpreter_tool import OpenInterpreterTool
 # from .file_editor import FileEditorTool # Removed
 
 __all__ = [
     "BaseAnthropicTool",
     "ToolError",
     "ToolResult",
-    # "BashTool",
+    "BashTool",
     "EditTool",
     "ToolCollection",
     # "GetExpertOpinionTool",
@@ -31,7 +31,7 @@ __all__ = [
     # "WindowsNavigationTool", # Removed
     "WriteCodeTool",
     "PictureGenerationTool",
-    "OpenInterpreterTool",
+    # "OpenInterpreterTool",
     # "windows_navigate",
     # "FileEditorTool", # Removed
 ]

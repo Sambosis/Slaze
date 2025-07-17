@@ -59,7 +59,7 @@ class OpenInterpreterTool(BaseTool):
                 from interpreter import interpreter as _interp
                 interpreter = _interp
 
-            result = interpreter.chat(message, display=False, stream=False, blocking=True)
+            result = interpreter.chat(message, display=True, stream=False, blocking=True)
             return ToolResult(
                 output=str(result),
                 tool_name=self.name,

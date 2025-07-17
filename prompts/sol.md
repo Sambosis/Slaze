@@ -1,1 +1,1 @@
-Create a web app solitare game that can be played in the browser. do not use port 5000 as it is taken.
+Create a pygame solitare game that learns to play using RL. It should display the full game every 10th training game. It should look good.

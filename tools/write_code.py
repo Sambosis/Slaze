@@ -129,8 +129,8 @@ class WriteCodeTool(BaseAnthropicTool):
     name: Literal["write_codebase_tool"] = "write_codebase_tool"
     api_type: Literal["custom"] = "custom"
     description: str = (
-        "Generates a codebase consisting of multiple files based on descriptions, skeletons, and import lists. "
-        "This is the tool to use to generate a code files for a codebase, can create any amount of files. "
+        "Generates a full or partial codebase consisting of up to 5 files based on descriptions, skeletons, and import lists. "
+        "This is the tool to use to generate a code files for a codebase, can create up to 5 files at a time. "
         "Use this tool to generate init files."
         "Creates skeletons first, then generates full code asynchronously, writing to the host filesystem."
         )
@@ -962,9 +962,9 @@ class WriteCodeTool(BaseAnthropicTool):
             and completion.choices[0].message.content
         ):
             logger.error(f"No valid completion content received for {file_path.name}")
-            # rr( # Replaced by logger
-            #     f"[bold red]Invalid or empty completion content from LLM for {file_path.name}[/bold red]"
-            # )
+            logger.error(
+                f"[bold red]Invalid or empty completion content from LLM for {file_path.name}[/bold red]"
+            )
             raise LLMResponseError(
                 f"Invalid or empty completion content from LLM for {file_path.name}"
             )
@@ -1046,17 +1046,14 @@ class WriteCodeTool(BaseAnthropicTool):
             logger.error(
                 f"LLMResponseError for skeleton {target_file_name} after all retries: {e}", exc_info=True
             )
-            # rr( # Replaced by logger
-            #     f"[bold red]LLM generated invalid skeleton for {target_file_name} after retries: {e}[/bold red]"
-            # )
+            logger.error(
+                f"[bold red]LLM generated invalid skeleton for {target_file_name} after retries: {e}[/bold red]"
+            )
             final_skeleton_string = f"# Error generating skeleton for {target_file_name}: LLMResponseError - {str(e)}"
         except APIError as e:  # Catch specific OpenAI errors
             logger.error(
                 f"OpenAI APIError for skeleton {target_file_name} after all retries: {type(e).__name__} - {e}", exc_info=True
             )
-            # rr( # Replaced by logger
-            #     f"[bold red]LLM skeleton call failed due to APIError for {target_file_name} after retries: {e}[/bold red]"
-            # )
             final_skeleton_string = f"# Error generating skeleton for {target_file_name}: API Error - {str(e)}"
         except Exception as e:
             logger.critical(
