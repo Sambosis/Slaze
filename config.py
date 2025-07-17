@@ -79,7 +79,7 @@ googleflashlite = "google/gemini-2.5-flash-lite-preview-06-17"
 grok4 = "x-ai/grok-4"
 SUMMARY_MODEL = kimi2  # Model for summaries
 MAIN_MODEL = f"{kimi2}"  # Primary model for main agent operations
-CODE_MODEL = f"{kimi2}:web"  # Model for code generation tasks
+CODE_MODEL = f"{googlepro}:web"  # Model for code generation tasks
 
 # Feature flag constants
 COMPUTER_USE_BETA_FLAG = "computer-use-2024-10-22"
