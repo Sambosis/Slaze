@@ -58,31 +58,48 @@ def format_messages_to_string(messages):
     try:
         output_pieces = []
         for msg in messages:
-            output_pieces.append(f"\n{msg['role'].upper()}:")
-            if isinstance(msg["content"], list):
-                for content_block in msg["content"]:
+            role = msg.get("role", "unknown").upper()
+            output_pieces.append(f"\n{role}:")
+
+            content = msg.get("content")
+            if isinstance(content, list):
+                for content_block in content:
                     if isinstance(content_block, dict):
-                        if content_block.get("type") == "tool_result":
-                            output_pieces.append(
-                                f"\nTool Result [ID: {content_block.get('name', 'unknown')}]:"
-                            )
-                            for item in content_block.get("content", []):
-                                if item.get("type") == "text":
+                        content_type = content_block.get("type")
+                        if content_type == "tool_code":
+                            output_pieces.append(f"\nTool Call:\n{content_block.get('code', '')}")
+                        elif content_type == "tool_result":
+                            tool_name = content_block.get('name', 'unknown')
+                            output_pieces.append(f"\nTool Result [{tool_name}]:")
+                            # The 'content' of a tool_result is a list of blocks
+                            result_content = content_block.get("content", [])
+                            for item in result_content:
+                                if isinstance(item, dict) and item.get("type") == "text":
                                     output_pieces.append(f"\nText: {item.get('text')}")
-                                elif item.get("type") == "image":
-                                    output_pieces.append(
-                                        "\nImage Source: base64 source too big"
-                                    )
+                                elif isinstance(item, dict) and item.get("type") == "image":
+                                    output_pieces.append("\nImage: (base64 source suppressed)")
+                                else:
+                                    # Fallback for unexpected item formats
+                                    output_pieces.append(f"\n{item}")
+                        elif content_type == "text":
+                             output_pieces.append(f"\n{content_block.get('text','')}")
                         else:
+                            # Fallback for other dict-based content types
                             for key, value in content_block.items():
                                 output_pieces.append(f"\n{key}: {value}")
                     else:
+                        # Fallback for non-dict content blocks
                         output_pieces.append(f"\n{content_block}")
+            elif isinstance(content, str):
+                output_pieces.append(f"\n{content}")
             else:
-                output_pieces.append(f"\n{msg['content']}")
+                output_pieces.append("\n[unsupported content format]")
+
             output_pieces.append("\n" + "-" * 80)
         return "".join(output_pieces)
     except Exception as e:
+        # It's good practice to log the exception
+        # logger.error(f"Error during message formatting: {e}", exc_info=True)
         return f"Error during formatting: {str(e)}"
 
 
