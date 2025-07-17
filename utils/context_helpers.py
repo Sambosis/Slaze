@@ -54,6 +54,7 @@ def format_messages_to_restart(messages):
 def format_messages_to_string(messages):
     """
     Format a list of messages into a formatted string.
+    Captures all content types including tool calls, tool results, text, and images.
     """
     try:
         output_pieces = []
@@ -62,23 +63,59 @@ def format_messages_to_string(messages):
             if isinstance(msg["content"], list):
                 for content_block in msg["content"]:
                     if isinstance(content_block, dict):
-                        if content_block.get("type") == "tool_result":
-                            output_pieces.append(
-                                f"\nTool Result [ID: {content_block.get('name', 'unknown')}]:"
-                            )
-                            for item in content_block.get("content", []):
-                                if item.get("type") == "text":
-                                    output_pieces.append(f"\nText: {item.get('text')}")
-                                elif item.get("type") == "image":
-                                    output_pieces.append(
-                                        "\nImage Source: base64 source too big"
-                                    )
+                        if content_block.get("type") == "tool_use":
+                            # Handle tool calls/tool use
+                            tool_name = content_block.get("name", "unknown")
+                            tool_id = content_block.get("id", "unknown")
+                            tool_input = content_block.get("input", {})
+                            output_pieces.append(f"\nTool Call: {tool_name}")
+                            output_pieces.append(f"\nTool ID: {tool_id}")
+                            if tool_input:
+                                output_pieces.append(f"\nInput: {tool_input}")
+                        elif content_block.get("type") == "tool_result":
+                            # Handle tool results
+                            tool_use_id = content_block.get("tool_use_id", "unknown")
+                            is_error = content_block.get("is_error", False)
+                            output_pieces.append(f"\nTool Result [ID: {tool_use_id}]:")
+                            output_pieces.append(f"\nError: {is_error}")
+                            
+                            # Handle tool result content
+                            result_content = content_block.get("content", "")
+                            if isinstance(result_content, list):
+                                for item in result_content:
+                                    if isinstance(item, dict):
+                                        if item.get("type") == "text":
+                                            output_pieces.append(f"\nText: {item.get('text', '')}")
+                                        elif item.get("type") == "image":
+                                            output_pieces.append("\nImage: base64 source too big")
+                                        else:
+                                            # Handle other content types
+                                            for key, value in item.items():
+                                                output_pieces.append(f"\n{key}: {value}")
+                                    else:
+                                        output_pieces.append(f"\nContent: {item}")
+                            elif result_content is not None:
+                                output_pieces.append(f"\nContent: {result_content}")
+                            else:
+                                output_pieces.append("\nContent: None")
+                        elif content_block.get("type") == "text":
+                            # Handle text content
+                            text_content = content_block.get("text", "")
+                            output_pieces.append(f"\nText: {text_content}")
+                        elif content_block.get("type") == "image":
+                            # Handle image content
+                            output_pieces.append("\nImage: base64 source too big")
                         else:
+                            # Handle any other content block types
+                            output_pieces.append(f"\nContent Block Type: {content_block.get('type', 'unknown')}")
                             for key, value in content_block.items():
-                                output_pieces.append(f"\n{key}: {value}")
+                                if key != "type":  # Don't repeat the type
+                                    output_pieces.append(f"\n{key}: {value}")
                     else:
+                        # Handle non-dict content blocks
                         output_pieces.append(f"\n{content_block}")
             else:
+                # Handle string content
                 output_pieces.append(f"\n{msg['content']}")
             output_pieces.append("\n" + "-" * 80)
         return "".join(output_pieces)
