@@ -51,38 +51,74 @@ def format_messages_to_restart(messages):
         return f"Error during formatting: {str(e)}"
 
 
-def format_messages_to_string(messages):
-    """
-    Format a list of messages into a formatted string.
-    """
+def _format_block(block: Any) -> List[str]:
+    """Return a list of strings describing a single content block."""
+    parts: List[str] = []
+    if isinstance(block, dict):
+        btype = block.get("type")
+        if btype == "text":
+            parts.append(f"\n{block.get('text', '')}")
+        elif btype == "image":
+            parts.append("\n[IMAGE]")
+        elif btype == "tool_use":
+            name = block.get("name", "unknown")
+            parts.append(f"\nTool Call: {name}")
+            if "input" in block:
+                parts.append(f"\nInput: {block.get('input')}")
+        elif btype == "tool_result":
+            result_id = block.get("tool_use_id") or block.get("name", "unknown")
+            parts.append(f"\nTool Result [ID: {result_id}]")
+            if block.get("is_error"):
+                parts.append("\nError:")
+            content = block.get("content")
+            if isinstance(content, list):
+                for item in content:
+                    parts.extend(_format_block(item))
+            elif content is not None:
+                parts.append(f"\n{content}")
+        else:
+            for key, value in block.items():
+                if key != "type":
+                    parts.append(f"\n{key}: {value}")
+    else:
+        parts.append(f"\n{block}")
+    return parts
+
+
+def format_messages_to_string(messages: List[Dict[str, Any]]) -> str:
+    """Convert a list of messages into a human readable string."""
     try:
-        output_pieces = []
+        output_pieces: List[str] = []
         for msg in messages:
-            output_pieces.append(f"\n{msg['role'].upper()}:")
-            if isinstance(msg["content"], list):
-                for content_block in msg["content"]:
-                    if isinstance(content_block, dict):
-                        if content_block.get("type") == "tool_result":
-                            output_pieces.append(
-                                f"\nTool Result [ID: {content_block.get('name', 'unknown')}]:"
-                            )
-                            for item in content_block.get("content", []):
-                                if item.get("type") == "text":
-                                    output_pieces.append(f"\nText: {item.get('text')}")
-                                elif item.get("type") == "image":
-                                    output_pieces.append(
-                                        "\nImage Source: base64 source too big"
-                                    )
-                        else:
-                            for key, value in content_block.items():
-                                output_pieces.append(f"\n{key}: {value}")
-                    else:
-                        output_pieces.append(f"\n{content_block}")
-            else:
-                output_pieces.append(f"\n{msg['content']}")
+            output_pieces.append(f"\n{msg.get('role', '').upper()}:")
+
+            content = msg.get("content")
+            if isinstance(content, list):
+                for block in content:
+                    output_pieces.extend(_format_block(block))
+            elif content is not None:
+                output_pieces.append(f"\n{content}")
+
+            if msg.get("tool_calls"):
+                for call in msg["tool_calls"]:
+                    output_pieces.append("\nTOOL CALL:")
+                    func = call.get("function", {}) if isinstance(call, dict) else getattr(call, "function", None)
+                    name = None
+                    args = None
+                    if isinstance(func, dict):
+                        name = func.get("name")
+                        args = func.get("arguments")
+                    elif func is not None:
+                        name = getattr(func, "name", None)
+                        args = getattr(func, "arguments", None)
+                    if name:
+                        output_pieces.append(f" {name}")
+                    if args is not None:
+                        output_pieces.append(f"\nArgs: {args}")
+
             output_pieces.append("\n" + "-" * 80)
         return "".join(output_pieces)
-    except Exception as e:
+    except Exception as e:  # pragma: no cover - defensive safety
         return f"Error during formatting: {str(e)}"
 
 
