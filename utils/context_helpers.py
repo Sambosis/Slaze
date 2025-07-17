@@ -11,6 +11,7 @@ from config import MAIN_MODEL, get_constant, googlepro # Import get_constant
 from utils.file_logger import aggregate_file_states
 from openai import OpenAI
 import logging
+import json
 from tenacity import retry, stop_after_attempt, wait_random_exponential
 # from icecream import ic # Removed
 # from rich import print as rr # Removed
@@ -52,35 +53,80 @@ def format_messages_to_restart(messages):
 
 
 def format_messages_to_string(messages):
-    """
-    Format a list of messages into a formatted string.
-    """
+    """Return a human readable string for a list of messages."""
+
+    def _val(obj, key, default=None):
+        if isinstance(obj, dict):
+            return obj.get(key, default)
+        return getattr(obj, key, default)
+
     try:
         output_pieces = []
         for msg in messages:
-            output_pieces.append(f"\n{msg['role'].upper()}:")
-            if isinstance(msg["content"], list):
-                for content_block in msg["content"]:
-                    if isinstance(content_block, dict):
-                        if content_block.get("type") == "tool_result":
-                            output_pieces.append(
-                                f"\nTool Result [ID: {content_block.get('name', 'unknown')}]:"
-                            )
-                            for item in content_block.get("content", []):
-                                if item.get("type") == "text":
-                                    output_pieces.append(f"\nText: {item.get('text')}")
-                                elif item.get("type") == "image":
+            role = msg.get("role", "unknown").upper()
+            output_pieces.append(f"\n{role}:")
+
+            if "tool_call_id" in msg:
+                output_pieces.append(f"\nTool Call ID: {msg['tool_call_id']}")
+
+            if msg.get("tool_calls"):
+                for tc in msg["tool_calls"]:
+                    name = _val(_val(tc, "function"), "name")
+                    args = _val(_val(tc, "function"), "arguments")
+                    tc_id = _val(tc, "id")
+                    output_pieces.append(
+                        f"\nTool Call -> {name or 'unknown'} (ID: {tc_id or 'n/a'})"
+                    )
+                    if args:
+                        try:
+                            parsed = json.loads(args) if isinstance(args, str) else args
+                            formatted = json.dumps(parsed, indent=2)
+                        except Exception:
+                            formatted = str(args)
+                        output_pieces.append(f"\nArguments: {formatted}")
+
+            content = msg.get("content")
+            if isinstance(content, list):
+                for block in content:
+                    if isinstance(block, dict):
+                        btype = block.get("type")
+                        if btype == "text":
+                            output_pieces.append(f"\n{block.get('text', '')}")
+                        elif btype == "image":
+                            output_pieces.append("\n[Image content omitted]")
+                        elif btype == "tool_use":
+                            output_pieces.append(f"\nTool Call: {block.get('name')}")
+                            if "input" in block:
+                                inp = block["input"]
+                                if isinstance(inp, (dict, list)):
                                     output_pieces.append(
-                                        "\nImage Source: base64 source too big"
+                                        f"\nInput: {json.dumps(inp, indent=2)}"
                                     )
+                                else:
+                                    output_pieces.append(f"\nInput: {inp}")
+                        elif btype == "tool_result":
+                            output_pieces.append(
+                                f"\nTool Result [ID: {block.get('tool_use_id', 'unknown')}]"
+                            )
+                            if block.get("is_error"):
+                                output_pieces.append("\nError: True")
+                            for item in block.get("content", []):
+                                if item.get("type") == "text":
+                                    output_pieces.append(f"\n{item.get('text', '')}")
+                                elif item.get("type") == "image":
+                                    output_pieces.append("\n[Image content omitted]")
                         else:
-                            for key, value in content_block.items():
+                            for key, value in block.items():
+                                if key == "cache_control":
+                                    continue
                                 output_pieces.append(f"\n{key}: {value}")
                     else:
-                        output_pieces.append(f"\n{content_block}")
-            else:
-                output_pieces.append(f"\n{msg['content']}")
+                        output_pieces.append(f"\n{block}")
+            elif content is not None:
+                output_pieces.append(f"\n{content}")
+
             output_pieces.append("\n" + "-" * 80)
+
         return "".join(output_pieces)
     except Exception as e:
         return f"Error during formatting: {str(e)}"

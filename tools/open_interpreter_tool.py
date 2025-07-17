@@ -10,7 +10,10 @@ import os
 import subprocess
 from pathlib import Path
 
-from interpreter import OpenInterpreter
+try:
+    from interpreter import OpenInterpreter
+except Exception:  # pragma: no cover - optional dependency
+    OpenInterpreter = None
 
 from config import get_constant, openai41
 from tools.base import BaseTool, ToolError, ToolResult
