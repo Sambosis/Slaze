@@ -846,7 +846,7 @@
                 userMessagesDiv.innerHTML = '<div class="empty-state">No user messages yet</div>';
             } else {
                 data.user.forEach(function(msg) {
-                    userMessagesDiv.innerHTML += '<div class="message user-message">' + escapeHtml(msg) + '</div>';
+                    userMessagesDiv.innerHTML += '<div class="message user-message">' + parseMarkdown(msg) + '</div>';
                 });
             }
             
