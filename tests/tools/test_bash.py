@@ -127,11 +127,14 @@ async def test_working_directory_handling(bash_tool: BashTool):
 async def test_display_integration(bash_tool: BashTool, mock_display):
     """Test that the display is properly integrated."""
     bash_tool.display = mock_display
-    
+
     result = await bash_tool("echo 'test'")
-    
+
     assert isinstance(result, ToolResult)
-    mock_display.add_message.assert_called_with("user", "Executing command: echo 'test'")
+    mock_display.add_message.assert_any_call("user", "Executing command: echo 'test'")
+    assistant_calls = [c for c in mock_display.add_message.call_args_list if c[0][0] == "assistant"]
+    assert assistant_calls
+    assert assistant_calls[0][0][1].startswith("```console")
 
 
 @pytest.mark.asyncio
