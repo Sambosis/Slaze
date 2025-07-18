@@ -123,5 +123,5 @@ reportAttributeAccessIssue = false
 reportArgumentType = false
 
 [tool.uv.workspace]
-members = ["repo/pinpong"]
+members = ["repo/pinpong", "repo/sol"]
 
