@@ -34,6 +34,29 @@ class BashTool(BaseTool):
     name: ClassVar[Literal["bash"]] = "bash"
     api_type: ClassVar[Literal["bash_20250124"]] = "bash_20250124"
 
+    def _format_terminal_output(self,
+                                command: str,
+                                result: subprocess.CompletedProcess | None = None,
+                                cwd: str | None = None) -> str:
+        """Format subprocess output similar to ProjectSetupTool style."""
+        output_lines = ["```console"]
+
+        if cwd:
+            output_lines.append(f"$ cd {cwd}")
+
+        output_lines.append(f"$ {command}")
+
+        if result is not None:
+            if result.stdout:
+                output_lines.extend(result.stdout.rstrip().split("\n"))
+            if result.stderr:
+                output_lines.extend(result.stderr.rstrip().split("\n"))
+            if result.returncode != 0:
+                output_lines.append(f"[Exit code: {result.returncode}]")
+
+        output_lines.append("```")
+        return "\n".join(output_lines)
+
     async def __call__(self, command: str | None = None, **kwargs):
         if command is not None:
             if self.display is not None:
@@ -166,12 +189,20 @@ class BashTool(BaseTool):
             if len(error) > 200000:
                 error = f"{error[:100000]} ... [TRUNCATED] ... {error[-100000:]}"
 
-            formatted_output = (f"command: {command}\n"
-                                f"working_directory: {cwd}\n"
-                                f"success: {str(success).lower()}\n"
-                                f"output: {output}\n"
-                                f"error: {error}")
+            formatted_output = (
+                f"command: {command}\n"
+                f"working_directory: {cwd}\n"
+                f"success: {str(success).lower()}\n"
+                f"output: {output}\n"
+                f"error: {error}"
+            )
             rr(formatted_output)
+            if self.display is not None:
+                try:
+                    console_out = self._format_terminal_output(command, result, cwd)
+                    self.display.add_message("assistant", console_out)
+                except Exception:
+                    pass
             return ToolResult(
                 output=formatted_output,
                 error=error,
@@ -188,11 +219,25 @@ class BashTool(BaseTool):
                 output = e.output or ""
                 stderr = e.stderr or ""
 
-            formatted_output = (f"command: {command}\n"
-                                f"working_directory: {cwd}\n"
-                                f"success: false\n"
-                                f"output: {output}\n"
-                                f"error: {stderr or error}")
+            formatted_output = (
+                f"command: {command}\n"
+                f"working_directory: {cwd}\n"
+                f"success: false\n"
+                f"output: {output}\n"
+                f"error: {stderr or error}"
+            )
+            if self.display is not None:
+                try:
+                    fake_result = subprocess.CompletedProcess(
+                        args=command,
+                        returncode=1,
+                        stdout=output,
+                        stderr=stderr or error,
+                    )
+                    console_out = self._format_terminal_output(command, fake_result, cwd)
+                    self.display.add_message("assistant", console_out)
+                except Exception as e:
+                    logging.error(f"Error while adding message to display: {e}", exc_info=True)
             return ToolResult(
                 output=formatted_output,
                 error=error,
