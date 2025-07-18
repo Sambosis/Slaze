@@ -34,6 +34,38 @@ class BashTool(BaseTool):
     name: ClassVar[Literal["bash"]] = "bash"
     api_type: ClassVar[Literal["bash_20250124"]] = "bash_20250124"
 
+    def _format_terminal_output(self, command: str, result: subprocess.CompletedProcess = None, cwd: str = None) -> str:
+        """Format command and response to look like terminal output."""
+        output_lines = []
+
+        # Start with console formatting
+        output_lines.append("```console")
+
+        # Format the command with current directory if provided
+        if cwd:
+            output_lines.append(f"$ cd {cwd}")
+
+        # Format the command
+        output_lines.append(f"$ {command}")
+
+        # Add the response if provided
+        if result is not None:
+            if result.stdout:
+                # Split stdout into lines and preserve formatting
+                stdout_lines = result.stdout.rstrip().split('\n')
+                output_lines.extend(stdout_lines)
+            if result.stderr:
+                # Split stderr into lines and preserve formatting
+                stderr_lines = result.stderr.rstrip().split('\n')
+                output_lines.extend(stderr_lines)
+            if result.returncode != 0:
+                output_lines.append(f"[Exit code: {result.returncode}]")
+
+        # End console formatting
+        output_lines.append("```")
+
+        return "\n".join(output_lines)
+
     async def __call__(self, command: str | None = None, **kwargs):
         if command is not None:
             if self.display is not None:
@@ -137,7 +169,6 @@ class BashTool(BaseTool):
             repo_dir = get_constant("REPO_DIR")
             cwd = str(
                 repo_dir) if repo_dir and Path(repo_dir).exists() else None
-            terminal_display = f"terminal {cwd}>  {command}"
 
             # Set up environment for UTF-8 support on Windows
             env = os.environ.copy()
@@ -160,7 +191,15 @@ class BashTool(BaseTool):
             output = result.stdout
             error = result.stderr
             success = result.returncode == 0
-            terminal_display = f"{output}\n{error}"
+            
+            # Display terminal-style output if display is available
+            if self.display is not None:
+                try:
+                    formatted_terminal_output = self._format_terminal_output(command, result, cwd)
+                    self.display.add_message("assistant", formatted_terminal_output)
+                except Exception as display_error:
+                    logger.warning(f"Failed to display terminal output: {display_error}")
+            
             if len(output) > 200000:
                 output = f"{output[:100000]} ... [TRUNCATED] ... {output[-100000:]}"
             if len(error) > 200000:
@@ -187,6 +226,33 @@ class BashTool(BaseTool):
             if isinstance(e, subprocess.TimeoutExpired):
                 output = e.output or ""
                 stderr = e.stderr or ""
+            elif isinstance(e, subprocess.CalledProcessError):
+                # CalledProcessError has stdout, stderr, and returncode attributes
+                output = e.stdout or ""
+                stderr = e.stderr or ""
+                
+                # Display terminal-style output for CalledProcessError
+                if self.display is not None:
+                    try:
+                        formatted_terminal_output = self._format_terminal_output(command, e, cwd)
+                        self.display.add_message("assistant", formatted_terminal_output)
+                    except Exception as display_error:
+                        logger.warning(f"Failed to display terminal output for CalledProcessError: {display_error}")
+            else:
+                # For other exceptions, create a mock result for display purposes
+                mock_result = type('MockResult', (), {
+                    'stdout': output,
+                    'stderr': stderr or error,
+                    'returncode': 1
+                })()
+                
+                # Display terminal-style output even for other errors
+                if self.display is not None:
+                    try:
+                        formatted_terminal_output = self._format_terminal_output(command, mock_result, cwd)
+                        self.display.add_message("assistant", formatted_terminal_output)
+                    except Exception as display_error:
+                        logger.warning(f"Failed to display terminal output for error: {display_error}")
 
             formatted_output = (f"command: {command}\n"
                                 f"working_directory: {cwd}\n"
