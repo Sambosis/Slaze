@@ -103,24 +103,22 @@ class EditTool(BaseTool):
         return params
 
     def format_output(self, data: Dict) -> str:
-        """Format the output data similar to ProjectSetupTool style"""
+        """Format the output data similar to Bash and ProjectSetupTool style"""
         output_lines = []
 
         # Add command type
-        output_lines.append(f"Command: {data['command']}")
-        if self.display is not None:
-            self.display.add_message("assistant",
-                                     f"EditTool Command: {data['command']}")
-        # Add status
-        output_lines.append(f"Status: {data['status']}")
+        output_lines.append(f"$ edit_tool --command {data['command']}")
 
         # Add file path if present
         if "file_path" in data:
-            output_lines.append(f"File Path: {data['file_path']}")
+            output_lines.append(f"--path {data['file_path']}")
 
         # Add operation details if present
         if "operation_details" in data:
-            output_lines.append(f"Operation: {data['operation_details']}")
+            output_lines.append(f"--details \"{data['operation_details']}\"")
+
+        output_lines.append(f"\n{data['status']}")
+
 
         # Join all lines with newlines
         output = "\n".join(output_lines)

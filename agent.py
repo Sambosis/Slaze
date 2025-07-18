@@ -266,15 +266,24 @@ class Agent:
             )
         finally:
             tool_result = self._make_api_tool_result(result, content_block["id"])
-            # logger.debug(f"Tool result: {tool_result}") # This might be too verbose, let's comment it out for now
             tool_output = (
                 result.output
                 if hasattr(result, "output") and result.output
                 else str(result)
             )
             tool_name = content_block["name"]
+
+            if tool_name == "str_replace_editor":
+                formatted_output = self.tool_collection.tools[tool_name].format_output({
+                    "command": result.command,
+                    "status": tool_output,
+                    "file_path": content_block["input"].get("path"),
+                })
+                tool_output = formatted_output
+
             if len(tool_name) > 64:
                 tool_name = tool_name[:61] + "..."  # Truncate to 61 and add ellipsis
+
             combined_content = [
                 {
                     "type": "tool_result",
@@ -290,17 +299,7 @@ class Agent:
                 }
             )
 
-            # Only tool messages should follow assistant tool calls. Appending a
-            # user message here violates the expected OpenAI API sequence and
-            # leads to errors like:
-            #   "An assistant message with 'tool_calls' must be followed by tool
-            #   messages responding to each 'tool_call_id'."
-            # The tool results are instead logged and a proper tool message is
-            # added by ``Agent.step`` after ``run_tool`` returns.
-
-            # Use the dedicated logging function instead of inline logging
             self.log_tool_results(combined_content, tool_name, content_block["input"])
-
             return tool_result
 
     def _make_api_tool_result(self, result: ToolResult, tool_use_id: str) -> Dict:
