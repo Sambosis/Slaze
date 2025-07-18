@@ -236,8 +236,8 @@ class BashTool(BaseTool):
                     )
                     console_out = self._format_terminal_output(command, fake_result, cwd)
                     self.display.add_message("assistant", console_out)
-                except Exception:
-                    pass
+                except Exception as e:
+                    logging.error(f"Error while adding message to display: {e}", exc_info=True)
             return ToolResult(
                 output=formatted_output,
                 error=error,
