@@ -226,21 +226,33 @@ class BashTool(BaseTool):
             if isinstance(e, subprocess.TimeoutExpired):
                 output = e.output or ""
                 stderr = e.stderr or ""
-
-            # Create a mock result for display purposes
-            mock_result = type('MockResult', (), {
-                'stdout': output,
-                'stderr': stderr or error,
-                'returncode': 1
-            })()
-            
-            # Display terminal-style output even for errors
-            if self.display is not None:
-                try:
-                    formatted_terminal_output = self._format_terminal_output(command, mock_result, cwd)
-                    self.display.add_message("assistant", formatted_terminal_output)
-                except Exception as display_error:
-                    logger.warning(f"Failed to display terminal output for error: {display_error}")
+            elif isinstance(e, subprocess.CalledProcessError):
+                # CalledProcessError has stdout, stderr, and returncode attributes
+                output = e.stdout or ""
+                stderr = e.stderr or ""
+                
+                # Display terminal-style output for CalledProcessError
+                if self.display is not None:
+                    try:
+                        formatted_terminal_output = self._format_terminal_output(command, e, cwd)
+                        self.display.add_message("assistant", formatted_terminal_output)
+                    except Exception as display_error:
+                        logger.warning(f"Failed to display terminal output for CalledProcessError: {display_error}")
+            else:
+                # For other exceptions, create a mock result for display purposes
+                mock_result = type('MockResult', (), {
+                    'stdout': output,
+                    'stderr': stderr or error,
+                    'returncode': 1
+                })()
+                
+                # Display terminal-style output even for other errors
+                if self.display is not None:
+                    try:
+                        formatted_terminal_output = self._format_terminal_output(command, mock_result, cwd)
+                        self.display.add_message("assistant", formatted_terminal_output)
+                    except Exception as display_error:
+                        logger.warning(f"Failed to display terminal output for error: {display_error}")
 
             formatted_output = (f"command: {command}\n"
                                 f"working_directory: {cwd}\n"
