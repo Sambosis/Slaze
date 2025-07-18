@@ -142,6 +142,39 @@ class WriteCodeTool(BaseAnthropicTool):
         # Initialize PictureGenerationTool for handling image files
         self.picture_tool = PictureGenerationTool(display=display)
 
+    def _format_terminal_output(self, 
+                               command: str, 
+                               files: List[str] = None, 
+                               result: str = None, 
+                               error: str = None,
+                               additional_info: str = None) -> str:
+        """Format write code operations to look like terminal output."""
+        output_lines = ["```console"]
+        
+        # Format the command with a pseudo-shell prompt
+        if files:
+            files_str = " ".join(files)
+            output_lines.append(f"$ write_code {command} {files_str}")
+        else:
+            output_lines.append(f"$ write_code {command}")
+        
+        # Add the result/output if provided
+        if result:
+            output_lines.extend(result.rstrip().split('\n'))
+        
+        # Add error if provided
+        if error:
+            output_lines.append(f"Error: {error}")
+        
+        # Add additional info if provided
+        if additional_info:
+            output_lines.extend(additional_info.rstrip().split('\n'))
+        
+        # End console formatting
+        output_lines.append("```")
+        
+        return "\n".join(output_lines)
+
     def to_params(self) -> dict:
         logger.debug(
             f"WriteCodeTool.to_params called with api_type: {self.api_type}")
@@ -386,10 +419,14 @@ class WriteCodeTool(BaseAnthropicTool):
             # Handle image files with PictureGenerationTool
             if image_files:
                 if self.display:
-                    self.display.add_message(
-                        "assistant",
-                        f"Detected image files, using PictureGenerationTool for:\n {'\n'.join(file.filename for file in image_files)}",
+                    image_filenames = [file.filename for file in image_files]
+                    console_output = self._format_terminal_output(
+                        command="generate_images",
+                        files=image_filenames,
+                        result="Detected image files, using PictureGenerationTool",
+                        additional_info=f"Files to generate:\n" + "\n".join(f"  - {filename}" for filename in image_filenames)
                     )
+                    self.display.add_message("assistant", console_output)
 
                 for image_file in image_files:
                     try:
@@ -407,10 +444,13 @@ class WriteCodeTool(BaseAnthropicTool):
                         image_results.append(result)
 
                         if self.display:
-                            self.display.add_message(
-                                "assistant",
-                                f"Generated image: {image_file.filename}",
+                            console_output = self._format_terminal_output(
+                                command="generate_image",
+                                files=[image_file.filename],
+                                result=f"Image generated successfully",
+                                additional_info=f"Generated: {image_file.filename}"
                             )
+                            self.display.add_message("assistant", console_output)
                     except Exception as e:
                         error_msg = f"Error generating image {image_file.filename}: {str(e)}"
                         logger.error(error_msg)
@@ -456,10 +496,14 @@ class WriteCodeTool(BaseAnthropicTool):
             # --- Step 1: Generate Skeletons Asynchronously ---
             if file_details:  # Only proceed if there are code files to process
                 if self.display:
-                    self.display.add_message(
-                        "assistant",
-                        f"Generating code for:\n {'\n'.join(file.filename for file in file_details)}",
+                    code_filenames = [file.filename for file in file_details]
+                    console_output = self._format_terminal_output(
+                        command="generate_code",
+                        files=code_filenames,
+                        result="Starting code generation process",
+                        additional_info=f"Files to generate:\n" + "\n".join(f"  - {filename}" for filename in code_filenames)
                     )
+                    self.display.add_message("assistant", console_output)
 
                 # CHANGE: Update the call to pass file_detail and all file_details
                 skeleton_tasks = [
@@ -697,8 +741,18 @@ class WriteCodeTool(BaseAnthropicTool):
                                 formatted_code = html_format_code(
                                     fixed_code, language
                                     or absolute_path.suffix.lstrip('.'))
-                                self.display.add_message(
-                                    "tool", formatted_code)
+                                
+                                # Show console output for successful file creation
+                                console_output = self._format_terminal_output(
+                                    command="write_file",
+                                    files=[filename],
+                                    result=f"File written successfully",
+                                    additional_info=f"Path: {docker_path_display}\nSize: {len(fixed_code)} characters\nLanguage: {language or 'unknown'}"
+                                )
+                                self.display.add_message("assistant", console_output)
+                                
+                                # Also show the formatted code
+                                self.display.add_message("tool", formatted_code)
 
                         except Exception as write_error:
                             logger.error(
@@ -781,6 +835,18 @@ class WriteCodeTool(BaseAnthropicTool):
                 "errors": errors_skeleton + errors_code_gen + errors_write,
             }
 
+            # Display final completion message
+            if self.display:
+                status_text = "completed successfully" if final_status == "success" else f"completed with status: {final_status}"
+                all_filenames = [f.filename for f in file_details] + [f.filename for f in image_files]
+                console_output = self._format_terminal_output(
+                    command="write_codebase",
+                    files=all_filenames,
+                    result=f"Codebase generation {status_text}",
+                    additional_info=f"Total files: {total_files}\nSuccessful: {total_success}\nCode files: {success_count}/{len(file_details)}\nImage files: {image_success_count}/{len(image_files)}\nWrite path: {repo_path_obj}"
+                )
+                self.display.add_message("assistant", console_output)
+
             return ToolResult(
                 output=self.format_output(result_data),
                 tool_name=self.name,
@@ -790,6 +856,14 @@ class WriteCodeTool(BaseAnthropicTool):
         except ValueError as ve:  # Catch specific config/path errors
             error_message = f"Configuration Error in WriteCodeTool __call__: {str(ve)}"
             logger.critical(error_message, exc_info=True)
+            
+            if self.display:
+                console_output = self._format_terminal_output(
+                    command="write_codebase",
+                    error=f"Configuration Error: {str(ve)}"
+                )
+                self.display.add_message("assistant", console_output)
+            
             return ToolResult(error=error_message,
                               tool_name=self.name,
                               command=command)
@@ -797,6 +871,13 @@ class WriteCodeTool(BaseAnthropicTool):
             error_message = f"Critical Error in WriteCodeTool __call__: {str(e)}"
             logger.critical("Critical error during codebase generation",
                             exc_info=True)
+            
+            if self.display:
+                console_output = self._format_terminal_output(
+                    command="write_codebase",
+                    error=f"Critical Error: {str(e)}"
+                )
+                self.display.add_message("assistant", console_output)
             # Optionally include repo_path_obj if it was set
             if repo_path_obj:
                 error_message += f"\nAttempted Host Path: {repo_path_obj}"
