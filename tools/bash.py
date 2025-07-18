@@ -38,7 +38,19 @@ class BashTool(BaseTool):
                                 command: str,
                                 result: subprocess.CompletedProcess | None = None,
                                 cwd: str | None = None) -> str:
-        """Format subprocess output similar to ProjectSetupTool style."""
+        """
+                                Formats the output of a subprocess command as a console-style markdown block.
+                                
+                                Includes the working directory change, the executed command, standard output, standard error, and the exit code if nonzero. Returns the formatted string for display or logging purposes.
+                                
+                                Parameters:
+                                    command (str): The command that was executed.
+                                    result (subprocess.CompletedProcess | None): The result object from subprocess execution, if available.
+                                    cwd (str | None): The working directory in which the command was run.
+                                
+                                Returns:
+                                    str: The formatted console-style output.
+                                """
         output_lines = ["```console"]
 
         if cwd:
@@ -58,6 +70,14 @@ class BashTool(BaseTool):
         return "\n".join(output_lines)
 
     async def __call__(self, command: str | None = None, **kwargs):
+        """
+        Executes a bash command asynchronously, optionally displaying the command before execution.
+        
+        If a display interface is set, the command is shown to the user prior to execution. The command is converted for compatibility with the current operating system before being run. Returns a `ToolResult` containing the command's output or error details.
+        
+        Raises:
+            ToolError: If no command is provided.
+        """
         if command is not None:
             if self.display is not None:
                 try:
@@ -150,7 +170,14 @@ class BashTool(BaseTool):
         return command
 
     async def _run_command(self, command: str):
-        """Execute a command in the Docker container."""
+        """
+        Execute a shell command asynchronously in the host environment, capturing output, error, and execution status.
+        
+        The command is run relative to the configured project directory if available. Output and error streams are truncated if excessively long. The formatted result is optionally displayed in the UI and returned as a `ToolResult` object containing details of the execution.
+        
+        Returns:
+            ToolResult: Structured result containing command output, error message, tool name, and the executed command.
+        """
         output = ""
         error = ""
         success = False
