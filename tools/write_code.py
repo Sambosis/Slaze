@@ -458,7 +458,7 @@ class WriteCodeTool(BaseAnthropicTool):
                 if self.display:
                     self.display.add_message(
                         "assistant",
-                        f"Generating skeletons for:\n {'\n'.join(file.filename for file in file_details)}",
+                        f"Generating code for:\n {'\n'.join(file.filename for file in file_details)}",
                     )
 
                 # CHANGE: Update the call to pass file_detail and all file_details

@@ -9,18 +9,6 @@ from typing import List, Optional
 import logging
 from config import get_constant
 from utils.file_logger import log_file_operation
-# from loguru import logger as ll # Removed loguru import
-
-# Configure logging to a file # Removed loguru specific file configuration
-# ll.add(
-#     "edit.log",
-#     rotation="500 KB",
-#     level="DEBUG",
-#     format="{time: MM-DD HH:mm} | {level: <8} | {module}.{function}:{line} - {message}",
-# )
-
-# Configure icecream for debugging
-# ic.configureOutput(includeContext=True, outputFunction=write_to_file) # Removed
 
 logger = logging.getLogger(__name__)
 

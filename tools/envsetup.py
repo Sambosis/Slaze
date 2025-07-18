@@ -199,11 +199,6 @@ class ProjectSetupTool(BaseAnthropicTool):
         venv_dir = repo_path / ".venv"
 
         try:
-            if self.display is not None:
-                self.display.add_message(
-                    "assistant",
-                    f"Creating virtual environment in {repo_path}")
-
             if not venv_dir.exists():
                 try:
                     self._run_subprocess_with_display(["uv", "venv"],
@@ -372,19 +367,10 @@ class ProjectSetupTool(BaseAnthropicTool):
                 for package in pkgs_to_install_this_round:
                     if not package:
                         continue
-                    if self.display is not None:
-                        self.display.add_message(
-                            "assistant",
-                            f"Installing package {i}/{len(packages)}: {package} using uv"
-                        )
                     try:
                         result = self._run_subprocess_with_display(
                             ["uv", "add", package], cwd=str(repo_path))
                         installed_packages.append(package)
-                        if self.display is not None:
-                            self.display.add_message(
-                                "assistant",
-                                f"Successfully installed {package}")
                     except subprocess.CalledProcessError as e:
                         error_result = {
                             "command": "add_additional_depends",

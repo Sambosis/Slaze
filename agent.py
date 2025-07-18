@@ -455,7 +455,7 @@ class Agent:
             # instructions when using an interactive display like the
             # console or web UI. This avoids test failures when a simple
             # DummyDisplay is used.
-            self.display.add_message("assistant", msg.content or "")
+            # self.display.add_message(msg_type="assistant", msg.content or "")
             wait_func = getattr(self.display, "wait_for_user_input", None)
             if wait_func and asyncio.iscoroutinefunction(wait_func):
                 should_prompt = True
