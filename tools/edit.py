@@ -38,6 +38,35 @@ class EditTool(BaseTool):
         self.display = display  # Explicitly set self.display
         self._file_history = defaultdict(list)
 
+    def _format_terminal_output(self, 
+                               command: str, 
+                               path: str, 
+                               result: str = None, 
+                               error: str = None,
+                               additional_info: str = None) -> str:
+        """Format edit operations to look like terminal output."""
+        output_lines = ["```console"]
+        
+        # Format the command with a pseudo-shell prompt
+        output_lines.append(f"$ edit {command} {path}")
+        
+        # Add the result/output if provided
+        if result:
+            output_lines.extend(result.rstrip().split('\n'))
+        
+        # Add error if provided
+        if error:
+            output_lines.append(f"Error: {error}")
+        
+        # Add additional info if provided
+        if additional_info:
+            output_lines.extend(additional_info.rstrip().split('\n'))
+        
+        # End console formatting
+        output_lines.append("```")
+        
+        return "\n".join(output_lines)
+
     def _resolve_path(self, path: str | Path) -> Path:
         """Resolve a given path relative to REPO_DIR if not absolute, and normalize it."""
         p = Path(path)
@@ -102,31 +131,7 @@ class EditTool(BaseTool):
         logger.debug(f"EditTool params: {params}")
         return params
 
-    def format_output(self, data: Dict) -> str:
-        """Format the output data similar to ProjectSetupTool style"""
-        output_lines = []
 
-        # Add command type
-        output_lines.append(f"Command: {data['command']}")
-        if self.display is not None:
-            self.display.add_message("assistant",
-                                     f"EditTool Command: {data['command']}")
-        # Add status
-        output_lines.append(f"Status: {data['status']}")
-
-        # Add file path if present
-        if "file_path" in data:
-            output_lines.append(f"File Path: {data['file_path']}")
-
-        # Add operation details if present
-        if "operation_details" in data:
-            output_lines.append(f"Operation: {data['operation_details']}")
-
-        # Join all lines with newlines
-        output = "\n".join(output_lines)
-        if len(output) > 12000:
-            output = f"{output[:5000]} ... (truncated) ... {output[-5000:]}"
-        return output
 
     async def __call__(
         self,
@@ -142,12 +147,6 @@ class EditTool(BaseTool):
     ) -> ToolResult:
         """Execute the specified command with proper error handling and formatted output."""
         try:
-            # Add display messages
-            if self.display is not None:
-                self.display.add_message(
-                    "assistant",
-                    f"EditTool Executing Command: {command} on path: {path}")
-
             # Normalize the path first relative to REPO_DIR
             _path = self._resolve_path(path)
             if command == "create":
@@ -159,11 +158,13 @@ class EditTool(BaseTool):
                 self._file_history[_path].append(file_text)
                 log_file_operation(_path, "create")
                 if self.display is not None:
-                    self.display.add_message(
-                        "assistant",
-                        f"EditTool Command: {command} successfully created file {_path} !",
+                    console_output = self._format_terminal_output(
+                        command="create", 
+                        path=str(_path), 
+                        result=f"File created successfully\nContent length: {len(file_text)} characters",
+                        additional_info=f"Preview (first 200 chars):\n{file_text[:200]}{'...' if len(file_text) > 200 else ''}"
                     )
-                    self.display.add_message("tool", file_text)
+                    self.display.add_message("assistant", console_output)
                 # Return detailed result with file creation confirmation
                 success_msg = f"File {_path} has been created successfully.\n"
                 success_msg += f"Content length: {len(file_text)} characters\n"
@@ -178,10 +179,13 @@ class EditTool(BaseTool):
             elif command == "view":
                 result = await self.view(_path, view_range)
                 if self.display is not None:
-                    self.display.add_message(
-                        "assistant",
-                        f"EditTool Command: {command} successfully viewed file\n {str(result.output[:100])} !",
+                    console_output = self._format_terminal_output(
+                        command="view",
+                        path=str(_path),
+                        result=f"File viewed successfully",
+                        additional_info=result.output[:500] + ("..." if len(result.output) > 500 else "")
                     )
+                    self.display.add_message("assistant", console_output)
                 # Return the detailed result from view method with proper metadata
                 return ToolResult(
                     output=result.output,
@@ -197,18 +201,15 @@ class EditTool(BaseTool):
                     )
                 result = self.str_replace(_path, old_str, new_str)
                 if self.display is not None:
-                    self.display.add_message(
-                        "assistant",
-                        f"EditTool Command: {command} successfully replaced text in file {str(_path)} !",
+                    old_preview = old_str[-200:] if len(old_str) > 200 else old_str
+                    new_preview = new_str[-200:] if new_str and len(new_str) > 200 else new_str
+                    console_output = self._format_terminal_output(
+                        command="str_replace",
+                        path=str(_path),
+                        result=f"Text replacement completed successfully",
+                        additional_info=f"Old text: {old_preview}\nNew text: {new_preview}"
                     )
-                    self.display.add_message(
-                        "assistant",
-                        f"End of Old Text: {old_str[-200:] if len(old_str) > 200 else old_str}",
-                    )
-                    self.display.add_message(
-                        "assistant",
-                        f"End of New Text: {new_str[-200:] if new_str and len(new_str) > 200 else new_str}",
-                    )
+                    self.display.add_message("assistant", console_output)
 
                 # Return the detailed result from str_replace method with proper metadata
                 return ToolResult(
@@ -228,10 +229,13 @@ class EditTool(BaseTool):
                         "Parameter `new_str` is required for command: insert")
                 result = self.insert(_path, insert_line, new_str)
                 if self.display is not None:
-                    self.display.add_message(
-                        "assistant",
-                        f"EditTool Command: {command} successfully inserted text at line {insert_line} in file {str(_path)} !",
+                    console_output = self._format_terminal_output(
+                        command="insert",
+                        path=str(_path),
+                        result=f"Text inserted successfully at line {insert_line}",
+                        additional_info=f"Inserted text: {new_str[:200]}{'...' if len(new_str) > 200 else ''}"
                     )
+                    self.display.add_message("assistant", console_output)
 
                 # Return the detailed result from insert method with proper metadata
                 return ToolResult(
@@ -244,10 +248,13 @@ class EditTool(BaseTool):
             elif command == "undo_edit":
                 result = self.undo_edit(_path)
                 if self.display is not None:
-                    self.display.add_message(
-                        "assistant",
-                        f"EditTool Command: {command} successfully undone last edit in file {str(_path)} !",
+                    console_output = self._format_terminal_output(
+                        command="undo_edit",
+                        path=str(_path),
+                        result=f"Last edit undone successfully",
+                        additional_info="Previous file state has been restored"
                     )
+                    self.display.add_message("assistant", console_output)
 
                 # Return the detailed result from undo_edit method with proper metadata
                 return ToolResult(
@@ -264,8 +271,12 @@ class EditTool(BaseTool):
 
         except Exception as e:
             if self.display is not None:
-                self.display.add_message("assistant",
-                                         f"EditTool error: {str(e)}")
+                console_output = self._format_terminal_output(
+                    command=str(command),
+                    path=str(_path) if '_path' in locals() else path,
+                    error=str(e)
+                )
+                self.display.add_message("assistant", console_output)
 
             # Return detailed error information
             error_msg = f"EditTool {command} command failed.\n"
