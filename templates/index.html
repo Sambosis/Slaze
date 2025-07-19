@@ -20,7 +20,8 @@
             margin: 0; 
             padding: 20px; 
             background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-            min-height: 100vh;
+            height: 100vh;
+            overflow: hidden;
         }
 
         .container { 
@@ -30,6 +31,9 @@
             padding: 24px; 
             border-radius: 16px; 
             box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            height: calc(100vh - 40px);
+            display: flex;
+            flex-direction: column;
         }
         
         /* Header styles */
@@ -40,6 +44,7 @@
             margin-bottom: 32px; 
             padding-bottom: 20px;
             border-bottom: 2px solid #e9ecef;
+            flex-shrink: 0;
         }
         
         .header h1 { 
@@ -79,12 +84,17 @@
             border-radius: 12px;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
             overflow: hidden;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
         }
         
         .tab-buttons { 
             display: flex; 
             margin: 0; 
             background: #f8f9fa;
+            flex-shrink: 0;
         }
         
         .tab-button { 
@@ -132,21 +142,24 @@
         
         .tab-content { 
             display: none; 
+            flex: 1;
+            min-height: 0;
         }
         
         .tab-content.active { 
-            display: block; 
+            display: flex;
+            flex-direction: column;
         }
         
         .messages { 
             border: 2px solid #e9ecef; 
             padding: 20px; 
-            min-height: 350px; 
-            max-height: 600px; 
             overflow-y: auto; 
             background: #fafbfc; 
             border-radius: 12px;
             position: relative;
+            flex: 1;
+            min-height: 0;
         }
         
         .message { 
@@ -314,6 +327,7 @@
             background: #f8f9fa;
             border-radius: 12px;
             border: 2px solid #e9ecef;
+            flex-shrink: 0;
         }
         
         .input-area textarea { 
@@ -381,6 +395,7 @@
             font-weight: 600;
             color: #856404;
             box-shadow: 0 4px 12px rgba(255, 193, 7, 0.2);
+            flex-shrink: 0;
         }
 
         /* Enhanced Modal Styles */
@@ -681,6 +696,7 @@
             
             .container {
                 padding: 16px;
+                height: calc(100vh - 24px);
             }
             
             .header {
@@ -695,10 +711,16 @@
             
             .tab-buttons {
                 flex-direction: column;
+                flex-shrink: 0;
             }
             
             .tab-button {
                 padding: 12px 16px;
+            }
+            
+            .tab-container {
+                flex: 1;
+                min-height: 0;
             }
             
             .input-area {
