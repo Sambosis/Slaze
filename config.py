@@ -77,9 +77,9 @@ googlepro = "google/gemini-2.5-pro-preview"
 googleflash = "google/gemini-2.5-flash"
 googleflashlite = "google/gemini-2.5-flash-lite-preview-06-17"
 grok4 = "x-ai/grok-4"
-SUMMARY_MODEL = openai41mini  # Model for summaries
+SUMMARY_MODEL = googleflash  # Model for summaries
 MAIN_MODEL = f"{openai41mini}"  # Primary model for main agent operations
-CODE_MODEL = f"{openai41mini}:web"  # Model for code generation tasks
+CODE_MODEL = f"{kimi2}:web"  # Model for code generation tasks
 
 # Feature flag constants
 COMPUTER_USE_BETA_FLAG = "computer-use-2024-10-22"

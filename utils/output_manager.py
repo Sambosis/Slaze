@@ -19,9 +19,10 @@ if TYPE_CHECKING:
 
 
 class OutputManager:
-    def __init__(
-        self, display: Union[WebUI, AgentDisplayConsole], image_dir: Optional[Path] = None
-    ):
+
+    def __init__(self,
+                 display: Union[WebUI, AgentDisplayConsole],
+                 image_dir: Optional[Path] = None):
         LOGS_DIR = Path(get_constant("LOGS_DIR"))
         self.image_dir = LOGS_DIR / "computer_tool_images"
         self.image_dir.mkdir(parents=True, exist_ok=True)
@@ -60,15 +61,13 @@ class OutputManager:
             output_text += f"{result}"
         else:
             text = self._truncate_string(
-                str(result.output) if result.output is not None else ""
-            )
+                str(result.output) if result.output is not None else "")
             output_text += f"Output: {text}\n"
             if result.base64_image:
                 image_path = self.save_image(result.base64_image)
                 if image_path:
                     output_text += (
-                        f"[green]📸 Screenshot saved to {image_path}[/green]\n"
-                    )
+                        f"[green]📸 Screenshot saved to {image_path}[/green]\n")
                 else:
                     output_text += "[red]Failed to save screenshot[/red]\n"
 
@@ -76,7 +75,8 @@ class OutputManager:
 
     def format_api_response(self, response: Dict[str, Any]):
         """Format and display API response."""
-        if response is None or not hasattr(response, "content") or not response.content:
+        if response is None or not hasattr(response,
+                                           "content") or not response.content:
             logger.error("Invalid API response in format_api_response")
             return
 
@@ -95,14 +95,16 @@ class OutputManager:
                 for k, v in block.input.items()
                 if not isinstance(v, str) or len(v) < 1000
             }
-            json.dumps(safe_input) if isinstance(safe_input, dict) else str(safe_input)
+            json.dumps(safe_input) if isinstance(safe_input,
+                                                 dict) else str(safe_input)
 
-    def format_recent_conversation(
-        self, messages: List[Dict[str, Any]], num_recent: int = 10
-    ):
+    def format_recent_conversation(self,
+                                   messages: List[Dict[str, Any]],
+                                   num_recent: int = 10):
         """Format and display recent conversation."""
         if messages is None or not messages:
-            logger.warning("No messages provided to format_recent_conversation")
+            logger.warning(
+                "No messages provided to format_recent_conversation")
             return
 
         # recent_messages = messages[:num_recent] if len(messages) > num_recent else messages
@@ -148,11 +150,13 @@ class OutputManager:
                         content_block.get("name")
                         tool_input = content_block.get("input", "")
                         if isinstance(tool_input, dict):
-                            "\n".join(f"{k}: {v}" for k, v in tool_input.items())
+                            "\n".join(f"{k}: {v}"
+                                      for k, v in tool_input.items())
                         else:
                             try:
                                 tool_input = json.loads(tool_input)
-                                "\n".join(f"{k}: {v}" for k, v in tool_input.items())
+                                "\n".join(f"{k}: {v}"
+                                          for k, v in tool_input.items())
                             except json.JSONDecodeError:
                                 str(tool_input)
                         # self.display., (tool_name, f"Input: {input_text}"))

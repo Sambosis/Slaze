@@ -155,7 +155,7 @@
             border-radius: 12px; 
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
             position: relative;
-            animation: slideIn 0.3s ease-out;
+            animation: slideIn 0.93s ease-out;
         }
         
         @keyframes slideIn {
@@ -172,13 +172,13 @@
         .user-message { 
             background: linear-gradient(135deg, #a8e6cf 0%, #88d8a3 100%);
             color: #2d5a3d;
-            text-align: right; 
+            text-align: left; 
             margin-left: 20%;
             border-left: 4px solid #66bb6a;
         }
         
         .assistant-message { 
-            background: linear-gradient(135deg, #9bc9eaff 0%, #245780ff 100%);
+            background: linear-gradient(135deg, #83bde7ff 0%, #245780ff 100%);
             color: #ffffffff;
             text-align: left; 
             margin-right: 20%;
@@ -846,8 +846,7 @@
                 userMessagesDiv.innerHTML = '<div class="empty-state">No user messages yet</div>';
             } else {
                 data.user.forEach(function(msg) {
-                    userMessagesDiv.innerHTML += '<div class="message user-message">' + escapeHtml(msg) + '</div>';
-                });
+                    userMessagesDiv.innerHTML += '<div class="message user-message">' + parseMarkdown(msg) + '</div>';                });
             }
             
             // Update assistant messages

@@ -78,6 +78,7 @@ async def call_llm_for_task_revision(prompt_text: str, client: OpenAI, model: st
         "        *   Lean towards creating FEWER files and folders while maintaining organization and manageability. Avoid overly nested structures unless strictly necessary.\n"
         "        *   Focus on simplicity.\n"
         "4.  **Output Format:**\n"
+        "    *   The output should be in markdown format.\n"
         "    *   The output should start with the expanded description (if a programming project) or the direct task (if non-coding).\n"
         "    *   This should be followed by the file tree section (if a programming project), clearly delineated.\n"
         "    *   Do NOT include any conversational preamble, your own comments about the process, or any text beyond the structured task definition itself.\n"
@@ -157,6 +158,8 @@ class Agent:
             with open(task_file_path, "w", encoding="utf-8") as f:
                 f.write(revised_task_from_llm)
             logger.info(f"Revised task saved to {task_file_path}")
+            if self.display:
+                self.display.add_message(msg_type="user", content=revised_task_from_llm or "")
         except Exception as e:
             logger.error(f"Error saving revised task to {task_file_path}: {e}", exc_info=True)
             # Continue even if file write fails, but log it.
@@ -408,10 +411,10 @@ class Agent:
         tool_messages = self.messages[:-1]  # All messages except the last assistant message
         # prompt creation that gives all but the last message , then a new user message that explains that given the context so far,
         # Give a couple sentences explanation that you are going to do the actions in assistant_msg["tool_calls"]
-        tool_prompt = f"""Given the context so far, We will be performing the following actions: 
+        tool_prompt = f"""Given the context so far, We will be performing the following actions: {assistant_msg['content'] if 'content' in assistant_msg else ''}
         {assistant_msg['tool_calls'] if 'tool_calls' in assistant_msg else []}
-        Please respond with an explanation of what action will be taken.
-        It should be no more than 2 sentences long and you should use first person phrasing such as I will create the code for main.py so I can do a test run of the app."""
+        Please respond with markdown formatted list that contains the actions you will take.
+        It should be no more than 2 to 4 items long long and you should use simple statements such as - Create the code for main.py - Run the app - Fix the bugs in the code """
         tool_messages.append({"role": "user", "content": tool_prompt})
         tool_response = self.client.chat.completions.create(
             model=MAIN_MODEL,
