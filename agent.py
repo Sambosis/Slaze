@@ -380,7 +380,7 @@ class Agent:
         rr(f"Step {self.step_count} with {len(messages)} messages")
         with open(f"{LOGS_DIR}/messages.md", "w", encoding="utf-8") as f:
             f.write(format_messages_to_string(messages) + "\n"  )
-        tool_choice = "auto" if self.step_count > 20 else "required"
+        tool_choice = "any" if self.step_count > 50 else "required"
         try:
             response = self.client.chat.completions.create(
                 model=MAIN_MODEL,
