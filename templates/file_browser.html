@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Slazy Agent - File Browser</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.0/socket.io.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/4.3.0/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-json.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-markdown.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet" />
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1e1e1e;
+            color: #d4d4d4;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .vscode-container {
+            display: grid;
+            grid-template-columns: 250px 1fr 300px;
+            grid-template-rows: 35px 1fr 200px;
+            height: 100vh;
+            grid-template-areas: 
+                "titlebar titlebar titlebar"
+                "sidebar editor right-sidebar"
+                "sidebar console right-sidebar";
+        }
+
+        /* Title Bar */
+        .titlebar {
+            grid-area: titlebar;
+            background: #323233;
+            border-bottom: 1px solid #2d2d30;
+            display: flex;
+            align-items: center;
+            padding: 0 16px;
+            font-size: 13px;
+            color: #cccccc;
+        }
+
+        .titlebar h1 {
+            font-size: 13px;
+            font-weight: normal;
+        }
+
+        /* Left Sidebar - File Explorer */
+        .sidebar {
+            grid-area: sidebar;
+            background: #252526;
+            border-right: 1px solid #2d2d30;
+            overflow-y: auto;
+        }
+
+        .sidebar-header {
+            padding: 8px 16px;
+            font-size: 11px;
+            font-weight: 600;
+            color: #cccccc;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            background: #2d2d30;
+            border-bottom: 1px solid #3e3e42;
+        }
+
+        .file-tree {
+            padding: 8px 0;
+        }
+
+        .file-item, .folder-item {
+            display: flex;
+            align-items: center;
+            padding: 4px 16px;
+            cursor: pointer;
+            font-size: 13px;
+            line-height: 22px;
+            user-select: none;
+        }
+
+        .file-item:hover, .folder-item:hover {
+            background: #2a2d2e;
+        }
+
+        .file-item.active {
+            background: #094771;
+            color: #ffffff;
+        }
+
+        .file-item i, .folder-item i {
+            margin-right: 8px;
+            width: 16px;
+            text-align: center;
+            font-size: 12px;
+        }
+
+        .folder-item {
+            font-weight: 500;
+        }
+
+        .folder-item.collapsed .fa-folder-open:before {
+            content: "\f07b";
+        }
+
+        .folder-contents {
+            margin-left: 16px;
+        }
+
+        .folder-contents.hidden {
+            display: none;
+        }
+
+        /* Main Editor Area */
+        .editor {
+            grid-area: editor;
+            background: #1e1e1e;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .editor-tabs {
+            background: #2d2d30;
+            border-bottom: 1px solid #3e3e42;
+            display: flex;
+            min-height: 35px;
+            align-items: center;
+        }
+
+        .editor-tab {
+            padding: 8px 16px;
+            font-size: 13px;
+            background: #2d2d30;
+            color: #969696;
+            border-right: 1px solid #3e3e42;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .editor-tab.active {
+            background: #1e1e1e;
+            color: #ffffff;
+        }
+
+        .editor-tab .close-btn {
+            opacity: 0;
+            margin-left: 4px;
+            cursor: pointer;
+        }
+
+        .editor-tab:hover .close-btn {
+            opacity: 1;
+        }
+
+        .editor-content {
+            flex: 1;
+            padding: 16px;
+            overflow: auto;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.5;
+            max-height: 100%;
+        }
+
+        .editor-welcome {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: #969696;
+            text-align: center;
+        }
+
+        .editor-welcome i {
+            font-size: 48px;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+
+        /* Bottom Console Panel */
+        .console {
+            grid-area: console;
+            background: #1e1e1e;
+            border-top: 1px solid #2d2d30;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .console-header {
+            background: #2d2d30;
+            padding: 8px 16px;
+            font-size: 13px;
+            color: #cccccc;
+            border-bottom: 1px solid #3e3e42;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .console-content {
+            flex: 1;
+            padding: 8px 16px;
+            overflow-y: auto;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.4;
+        }
+
+        /* Right Sidebar - User Messages */
+        .right-sidebar {
+            grid-area: right-sidebar;
+            background: #252526;
+            border-left: 1px solid #2d2d30;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .right-sidebar-header {
+            padding: 8px 16px;
+            font-size: 11px;
+            font-weight: 600;
+            color: #cccccc;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            background: #2d2d30;
+            border-bottom: 1px solid #3e3e42;
+        }
+
+        .user-messages {
+            flex: 1;
+            padding: 8px;
+            overflow-y: auto;
+        }
+
+        .user-message {
+            background: #2d2d30;
+            border-radius: 4px;
+            padding: 8px 12px;
+            margin-bottom: 8px;
+            font-size: 12px;
+            line-height: 1.4;
+            border-left: 3px solid #007acc;
+        }
+
+        /* File type icons */
+        .file-icon-python { color: #3776ab; }
+        .file-icon-javascript { color: #f7df1e; }
+        .file-icon-html { color: #e34f26; }
+        .file-icon-css { color: #1572b6; }
+        .file-icon-json { color: #cbcb41; }
+        .file-icon-markdown { color: #083fa1; }
+        .file-icon-text { color: #969696; }
+        .file-icon-default { color: #969696; }
+
+        /* Scrollbars */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #1e1e1e;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #424242;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #4f4f4f;
+        }
+
+        /* Code highlighting adjustments */
+        .editor-content pre {
+            margin: 0;
+            background: transparent !important;
+            white-space: pre;
+            overflow-x: auto;
+            max-width: 100%;
+        }
+
+        .editor-content code {
+            background: transparent !important;
+            color: inherit !important;
+            white-space: pre;
+            word-wrap: normal;
+        }
+
+        /* Console message styling */
+        .console-message {
+            margin-bottom: 8px;
+            padding: 4px 0;
+        }
+
+        .console-message.assistant {
+            color: #4ec9b0;
+        }
+
+        .console-message.tool {
+            color: #dcdcaa;
+        }
+
+        .console-message.error {
+            color: #f44747;
+        }
+
+        .console-message.info {
+            color: #569cd6;
+        }
+    </style>
+</head>
+<body>
+    <div class="vscode-container">
+        <!-- Title Bar -->
+        <div class="titlebar">
+            <h1>Slazy Agent - File Browser</h1>
+        </div>
+
+        <!-- Left Sidebar - File Explorer -->
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <i class="fas fa-folder"></i> Explorer
+                <button onclick="refreshFileTree()" style="background: none; border: none; color: #cccccc; cursor: pointer; float: right;" title="Refresh file tree">
+                    <i class="fas fa-sync-alt"></i>
+                </button>
+            </div>
+            <div class="file-tree" id="file-tree">
+                <div class="folder-item" data-path="REPO_DIR">
+                    <i class="fas fa-folder-open"></i>
+                    <span>REPO_DIR</span>
+                </div>
+                <div class="folder-contents" id="root-contents">
+                    <!-- File tree will be populated here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Editor Area -->
+        <div class="editor">
+            <div class="editor-tabs" id="editor-tabs">
+                <!-- Tabs will be added here dynamically -->
+            </div>
+            <div class="editor-content" id="editor-content">
+                <div class="editor-welcome">
+                    <i class="fas fa-file-code"></i>
+                    <h3>Welcome to File Browser</h3>
+                    <p>Select a file from the explorer to view its contents</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottom Console Panel -->
+        <div class="console">
+            <div class="console-header">
+                <span><i class="fas fa-terminal"></i> Console</span>
+                <button onclick="clearConsole()" style="background: none; border: none; color: #cccccc; cursor: pointer;">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </div>
+            <div class="console-content" id="console-content">
+                <!-- Console messages will appear here -->
+            </div>
+        </div>
+
+        <!-- Right Sidebar - User Messages -->
+        <div class="right-sidebar">
+            <div class="right-sidebar-header">
+                <i class="fas fa-comments"></i> User Messages
+            </div>
+            <div class="user-messages" id="user-messages">
+                <!-- User messages will appear here -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let openTabs = [];
+        let activeTab = null;
+        let fileContents = {};
+        let socket = null;
+        let expandedFolders = new Set(); // Track expanded folders
+
+        // Initialize Socket.IO connection
+        function initSocket() {
+            socket = io();
+            
+            socket.on('connect', function() {
+                console.log('Connected to server');
+                addConsoleMessage('Connected to Slazy Agent server', 'info');
+            });
+
+            socket.on('disconnect', function() {
+                console.log('Disconnected from server');
+                addConsoleMessage('Disconnected from server', 'error');
+            });
+
+            socket.on('assistant_message', function(data) {
+                addConsoleMessage(data.content, 'assistant');
+            });
+
+            socket.on('tool_result', function(data) {
+                addConsoleMessage(`Tool: ${data.tool_name}\nResult: ${data.result}`, 'tool');
+            });
+
+            socket.on('user_message', function(data) {
+                addUserMessage(data.content);
+            });
+
+            socket.on('file_tree_update', function(data) {
+                console.log('File tree update received');
+                loadFileTree();
+            });
+
+            socket.on('tool_result', function(data) {
+                addConsoleMessage(`Tool: ${data.tool_name}\nResult: ${data.result}`, 'tool');
+                // Refresh file tree after tool execution (files might have been created/modified)
+                setTimeout(loadFileTree, 1000);
+            });
+        }
+
+        // Load file tree
+        async function loadFileTree() {
+            try {
+                const response = await fetch('/api/file-tree');
+                const fileTree = await response.json();
+                renderFileTree(fileTree, document.getElementById('root-contents'));
+            } catch (error) {
+                console.error('Error loading file tree:', error);
+                addConsoleMessage('Error loading file tree: ' + error.message, 'error');
+            }
+        }
+
+        // Refresh file tree manually
+        function refreshFileTree() {
+            addConsoleMessage('Refreshing file tree...', 'info');
+            loadFileTree();
+        }
+
+        // Auto-refresh file tree periodically
+        function startAutoRefresh() {
+            // Refresh every 30 seconds
+            setInterval(loadFileTree, 30000);
+        }
+
+        // Render file tree recursively
+        function renderFileTree(items, container) {
+            container.innerHTML = '';
+            
+            items.forEach(item => {
+                if (item.type === 'directory') {
+                    const folderDiv = document.createElement('div');
+                    folderDiv.className = 'folder-item';
+                    folderDiv.dataset.path = item.path;
+                    
+                    const contentsDiv = document.createElement('div');
+                    contentsDiv.className = 'folder-contents';
+                    
+                    // Check if this folder was previously expanded
+                    const wasExpanded = expandedFolders.has(item.path);
+                    if (wasExpanded) {
+                        contentsDiv.classList.remove('hidden');
+                        folderDiv.innerHTML = `
+                            <i class="fas fa-folder-open"></i>
+                            <span>${item.name}</span>
+                        `;
+                        if (item.children && item.children.length > 0) {
+                            renderFileTree(item.children, contentsDiv);
+                        }
+                    } else {
+                        contentsDiv.classList.add('hidden');
+                        folderDiv.innerHTML = `
+                            <i class="fas fa-folder"></i>
+                            <span>${item.name}</span>
+                        `;
+                    }
+                    
+                    folderDiv.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        toggleFolder(folderDiv, contentsDiv, item.children);
+                    });
+                    
+                    container.appendChild(folderDiv);
+                    container.appendChild(contentsDiv);
+                } else {
+                    const fileDiv = document.createElement('div');
+                    fileDiv.className = 'file-item';
+                    fileDiv.dataset.path = item.path;
+                    
+                    const icon = getFileIcon(item.name);
+                    fileDiv.innerHTML = `
+                        <i class="${icon.class} ${icon.color}"></i>
+                        <span>${item.name}</span>
+                    `;
+                    
+                    fileDiv.addEventListener('click', () => openFile(item.path, item.name));
+                    container.appendChild(fileDiv);
+                }
+            });
+        }
+
+        // Toggle folder open/closed
+        function toggleFolder(folderDiv, contentsDiv, children) {
+            const icon = folderDiv.querySelector('i');
+            const isOpen = !contentsDiv.classList.contains('hidden');
+            const folderPath = folderDiv.dataset.path;
+            
+            if (isOpen) {
+                contentsDiv.classList.add('hidden');
+                icon.className = 'fas fa-folder';
+                expandedFolders.delete(folderPath);
+            } else {
+                contentsDiv.classList.remove('hidden');
+                icon.className = 'fas fa-folder-open';
+                expandedFolders.add(folderPath);
+                if (children && children.length > 0) {
+                    renderFileTree(children, contentsDiv);
+                }
+            }
+        }
+
+        // Get file icon based on extension
+        function getFileIcon(filename) {
+            const ext = filename.split('.').pop().toLowerCase();
+            const icons = {
+                'py': { class: 'fab fa-python', color: 'file-icon-python' },
+                'js': { class: 'fab fa-js-square', color: 'file-icon-javascript' },
+                'html': { class: 'fab fa-html5', color: 'file-icon-html' },
+                'css': { class: 'fab fa-css3-alt', color: 'file-icon-css' },
+                'json': { class: 'fas fa-code', color: 'file-icon-json' },
+                'md': { class: 'fab fa-markdown', color: 'file-icon-markdown' },
+                'txt': { class: 'fas fa-file-alt', color: 'file-icon-text' }
+            };
+            
+            return icons[ext] || { class: 'fas fa-file', color: 'file-icon-default' };
+        }
+
+        // Open file in editor
+        async function openFile(filePath, fileName) {
+            try {
+                // Check if tab is already open
+                const existingTab = openTabs.find(tab => tab.path === filePath);
+                if (existingTab) {
+                    switchToTab(existingTab);
+                    return;
+                }
+
+                // Load file content
+                const response = await fetch(`/api/file-content?path=${encodeURIComponent(filePath)}`);
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const content = await response.text();
+                
+                // Create new tab
+                const tab = {
+                    path: filePath,
+                    name: fileName,
+                    content: content,
+                    modified: false
+                };
+                
+                openTabs.push(tab);
+                fileContents[filePath] = content;
+                
+                renderTabs();
+                switchToTab(tab);
+                
+                // Update active file item
+                document.querySelectorAll('.file-item').forEach(item => {
+                    item.classList.remove('active');
+                });
+                document.querySelector(`[data-path="${filePath}"]`).classList.add('active');
+                
+            } catch (error) {
+                console.error('Error opening file:', error);
+                addConsoleMessage(`Error opening file ${fileName}: ${error.message}`, 'error');
+            }
+        }
+
+        // Render tabs
+        function renderTabs() {
+            const tabsContainer = document.getElementById('editor-tabs');
+            tabsContainer.innerHTML = '';
+            
+            openTabs.forEach(tab => {
+                const tabDiv = document.createElement('div');
+                tabDiv.className = `editor-tab ${tab === activeTab ? 'active' : ''}`;
+                tabDiv.innerHTML = `
+                    <span>${tab.name}</span>
+                    <span class="close-btn" onclick="closeTab('${tab.path}')">&times;</span>
+                `;
+                
+                tabDiv.addEventListener('click', (e) => {
+                    if (!e.target.classList.contains('close-btn')) {
+                        switchToTab(tab);
+                    }
+                });
+                
+                tabsContainer.appendChild(tabDiv);
+            });
+        }
+
+        // Switch to tab
+        function switchToTab(tab) {
+            activeTab = tab;
+            renderTabs();
+            
+            const editorContent = document.getElementById('editor-content');
+            const language = getLanguageFromFilename(tab.name);
+            
+            editorContent.innerHTML = `
+                <pre><code class="language-${language}">${escapeHtml(tab.content)}</code></pre>
+            `;
+            
+            // Re-highlight syntax
+            Prism.highlightAll();
+        }
+
+        // Close tab
+        function closeTab(filePath) {
+            const tabIndex = openTabs.findIndex(tab => tab.path === filePath);
+            if (tabIndex === -1) return;
+            
+            const tab = openTabs[tabIndex];
+            openTabs.splice(tabIndex, 1);
+            
+            if (activeTab === tab) {
+                activeTab = openTabs.length > 0 ? openTabs[openTabs.length - 1] : null;
+            }
+            
+            if (activeTab) {
+                switchToTab(activeTab);
+            } else {
+                document.getElementById('editor-content').innerHTML = `
+                    <div class="editor-welcome">
+                        <i class="fas fa-file-code"></i>
+                        <h3>Welcome to File Browser</h3>
+                        <p>Select a file from the explorer to view its contents</p>
+                    </div>
+                `;
+                renderTabs();
+            }
+            
+            // Remove active state from file item
+            const fileItem = document.querySelector(`[data-path="${filePath}"]`);
+            if (fileItem) {
+                fileItem.classList.remove('active');
+            }
+        }
+
+        // Get language for syntax highlighting
+        function getLanguageFromFilename(filename) {
+            const ext = filename.split('.').pop().toLowerCase();
+            const languages = {
+                'py': 'python',
+                'js': 'javascript',
+                'html': 'html',
+                'css': 'css',
+                'json': 'json',
+                'md': 'markdown',
+                'sh': 'bash',
+                'yml': 'yaml',
+                'yaml': 'yaml'
+            };
+            
+            return languages[ext] || 'text';
+        }
+
+        // Escape HTML
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Add console message
+        function addConsoleMessage(message, type = 'info') {
+            const consoleContent = document.getElementById('console-content');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `console-message ${type}`;
+            messageDiv.innerHTML = `<pre>${escapeHtml(message)}</pre>`;
+            consoleContent.appendChild(messageDiv);
+            consoleContent.scrollTop = consoleContent.scrollHeight;
+        }
+
+        // Add user message
+        function addUserMessage(message) {
+            const userMessages = document.getElementById('user-messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'user-message';
+            messageDiv.innerHTML = escapeHtml(message);
+            userMessages.appendChild(messageDiv);
+            userMessages.scrollTop = userMessages.scrollHeight;
+        }
+
+        // Clear console
+        function clearConsole() {
+            document.getElementById('console-content').innerHTML = '';
+        }
+
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', function() {
+            initSocket();
+            loadFileTree();
+            startAutoRefresh();
+            addConsoleMessage('File browser initialized with auto-refresh', 'info');
+        });
+    </script>
+</body>
+</html>
