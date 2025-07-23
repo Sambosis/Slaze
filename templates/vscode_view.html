@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Repository Viewer</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/4.3.0/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <style>
+        body, html { margin:0; height:100%; font-family: Arial, sans-serif; }
+        .layout { display:flex; height:100vh; }
+        .sidebar { background:#1e1e1e; color:#ccc; overflow:auto; }
+        .primary { width:250px; }
+        .secondary { width:300px; }
+        .main { flex:1; display:flex; flex-direction:column; }
+        #editor { flex:1; padding:10px; background:#1e1e1e; color:#fff; overflow:auto; font-family:Menlo, monospace; }
+        #assistant-panel { height:200px; overflow:auto; border-top:1px solid #333; padding:10px; background:#111; }
+        #assistant-panel .message, #user-panel .message { white-space:pre-wrap; margin-bottom:10px; }
+        ul.tree { list-style:none; padding-left:20px; }
+        ul.tree li { cursor:pointer; }
+    </style>
+</head>
+<body>
+<div class="layout">
+    <div class="sidebar primary">
+        <ul id="file-tree" class="tree"></ul>
+    </div>
+    <div class="main">
+        <pre id="editor"></pre>
+        <div id="assistant-panel"></div>
+    </div>
+    <div class="sidebar secondary">
+        <div id="user-panel"></div>
+    </div>
+</div>
+<script>
+function fetchFileTree(){
+    fetch('/api/file_tree').then(r=>r.json()).then(buildTree);
+}
+function buildTree(paths){
+    const root={};
+    paths.forEach(p=>{
+        const parts=p.split('/');
+        let cur=root;
+        parts.forEach((pt,i)=>{
+            cur[pt]=cur[pt]||{};
+            if(i===parts.length-1) cur[pt].__path=p;
+            cur=cur[pt];
+        });
+    });
+    const rootEl=document.getElementById('file-tree');
+    rootEl.innerHTML='';
+    function create(el,obj){
+        Object.keys(obj).sort().forEach(name=>{
+            if(name==='__path') return;
+            const li=document.createElement('li');
+            li.textContent=name;
+            if(obj[name].__path) li.dataset.path=obj[name].__path;
+            const children=Object.keys(obj[name]).filter(k=>k!=='__path');
+            if(children.length){
+                const ul=document.createElement('ul');
+                create(ul,obj[name]);
+                li.appendChild(ul);
+            }
+            el.appendChild(li);
+        });
+    }
+    create(rootEl,root);
+}
+
+document.getElementById('file-tree').addEventListener('click',e=>{
+    const path=e.target.dataset.path;
+    if(path){
+        fetch('/api/file?path='+encodeURIComponent(path)).then(r=>r.json()).then(d=>{
+            document.getElementById('editor').textContent=d.content||'';
+        });
+    }
+});
+
+function loadMessages(){
+    fetch('/messages').then(r=>r.json()).then(d=>{
+        const assist=document.getElementById('assistant-panel');
+        assist.innerHTML='';
+        d.assistant.forEach(m=>{ assist.innerHTML += '<div class="message">'+marked.parse(m)+'</div>'; });
+        const user=document.getElementById('user-panel');
+        user.innerHTML='';
+        d.user.forEach(m=>{ user.innerHTML += '<div class="message">'+marked.parse(m)+'</div>'; });
+        Prism.highlightAll();
+    });
+}
+fetchFileTree();
+loadMessages();
+setInterval(loadMessages,2000);
+</script>
+</body>
+</html>
