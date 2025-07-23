@@ -63,6 +63,7 @@
             background: #252526;
             border-right: 1px solid #2d2d30;
             overflow-y: auto;
+            min-height: 0; /* Allow sidebar to shrink and scroll within grid */
         }
 
         .sidebar-header {
@@ -172,7 +173,8 @@
             font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
             font-size: 14px;
             line-height: 1.5;
-            max-height: 100%;
+            height: 0; /* Force flex item to respect container bounds */
+            min-height: 0; /* Allow flex item to shrink below content size */
         }
 
         .editor-welcome {
@@ -218,6 +220,8 @@
             font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
             font-size: 12px;
             line-height: 1.4;
+            height: 0; /* Force flex item to respect container bounds */
+            min-height: 0; /* Allow flex item to shrink below content size */
         }
 
         /* Right Sidebar - User Messages */
@@ -244,6 +248,8 @@
             flex: 1;
             padding: 8px;
             overflow-y: auto;
+            height: 0; /* Force flex item to respect container bounds */
+            min-height: 0; /* Allow flex item to shrink below content size */
         }
 
         .user-message {
@@ -268,21 +274,48 @@
 
         /* Scrollbars */
         ::-webkit-scrollbar {
-            width: 8px;
-            height: 8px;
+            width: 12px;
+            height: 12px;
         }
 
         ::-webkit-scrollbar-track {
             background: #1e1e1e;
+            border-radius: 6px;
         }
 
         ::-webkit-scrollbar-thumb {
             background: #424242;
-            border-radius: 4px;
+            border-radius: 6px;
+            border: 2px solid #1e1e1e;
         }
 
         ::-webkit-scrollbar-thumb:hover {
             background: #4f4f4f;
+        }
+
+        ::-webkit-scrollbar-corner {
+            background: #1e1e1e;
+        }
+
+        /* Ensure scrollbars are always visible when content overflows */
+        .editor-content {
+            scrollbar-width: thin;
+            scrollbar-color: #424242 #1e1e1e;
+        }
+
+        .console-content {
+            scrollbar-width: thin;
+            scrollbar-color: #424242 #1e1e1e;
+        }
+
+        .user-messages {
+            scrollbar-width: thin;
+            scrollbar-color: #424242 #1e1e1e;
+        }
+
+        .sidebar {
+            scrollbar-width: thin;
+            scrollbar-color: #424242 #252526;
         }
 
         /* Code highlighting adjustments */
@@ -292,6 +325,7 @@
             white-space: pre;
             overflow-x: auto;
             max-width: 100%;
+            word-wrap: normal;
         }
 
         .editor-content code {
@@ -299,6 +333,7 @@
             color: inherit !important;
             white-space: pre;
             word-wrap: normal;
+            display: block; /* Ensure code takes full width for proper scrolling */
         }
 
         /* Console message styling */
@@ -559,6 +594,16 @@
                     return;
                 }
 
+                // Show loading indicator
+                const editorContent = document.getElementById('editor-content');
+                editorContent.innerHTML = `
+                    <div class="editor-welcome">
+                        <i class="fas fa-spinner fa-spin"></i>
+                        <h3>Loading ${fileName}...</h3>
+                        <p>Please wait while the file content is loaded</p>
+                    </div>
+                `;
+
                 // Load file content
                 const response = await fetch(`/api/file-content?path=${encodeURIComponent(filePath)}`);
                 if (!response.ok) {
@@ -566,6 +611,22 @@
                 }
                 
                 const content = await response.text();
+                
+                // Check file size and warn if very large
+                if (content.length > 1000000) { // 1MB
+                    const proceed = confirm(`This file is quite large (${Math.round(content.length / 1024)}KB). Loading it may slow down the browser. Continue?`);
+                    if (!proceed) {
+                        // Restore welcome screen
+                        editorContent.innerHTML = `
+                            <div class="editor-welcome">
+                                <i class="fas fa-file-code"></i>
+                                <h3>Welcome to File Browser</h3>
+                                <p>Select a file from the explorer to view its contents</p>
+                            </div>
+                        `;
+                        return;
+                    }
+                }
                 
                 // Create new tab
                 const tab = {
