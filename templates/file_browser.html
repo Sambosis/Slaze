@@ -775,6 +775,27 @@
             document.getElementById('console-content').innerHTML = '';
         }
 
+        // Handle custom element conflicts - add this before DOMContentLoaded
+        window.addEventListener('error', function(e) {
+            if (e.message && e.message.includes('custom element') && e.message.includes('already been defined')) {
+                console.warn('Custom element conflict detected, but continuing execution:', e.message);
+                e.preventDefault();
+                return true;
+            }
+        });
+
+        // Prevent duplicate custom element registration
+        if (typeof customElements !== 'undefined') {
+            const originalDefine = customElements.define;
+            customElements.define = function(name, constructor, options) {
+                if (!customElements.get(name)) {
+                    originalDefine.call(this, name, constructor, options);
+                } else {
+                    console.warn(`Custom element '${name}' already defined, skipping redefinition`);
+                }
+            };
+        }
+
         // Initialize the application
         document.addEventListener('DOMContentLoaded', function() {
             initSocket();

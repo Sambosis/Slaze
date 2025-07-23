@@ -101,42 +101,61 @@ class WebUI:
         @self.app.route("/run_agent", methods=["POST"])
         def run_agent_route():
             logging.info("Received request to run agent")
-            choice = request.form.get("choice")
-            filename = request.form.get("filename")
-            prompt_text = request.form.get("prompt_text")
-            logging.info(f"Form data: choice={choice}, filename={filename}")
+            try:
+                choice = request.form.get("choice")
+                filename = request.form.get("filename")
+                prompt_text = request.form.get("prompt_text")
+                logging.info(f"Form data: choice={choice}, filename={filename}, prompt_text length={len(prompt_text) if prompt_text else 0}")
 
-            if choice == "new":
-                logging.info("Creating new prompt")
-                new_prompt_path = PROMPTS_DIR / f"{filename}.md"
-                prompt_name = Path(filename).stem
-                with open(new_prompt_path, "w", encoding="utf-8") as f:
-                    f.write(prompt_text)
-                task = prompt_text
-            else:
-                logging.info(f"Loading existing prompt: {choice}")
-                prompt_path = PROMPTS_DIR / choice
-                prompt_name = prompt_path.stem
-                if prompt_text:
-                    logging.info("Updating existing prompt")
-                    with open(prompt_path, "w", encoding="utf-8") as f:
-                        f.write(prompt_text)
-                with open(prompt_path, "r", encoding="utf-8") as f:
-                    task = f.read()
-                filename = prompt_path.stem
+                if choice == "new":
+                    logging.info("Creating new prompt")
+                    if not filename:
+                        logging.error("Filename is required for new prompts")
+                        return jsonify({"error": "Filename is required for new prompts"}), 400
+                    new_prompt_path = PROMPTS_DIR / f"{filename}.md"
+                    prompt_name = Path(filename).stem
+                    with open(new_prompt_path, "w", encoding="utf-8") as f:
+                        f.write(prompt_text or "")
+                    task = prompt_text or ""
+                else:
+                    logging.info(f"Loading existing prompt: {choice}")
+                    if not choice:
+                        logging.error("Choice is required for existing prompts")
+                        return jsonify({"error": "Choice is required for existing prompts"}), 400
+                    prompt_path = PROMPTS_DIR / choice
+                    if not prompt_path.exists():
+                        logging.error(f"Prompt file not found: {prompt_path}")
+                        return jsonify({"error": f"Prompt file not found: {choice}"}), 404
+                    prompt_name = prompt_path.stem
+                    if prompt_text:
+                        logging.info("Updating existing prompt")
+                        with open(prompt_path, "w", encoding="utf-8") as f:
+                            f.write(prompt_text)
+                    with open(prompt_path, "r", encoding="utf-8") as f:
+                        task = f.read()
+                    filename = prompt_path.stem
 
-            # Configure repository directory for this prompt
-            base_repo_dir = Path(get_constant("TOP_LEVEL_DIR")) / "repo"
-            repo_dir = base_repo_dir / prompt_name
-            repo_dir.mkdir(parents=True, exist_ok=True)
-            set_prompt_name(prompt_name)
-            set_constant("REPO_DIR", repo_dir)
-            write_constants_to_file()
-            
-            logging.info("Starting agent runner in background thread")
-            coro = self.agent_runner(task, self)
-            self.socketio.start_background_task(asyncio.run, coro)
-            return render_template("web_ide.html")
+                # Configure repository directory for this prompt
+                base_repo_dir = Path(get_constant("TOP_LEVEL_DIR")) / "repo"
+                repo_dir = base_repo_dir / prompt_name
+                repo_dir.mkdir(parents=True, exist_ok=True)
+                set_prompt_name(prompt_name)
+                set_constant("REPO_DIR", repo_dir)
+                write_constants_to_file()
+                
+                logging.info(f"Starting agent runner in background thread for task: {prompt_name}")
+                coro = self.agent_runner(task, self)
+                self.socketio.start_background_task(asyncio.run, coro)
+                return render_template("web_ide.html")
+            except FileNotFoundError as e:
+                logging.error(f"File not found in run_agent route: {e}", exc_info=True)
+                return jsonify({"error": f"File not found: {str(e)}"}), 404
+            except PermissionError as e:
+                logging.error(f"Permission error in run_agent route: {e}", exc_info=True)
+                return jsonify({"error": f"Permission error: {str(e)}"}), 403
+            except Exception as e:
+                logging.error(f"Unexpected error in run_agent route: {e}", exc_info=True)
+                return jsonify({"error": f"Unexpected error starting agent: {str(e)}"}), 500
 
         @self.app.route("/messages")
         def get_messages():
@@ -210,13 +229,18 @@ class WebUI:
             rel_path = request.args.get("path", "")
             repo_dir = Path(get_constant("REPO_DIR"))
             safe_path = os.path.normpath(rel_path)
-            file_path = repo_dir / safe_path
             
             try:
-                return jsonify(get_file_tree(repo_dir))
+                file_path = repo_dir / safe_path
+                if file_path.is_file():
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                    return jsonify({"content": content})
+                else:
+                    return jsonify({"error": "File not found"}), 404
             except Exception as e:
-                logging.error(f"Error getting file tree: {e}")
-                return jsonify({"error": "Error getting file tree"}), 500
+                logging.error(f"Error getting file: {e}")
+                return jsonify({"error": "Error getting file"}), 500
 
         @self.app.route("/api/files/content")
         def api_get_file_content():
@@ -383,16 +407,22 @@ class WebUI:
 
         @self.socketio.on("user_input")
         def handle_user_input(data):
-            user_input = data.get("input", "")
+            user_input = data.get("message", "") or data.get("input", "")
             logging.info(f"Received user input: {user_input}")
             # Queue is thread-safe; use blocking put to notify waiting tasks
             self.input_queue.put(user_input)
 
         @self.socketio.on("tool_response")
         def handle_tool_response(data):
-            params = data.get("input", {})
-            logging.info("Received tool response")
+            params = data.get("input", {}) if data.get("action") != "cancel" else {}
+            logging.info(f"Received tool response: {data.get('action', 'execute')}")
             self.tool_queue.put(params)
+
+        @self.socketio.on("interrupt_agent")
+        def handle_interrupt_agent():
+            logging.info("Received interrupt agent request")
+            # This could be used to signal the agent to stop processing
+            self.input_queue.put("INTERRUPT")
         logging.info("SocketIO events set up")
 
     def start_server(self, host="0.0.0.0", port=5002):
@@ -440,7 +470,7 @@ class WebUI:
             },
         )
 
-    async def wait_for_user_input(self, prompt_message: str = None) -> str:
+    async def wait_for_user_input(self, prompt_message: str | None = None) -> str:
         """Await the next user input sent via the web UI input queue."""
         if prompt_message:
             logging.info(f"Emitting agent_prompt: {prompt_message}")
