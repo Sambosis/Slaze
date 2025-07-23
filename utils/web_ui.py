@@ -193,6 +193,25 @@ class WebUI:
                     tree.append(node)
                 return tree
 
+        @self.app.route("/api/file_tree")
+        def api_file_list():
+            """Return a list of files under the current repository."""
+            repo_dir = Path(get_constant("REPO_DIR"))
+            files = [
+                str(p.relative_to(repo_dir))
+                for p in repo_dir.rglob("*")
+                if p.is_file()
+            ]
+            return jsonify(files)
+
+        @self.app.route("/api/file")
+        def api_get_file():
+            """Return the contents of a file within the repo."""
+            rel_path = request.args.get("path", "")
+            repo_dir = Path(get_constant("REPO_DIR"))
+            safe_path = os.path.normpath(rel_path)
+            file_path = repo_dir / safe_path
+            
             try:
                 return jsonify(get_file_tree(repo_dir))
             except Exception as e:
