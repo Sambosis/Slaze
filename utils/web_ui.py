@@ -180,7 +180,7 @@ class WebUI:
             return render_template("vscode_view.html")
 
         @self.app.route("/api/file_tree")
-        def api_file_tree():
+        def api_file_list():
             """Return a list of files under the current repository."""
             repo_dir = Path(get_constant("REPO_DIR"))
             files = [

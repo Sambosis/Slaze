@@ -1,4 +1,4 @@
-# VS Code-Style File Browser
+****# VS Code-Style File Browser
 
 A new VS Code-style file browser interface has been added to the Slazy Agent web UI. This interface provides a comprehensive view of project files with syntax highlighting and real-time updates.
 
@@ -10,9 +10,9 @@ A new VS Code-style file browser interface has been added to the Slazy Agent web
 - **Bottom Console Panel**: Real-time display of assistant messages and tool outputs
 - **Right Sidebar**: User messages and interaction history
 
-### 📁 **File Explorer**
+### 📁 ****File** Explorer**
 - Hierarchical tree view of project files and directories
-- Click to expand/collapse folders
+- Click to expand/collapse **folders**
 - **Auto-refresh** when new files are created (every 30 seconds + after tool execution)
 - **Manual refresh button** (🔄) in the explorer header
 - **Preserves expanded folder state** during refresh
