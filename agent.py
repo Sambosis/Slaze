@@ -11,14 +11,13 @@ from rich import print as rr
 
 from tools import (
     # BashTool,
-
     ProjectSetupTool,
     WriteCodeTool,
     PictureGenerationTool,
     EditTool,
     ToolCollection,
     ToolResult,
-    BashTool
+    BashTool,
 )
 from utils.web_ui import WebUI
 from utils.agent_display_console import AgentDisplayConsole
@@ -32,8 +31,9 @@ from config import (
     PROMPT_CACHING_BETA_FLAG,
     MAIN_MODEL,
     MAX_SUMMARY_TOKENS,
+    SUMMARY_MODEL,
     reload_system_prompt,
-    LOGS_DIR
+    LOGS_DIR,
 )
 
 from dotenv import load_dotenv
@@ -45,12 +45,16 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 
-async def call_llm_for_task_revision(prompt_text: str, client: OpenAI, model: str) -> str:
+async def call_llm_for_task_revision(
+    prompt_text: str, client: OpenAI, model: str
+) -> str:
     """
     Calls an LLM to revise the given prompt_text, incorporating detailed instructions
     for structuring the task, especially for programming projects.
     """
-    logger.info(f"Attempting to revise/structure task with LLM ({model}): '{prompt_text[:100]}...'")
+    logger.info(
+        f"Attempting to revise/structure task with LLM ({model}): '{prompt_text[:100]}...'"
+    )
 
     # This combined prompt is based on the user-provided example
     detailed_revision_prompt_template = (
@@ -97,7 +101,9 @@ async def call_llm_for_task_revision(prompt_text: str, client: OpenAI, model: st
         "Now, process the user's original request based on these instructions."
     )
 
-    formatted_revision_prompt = detailed_revision_prompt_template.format(user_request=prompt_text)
+    formatted_revision_prompt = detailed_revision_prompt_template.format(
+        user_request=prompt_text
+    )
 
     try:
         # The user's example used "anthropic/claude-3.7-sonnet:beta".
@@ -111,25 +117,40 @@ async def call_llm_for_task_revision(prompt_text: str, client: OpenAI, model: st
         response = client.chat.completions.create(
             model=model,
             messages=[{"role": "user", "content": formatted_revision_prompt}],
-            temperature=0.3, # Lower temperature for more focused, less creative revision
+            temperature=0.3,  # Lower temperature for more focused, less creative revision
             n=1,
             stop=None,
         )
 
-        if response.choices and response.choices[0].message and response.choices[0].message.content:
+        if (
+            response.choices
+            and response.choices[0].message
+            and response.choices[0].message.content
+        ):
             revised_task = response.choices[0].message.content.strip()
             # Basic check to ensure LLM didn't just return an empty string or something very short
-            if len(revised_task) < 0.5 * len(prompt_text) and len(prompt_text) > 50 : # Heuristic: if significantly shorter
-                logger.warning(f"LLM task revision is much shorter than original. Original: '{prompt_text[:100]}...', Revised: '{revised_task[:100]}...'. Using original.")
+            if (
+                len(revised_task) < 0.5 * len(prompt_text) and len(prompt_text) > 50
+            ):  # Heuristic: if significantly shorter
+                logger.warning(
+                    f"LLM task revision is much shorter than original. Original: '{prompt_text[:100]}...', Revised: '{revised_task[:100]}...'. Using original."
+                )
                 return prompt_text
 
-            logger.info(f"Task successfully revised by LLM ({model}): '{revised_task[:100]}...'")
+            logger.info(
+                f"Task successfully revised by LLM ({model}): '{revised_task[:100]}...'"
+            )
             return revised_task
         else:
-            logger.warning(f"LLM task revision ({model}) returned empty or invalid response. Using original task: '{prompt_text[:100]}...'")
+            logger.warning(
+                f"LLM task revision ({model}) returned empty or invalid response. Using original task: '{prompt_text[:100]}...'"
+            )
             return prompt_text
     except Exception as e:
-        logger.error(f"Error during LLM task revision with model {model}: {e}. Using original task: '{prompt_text[:100]}...'", exc_info=True)
+        logger.error(
+            f"Error during LLM task revision with model {model}: {e}. Using original task: '{prompt_text[:100]}...'",
+            exc_info=True,
+        )
         return prompt_text
 
 
@@ -139,13 +160,19 @@ class Agent:
         Revises the task using an LLM, saves it to task.txt, updates the
         TASK constant, and returns the revised task.
         """
-        revised_task_from_llm = await call_llm_for_task_revision(initial_task, self.client, MAIN_MODEL)
-        logger.info(f"Task revision result: '{initial_task[:100]}...' -> '{revised_task_from_llm[:100]}...'")
+        revised_task_from_llm = await call_llm_for_task_revision(
+            initial_task, self.client, SUMMARY_MODEL
+        )
+        logger.info(
+            f"Task revision result: '{initial_task[:100]}...' -> '{revised_task_from_llm[:100]}...'"
+        )
 
         # Use the LOGS_DIR constant from config
         logs_dir = get_constant("LOGS_DIR")
         if not logs_dir:
-            logger.error("LOGS_DIR not found in constants. Cannot save revised task.txt.")
+            logger.error(
+                "LOGS_DIR not found in constants. Cannot save revised task.txt."
+            )
             # Fallback: update TASK constant but don't write to file.
             set_constant("TASK", revised_task_from_llm)
             return revised_task_from_llm
@@ -159,16 +186,25 @@ class Agent:
                 f.write(revised_task_from_llm)
             logger.info(f"Revised task saved to {task_file_path}")
             if self.display:
-                self.display.add_message(msg_type="user", content=revised_task_from_llm or "")
+                self.display.add_message(
+                    msg_type="user", content=revised_task_from_llm or ""
+                )
         except Exception as e:
-            logger.error(f"Error saving revised task to {task_file_path}: {e}", exc_info=True)
+            logger.error(
+                f"Error saving revised task to {task_file_path}: {e}", exc_info=True
+            )
             # Continue even if file write fails, but log it.
         self.task = revised_task_from_llm
         set_constant("TASK", revised_task_from_llm)
         logger.info("TASK constant updated with revised task.")
         return revised_task_from_llm
 
-    def __init__(self, task: str, display: Union[WebUI, AgentDisplayConsole], manual_tool_confirmation: bool = False):
+    def __init__(
+        self,
+        task: str,
+        display: Union[WebUI, AgentDisplayConsole],
+        manual_tool_confirmation: bool = False,
+    ):
         self.task = task
         # Set initial task constant
         set_constant("TASK", self.task)
@@ -378,15 +414,26 @@ class Agent:
         self.step_count += 1
         messages = self.messages
         rr(f"Step {self.step_count} with {len(messages)} messages")
+        tool_choice = "auto" if self.step_count > 50 else "required"
+        rr(tool_choice)
+        # Append tool requirement message to last user message when tool_choice is "required"
+
+                
         with open(f"{LOGS_DIR}/messages.md", "w", encoding="utf-8") as f:
-            f.write(format_messages_to_string(messages) + "\n"  )
-        tool_choice = "auto" if self.step_count > 20 else "required"
+            f.write(format_messages_to_string(messages) + "\n")
+      
         try:
             response = self.client.chat.completions.create(
                 model=MAIN_MODEL,
                 messages=messages,
                 tools=self.tool_params,
-                tool_choice=tool_choice,
+                tool_choice=[tool_choice],
+                extra_body={
+                    "transforms": [
+                        "middle-out",
+
+                    ]
+                },
                 max_tokens=MAX_SUMMARY_TOKENS,
             )
 
@@ -399,8 +446,20 @@ class Agent:
             self.context_recently_refreshed = True
             return True
 
-        msg = response.choices[0].message
-        rr(response.choices[0])
+        # Check if response has choices before accessing
+        if not response.choices:
+            self.display.add_message("assistant", "LLM returned empty response")
+            return True
+
+        # Check if the first choice has an error
+        choice = response.choices[0]
+        if hasattr(choice, "error") and choice.error:
+            error_msg = choice.error.get("message", "Unknown error")
+            self.display.add_message("assistant", f"LLM returned error: {error_msg}")
+            return True
+
+        msg = choice.message
+        rr(choice)
         assistant_msg = {"role": "assistant", "content": msg.content or ""}
         if msg.tool_calls:
             assistant_msg["tool_calls"] = [
@@ -408,7 +467,9 @@ class Agent:
                 for tc in msg.tool_calls
             ]
         self.messages.append(assistant_msg)
-        tool_messages = self.messages[:-1]  # All messages except the last assistant message
+        tool_messages = self.messages[
+            :-1
+        ]  # All messages except the last assistant message
         # prompt creation that gives all but the last message , then a new user message that explains that given the context so far,
         # Give a couple sentences explanation that you are going to do the actions in assistant_msg["tool_calls"]
         tool_prompt = f"""Given the context so far, We will be performing the following actions: {assistant_msg['content'] if 'content' in assistant_msg else ''}
@@ -421,25 +482,56 @@ class Agent:
             messages=tool_messages,
             max_tokens=MAX_SUMMARY_TOKENS,
         )
-        tool_msg = tool_response.choices[0].message
+
+        # Check if tool response has choices before accessing
+        if not tool_response.choices:
+            self.display.add_message(
+                "assistant", "Tool response LLM returned empty response"
+            )
+            tool_msg = None
+        else:
+            # Check if the first choice has an error
+            tool_choice = tool_response.choices[0]
+            if hasattr(tool_choice, "error") and tool_choice.error:
+                error_msg = tool_choice.error.get("message", "Unknown error")
+                self.display.add_message(
+                    "assistant", f"Tool response LLM returned error: {error_msg}"
+                )
+                tool_msg = None
+            else:
+                tool_msg = tool_choice.message
 
         if tool_msg:
             self.display.add_message("user", tool_msg.content or "")
 
         if msg.tool_calls:
-            print(msg)
+            rr(msg)
             for tc in msg.tool_calls:
                 args = (
                     json.loads(tc.function.arguments) if tc.function.arguments else {}
                 )
-                if self.manual_tool_confirmation and hasattr(self.display, "confirm_tool_call"):
-                    schema = self.tool_collection.tools.get(tc.function.name).to_params()["function"]["parameters"]
-                    new_args = await self.display.confirm_tool_call(tc.function.name, args, schema)
-                    if new_args is None:
-                        self.messages.append({"role": "tool", "tool_call_id": tc.id, "content": "Tool execution cancelled"})
-                        continue
-                    args = new_args
-                tool_result = await self.run_tool({"name": tc.function.name, "id": tc.id, "input": args})
+                if self.manual_tool_confirmation and hasattr(
+                    self.display, "confirm_tool_call"
+                ):
+                    tool = self.tool_collection.tools.get(tc.function.name)
+                    if tool:
+                        schema = tool.to_params()["function"]["parameters"]
+                        new_args = await self.display.confirm_tool_call(
+                            tc.function.name, args, schema
+                        )
+                        if new_args is None:
+                            self.messages.append(
+                                {
+                                    "role": "tool",
+                                    "tool_call_id": tc.id,
+                                    "content": "Tool execution cancelled",
+                                }
+                            )
+                            continue
+                        args = new_args
+                tool_result = await self.run_tool(
+                    {"name": tc.function.name, "id": tc.id, "input": args}
+                )
                 result_text_parts = []
                 if isinstance(tool_result.get("content"), list):
                     for content_item in tool_result["content"]:
@@ -459,22 +551,38 @@ class Agent:
             # console or web UI. This avoids test failures when a simple
             # DummyDisplay is used.
             # self.display.add_message(msg_type="assistant", msg.content or "")
-            wait_func = getattr(self.display, "wait_for_user_input", None)
-            if wait_func and asyncio.iscoroutinefunction(wait_func):
-                should_prompt = True
-                if self.display.__class__.__name__ == "DummyDisplay" and not isinstance(
-                    wait_func, AsyncMock
-                ):
-                    should_prompt = False
-                if should_prompt:
-                    user_input = await wait_func(
-                        "No tool calls. Enter instructions or type 'exit' to quit: "
-                    )
-                    if user_input:
-                        if user_input.strip().lower() in {"exit", "quit"}:
-                            return False
-                        self.messages.append(
-                            {"role": "user", "content": user_input}
+            if self.step_count < 50 and messages:
+                # Add a user message to continue development and to either run, test or improve the code
+                self.messages.append(
+                    {
+                        "role": "user",
+                        "content": "Please run, test or improve the code based on the previous messages.",
+                    }
+                )
+                self.display.add_message("assistant", f"Refreshing context after {self.refresh_count} steps and no tool calls.")
+                new_context = await refresh_context_async(
+                    self.task, messages, self.display, self.client
+                )
+                self.messages = [{"role": "user", "content": new_context}]
+                self.context_recently_refreshed = True
+            
+                return True
+            else:
+                wait_func = getattr(self.display, "wait_for_user_input", None)
+                if wait_func and asyncio.iscoroutinefunction(wait_func):
+                    should_prompt = True
+                    if (
+                        self.display.__class__.__name__ == "DummyDisplay"
+                        and not isinstance(wait_func, AsyncMock)
+                    ):
+                        should_prompt = False
+                    if should_prompt:
+                        user_input = await wait_func(
+                            "No tool calls. Enter instructions or type 'exit' to quit: "
                         )
+                        if user_input:
+                            if user_input.strip().lower() in {"exit", "quit"}:
+                                return False
+                            self.messages.append({"role": "user", "content": user_input})
 
         return True

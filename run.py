@@ -22,12 +22,14 @@ async def run_agent_async(task, display, manual_tools=False):
     await agent._revise_and_save_task(agent.task)
     agent.messages.append({"role": "user", "content": agent.task})
     await sampling_loop(agent=agent)
-
+    return True
+            
 async def sampling_loop(agent: Agent):
     """Main loop for the agent."""
     running = True
     while running:
         running = await agent.step()
+    return True
 
 @cli.command()
 @click.option('--manual-tools', is_flag=True, help='Confirm tool parameters before execution')

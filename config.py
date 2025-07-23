@@ -77,9 +77,9 @@ googlepro = "google/gemini-2.5-pro-preview"
 googleflash = "google/gemini-2.5-flash"
 googleflashlite = "google/gemini-2.5-flash-lite-preview-06-17"
 grok4 = "x-ai/grok-4"
-SUMMARY_MODEL = googleflash  # Model for summaries
-MAIN_MODEL = f"{openai41mini}"  # Primary model for main agent operations
-CODE_MODEL = f"{kimi2}:web"  # Model for code generation tasks
+SUMMARY_MODEL = googlepro  # Model for summaries
+MAIN_MODEL = f"{googlepro}"  # Primary model for main agent operations
+CODE_MODEL = f"{googlepro}"  # Model for code generation tasks
 
 # Feature flag constants
 COMPUTER_USE_BETA_FLAG = "computer-use-2024-10-22"
@@ -87,7 +87,7 @@ PROMPT_CACHING_BETA_FLAG = "prompt-caching-2024-07-31"
 
 # Limits
 MAX_SUMMARY_MESSAGES = 40 # Max messages for context summarization input
-MAX_SUMMARY_TOKENS = 65000 # Max tokens for context summarization output (aligning with config.py's original value)
+MAX_SUMMARY_TOKENS = 265000 # Max tokens for context summarization output (aligning with config.py's original value)
 
 # Create a cache directory if it does not exist
 CACHE_DIR = TOP_LEVEL_DIR / "cache"
