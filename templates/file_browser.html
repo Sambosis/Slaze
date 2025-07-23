@@ -168,10 +168,11 @@
         .editor-content {
             flex: 1;
             padding: 16px;
-            overflow-y: auto;
+            overflow: auto;
             font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
             font-size: 14px;
             line-height: 1.5;
+            max-height: 100%;
         }
 
         .editor-welcome {
@@ -288,11 +289,16 @@
         .editor-content pre {
             margin: 0;
             background: transparent !important;
+            white-space: pre;
+            overflow-x: auto;
+            max-width: 100%;
         }
 
         .editor-content code {
             background: transparent !important;
             color: inherit !important;
+            white-space: pre;
+            word-wrap: normal;
         }
 
         /* Console message styling */
@@ -329,6 +335,9 @@
         <div class="sidebar">
             <div class="sidebar-header">
                 <i class="fas fa-folder"></i> Explorer
+                <button onclick="refreshFileTree()" style="background: none; border: none; color: #cccccc; cursor: pointer; float: right;" title="Refresh file tree">
+                    <i class="fas fa-sync-alt"></i>
+                </button>
             </div>
             <div class="file-tree" id="file-tree">
                 <div class="folder-item" data-path="REPO_DIR">
@@ -384,6 +393,7 @@
         let activeTab = null;
         let fileContents = {};
         let socket = null;
+        let expandedFolders = new Set(); // Track expanded folders
 
         // Initialize Socket.IO connection
         function initSocket() {
@@ -410,6 +420,17 @@
             socket.on('user_message', function(data) {
                 addUserMessage(data.content);
             });
+
+            socket.on('file_tree_update', function(data) {
+                console.log('File tree update received');
+                loadFileTree();
+            });
+
+            socket.on('tool_result', function(data) {
+                addConsoleMessage(`Tool: ${data.tool_name}\nResult: ${data.result}`, 'tool');
+                // Refresh file tree after tool execution (files might have been created/modified)
+                setTimeout(loadFileTree, 1000);
+            });
         }
 
         // Load file tree
@@ -424,6 +445,18 @@
             }
         }
 
+        // Refresh file tree manually
+        function refreshFileTree() {
+            addConsoleMessage('Refreshing file tree...', 'info');
+            loadFileTree();
+        }
+
+        // Auto-refresh file tree periodically
+        function startAutoRefresh() {
+            // Refresh every 30 seconds
+            setInterval(loadFileTree, 30000);
+        }
+
         // Render file tree recursively
         function renderFileTree(items, container) {
             container.innerHTML = '';
@@ -433,13 +466,28 @@
                     const folderDiv = document.createElement('div');
                     folderDiv.className = 'folder-item';
                     folderDiv.dataset.path = item.path;
-                    folderDiv.innerHTML = `
-                        <i class="fas fa-folder"></i>
-                        <span>${item.name}</span>
-                    `;
                     
                     const contentsDiv = document.createElement('div');
-                    contentsDiv.className = 'folder-contents hidden';
+                    contentsDiv.className = 'folder-contents';
+                    
+                    // Check if this folder was previously expanded
+                    const wasExpanded = expandedFolders.has(item.path);
+                    if (wasExpanded) {
+                        contentsDiv.classList.remove('hidden');
+                        folderDiv.innerHTML = `
+                            <i class="fas fa-folder-open"></i>
+                            <span>${item.name}</span>
+                        `;
+                        if (item.children && item.children.length > 0) {
+                            renderFileTree(item.children, contentsDiv);
+                        }
+                    } else {
+                        contentsDiv.classList.add('hidden');
+                        folderDiv.innerHTML = `
+                            <i class="fas fa-folder"></i>
+                            <span>${item.name}</span>
+                        `;
+                    }
                     
                     folderDiv.addEventListener('click', (e) => {
                         e.stopPropagation();
@@ -469,13 +517,16 @@
         function toggleFolder(folderDiv, contentsDiv, children) {
             const icon = folderDiv.querySelector('i');
             const isOpen = !contentsDiv.classList.contains('hidden');
+            const folderPath = folderDiv.dataset.path;
             
             if (isOpen) {
                 contentsDiv.classList.add('hidden');
                 icon.className = 'fas fa-folder';
+                expandedFolders.delete(folderPath);
             } else {
                 contentsDiv.classList.remove('hidden');
                 icon.className = 'fas fa-folder-open';
+                expandedFolders.add(folderPath);
                 if (children && children.length > 0) {
                     renderFileTree(children, contentsDiv);
                 }
@@ -667,7 +718,8 @@
         document.addEventListener('DOMContentLoaded', function() {
             initSocket();
             loadFileTree();
-            addConsoleMessage('File browser initialized', 'info');
+            startAutoRefresh();
+            addConsoleMessage('File browser initialized with auto-refresh', 'info');
         });
     </script>
 </body>

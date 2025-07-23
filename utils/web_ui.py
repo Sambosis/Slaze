@@ -354,6 +354,13 @@ class WebUI:
                     if first_line.startswith('Tool:'):
                         tool_name = first_line.replace('Tool:', '').strip()
                 self.socketio.emit("tool_result", {"tool_name": tool_name, "result": content})
+                
+                # Check if this tool might have created/modified files
+                if any(keyword in content.lower() for keyword in ['created', 'wrote', 'generated', 'saved', 'modified', 'updated']):
+                    # Emit file tree update after a short delay
+                    self.socketio.sleep(1)
+                    self.socketio.emit("file_tree_update", {"message": "Files may have been modified"})
+                    
         self.broadcast_update()
 
     def broadcast_update(self):
