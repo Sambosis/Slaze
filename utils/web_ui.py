@@ -393,9 +393,8 @@ class WebUI:
                 
                 # Check if this tool might have created/modified files
                 if any(keyword in content.lower() for keyword in ['created', 'wrote', 'generated', 'saved', 'modified', 'updated']):
-                    # Emit file tree update after a short delay
-                    self.socketio.sleep(1)
-                    self.socketio.emit("file_tree_update", {"message": "Files may have been modified"})
+                    # Emit file tree update after a short delay asynchronously
+                    self.socketio.start_background_task(self._emit_file_tree_update)
                     
         self.broadcast_update()
 
