@@ -174,6 +174,42 @@ class WebUI:
                 logging.error(f"Error loading tasks: {e}")
                 return jsonify([]), 500
 
+        @self.app.route("/vscode")
+        def repo_browser():
+            """Render a simple VS Code style viewer."""
+            return render_template("vscode_view.html")
+
+        @self.app.route("/api/file_tree")
+        def api_file_tree():
+            """Return a list of files under the current repository."""
+            repo_dir = Path(get_constant("REPO_DIR"))
+            files = [
+                str(p.relative_to(repo_dir))
+                for p in repo_dir.rglob("*")
+                if p.is_file()
+            ]
+            return jsonify(files)
+
+        @self.app.route("/api/file")
+        def api_get_file():
+            """Return the contents of a file within the repo."""
+            rel_path = request.args.get("path", "")
+            repo_dir = Path(get_constant("REPO_DIR"))
+            safe_path = os.path.normpath(rel_path)
+            file_path = repo_dir / safe_path
+            try:
+                file_path.resolve().relative_to(repo_dir.resolve())
+            except ValueError:
+                return jsonify({"error": "Invalid path"}), 400
+            if not file_path.is_file():
+                return jsonify({"error": "File not found"}), 404
+            try:
+                with open(file_path, "r", encoding="utf-8") as f:
+                    content = f.read()
+            except Exception as exc:  # pragma: no cover - unlikely
+                return jsonify({"error": str(exc)}), 500
+            return jsonify({"content": content})
+
         @self.app.route("/tools")
         def tools_route():
             """Display available tools."""
