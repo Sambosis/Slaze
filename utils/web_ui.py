@@ -136,7 +136,7 @@ class WebUI:
             logging.info("Starting agent runner in background thread")
             coro = self.agent_runner(task, self)
             self.socketio.start_background_task(asyncio.run, coro)
-            return render_template("index.html")
+            return render_template("web_ide.html")
 
         @self.app.route("/messages")
         def get_messages():
@@ -174,41 +174,53 @@ class WebUI:
                 logging.error(f"Error loading tasks: {e}")
                 return jsonify([]), 500
 
-        @self.app.route("/vscode")
-        def repo_browser():
-            """Render a simple VS Code style viewer."""
-            return render_template("vscode_view.html")
+        @self.app.route("/api/files")
+        def api_get_files():
+            """Return the file tree."""
+            repo_dir = get_constant("REPO_DIR")
+            if not repo_dir:
+                return jsonify({"error": "REPO_DIR not configured"}), 500
 
-        @self.app.route("/api/file_tree")
-        def api_file_tree():
-            """Return a list of files under the current repository."""
-            repo_dir = Path(get_constant("REPO_DIR"))
-            files = [
-                str(p.relative_to(repo_dir))
-                for p in repo_dir.rglob("*")
-                if p.is_file()
-            ]
-            return jsonify(files)
+            def get_file_tree(path):
+                tree = []
+                for item in sorted(Path(path).iterdir()):
+                    node = {"name": item.name, "path": str(item.relative_to(repo_dir))}
+                    if item.is_dir():
+                        node["type"] = "directory"
+                        node["children"] = get_file_tree(item)
+                    else:
+                        node["type"] = "file"
+                    tree.append(node)
+                return tree
 
-        @self.app.route("/api/file")
-        def api_get_file():
-            """Return the contents of a file within the repo."""
-            rel_path = request.args.get("path", "")
-            repo_dir = Path(get_constant("REPO_DIR"))
-            safe_path = os.path.normpath(rel_path)
-            file_path = repo_dir / safe_path
             try:
-                file_path.resolve().relative_to(repo_dir.resolve())
-            except ValueError:
-                return jsonify({"error": "Invalid path"}), 400
-            if not file_path.is_file():
-                return jsonify({"error": "File not found"}), 404
+                return jsonify(get_file_tree(repo_dir))
+            except Exception as e:
+                logging.error(f"Error getting file tree: {e}")
+                return jsonify({"error": "Error getting file tree"}), 500
+
+        @self.app.route("/api/files/content")
+        def api_get_file_content():
+            """Return the content of a file."""
+            repo_dir = get_constant("REPO_DIR")
+            if not repo_dir:
+                return jsonify({"error": "REPO_DIR not configured"}), 500
+
+            file_path = request.args.get("path")
+            if not file_path:
+                return jsonify({"error": "Missing path parameter"}), 400
+
             try:
-                with open(file_path, "r", encoding="utf-8") as f:
+                abs_path = Path(repo_dir) / file_path
+                if not abs_path.is_file():
+                    return jsonify({"error": "File not found"}), 404
+                with open(abs_path, "r", encoding="utf-8") as f:
                     content = f.read()
-            except Exception as exc:  # pragma: no cover - unlikely
-                return jsonify({"error": str(exc)}), 500
-            return jsonify({"content": content})
+                return jsonify({"content": content})
+            except Exception as e:
+                logging.error(f"Error getting file content: {e}")
+                return jsonify({"error": "Error getting file content"}), 500
+
 
         @self.app.route("/tools")
         def tools_route():
