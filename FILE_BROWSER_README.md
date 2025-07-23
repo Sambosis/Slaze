@@ -13,6 +13,9 @@ A new VS Code-style file browser interface has been added to the Slazy Agent web
 ### 📁 **File Explorer**
 - Hierarchical tree view of project files and directories
 - Click to expand/collapse folders
+- **Auto-refresh** when new files are created (every 30 seconds + after tool execution)
+- **Manual refresh button** (🔄) in the explorer header
+- **Preserves expanded folder state** during refresh
 - File type icons with color coding:
   - 🐍 Python files (blue)
   - 🟨 JavaScript files (yellow)
@@ -25,8 +28,11 @@ A new VS Code-style file browser interface has been added to the Slazy Agent web
 ### 📝 **Code Editor**
 - Syntax highlighting for multiple languages (Python, JavaScript, HTML, CSS, JSON, Markdown, etc.)
 - Tabbed interface for multiple open files
-- Read-only view of file contents
+- Read-only view of file contents with proper scrolling
+- **Vertical scrolling** for long files (no more pushing panels off screen)
+- **Horizontal scrolling** for wide files with long lines
 - Automatic language detection based on file extension
+- Proper text wrapping and overflow handling
 
 ### 💬 **Real-time Communication**
 - **Console Panel**: Shows assistant responses and tool execution results
@@ -57,8 +63,16 @@ Then visit: `http://localhost:5004/browser`
 3. **Multiple Tabs**: Open multiple files - they'll appear as tabs at the top
 4. **Close Tabs**: Click the × button on any tab to close it
 5. **Switch Between Files**: Click on tab headers to switch between open files
-6. **Monitor Activity**: Watch the console panel for real-time agent activity
-7. **View Messages**: Check the right sidebar for user message history
+6. **Scroll Content**: Use mouse wheel or scrollbars for long/wide files
+7. **Refresh Files**: Click the 🔄 button in the explorer header to manually refresh
+8. **Monitor Activity**: Watch the console panel for real-time agent activity
+9. **View Messages**: Check the right sidebar for user message history
+
+### 🔄 **Auto-Refresh Features**
+- File tree automatically refreshes every 30 seconds
+- Immediate refresh after tool execution that creates/modifies files
+- Manual refresh button always available
+- Expanded folders remain open during refresh
 
 ## File Structure
 
@@ -77,6 +91,7 @@ The file browser displays files from the configured `REPO_DIR` directory, which 
 - `user_message` - User input messages
 - `assistant_message` - Agent responses  
 - `tool_result` - Tool execution results
+- `file_tree_update` - Triggers file tree refresh when files are modified
 
 ### Security
 - File access is restricted to the configured REPO_DIR
@@ -119,6 +134,16 @@ The interface can be customized by modifying:
 - Ensure Prism.js CDN resources are loading
 - Check browser console for JavaScript errors
 - Verify file extensions are recognized
+
+### Scrolling Issues
+- Long files should scroll vertically within the editor panel
+- Wide files should scroll horizontally without affecting layout
+- If scrollbars don't appear, check CSS overflow settings
+
+### Auto-Refresh Not Working
+- Check WebSocket connection in browser console
+- Verify server is emitting `file_tree_update` events
+- Manual refresh button should always work as fallback
 
 ## Future Enhancements
 
