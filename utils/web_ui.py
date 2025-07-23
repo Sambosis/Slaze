@@ -256,6 +256,87 @@ class WebUI:
                 params=params,
                 result=result_text,
             )
+
+        @self.app.route("/browser")
+        def file_browser_route():
+            """Serve the VS Code-style file browser interface."""
+            logging.info("Serving file browser interface")
+            return render_template("file_browser.html")
+
+        @self.app.route("/api/file-tree")
+        def api_file_tree():
+            """Return the file tree structure for the current REPO_DIR."""
+            logging.info("Serving file tree")
+            try:
+                repo_dir = Path(get_constant("REPO_DIR"))
+                if not repo_dir.exists():
+                    return jsonify([])
+                
+                def build_tree(path):
+                    items = []
+                    try:
+                        for item in sorted(path.iterdir()):
+                            # Skip hidden files and directories
+                            if item.name.startswith('.'):
+                                continue
+                            
+                            if item.is_dir():
+                                items.append({
+                                    'name': item.name,
+                                    'path': str(item),
+                                    'type': 'directory',
+                                    'children': build_tree(item)
+                                })
+                            else:
+                                items.append({
+                                    'name': item.name,
+                                    'path': str(item),
+                                    'type': 'file'
+                                })
+                    except PermissionError:
+                        pass
+                    return items
+                
+                tree = build_tree(repo_dir)
+                return jsonify(tree)
+            except Exception as e:
+                logging.error(f"Error building file tree: {e}")
+                return jsonify([])
+
+        @self.app.route("/api/file-content")
+        def api_file_content():
+            """Return the content of a specific file."""
+            file_path = request.args.get('path')
+            if not file_path:
+                return "File path is required", 400
+            
+            try:
+                path = Path(file_path)
+                # Security check - ensure the path is within REPO_DIR
+                repo_dir = Path(get_constant("REPO_DIR"))
+                if not path.resolve().is_relative_to(repo_dir.resolve()):
+                    return "Access denied", 403
+                
+                if not path.exists():
+                    return "File not found", 404
+                
+                if not path.is_file():
+                    return "Path is not a file", 400
+                
+                # Try to read as text, handle binary files gracefully
+                try:
+                    with open(path, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                except UnicodeDecodeError:
+                    # If it's a binary file, return a message instead
+                    return "Binary file - cannot display content", 200
+                
+                return content, 200, {"Content-Type": "text/plain; charset=utf-8"}
+                
+            except Exception as e:
+                logging.error(f"Error reading file {file_path}: {e}")
+                return f"Error reading file: {str(e)}", 500
+
         logging.info("Routes set up")
 
     def setup_socketio_events(self):
@@ -292,10 +373,29 @@ class WebUI:
         log_message(msg_type, content)
         if msg_type == "user":
             self.user_messages.append(content)
+            # Also emit to file browser
+            self.socketio.emit("user_message", {"content": content})
         elif msg_type == "assistant":
             self.assistant_messages.append(content)
+            # Also emit to file browser
+            self.socketio.emit("assistant_message", {"content": content})
         elif msg_type == "tool":
             self.tool_results.append(content)
+            # Parse tool result for file browser
+            if isinstance(content, str):
+                lines = content.split('\n')
+                tool_name = "Unknown"
+                if lines:
+                    first_line = lines[0].strip()
+                    if first_line.startswith('Tool:'):
+                        tool_name = first_line.replace('Tool:', '').strip()
+                self.socketio.emit("tool_result", {"tool_name": tool_name, "result": content})
+                
+                # Check if this tool might have created/modified files
+                if any(keyword in content.lower() for keyword in ['created', 'wrote', 'generated', 'saved', 'modified', 'updated']):
+                    # Emit file tree update after a short delay asynchronously
+                    self.socketio.start_background_task(self._emit_file_tree_update)
+                    
         self.broadcast_update()
 
     def broadcast_update(self):
