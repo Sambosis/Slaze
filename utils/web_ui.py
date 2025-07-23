@@ -314,7 +314,7 @@ class WebUI:
                 path = Path(file_path)
                 # Security check - ensure the path is within REPO_DIR
                 repo_dir = Path(get_constant("REPO_DIR"))
-                if not str(path).startswith(str(repo_dir)):
+                if not path.resolve().is_relative_to(repo_dir.resolve()):
                     return "Access denied", 403
                 
                 if not path.exists():
