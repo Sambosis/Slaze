@@ -12,7 +12,7 @@ from utils.file_logger import aggregate_file_states
 from openai import OpenAI
 import logging
 import json
-from tenacity import retry, stop_after_attempt, wait_random_exponential
+from tenacity import retry, stop_after_attempt, wait_fixed
 # from icecream import ic # Removed
 # from rich import print as rr # Removed
 
@@ -400,7 +400,7 @@ async def reorganize_context(messages: List[Dict[str, Any]], summary: str) -> st
             base_url="https://openrouter.ai/api/v1",
             api_key=OPENROUTER_API_KEY,
         )
-        model = MAIN_MODEL
+        model = googlepro
         response = sum_client.chat.completions.create(
             model=model, messages=[{"role": "user", "content": summary_prompt}]
         )
@@ -437,14 +437,11 @@ async def reorganize_context(messages: List[Dict[str, Any]], summary: str) -> st
         logger.error(f"Error in reorganize_context: {str(e)}", exc_info=True)
         # Return default values in case of error
         return (
-            "Error processing context. Please try again.",
-            "Error processing steps. Please try again.",
+            "Error processing context. Please try again."
         )
 
-@retry(
-    stop=stop_after_attempt(max_attempt_number=5),
-    wait=wait_random_exponential(multiplier=2, min=4, max=10),
-)
+# try 3 times with 4 seconds between attempts
+@retry(stop=stop_after_attempt(3), wait=wait_fixed(4))
 async def refresh_context_async(
     task: str, messages: List[Dict], display: Union[WebUI, AgentDisplayConsole], client
 ) -> str:

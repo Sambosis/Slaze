@@ -53,7 +53,7 @@ class PictureGenerationTool(BaseAnthropicTool):
                             "type":
                             "string",
                             "description":
-                            "Path where the generated image will be saved, relative to REPO_DIR (e.g., 'images/my_pic.png').",
+                            "Path where the generated image will be saved, relative to REPO_DIR. Should include filename with .png extension (e.g., 'images/cards.png') or just directory name if you want a default filename.",
                         },
                         "width": {
                             "type": "integer",
@@ -103,6 +103,12 @@ class PictureGenerationTool(BaseAnthropicTool):
                 raise ValueError("REPO_DIR is not configured in config.py.")
 
             base_save_path = Path(host_repo_dir)
+            
+            # Ensure output_path includes a filename with extension
+            if not output_path.endswith(('.png', '.jpg', '.jpeg')):
+                # If output_path is just a directory, add a default filename
+                output_path = f"{output_path}/generated_image.png"
+            
             output_path_obj = (base_save_path / output_path).resolve()
 
             # Ensure the parent directory exists
@@ -164,7 +170,13 @@ class PictureGenerationTool(BaseAnthropicTool):
                     ratio = height / img.height
                     new_size = (int(img.width * ratio), height)
 
-                img = img.resize(new_size, Image.LANCZOS)
+                # Use the correct resampling filter for PIL version compatibility
+                try:
+                    resample_filter = Image.Resampling.LANCZOS
+                except AttributeError:
+                    resample_filter = 1  # LANCZOS constant value
+                
+                img = img.resize(new_size, resample_filter)
                 img.save(output_path_obj)
 
                 # Update metadata with new dimensions
@@ -188,7 +200,8 @@ class PictureGenerationTool(BaseAnthropicTool):
             html_output = f'<div><p>Image generated from prompt: "{prompt}"</p>'
             html_output += f"<p>Saved to: {output_path_obj}</p>"
             html_output += f'<img src="data:image/png;base64,{base64_data}" style="max-width:100%; max-height:500px;"></div>'
-            self.display.add_message("tool", html_output)
+            if self.display:
+                self.display.add_message("tool", html_output)
             return {
                 "status": "success",
                 "output_path": output_path_obj,

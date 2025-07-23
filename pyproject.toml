@@ -123,3 +123,6 @@ reportIncompatibleMethodOverride = false
 reportGeneralTypeIssues = false
 reportAttributeAccessIssue = false
 reportArgumentType = false
+
+[tool.uv.workspace]
+members = ["repo/3dsim", "repo/abacus", "repo/shoppingsite", "repo/heyworld", "repo/pinpong", "repo/bogame", "repo/maze", "repo/battleshiprl", "repo/battleship_rl"]
