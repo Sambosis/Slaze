@@ -123,3 +123,6 @@ reportIncompatibleMethodOverride = false
 reportGeneralTypeIssues = false
 reportAttributeAccessIssue = false
 reportArgumentType = false
+
+[tool.uv.workspace]
+members = ["repo/graphingCalc"]
