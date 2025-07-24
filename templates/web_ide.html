@@ -64,19 +64,6 @@
             background-color: var(--tertiary-bg);
         }
 
-        .container {
-            flex: 1;
-            display: flex;
-            height: calc(100vh - 60px);
-        }
-
-        .sidebar {
-            width: 300px;
-            background-color: var(--secondary-bg);
-            border-right: 1px solid var(--tertiary-bg);
-            overflow-y: auto;
-        }
-
         .tab-nav {
             display: flex;
             background-color: var(--tertiary-bg);
@@ -110,29 +97,6 @@
 
         .tab-content.active {
             display: block;
-        }
-
-        .main-content {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            background-color: var(--primary-bg);
-        }
-
-        .editor-area {
-            flex: 1;
-            padding: 20px;
-            overflow-y: auto;
-        }
-
-        .console-area {
-            height: 200px;
-            background-color: var(--secondary-bg);
-            border-top: 1px solid var(--tertiary-bg);
-            padding: 10px 20px;
-            overflow-y: auto;
-            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-            font-size: 14px;
         }
 
         .message {
@@ -291,6 +255,76 @@
         ::-webkit-scrollbar-thumb:hover {
             background: #555;
         }
+
+        /* Resizer styles */
+        .resizer {
+            background-color: var(--tertiary-bg);
+            position: relative;
+            user-select: none;
+        }
+
+        .resizer:hover {
+            background-color: var(--accent-color);
+        }
+
+        .resizer.resizing {
+            background-color: var(--accent-color);
+        }
+
+        .vertical-resizer {
+            width: 4px;
+            cursor: col-resize;
+            min-height: 100%;
+        }
+
+        .horizontal-resizer {
+            height: 4px;
+            cursor: row-resize;
+            width: 100%;
+        }
+
+        .container {
+            flex: 1;
+            display: flex;
+            height: calc(100vh - 60px);
+            position: relative;
+        }
+
+        .sidebar {
+            width: 300px;
+            min-width: 200px;
+            max-width: 50%;
+            background-color: var(--secondary-bg);
+            border-right: 1px solid var(--tertiary-bg);
+            overflow-y: auto;
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background-color: var(--primary-bg);
+            position: relative;
+        }
+
+        .editor-area {
+            flex: 1;
+            min-height: 200px;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .console-area {
+            height: 200px;
+            min-height: 100px;
+            max-height: 60%;
+            background-color: var(--secondary-bg);
+            border-top: 1px solid var(--tertiary-bg);
+            padding: 10px 20px;
+            overflow-y: auto;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 14px;
+        }
     </style>
 </head>
 <body>
@@ -330,6 +364,8 @@
             </div>
         </div>
 
+        <div class="resizer vertical-resizer" id="sidebar-resizer"></div>
+
         <div class="main-content">
             <div class="editor-area">
                 <div id="main-display">
@@ -339,6 +375,8 @@
                     </div>
                 </div>
             </div>
+
+            <div class="resizer horizontal-resizer" id="console-resizer"></div>
 
             <div class="console-area">
                 <div id="console-messages">
@@ -562,18 +600,6 @@
             }
         });
 
-        // Load initial messages when page loads
-        window.addEventListener('load', function() {
-            fetch('/messages')
-                .then(response => response.json())
-                .then(data => {
-                    updateMessages(data);
-                })
-                .catch(error => {
-                    console.error('Error loading initial messages:', error);
-                });
-        });
-
         // Handle custom element conflicts
         window.addEventListener('error', function(e) {
             if (e.message && e.message.includes('custom element') && e.message.includes('already been defined')) {
@@ -592,6 +618,97 @@
                 console.warn(`Custom element '${name}' already defined, skipping redefinition`);
             }
         };
+
+        // Drag-to-resize functionality
+        let isResizing = false;
+        let currentResizer = null;
+
+        function initializeResizers() {
+            const sidebarResizer = document.getElementById('sidebar-resizer');
+            const consoleResizer = document.getElementById('console-resizer');
+            const sidebar = document.querySelector('.sidebar');
+            const mainContent = document.querySelector('.main-content');
+            const editorArea = document.querySelector('.editor-area');
+            const consoleArea = document.querySelector('.console-area');
+
+            // Sidebar resizer
+            sidebarResizer.addEventListener('mousedown', function(e) {
+                isResizing = true;
+                currentResizer = 'sidebar';
+                sidebarResizer.classList.add('resizing');
+                document.body.style.cursor = 'col-resize';
+                e.preventDefault();
+            });
+
+            // Console resizer
+            consoleResizer.addEventListener('mousedown', function(e) {
+                isResizing = true;
+                currentResizer = 'console';
+                consoleResizer.classList.add('resizing');
+                document.body.style.cursor = 'row-resize';
+                e.preventDefault();
+            });
+
+            // Mouse move handler
+            document.addEventListener('mousemove', function(e) {
+                if (!isResizing) return;
+
+                if (currentResizer === 'sidebar') {
+                    const containerRect = document.querySelector('.container').getBoundingClientRect();
+                    const newWidth = e.clientX - containerRect.left;
+                    const minWidth = 200;
+                    const maxWidth = containerRect.width * 0.5;
+                    
+                    if (newWidth >= minWidth && newWidth <= maxWidth) {
+                        sidebar.style.width = newWidth + 'px';
+                    }
+                } else if (currentResizer === 'console') {
+                    const mainContentRect = mainContent.getBoundingClientRect();
+                    const inputArea = document.querySelector('.input-area');
+                    const inputAreaHeight = inputArea.getBoundingClientRect().height;
+                    const availableHeight = mainContentRect.height - inputAreaHeight;
+                    const newConsoleHeight = mainContentRect.bottom - e.clientY - inputAreaHeight;
+                    const minConsoleHeight = 100;
+                    const maxConsoleHeight = availableHeight * 0.6;
+                    
+                    if (newConsoleHeight >= minConsoleHeight && newConsoleHeight <= maxConsoleHeight) {
+                        consoleArea.style.height = newConsoleHeight + 'px';
+                    }
+                }
+            });
+
+            // Mouse up handler
+            document.addEventListener('mouseup', function() {
+                if (isResizing) {
+                    isResizing = false;
+                    currentResizer = null;
+                    document.body.style.cursor = '';
+                    sidebarResizer.classList.remove('resizing');
+                    consoleResizer.classList.remove('resizing');
+                }
+            });
+
+            // Prevent text selection during resize
+            document.addEventListener('selectstart', function(e) {
+                if (isResizing) {
+                    e.preventDefault();
+                }
+            });
+        }
+
+        // Initialize resizers when page loads
+        window.addEventListener('load', function() {
+            initializeResizers();
+            
+            fetch('/messages')
+                .then(response => response.json())
+                .then(data => {
+                    updateMessages(data);
+                })
+                .catch(error => {
+                    console.error('Error loading initial messages:', error);
+                });
+        });
     </script>
 </body>
 </html>
