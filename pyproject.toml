@@ -125,4 +125,4 @@ reportAttributeAccessIssue = false
 reportArgumentType = false
 
 [tool.uv.workspace]
-members = ["repo/bogame", "repo/atrain", "repo/draggableDashboard", "repo/battleshiprl"]
+members = ["repo/battleshiprl"]

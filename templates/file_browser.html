@@ -34,6 +34,8 @@
             grid-template-columns: 250px 1fr 300px;
             grid-template-rows: 35px 1fr 200px;
             height: 100vh;
+            width: 100vw;
+            overflow: hidden;
             grid-template-areas: 
                 "titlebar titlebar titlebar"
                 "sidebar editor right-sidebar"
@@ -63,7 +65,10 @@
             background: #252526;
             border-right: 1px solid #2d2d30;
             overflow-y: auto;
-            min-height: 0; /* Allow sidebar to shrink and scroll within grid */
+            overflow-x: hidden;
+            min-height: 0;
+            min-width: 0;
+            max-height: 100%;
         }
 
         .sidebar-header {
@@ -89,6 +94,9 @@
             font-size: 13px;
             line-height: 22px;
             user-select: none;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .file-item:hover, .folder-item:hover {
@@ -129,6 +137,9 @@
             background: #1e1e1e;
             display: flex;
             flex-direction: column;
+            min-height: 0;
+            min-width: 0;
+            overflow: hidden;
         }
 
         .editor-tabs {
@@ -173,8 +184,11 @@
             font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
             font-size: 14px;
             line-height: 1.5;
-            height: 0; /* Force flex item to respect container bounds */
-            min-height: 0; /* Allow flex item to shrink below content size */
+            height: 0;
+            min-height: 0;
+            max-height: 100%;
+            width: 100%;
+            box-sizing: border-box;
         }
 
         .editor-welcome {
@@ -200,6 +214,9 @@
             border-top: 1px solid #2d2d30;
             display: flex;
             flex-direction: column;
+            min-height: 0;
+            min-width: 0;
+            overflow: hidden;
         }
 
         .console-header {
@@ -217,11 +234,15 @@
             flex: 1;
             padding: 8px 16px;
             overflow-y: auto;
+            overflow-x: auto;
             font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
             font-size: 12px;
             line-height: 1.4;
-            height: 0; /* Force flex item to respect container bounds */
-            min-height: 0; /* Allow flex item to shrink below content size */
+            height: 0;
+            min-height: 0;
+            max-height: 100%;
+            word-wrap: break-word;
+            white-space: pre-wrap;
         }
 
         /* Right Sidebar - User Messages */
@@ -231,6 +252,9 @@
             border-left: 1px solid #2d2d30;
             display: flex;
             flex-direction: column;
+            min-height: 0;
+            min-width: 0;
+            overflow: hidden;
         }
 
         .right-sidebar-header {
@@ -248,18 +272,11 @@
             flex: 1;
             padding: 8px;
             overflow-y: auto;
-            height: 0; /* Force flex item to respect container bounds */
-            min-height: 0; /* Allow flex item to shrink below content size */
-        }
-
-        .user-message {
-            background: #2d2d30;
-            border-radius: 4px;
-            padding: 8px 12px;
-            margin-bottom: 8px;
-            font-size: 12px;
-            line-height: 1.4;
-            border-left: 3px solid #007acc;
+            overflow-x: hidden;
+            height: 0;
+            min-height: 0;
+            max-height: 100%;
+            word-wrap: break-word;
         }
 
         /* File type icons */
@@ -333,13 +350,34 @@
             color: inherit !important;
             white-space: pre;
             word-wrap: normal;
-            display: block; /* Ensure code takes full width for proper scrolling */
+            display: block;
+            max-width: 100%;
+            overflow-x: auto;
+        }
+
+        /* Ensure proper scrolling for long lines in editor */
+        .editor-content pre code {
+            white-space: pre;
+            overflow-x: auto;
+            display: block;
+            width: 100%;
+            box-sizing: border-box;
         }
 
         /* Console message styling */
         .console-message {
             margin-bottom: 8px;
             padding: 4px 0;
+            max-width: 100%;
+            overflow-wrap: break-word;
+            word-break: break-word;
+        }
+
+        .console-message pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            overflow-x: auto;
+            margin: 0;
         }
 
         .console-message.assistant {
@@ -356,6 +394,55 @@
 
         .console-message.info {
             color: #569cd6;
+        }
+
+        /* Prevent horizontal overflow in user messages */
+        .user-message {
+            background: #2d2d30;
+            border-radius: 4px;
+            padding: 8px 12px;
+            margin-bottom: 8px;
+            font-size: 12px;
+            line-height: 1.4;
+            border-left: 3px solid #007acc;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            max-width: 100%;
+            box-sizing: border-box;
+        }
+
+        /* Additional scrollbar improvements */
+        .file-tree {
+            padding: 8px 0;
+            overflow-x: hidden;
+            word-wrap: break-word;
+        }
+
+        /* Ensure tabs don't overflow */
+        .editor-tabs {
+            background: #2d2d30;
+            border-bottom: 1px solid #3e3e42;
+            display: flex;
+            min-height: 35px;
+            align-items: center;
+            overflow-x: auto;
+            overflow-y: hidden;
+            white-space: nowrap;
+        }
+
+        /* Ensure tab content doesn't cause overflow */
+        .editor-tab {
+            padding: 8px 16px;
+            font-size: 13px;
+            background: #2d2d30;
+            color: #969696;
+            border-right: 1px solid #3e3e42;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-shrink: 0;
+            white-space: nowrap;
         }
     </style>
 </head>
