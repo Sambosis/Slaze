@@ -32,32 +32,49 @@
         .vscode-container {
             display: grid;
             grid-template-columns: 250px 4px 1fr 4px 300px;
-            grid-template-rows: 35px 1fr 4px 200px;
+            grid-template-rows: 60px 1fr 4px 200px;
             height: 100vh;
             width: 100vw;
             overflow: hidden;
             grid-template-areas: 
-                "titlebar titlebar titlebar titlebar titlebar"
+                "header header header header header"
                 "sidebar sidebar-resizer editor editor-resizer right-sidebar"
                 "sidebar console-resizer console-resizer console-resizer right-sidebar"
                 "sidebar console-bottom console-bottom console-bottom right-sidebar";
         }
 
-        /* Title Bar */
-        .titlebar {
-            grid-area: titlebar;
-            background: #323233;
+        /* Header */
+        .header {
+            grid-area: header;
+            background: #252526;
             border-bottom: 1px solid #2d2d30;
             display: flex;
+            justify-content: space-between;
             align-items: center;
-            padding: 0 16px;
-            font-size: 13px;
-            color: #cccccc;
+            padding: 10px 20px;
         }
 
-        .titlebar h1 {
-            font-size: 13px;
-            font-weight: normal;
+        .header h1 {
+            margin: 0;
+            font-size: 20px;
+            color: #007acc;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 15px;
+        }
+
+        .nav-links a {
+            color: #cccccc;
+            text-decoration: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            transition: background-color 0.2s;
+        }
+
+        .nav-links a:hover {
+            background-color: #333333;
         }
 
         /* Left Sidebar - File Explorer */
@@ -486,9 +503,14 @@
 </head>
 <body>
     <div class="vscode-container">
-        <!-- Title Bar -->
-        <div class="titlebar">
-            <h1>Slazy Agent - File Browser</h1>
+        <!-- Header -->
+        <div class="header">
+            <h1>📁 Slazy Agent - File Browser</h1>
+            <div class="nav-links">
+                <a href="/">🏠 Home</a>
+                <a href="/web_ide">🚀 Web IDE</a>
+                <a href="/tools">🔧 Tools</a>
+            </div>
         </div>
 
         <!-- Left Sidebar - File Explorer -->
