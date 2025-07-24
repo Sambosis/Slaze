@@ -31,15 +31,16 @@
 
         .vscode-container {
             display: grid;
-            grid-template-columns: 250px 1fr 300px;
-            grid-template-rows: 35px 1fr 200px;
+            grid-template-columns: 250px 4px 1fr 4px 300px;
+            grid-template-rows: 35px 1fr 4px 200px;
             height: 100vh;
             width: 100vw;
             overflow: hidden;
             grid-template-areas: 
-                "titlebar titlebar titlebar"
-                "sidebar editor right-sidebar"
-                "sidebar console right-sidebar";
+                "titlebar titlebar titlebar titlebar titlebar"
+                "sidebar sidebar-resizer editor editor-resizer right-sidebar"
+                "sidebar console-resizer console-resizer console-resizer right-sidebar"
+                "sidebar console-bottom console-bottom console-bottom right-sidebar";
         }
 
         /* Title Bar */
@@ -209,7 +210,7 @@
 
         /* Bottom Console Panel */
         .console {
-            grid-area: console;
+            grid-area: console-bottom;
             background: #1e1e1e;
             border-top: 1px solid #2d2d30;
             display: flex;
@@ -444,6 +445,41 @@
             flex-shrink: 0;
             white-space: nowrap;
         }
+
+        /* Resizer styles */
+        .resizer {
+            background-color: #2d2d30;
+            position: relative;
+            user-select: none;
+        }
+
+        .resizer:hover {
+            background-color: #007acc;
+        }
+
+        .resizer.resizing {
+            background-color: #007acc;
+        }
+
+        .vertical-resizer {
+            cursor: col-resize;
+        }
+
+        .horizontal-resizer {
+            cursor: row-resize;
+        }
+
+        .sidebar-resizer {
+            grid-area: sidebar-resizer;
+        }
+
+        .editor-resizer {
+            grid-area: editor-resizer;
+        }
+
+        .console-resizer {
+            grid-area: console-resizer;
+        }
     </style>
 </head>
 <body>
@@ -472,6 +508,9 @@
             </div>
         </div>
 
+        <!-- Sidebar Resizer -->
+        <div class="resizer vertical-resizer sidebar-resizer" id="sidebar-resizer"></div>
+
         <!-- Main Editor Area -->
         <div class="editor">
             <div class="editor-tabs" id="editor-tabs">
@@ -485,6 +524,12 @@
                 </div>
             </div>
         </div>
+
+        <!-- Editor Resizer -->
+        <div class="resizer vertical-resizer editor-resizer" id="editor-resizer"></div>
+
+        <!-- Console Resizer -->
+        <div class="resizer horizontal-resizer console-resizer" id="console-resizer"></div>
 
         <!-- Bottom Console Panel -->
         <div class="console">
@@ -883,12 +928,112 @@
             };
         }
 
+        // Drag-to-resize functionality
+        let isResizing = false;
+        let currentResizer = null;
+
+        function initializeResizers() {
+            const sidebarResizer = document.getElementById('sidebar-resizer');
+            const editorResizer = document.getElementById('editor-resizer');
+            const consoleResizer = document.getElementById('console-resizer');
+            const container = document.querySelector('.vscode-container');
+
+            // Sidebar resizer (left sidebar width)
+            sidebarResizer.addEventListener('mousedown', function(e) {
+                isResizing = true;
+                currentResizer = 'sidebar';
+                sidebarResizer.classList.add('resizing');
+                document.body.style.cursor = 'col-resize';
+                e.preventDefault();
+            });
+
+            // Editor resizer (right sidebar width)
+            editorResizer.addEventListener('mousedown', function(e) {
+                isResizing = true;
+                currentResizer = 'editor';
+                editorResizer.classList.add('resizing');
+                document.body.style.cursor = 'col-resize';
+                e.preventDefault();
+            });
+
+            // Console resizer (console height)
+            consoleResizer.addEventListener('mousedown', function(e) {
+                isResizing = true;
+                currentResizer = 'console';
+                consoleResizer.classList.add('resizing');
+                document.body.style.cursor = 'row-resize';
+                e.preventDefault();
+            });
+
+            // Mouse move handler
+            document.addEventListener('mousemove', function(e) {
+                if (!isResizing) return;
+
+                const containerRect = container.getBoundingClientRect();
+
+                if (currentResizer === 'sidebar') {
+                    const newWidth = e.clientX - containerRect.left;
+                    const minWidth = 150;
+                    const maxWidth = containerRect.width * 0.4;
+                    
+                    if (newWidth >= minWidth && newWidth <= maxWidth) {
+                        const columns = container.style.gridTemplateColumns || '250px 4px 1fr 4px 300px';
+                        const parts = columns.split(' ');
+                        parts[0] = newWidth + 'px';
+                        container.style.gridTemplateColumns = parts.join(' ');
+                    }
+                } else if (currentResizer === 'editor') {
+                    const newRightWidth = containerRect.right - e.clientX;
+                    const minWidth = 150;
+                    const maxWidth = containerRect.width * 0.4;
+                    
+                    if (newRightWidth >= minWidth && newRightWidth <= maxWidth) {
+                        const columns = container.style.gridTemplateColumns || '250px 4px 1fr 4px 300px';
+                        const parts = columns.split(' ');
+                        parts[4] = newRightWidth + 'px';
+                        container.style.gridTemplateColumns = parts.join(' ');
+                    }
+                } else if (currentResizer === 'console') {
+                    const newConsoleHeight = containerRect.bottom - e.clientY;
+                    const minHeight = 100;
+                    const maxHeight = containerRect.height * 0.6;
+                    
+                    if (newConsoleHeight >= minHeight && newConsoleHeight <= maxHeight) {
+                        const rows = container.style.gridTemplateRows || '35px 1fr 4px 200px';
+                        const parts = rows.split(' ');
+                        parts[3] = newConsoleHeight + 'px';
+                        container.style.gridTemplateRows = parts.join(' ');
+                    }
+                }
+            });
+
+            // Mouse up handler
+            document.addEventListener('mouseup', function() {
+                if (isResizing) {
+                    isResizing = false;
+                    currentResizer = null;
+                    document.body.style.cursor = '';
+                    sidebarResizer.classList.remove('resizing');
+                    editorResizer.classList.remove('resizing');
+                    consoleResizer.classList.remove('resizing');
+                }
+            });
+
+            // Prevent text selection during resize
+            document.addEventListener('selectstart', function(e) {
+                if (isResizing) {
+                    e.preventDefault();
+                }
+            });
+        }
+
         // Initialize the application
         document.addEventListener('DOMContentLoaded', function() {
             initSocket();
             loadFileTree();
             startAutoRefresh();
-            addConsoleMessage('File browser initialized with auto-refresh', 'info');
+            initializeResizers();
+            addConsoleMessage('File browser initialized with auto-refresh and drag-to-resize', 'info');
         });
     </script>
 </body>
