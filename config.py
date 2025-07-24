@@ -78,9 +78,9 @@ googleflash = "google/gemini-2.5-flash"
 googleflashlite = "google/gemini-2.5-flash-lite-preview-06-17"
 grok4 = "x-ai/grok-4"
 qwen3 = "qwen/qwen3-235b-a22b-07-25"
-SUMMARY_MODEL = qwen3  # Model for summaries
-MAIN_MODEL = qwen3  # Primary model for main agent operations
-CODE_MODEL = qwen3  # Model for code generation tasks
+SUMMARY_MODEL = googleflash  # Model for summaries
+MAIN_MODEL = googleflash  # Primary model for main agent operations
+CODE_MODEL = googleflash  # Model for code generation tasks
 
 # Feature flag constants
 COMPUTER_USE_BETA_FLAG = "computer-use-2024-10-22"
