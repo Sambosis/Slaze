@@ -36,10 +36,12 @@ def log_message(msg_type, message):
 class WebUI:
     def __init__(self, agent_runner):
         logging.info("Initializing WebUI")
-        # More robust path for templates
+        # More robust path for templates and static files
         template_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'templates'))
+        static_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'assets'))
         logging.info(f"Template directory set to: {template_dir}")
-        self.app = Flask(__name__, template_folder=template_dir)
+        logging.info(f"Static directory set to: {static_dir}")
+        self.app = Flask(__name__, template_folder=template_dir, static_folder=static_dir, static_url_path='/assets')
         self.app.config["SECRET_KEY"] = "secret!"
         self.socketio = SocketIO(self.app, async_mode="threading", cookie=None)
         self.user_messages = []
@@ -136,7 +138,7 @@ class WebUI:
             logging.info("Starting agent runner in background thread")
             coro = self.agent_runner(task, self)
             self.socketio.start_background_task(asyncio.run, coro)
-            return render_template("web_ide.html")
+            return render_template("index.html")
 
         @self.app.route("/messages")
         def get_messages():

@@ -1,0 +1,175 @@
+:root {
+    --primary-bg: #1e1e1e;
+    --secondary-bg: #252526;
+    --tertiary-bg: #333333;
+    --text-color: #cccccc;
+    --accent-color: #007acc;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    margin: 0;
+    background-color: var(--primary-bg);
+    color: var(--text-color);
+}
+
+.container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+}
+
+.header {
+    background-color: var(--secondary-bg);
+    padding: 15px 20px;
+    border-bottom: 1px solid var(--tertiary-bg);
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.header h1 {
+    margin: 0;
+    color: var(--text-color);
+    font-size: 24px;
+}
+
+.header a {
+    color: var(--accent-color);
+    text-decoration: none;
+    padding: 8px 12px;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+}
+
+.header a:hover {
+    background-color: var(--tertiary-bg);
+}
+
+.main-content {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+}
+
+.editor-area {
+    flex: 1;
+    background-color: var(--primary-bg);
+    padding: 10px;
+    overflow: auto;
+}
+
+.editor-area pre {
+    margin: 0;
+    height: 100%;
+}
+
+.editor-area code {
+    display: block;
+    height: 100%;
+    padding: 20px;
+    background-color: var(--secondary-bg);
+    border-radius: 4px;
+    overflow: auto;
+}
+
+.console-area {
+    height: 300px;
+    background-color: var(--secondary-bg);
+    padding: 10px;
+    overflow-y: auto;
+    border-top: 1px solid var(--tertiary-bg);
+}
+
+.sidebar {
+    width: 300px;
+    background-color: var(--secondary-bg);
+    padding: 15px;
+    overflow-y: auto;
+    border-left: 1px solid var(--tertiary-bg);
+}
+
+.sidebar h3 {
+    margin-top: 0;
+    color: var(--text-color);
+    font-size: 16px;
+    border-bottom: 1px solid var(--tertiary-bg);
+    padding-bottom: 10px;
+}
+
+.messages {
+    height: 100%;
+    overflow-y: auto;
+}
+
+.message {
+    margin-bottom: 15px;
+    padding: 12px;
+    border-radius: 6px;
+    line-height: 1.4;
+}
+
+.user-message {
+    background-color: var(--tertiary-bg);
+    border-left: 3px solid var(--accent-color);
+}
+
+.assistant-message {
+    background-color: var(--accent-color);
+    color: white;
+}
+
+.empty-state {
+    color: #888;
+    font-style: italic;
+    text-align: center;
+    padding: 20px;
+}
+
+.file-tree ul {
+    list-style-type: none;
+    padding-left: 15px;
+    margin: 5px 0;
+}
+
+.file-tree li {
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 3px;
+    transition: background-color 0.2s;
+}
+
+.file-tree li:hover {
+    background-color: var(--tertiary-bg);
+}
+
+.file-tree .directory {
+    font-weight: bold;
+    color: #ddd;
+}
+
+.file-tree .file {
+    color: var(--accent-color);
+}
+
+.file-tree .file:hover {
+    text-decoration: underline;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .main-content {
+        flex-direction: column;
+    }
+    
+    .sidebar {
+        width: 100%;
+        height: 200px;
+        border-left: none;
+        border-top: 1px solid var(--tertiary-bg);
+    }
+    
+    .console-area {
+        height: 150px;
+    }
+}
