@@ -125,4 +125,4 @@ reportAttributeAccessIssue = false
 reportArgumentType = false
 
 [tool.uv.workspace]
-members = ["repo/battleshiprl"]
+exclude = ["repo/*"]
