@@ -1,0 +1,83 @@
+:root {
+    --primary-bg: #1e1e1e;
+    --secondary-bg: #252526;
+    --tertiary-bg: #333333;
+    --text-color: #cccccc;
+    --accent-color: #007acc;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    margin: 0;
+    background-color: var(--primary-bg);
+    color: var(--text-color);
+}
+
+.ide-container {
+    display: flex;
+    height: 100vh;
+}
+
+.sidebar {
+    width: 250px;
+    background-color: var(--secondary-bg);
+    padding: 10px;
+    overflow-y: auto;
+}
+
+.main-content {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.editor-area {
+    flex-grow: 1;
+    background-color: var(--primary-bg);
+    padding: 10px;
+}
+
+.console-area {
+    height: 300px;
+    background-color: var(--secondary-bg);
+    padding: 10px;
+    overflow-y: auto;
+}
+
+.messages {
+    height: 100%;
+    overflow-y: auto;
+}
+
+.message {
+    margin-bottom: 10px;
+    padding: 10px;
+    border-radius: 5px;
+}
+
+.user-message {
+    background-color: var(--tertiary-bg);
+}
+
+.assistant-message {
+    background-color: var(--accent-color);
+    color: white;
+}
+
+.file-tree ul {
+    list-style-type: none;
+    padding-left: 15px;
+}
+
+.file-tree li {
+    cursor: pointer;
+    padding: 2px 0;
+}
+
+.file-tree .directory {
+    font-weight: bold;
+}
+
+.file-tree .file:hover {
+    text-decoration: underline;
+}
