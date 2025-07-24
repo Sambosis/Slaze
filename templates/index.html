@@ -4,221 +4,63 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Slazy Agent - Web IDE</title>
+    
+    <!-- External Dependencies -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.0/socket.io.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/4.3.0/marked.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-shell-session.min.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
-    <style>
-        :root {
-            --primary-bg: #1e1e1e;
-            --secondary-bg: #252526;
-            --tertiary-bg: #333333;
-            --text-color: #cccccc;
-            --accent-color: #007acc;
-        }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            margin: 0;
-            background-color: var(--primary-bg);
-            color: var(--text-color);
-        }
-
-        .ide-container {
-            display: flex;
-            height: 100vh;
-        }
-
-        .sidebar {
-            width: 250px;
-            background-color: var(--secondary-bg);
-            padding: 10px;
-            overflow-y: auto;
-        }
-
-        .main-content {
-            flex-grow: 1;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .editor-area {
-            flex-grow: 1;
-            background-color: var(--primary-bg);
-            padding: 10px;
-        }
-
-        .console-area {
-            height: 300px;
-            background-color: var(--secondary-bg);
-            padding: 10px;
-            overflow-y: auto;
-        }
-
-        .messages {
-            height: 100%;
-            overflow-y: auto;
-        }
-
-        .message {
-            margin-bottom: 10px;
-            padding: 10px;
-            border-radius: 5px;
-        }
-
-        .user-message {
-            background-color: var(--tertiary-bg);
-        }
-
-        .assistant-message {
-            background-color: var(--accent-color);
-            color: white;
-        }
-
-        .file-tree ul {
-            list-style-type: none;
-            padding-left: 15px;
-        }
-
-        .file-tree li {
-            cursor: pointer;
-            padding: 2px 0;
-        }
-
-        .file-tree .directory {
-            font-weight: bold;
-        }
-
-        .file-tree .file:hover {
-            text-decoration: underline;
-        }
-
-    </style>
+    
+    <!-- Local Styles -->
+    <link href="/assets/ide.css" rel="stylesheet" />
 </head>
 <body>
-
     <div class="container">
+        <!-- Header Navigation -->
         <div class="header">
             <h1>Slazy Agent</h1>
-            <a href="/">🏠 Task Selection</a>
-                            <a href="/tools" style="margin-left:15px;">🔧 Toolbox</a>
-                <a href="/browser" style="margin-left:15px;">📁 File Browser</a>
-            <a href="/classic" style="margin-left:15px;">📝 Classic Interface</a>
+            <nav>
+                <a href="/">🏠 Task Selection</a>
+                <a href="/tools">🔧 Toolbox</a>
+                <a href="/browser">📁 File Browser</a>
+                <a href="/classic">📝 Classic Interface</a>
+            </nav>
         </div>
+
+        <!-- Main Content Area -->
         <div class="main-content">
+            <!-- Code Editor -->
             <div class="editor-area">
-                <pre><code id="editor" class="language-javascript"></code></pre>
+                <pre><code id="editor" class="language-javascript">// Select a file from the sidebar to view its content</code></pre>
             </div>
-            <div class="console-area">
-                <div class="messages" id="messages-container">
-                    <div class="messages" id="assistant-messages">
-                        <div class="empty-state">No assistant messages yet</div>
-                    </div>
+
+            <!-- Sidebar for User Messages and File Tree -->
+            <div class="sidebar">
+                <h3>User Messages</h3>
+                <div class="messages" id="user-messages">
+                    <div class="empty-state">No user messages yet</div>
+                </div>
+                
+                <h3>File Tree</h3>
+                <div class="file-tree" id="file-tree">
+                    <div class="empty-state">Loading files...</div>
                 </div>
             </div>
         </div>
-        <div class="sidebar">
-            <h3>User Messages</h3>
-            <div class="messages" id="user-messages">
-                <div class="empty-state">No user messages yet</div>
+
+        <!-- Console/Assistant Messages Area -->
+        <div class="console-area">
+            <div class="messages" id="messages-container">
+                <div class="messages" id="assistant-messages">
+                    <div class="empty-state">No assistant messages yet</div>
+                </div>
             </div>
         </div>
     </div>
 
-    <script>
-        const socket = io();
-
-        function renderFileTree(files, container) {
-            const ul = document.createElement('ul');
-            files.forEach(file => {
-                const li = document.createElement('li');
-                li.textContent = file.name;
-                if (file.type === 'directory') {
-                    li.classList.add('directory');
-                    li.addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        const childUl = li.querySelector('ul');
-                        if (childUl) {
-                            childUl.style.display = childUl.style.display === 'none' ? 'block' : 'none';
-                        }
-                    });
-                    if (file.children) {
-                        renderFileTree(file.children, li);
-                    }
-                } else {
-                    li.classList.add('file');
-                    li.addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        fetch(`/api/files/content?path=${file.path}`)
-                            .then(response => response.json())
-                            .then(data => {
-                                const editor = document.getElementById('editor');
-                                editor.textContent = data.content;
-                                Prism.highlightElement(editor);
-                            });
-                    });
-                }
-                ul.appendChild(li);
-            });
-            container.appendChild(ul);
-        }
-
-        fetch('/api/files')
-            .then(response => response.json())
-            .then(data => {
-                const fileTreeContainer = document.getElementById('file-tree');
-                renderFileTree(data, fileTreeContainer);
-            });
-
-        socket.on('update', function(data) {
-            const userMessagesDiv = document.getElementById('user-messages');
-            userMessagesDiv.innerHTML = '';
-            if (data.user.length === 0) {
-                userMessagesDiv.innerHTML = '<div class="empty-state">No user messages yet</div>';
-            } else {
-                data.user.forEach(function(msg) {
-                    userMessagesDiv.innerHTML += '<div class="message user-message">' + marked.parse(msg) + '</div>';
-                });
-            }
-
-            const assistantMessagesDiv = document.getElementById('assistant-messages');
-            assistantMessagesDiv.innerHTML = '';
-            if (data.assistant.length === 0) {
-                assistantMessagesDiv.innerHTML = '<div class="empty-state">No assistant messages yet</div>';
-            } else {
-                data.assistant.forEach(function(msg) {
-                    assistantMessagesDiv.innerHTML += '<div class="message assistant-message">' + marked.parse(msg) + '</div>';
-                });
-            }
-        });
-
-        fetch('/messages')
-            .then(response => response.json())
-            .then(data => {
-                socket.on('update', function(data) {
-                    const userMessagesDiv = document.getElementById('user-messages');
-                    userMessagesDiv.innerHTML = '';
-                    if (data.user.length === 0) {
-                        userMessagesDiv.innerHTML = '<div class="empty-state">No user messages yet</div>';
-                    } else {
-                        data.user.forEach(function(msg) {
-                            userMessagesDiv.innerHTML += '<div class="message user-message">' + marked.parse(msg) + '</div>';
-                        });
-                    }
-
-                    const assistantMessagesDiv = document.getElementById('assistant-messages');
-                    assistantMessagesDiv.innerHTML = '';
-                    if (data.assistant.length === 0) {
-                        assistantMessagesDiv.innerHTML = '<div class="empty-state">No assistant messages yet</div>';
-                    } else {
-                        data.assistant.forEach(function(msg) {
-                            assistantMessagesDiv.innerHTML += '<div class="message assistant-message">' + marked.parse(msg) + '</div>';
-                        });
-                    }
-                });
-            });
-    </script>
+    <!-- Local Scripts -->
+    <script src="/assets/ide.js"></script>
 </body>
 </html>
