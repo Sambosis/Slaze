@@ -397,15 +397,17 @@
             color: #569cd6;
         }
 
-        /* Prevent horizontal overflow in user messages */
+        /* User message styling - matching web_ide.html */
+        .message {
+            margin-bottom: 15px;
+            padding: 10px;
+            border-radius: 8px;
+            line-height: 1.5;
+        }
+
         .user-message {
-            background: #2d2d30;
-            border-radius: 4px;
-            padding: 8px 12px;
-            margin-bottom: 8px;
-            font-size: 12px;
-            line-height: 1.4;
-            border-left: 3px solid #007acc;
+            background-color: #333333;
+            border-left: 4px solid #4CAF50;
             word-wrap: break-word;
             overflow-wrap: break-word;
             max-width: 100%;
@@ -892,12 +894,12 @@
             consoleContent.scrollTop = consoleContent.scrollHeight;
         }
 
-        // Add user message
+        // Add user message - matching web_ide.html approach
         function addUserMessage(message) {
             const userMessages = document.getElementById('user-messages');
             const messageDiv = document.createElement('div');
-            messageDiv.className = 'user-message';
-            messageDiv.innerHTML = escapeHtml(message);
+            messageDiv.className = 'message user-message';
+            messageDiv.innerHTML = marked.parse(message);
             userMessages.appendChild(messageDiv);
             userMessages.scrollTop = userMessages.scrollHeight;
         }
