@@ -802,7 +802,10 @@
                 document.querySelectorAll('.file-item').forEach(item => {
                     item.classList.remove('active');
                 });
-                document.querySelector(`[data-path="${filePath}"]`).classList.add('active');
+                const fileItem = document.querySelector(`[data-path="${filePath}"]`);
+                if (fileItem) {
+                    fileItem.classList.add('active');
+                }
                 
             } catch (error) {
                 console.error('Error opening file:', error);
