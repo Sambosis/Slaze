@@ -429,16 +429,30 @@ class Agent:
         if msg.tool_calls:
             print(msg)
             for tc in msg.tool_calls:
-                args = (
-                    json.loads(tc.function.arguments) if tc.function.arguments else {}
-                )
+                try:
+                    args = (
+                        json.loads(tc.function.arguments) if tc.function.arguments else {}
+                    )
+                except json.JSONDecodeError as e:
+                    logger.error(f"Failed to parse tool call arguments: {tc.function.arguments}")
+                    logger.error(f"JSON decode error: {e}")
+                    # Skip this tool call and continue with the next one
+                    self.messages.append({
+                        "role": "tool", 
+                        "tool_call_id": tc.id, 
+                        "content": f"Error: Invalid JSON in tool arguments: {str(e)}"
+                    })
+                    continue
+                    
                 if self.manual_tool_confirmation and hasattr(self.display, "confirm_tool_call"):
-                    schema = self.tool_collection.tools.get(tc.function.name).to_params()["function"]["parameters"]
-                    new_args = await self.display.confirm_tool_call(tc.function.name, args, schema)
-                    if new_args is None:
-                        self.messages.append({"role": "tool", "tool_call_id": tc.id, "content": "Tool execution cancelled"})
-                        continue
-                    args = new_args
+                    tool = self.tool_collection.tools.get(tc.function.name)
+                    if tool:
+                        schema = tool.to_params()["function"]["parameters"]
+                        new_args = await self.display.confirm_tool_call(tc.function.name, args, schema)
+                        if new_args is None:
+                            self.messages.append({"role": "tool", "tool_call_id": tc.id, "content": "Tool execution cancelled"})
+                            continue
+                        args = new_args
                 tool_result = await self.run_tool({"name": tc.function.name, "id": tc.id, "input": args})
                 result_text_parts = []
                 if isinstance(tool_result.get("content"), list):
