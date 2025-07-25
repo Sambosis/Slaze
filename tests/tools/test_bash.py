@@ -125,7 +125,11 @@ async def test_working_directory_handling(bash_tool: BashTool):
 
 @pytest.mark.asyncio
 async def test_display_integration(bash_tool: BashTool, mock_display):
-    """Test that the display is properly integrated."""
+    """
+    Verify that BashTool integrates with a display interface by asserting user and assistant messages are sent during command execution.
+    
+    This test assigns a mock display to the tool, runs a command, and checks that the display receives both the user message indicating command execution and at least one assistant message containing console-formatted output.
+    """
     bash_tool.display = mock_display
 
     result = await bash_tool("echo 'test'")
