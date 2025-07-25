@@ -208,7 +208,9 @@ class EditTool(BaseTool):
         if old is None:
             raise ToolError("`old_str` required for str_replace")
         if mode not in {"exact", "regex", "fuzzy"}:
-            raise ToolError("match_mode must be exact/regex/fuzzy")
+            # set mode to fuzzy if it is not correctly specified
+            mode = "fuzzy"
+            #raise ToolError("match_mode must be exact/regex/fuzzy")
         return self._file_str_replace(path, old, new or "", mode)
 
     def _cmd_insert(
