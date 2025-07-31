@@ -499,7 +499,7 @@ async def refresh_context_async(
 
     messages_for_llm = [{"role": "user", "content": prompt}]
     response = client.chat.completions.create(
-        model=googlepro,
+        model=MAIN_MODEL,
         messages=messages_for_llm, # Corrected variable name
         max_tokens=get_constant("MAX_SUMMARY_TOKENS", 20000) # Use get_constant
     )

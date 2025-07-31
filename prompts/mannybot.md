@@ -1,0 +1,1 @@
+Create a gui Mandelbrot set viewer as a desktop app using python.  It should be very efficient and customizable. 
