@@ -84,9 +84,9 @@ qwencoder = "qwen/qwen3-coder:nitro"
 zai45 = "z-ai/glm-4.5"
 halfa = "openrouter/horizon-beta"
 autor = "meta-llama/llama-4-maverick"
-SUMMARY_MODEL = openaio3  # Model for summaries
-MAIN_MODEL = openaio3  # Primary model for main agent operations
-CODE_MODEL = openaio3  # Model for code generation tasks
+SUMMARY_MODEL = halfa  # Model for summaries
+MAIN_MODEL = halfa  # Primary model for main agent operations
+CODE_MODEL = halfa  # Model for code generation tasks
 
 # Feature flag constants
 COMPUTER_USE_BETA_FLAG = "computer-use-2024-10-22"
