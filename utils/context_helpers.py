@@ -20,11 +20,6 @@ from tenacity import retry, stop_after_attempt, wait_random_exponential
 
 logger = logging.getLogger(__name__)
 
-QUICK_SUMMARIES = []
-
-
-
-
 
 def format_messages_to_string(messages):
     """Return a human readable string for a list of messages."""
@@ -150,25 +145,8 @@ def extract_text_from_content(content: Any) -> str:
     return ""
 
 
-
-
-
-
-
-
-def get_all_summaries() -> str:
-    """Combine all summaries into a chronological narrative."""
-    if not QUICK_SUMMARIES:
-        return "No summaries available yet."
-
-    combined = "\n"
-    for entry in QUICK_SUMMARIES:
-        combined += f"{entry}\n"
-    return combined
-
-
-async def reorganize_context(messages: List[Dict[str, Any]], summary: str) -> str:
-    """Reorganize the context by filtering and summarizing messages."""
+async def summarize_context_with_llm(messages: List[Dict[str, Any]], file_contents: str, code_skeletons: str) -> str:
+    """Summarize the context using an LLM to produce a summary of completed steps and next steps."""
     conversation_text = ""
 
     # Look for tool results related to image generation
@@ -210,44 +188,45 @@ async def reorganize_context(messages: List[Dict[str, Any]], summary: str) -> st
         conversation_text += "\n\nIMAGE GENERATION RESULTS:\n" + "\n".join(
             image_generation_results
         )
-    logger.debug(f"Conversation text for reorganize_context: {conversation_text[:500]}...") # Log snippet
-    summary_prompt = f"""I need a summary of completed steps and next steps for a project that is ALREADY IN PROGRESS. 
-    This is NOT a new project - you are continuing work on an existing codebase.
+    logger.debug(f"Conversation text for summarize_context_with_llm: {conversation_text[:500]}...") # Log snippet
+    summary_prompt = f"""Your task is to analyze the state of an ongoing software development project and provide a concise summary.
+Based on the conversation history, file contents, and code structure, generate two lists: one of completed tasks and one of the next immediate actions.
 
-    VERY IMPORTANT INSTRUCTIONS:
-    1. ALL FILES mentioned as completed or created ARE ALREADY CREATED AND FULLY FUNCTIONAL.
-       - Do NOT suggest recreating these files.
-       - Do NOT suggest checking if these files exist.
-       - Assume all files mentioned in completed steps exist exactly where they are described.
-    
-    2. ALL STEPS listed as completed HAVE ALREADY BEEN SUCCESSFULLY DONE.
-       - Do NOT suggest redoing any completed steps.
-    
-    3. Your summary should be in TWO clearly separated parts:
-       a. COMPLETED: List all tasks/steps that have been completed so far
-       b. NEXT STEPS: List 1-4 specific, actionable steps that should be taken next to complete the project
-    
-    4. List each completed item and next step ONLY ONCE, even if it appears multiple times in the context.
-    
-    5. If any images were generated, mention each image, its purpose, and its location in the COMPLETED section.
-    
-    Please format your response with:
-    <COMPLETED>
-    [List of ALL completed steps and created files - these are DONE and exist]
-    </COMPLETED>
+**INSTRUCTIONS:**
+1.  **Analyze the provided context thoroughly.** The context includes the conversation history, the full contents of the project files, and the structure of the code.
+2.  **Assume all files and completed steps mentioned are already done and exist.** Do not suggest re-doing them.
+3.  **Your output MUST be in two distinct, clearly labeled sections:** `<COMPLETED>` and `<NEXT_STEPS>`.
+4.  **Completed Section:** List all tangible achievements, such as created files, implemented features, and fixed bugs.
+5.  **Next Steps Section:** List 1-4 specific, actionable steps required to move the project forward. These should be immediate, not long-term goals.
+6.  **Be concise and factual.** Avoid conversational language.
 
-    <NEXT_STEPS>
-    [Numbered list of 1-4 next steps to complete the project]
-    </NEXT_STEPS>
+**CONTEXT:**
 
-    Here is the Summary part:
-    {summary}
-    
-    Here is the messages part:
-    <MESSAGES>
-    {conversation_text}
-    </MESSAGES>
-    """
+**Project Files:**
+```
+{file_contents}
+```
+
+**Code Structure:**
+```
+{code_skeletons}
+```
+
+**Conversation History:**
+```
+{conversation_text}
+```
+
+**OUTPUT FORMAT:**
+
+<COMPLETED>
+[A bulleted list of all completed steps and created files.]
+</COMPLETED>
+
+<NEXT_STEPS>
+[A numbered list of 1-4 concrete next steps.]
+</NEXT_STEPS>
+"""
 
     try:
         OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
@@ -307,87 +286,57 @@ async def refresh_context_async(
     task: str, messages: List[Dict], display: Union[WebUI, AgentDisplayConsole], client
 ) -> str:
     """
-    Create a combined context string by filtering and (if needed) summarizing messages
-    and appending current file contents.
+    Create a combined context string by filtering and summarizing messages
+    and appending current file contents. This version is streamlined to use a single LLM call.
     """
-    filtered = filter_messages(messages)
-    summary = get_all_summaries() # This is a local function in context_helpers
-    completed, next_steps = await reorganize_context(filtered, summary)
+    filtered_messages = filter_messages(messages)
 
+    # 1. Aggregate current state
     file_contents = aggregate_file_states()
     if len(file_contents) > 200000:
         file_contents = (
             file_contents[:70000] + " ... [TRUNCATED] ... " + file_contents[-70000:]
         )
 
-    # Get code skeletons
-    from utils.file_logger import get_all_current_skeleton
-    from utils.file_logger import get_all_current_code
+    from utils.file_logger import get_all_current_skeleton, get_all_current_code
     code_skeletons = get_all_current_skeleton()
     current_code = get_all_current_code()
-    # The logic is if there is code, then supply that, if not then supply the skeletons, if there is no code or skeletons, then say there are no code skeletons
-
     if current_code:
         code_skeletons = current_code
     elif not code_skeletons or code_skeletons == "No Python files have been tracked yet.":
         code_skeletons = "No code skeletons available."
 
-    # Extract information about images generated
-    images_info = ""
-    if "## Generated Images:" in file_contents:
-        images_section = file_contents.split("## Generated Images:")[1]
-        if "##" in images_section:
-            images_section = images_section.split("##")[0]
-        images_info = "## Generated Images:\n" + images_section.strip()
-
-    # call the LLM and pass it all current messages then the task and ask it to give an updated version of the task
-    prompt = f""" Your job is to update the task based on the current state of the project.
-    The task is: {task}
-    The current state of the project is:
-    {file_contents}
-    {code_skeletons}
-    {completed}
-    {next_steps}
-    {images_info}
-
-    Once again, here is the task that I need you to give an updated version of.  
-    Make sure that you give any tips, lessons learned,  what has been done, and what needs to be done.
-    Make sure you give clear guidance on how to import various files and in general how they should work together.
-    """
-
-    messages_for_llm = [{"role": "user", "content": prompt}]
-    response = client.chat.completions.create(
-        model=MAIN_MODEL,
-        messages=messages_for_llm, # Corrected variable name
-        max_tokens=get_constant("MAX_SUMMARY_TOKENS", 20000) # Use get_constant
+    # 2. Summarize context with a single LLM call
+    completed, next_steps = await summarize_context_with_llm(
+        filtered_messages, file_contents, code_skeletons
     )
-    new_task = response.choices[0].message.content
 
-    combined_content = f"""Original request: 
-    {task}
-    
-    IMPORTANT: This is a CONTINUING PROJECT. All files listed below ALREADY EXIST and are FULLY FUNCTIONAL.
-    DO NOT recreate any existing files or redo completed steps. Continue the work from where it left off.
+    # 3. Construct the final context string
+    # No second LLM call is needed. We directly use the summary.
+    # The "updated task" is now implicitly the "next steps".
 
-    Current Project Files and Assets:
-    {file_contents}
+    combined_content = f"""Original request:
+{task}
 
-    Code Skeletons (Structure of Python files):
-    {code_skeletons}
+IMPORTANT: This is a CONTINUING PROJECT. All files listed below ALREADY EXIST and are FULLY FUNCTIONAL.
+DO NOT recreate any existing files or redo completed steps. Continue the work from where it left off.
 
-    COMPLETED STEPS (These have ALL been successfully completed - DO NOT redo these):
-    {completed}
+Current Project Files and Assets:
+{file_contents}
 
-    NEXT STEPS (Continue the project by completing these):
-    {next_steps}
+Code Skeletons (Structure of Python files):
+{code_skeletons}
 
+COMPLETED STEPS (These have ALL been successfully completed - DO NOT redo these):
+{completed}
 
-    Updated Request:
-    {new_task}
-    NOTES: 
-    - All files mentioned in completed steps ALREADY EXIST in the locations specified.
-    - All completed steps have ALREADY BEEN DONE successfully.
-    - Continue the project by implementing the next steps, building on the existing work.
-    """
+NEXT STEPS (Continue the project by completing these):
+{next_steps}
+
+NOTES:
+- All files mentioned in completed steps ALREADY EXIST in the locations specified.
+- All completed steps have ALREADY BEEN DONE successfully.
+- Your task is to continue the project by implementing the NEXT STEPS, building on the existing work.
+"""
     logger.info(f"Refreshed context combined_content (first 500 chars): {combined_content[:500]}...")
     return combined_content
