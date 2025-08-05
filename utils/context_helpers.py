@@ -23,33 +23,7 @@ logger = logging.getLogger(__name__)
 QUICK_SUMMARIES = []
 
 
-def format_messages_to_restart(messages):
-    """
-    Format a list of messages into a formatted string.
-    """
-    try:
-        output_pieces = []
-        for msg in messages:
-            output_pieces.append(f"\n{msg['role'].upper()}:")
-            if isinstance(msg["content"], list):
-                for content_block in msg["content"]:
-                    if isinstance(content_block, dict):
-                        if content_block.get("type") == "tool_result":
-                            output_pieces.append("\nResult:")
-                            for item in content_block.get("content", []):
-                                if item.get("type") == "text":
-                                    output_pieces.append(f"\n{item.get('text')}")
-                        else:
-                            for key, value in content_block.items():
-                                output_pieces.append(f"\n{value}")
-                    else:
-                        output_pieces.append(f"\n{content_block}")
-            else:
-                output_pieces.append(f"\n{msg['content']}")
-            output_pieces.append("\n" + "-" * 80)
-        return "".join(output_pieces)
-    except Exception as e:
-        return f"Error during formatting: {str(e)}"
+
 
 
 def format_messages_to_string(messages):
@@ -132,96 +106,7 @@ def format_messages_to_string(messages):
         return f"Error during formatting: {str(e)}"
 
 
-async def summarize_recent_messages(
-    short_messages: List[Dict[str, Any]], display: Union[WebUI, AgentDisplayConsole]
-) -> str:
-    """
-    Summarize the most recent messages.
-    """
-    
-    try:
-        OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-        sum_client = OpenAI(
-            base_url="https://openrouter.ai/api/v1",
-            api_key=OPENROUTER_API_KEY,
-        )
-        all_summaries = get_all_summaries()
-        model = MAIN_MODEL
-        conversation_text = ""
-        for msg in short_messages:
-            role = msg["role"].upper()
-            if isinstance(msg["content"], list):
-                for block in msg["content"]:
-                    if isinstance(block, dict):
-                        if block.get("type") == "text":
-                            content = block.get("text", "")
-                            if len(content) > 150000:
-                                content = (
-                                    content[:70000]
-                                    + " ... [TRUNCATED] ... "
-                                    + content[-70000:]
-                                )
-                            conversation_text += f"\n{role}: {content}"
-                        elif block.get("type") == "tool_result":
-                            for item in block.get("content", []):
-                                if item.get("type") == "text":
-                                    content = item.get("text", "")
-                                    if len(content) > 150000:
-                                        content = (
-                                            content[:70000]
-                                            + " ... [TRUNCATED] ... "
-                                            + content[-70000:]
-                                        )
-                                    conversation_text += (
-                                        f"\n{role} (Tool Result): {content}"
-                                    )
-            else:
-                content = msg["content"]
-                if len(content) > 150000:
-                    content = (
-                        content[:70000] + " ... [TRUNCATED] ... " + content[-70000:]
-                    )
-                conversation_text += f"\n{role}: {content}"
-        logger.debug(f"conversation_text for summary: {conversation_text[:500]}...") # Log snippet
-        summary_prompt = f"""Please provide your response in a concise markdown format with short statements that document what happened. Structure your response as a list with clear labels for each step, such as:
 
-            - **Action:** [brief description of what was done]
-            - **Result:** [outcome of the action]
-
-            
-            - Here are the actions that have been logged so far.  You should not repeat these, they are only to give you context to what is going on. 
-            Previous Actions:
-            {all_summaries}
-            Please be specific but concise, focusing on documenting the sequence of events in this structured format.
-            Messages to summarize:
-            {conversation_text}"""
-        response = sum_client.chat.completions.create(
-            model=model, messages=[{"role": "user", "content": summary_prompt}],
-            max_tokens=get_constant("MAX_SUMMARY_TOKENS", 4000) # Use get_constant
-        )
-        logger.debug(f"Summary API response: {response}")
-
-        # Add error handling for response
-        if not response or not response.choices or len(response.choices) == 0:
-            error_msg = "Error: No valid response received from summary API"
-            # print(response) # Replaced by logger
-            logger.error(f"{error_msg} - Full response: {response}")
-            return "Error generating summary: No valid response received from API"
-
-        summary = response.choices[0].message.content
-
-        # Check if summary is None or empty
-        if not summary:
-            error_msg = "Error: Empty summary received from API"
-            logger.error(error_msg)
-            return "Error generating summary: Empty summary received from API"
-
-        logger.debug(f"Generated summary: {summary[:500]}...") # Log snippet
-        return summary
-    except Exception as e:
-        error_msg = f"Error generating summary: {str(e)}"
-        logger.error(error_msg, exc_info=True)
-        return error_msg
 
 
 def filter_messages(messages: List[Dict]) -> List[Dict]:
@@ -265,37 +150,10 @@ def extract_text_from_content(content: Any) -> str:
     return ""
 
 
-def truncate_message_content(content: Any, max_length: int = 150_000) -> Any:
-    if isinstance(content, str):
-        if len(content) > max_length:
-            return content[:70000] + " ... [TRUNCATED] ... " + content[-70000:]
-        return content
-    elif isinstance(content, list):
-        return [truncate_message_content(item, max_length) for item in content]
-    elif isinstance(content, dict):
-        return {
-            k: truncate_message_content(v, max_length) if k != "source" else v
-            for k, v in content.items()
-        }
-    return content
 
 
-def add_summary(summary: str) -> None:
-    """Add a new summary to the global list with timestamp and log it to a file."""
-    stripped_summary = summary.strip()
-    QUICK_SUMMARIES.append(stripped_summary)
 
-    try:
-        summary_file_path = Path(get_constant("SUMMARY_FILE"))
-        summary_file_path.parent.mkdir(parents=True, exist_ok=True)
 
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        log_entry = f"\n--------------------\n[{timestamp}]\n{stripped_summary}\n--------------------\n"
-
-        with open(summary_file_path, "a", encoding="utf-8") as f:
-            f.write(log_entry)
-    except Exception as e:
-        logger.error(f"Failed to log summary to file: {e}", exc_info=True)
 
 
 def get_all_summaries() -> str:

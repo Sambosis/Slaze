@@ -883,35 +883,7 @@ def get_language_from_extension(extension: str) -> str:
     return mapping.get(extension, "")
 
 
-def should_skip_for_zip(path):
-    """
-    Determine if a file or directory should be skipped when creating a ZIP file.
 
-    Args:
-        path: Path to check
-
-    Returns:
-        bool: True if the path should be skipped, False otherwise
-    """
-    path_str = str(path).lower()
-
-    # Skip virtual environment files and directories
-    if ".venv" in path_str:
-        # On Windows, particularly skip Linux-style virtual env paths
-        if os.name == "nt" and ("bin/" in path_str or "lib/" in path_str):
-            return True
-
-    # Skip common directories not needed in the ZIP
-    dirs_to_skip = [
-        "__pycache__",
-        ".git",
-        ".idea",
-        ".vscode",
-        "node_modules",
-        ".pytest_cache",
-    ]
-
-    return any(skip_dir in path_str for skip_dir in dirs_to_skip)
 
 
 def archive_logs():
