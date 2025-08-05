@@ -552,15 +552,45 @@
         }
 
         function showToolPrompt(data) {
-            // Basic tool prompt functionality
             console.log('Tool prompt:', data);
             const modal = document.getElementById('tool_prompt_modal');
             const title = document.getElementById('tool_name_text');
             const description = document.getElementById('tool_description');
-            
+            const form = document.getElementById('tool_prompt_form');
+
             title.textContent = `Confirm ${data.tool || 'Tool'}`;
-            description.textContent = data.description || 'Tool requires confirmation';
-            
+            description.textContent = data.schema?.description || 'Tool requires confirmation';
+
+            form.innerHTML = '';
+
+            const props = data.schema?.properties || {};
+            const values = data.values || {};
+
+            for (const param in props) {
+                const info = props[param];
+                const value = values[param];
+
+                const group = document.createElement('div');
+                const label = document.createElement('label');
+                label.textContent = param;
+
+                let input;
+                if (info.type === 'integer') {
+                    input = document.createElement('input');
+                    input.type = 'number';
+                    input.value = value ?? '';
+                } else {
+                    input = document.createElement('input');
+                    input.type = 'text';
+                    input.value = value !== undefined ? (typeof value === 'string' ? value : JSON.stringify(value)) : '';
+                }
+                input.name = param;
+
+                group.appendChild(label);
+                group.appendChild(input);
+                form.appendChild(group);
+            }
+
             modal.style.display = 'block';
         }
 
@@ -574,8 +604,20 @@
         }
 
         function executeToolCall() {
+            const form = document.getElementById('tool_prompt_form');
+            const formData = new FormData(form);
+            const params = {};
+            for (const [key, val] of formData.entries()) {
+                let parsed = val;
+                try {
+                    parsed = JSON.parse(val);
+                } catch (e) {
+                    // Use raw string if JSON parsing fails
+                }
+                params[key] = parsed;
+            }
             hideToolPrompt();
-            socket.emit('tool_response', {action: 'execute'});
+            socket.emit('tool_response', {action: 'execute', input: params});
         }
 
         // Handle Enter key in textarea
