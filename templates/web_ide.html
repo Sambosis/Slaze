@@ -552,15 +552,67 @@
         }
 
         function showToolPrompt(data) {
-            // Basic tool prompt functionality
             console.log('Tool prompt:', data);
             const modal = document.getElementById('tool_prompt_modal');
             const title = document.getElementById('tool_name_text');
             const description = document.getElementById('tool_description');
-            
+            const form = document.getElementById('tool_prompt_form');
+
             title.textContent = `Confirm ${data.tool || 'Tool'}`;
-            description.textContent = data.description || 'Tool requires confirmation';
-            
+            description.innerHTML = data.schema.description || 'Tool requires confirmation';
+            form.innerHTML = ''; // Clear previous form content
+
+            const properties = data.schema.properties || {};
+            for (const param in properties) {
+                const info = properties[param];
+                const value = data.values ? data.values[param] : '';
+
+                const formGroup = document.createElement('div');
+                formGroup.className = 'form-group';
+
+                const label = document.createElement('label');
+                label.htmlFor = param;
+                label.textContent = param;
+                formGroup.appendChild(label);
+
+                if (info.enum) {
+                    const select = document.createElement('select');
+                    select.name = param;
+                    select.id = param;
+                    info.enum.forEach(opt => {
+                        const option = document.createElement('option');
+                        option.value = opt;
+                        option.textContent = opt;
+                        if (opt === value) {
+                            option.selected = true;
+                        }
+                        select.appendChild(option);
+                    });
+                    formGroup.appendChild(select);
+                } else if (info.type === 'array') {
+                    const textarea = document.createElement('textarea');
+                    textarea.name = param;
+                    textarea.id = param;
+                    textarea.placeholder = 'Enter JSON array or comma-separated values';
+                    textarea.value = Array.isArray(value) ? JSON.stringify(value, null, 2) : value;
+                    formGroup.appendChild(textarea);
+                } else if (info.type === 'string' && info.format === 'long-text') {
+                    const textarea = document.createElement('textarea');
+                    textarea.name = param;
+                    textarea.id = param;
+                    textarea.rows = 5;
+                    textarea.value = value;
+                    formGroup.appendChild(textarea);
+                } else {
+                    const input = document.createElement('input');
+                    input.type = 'text';
+                    input.name = param;
+                    input.id = param;
+                    input.value = value;
+                    formGroup.appendChild(input);
+                }
+                form.appendChild(formGroup);
+            }
             modal.style.display = 'block';
         }
 
@@ -574,8 +626,18 @@
         }
 
         function executeToolCall() {
+            const form = document.getElementById('tool_prompt_form');
+            const inputs = form.querySelectorAll('input, textarea, select');
+            const params = {};
+            inputs.forEach(input => {
+                if (input.type === 'checkbox') {
+                    params[input.name] = input.checked;
+                } else {
+                    params[input.name] = input.value;
+                }
+            });
             hideToolPrompt();
-            socket.emit('tool_response', {action: 'execute'});
+            socket.emit('tool_response', {action: 'execute', input: params});
         }
 
         // Handle Enter key in textarea
