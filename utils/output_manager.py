@@ -73,95 +73,15 @@ class OutputManager:
 
         # self.display., output_text)
 
-    def format_api_response(self, response: Dict[str, Any]):
-        """Format and display API response."""
-        if response is None or not hasattr(response,
-                                           "content") or not response.content:
-            logger.error("Invalid API response in format_api_response")
-            return
 
-        if response.content and hasattr(response.content[0], "text"):
-            self._truncate_string(response.content[0].text)
 
-    def format_content_block(self, block: Dict[str, Any]) -> None:
-        """Format and display content block."""
-        if block is None:
-            logger.error("None block provided to format_content_block")
-            return
 
-        if getattr(block, "type", None) == "tool_use":
-            safe_input = {
-                k: v
-                for k, v in block.input.items()
-                if not isinstance(v, str) or len(v) < 1000
-            }
-            json.dumps(safe_input) if isinstance(safe_input,
-                                                 dict) else str(safe_input)
 
-    def format_recent_conversation(self,
-                                   messages: List[Dict[str, Any]],
-                                   num_recent: int = 10):
-        """Format and display recent conversation."""
-        if messages is None or not messages:
-            logger.warning(
-                "No messages provided to format_recent_conversation")
-            return
 
-        # recent_messages = messages[:num_recent] if len(messages) > num_recent else messages
-        recent_messages = messages[-num_recent:]
-        for msg in recent_messages:
-            if msg["role"] == "user":
-                self._format_user_content(msg["content"])
-            elif msg["role"] == "assistant":
-                self._format_assistant_content(msg["content"])
 
-    def _format_user_content(self, content: Any):
-        """Format and display user content."""
-        if content is None:
-            logger.error("None content provided to _format_user_content")
-            return
 
-        if isinstance(content, list):
-            for content_block in content:
-                if isinstance(content_block, dict):
-                    if content_block.get("type") == "tool_result":
-                        for item in content_block.get("content", []):
-                            if item.get("type") == "text":
-                                self._truncate_string(item.get("text", ""))
-                            #     self.display., text)
-                            # elif item.get("type") == "image":
-                            #     self.display., "📸 Screenshot captured")
-        elif isinstance(content, str):
-            self._truncate_string(content)
-            # self.display., text)
 
-    def _format_assistant_content(self, content: Any):
-        """Format and display assistant content."""
-        if content is None:
-            logger.error("None content provided to _format_assistant_content")
-            return
 
-        if isinstance(content, list):
-            for content_block in content:
-                if isinstance(content_block, dict):
-                    if content_block.get("type") == "text":
-                        self._truncate_string(content_block.get("text", ""))
-                    elif content_block.get("type") == "tool_use":
-                        content_block.get("name")
-                        tool_input = content_block.get("input", "")
-                        if isinstance(tool_input, dict):
-                            "\n".join(f"{k}: {v}"
-                                      for k, v in tool_input.items())
-                        else:
-                            try:
-                                tool_input = json.loads(tool_input)
-                                "\n".join(f"{k}: {v}"
-                                          for k, v in tool_input.items())
-                            except json.JSONDecodeError:
-                                str(tool_input)
-                        # self.display., (tool_name, f"Input: {input_text}"))
-        elif isinstance(content, str):
-            self._truncate_string(content)
 
     def _truncate_string(self, text: str, max_length: int = 500) -> str:
         """Truncate a string to a max length with ellipsis."""
