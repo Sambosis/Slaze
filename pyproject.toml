@@ -30,6 +30,7 @@ dependencies = [
     "executing==2.2.0",
     "farama-notifications==0.0.4",
     "filelock==3.17.0",
+    "fire>=0.7.0",
     "flask-socketio==5.5.1",
     "flask==3.1.0",
     "fsspec==2025.2.0",

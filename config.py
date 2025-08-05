@@ -8,6 +8,7 @@ from typing import Any, Optional
 
 from dotenv import load_dotenv
 from flask import g
+import openai
 
 # Load environment variables from .env file
 load_dotenv()
@@ -81,9 +82,11 @@ grok4 = "x-ai/grok-4"
 qwen3 = "qwen/qwen3-235b-a22b-07-25"
 qwencoder = "qwen/qwen3-coder:nitro"
 zai45 = "z-ai/glm-4.5"
+halfa = "openrouter/horizon-beta"
+autor = "meta-llama/llama-4-maverick"
 SUMMARY_MODEL = openaio3  # Model for summaries
-MAIN_MODEL = sonnet4  # Primary model for main agent operations
-CODE_MODEL = googlepro  # Model for code generation tasks
+MAIN_MODEL = openaio3  # Primary model for main agent operations
+CODE_MODEL = openaio3  # Model for code generation tasks
 
 # Feature flag constants
 COMPUTER_USE_BETA_FLAG = "computer-use-2024-10-22"

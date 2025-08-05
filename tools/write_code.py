@@ -752,7 +752,7 @@ class WriteCodeTool(BaseAnthropicTool):
                                 self.display.add_message("assistant", console_output)
                                 
                                 # Also show the formatted code
-                                self.display.add_message("tool", formatted_code)
+                                # self.display.add_message("tool", formatted_code)
 
                         except Exception as write_error:
                             logger.error(

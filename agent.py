@@ -50,52 +50,84 @@ async def call_llm_for_task_revision(prompt_text: str, client: OpenAI, model: st
     Calls an LLM to revise the given prompt_text, incorporating detailed instructions
     for structuring the task, especially for programming projects.
     """
-    logger.info(f"Attempting to revise/structure task with LLM ({model}): '{prompt_text[:100]}...'")
+    logger.info(f"Attempting to revise/structure task with LLM ({model}): '{prompt_text[:100]}...' ")
 
-    # This combined prompt is based on the user-provided example
-    detailed_revision_prompt_template = (
-        "Your primary function is to analyze and structure a user's request. Your output will be used as the main task definition for a subsequent AI agent that generates software projects. "
-        "Carefully consider the user's input and transform it into a detailed and actionable task definition.\n\n"
-        "USER'S ORIGINAL REQUEST:\n"
-        "------------------------\n"
-        "{user_request}\n"
-        "------------------------\n\n"
-        "INSTRUCTIONS:\n"
-        "1.  **Analyze the Request Type:**\n"
-        "    *   **If the request sounds like a programming project:** Proceed with instructions 2-4.\n"
-        "    *   **If the user asks a simple non-coding question:** Simply repeat the user's question as the task definition. For example, if the user asks 'What is the capital of France?', the output should be 'What is the capital of France?'.\n"
-        "    *   **If the request is unexpected or ambiguous:** Use your best judgment to create a concise task definition that makes sense for the circumstance. Prioritize clarity.\n\n"
-        "2.  **For Programming Projects - Expand Description:**\n"
-        "    *   Restate the problem in significantly more detail. Flesh out the requirements.\n"
-        "    *   If there are any decisions left for the developer (e.g., choice of a specific algorithm, UI details if not specified), you MUST make those choices now and clearly include them in your expanded description. Be specific.\n\n"
-        "3.  **For Programming Projects - Define File Tree:**\n"
-        "    *   After the expanded description, provide a file tree for the program. This tree should list ALL necessary code files and any crucial asset files (e.g., `main.py`, `utils/helper.py`, `assets/icon.png`).\n"
-        "    *   For each file in the tree, you MUST provide:\n"
-        "        *   The filename relative to the project root which will be your current working directory(e.g., `main.py`, `utils/helper.py`, `assets/icon.png`).\n"
-        "        *   A brief, clear statement about the purpose of that specific file.\n"
-        "        *   Explicitly state the correct way to import the file/module using absolute imports from the project root (e.g., `from src import app`, `import src.models.user`). Assume the project root is the primary location for running the code or is added to PYTHONPATH.\n"
-        "    *   **Important Considerations for File Tree:**\n"
-        "        *   Lean towards creating FEWER files and folders while maintaining organization and manageability. Avoid overly nested structures unless strictly necessary.\n"
-        "        *   Focus on simplicity.\n"
-        "4.  **Output Format:**\n"
-        "    *   The output should be in markdown format.\n"
-        "    *   The output should start with the expanded description (if a programming project) or the direct task (if non-coding).\n"
-        "    *   This should be followed by the file tree section (if a programming project), clearly delineated.\n"
-        "    *   Do NOT include any conversational preamble, your own comments about the process, or any text beyond the structured task definition itself.\n"
-        "    *   Example structure for a programming project:\n"
-        '        """\n'
-        "        [Expanded Description of the project, including decisions made...]\n\n"
-        "        File Tree:\n"
-        "        - ./\n"
-        "        - main.py (Purpose: Main entry point of the application. Import: `from src import main` or `import src.main`)\n"
-        "          - module_one/\n"
-        "            - __init__.py (Purpose: Marks 'module_one' as a sub-package. Import: `from src import module_one`)\n"
-        "            - functions.py (Purpose: Contains utility functions for module_one. Import: `from module_one import functions`)\n"
-        "          - assets/\n"
-        "            - image.png (Purpose: An image asset for the UI.)\n"
-        '        """\n\n'
-        "Now, process the user's original request based on these instructions."
-    )
+    # This combined prompt is based on the user's example
+    detailed_revision_prompt_template = """
+      Your primary function is to analyze and structure a user's request. Your output will be used as the main task definition for a subsequent AI agent that generates software projects.
+
+      Carefully consider the user's input and transform it into a detailed and actionable task definition.
+
+      ## **USER'S ORIGINAL REQUEST:**
+
+      ## {user_request}
+
+      **INSTRUCTIONS:**
+
+      1.  **Analyze the Request Type:**
+
+            * **If the request sounds like a programming project:** Proceed with instructions 2-5.
+            * **If the user asks a simple non-coding question:** Simply repeat the user's question as the task definition. For example, if the user asks 'What is the capital of France?', the output should be 'What is the capital of France?'.
+            * **If the request is unexpected or ambiguous:** Use your best judgment to create a concise task definition that makes sense for the circumstance. Prioritize clarity.
+
+      2.  **For Programming Projects - Expand Description:**
+
+            * Restate the problem in significantly more detail. Flesh out the requirements.
+            * If there are any decisions left for the developer (e.g., choice of a specific algorithm, UI details if not specified), you MUST make those choices now and clearly include them in your expanded description. Be specific.
+
+      3.  **For Programming Projects - Define Data Dictionary:**
+
+            * After the expanded description, create a **Data Dictionary**. This dictionary serves as a foundational reference to ensure consistency in naming and typing throughout the codebase.
+            * Define the key **Classes, functions, methods, and important data structures** that will form the core logic of the application.
+            * Present this as a markdown table with the following columns:
+            * **Name:** The name of the class, function, or variable (e.g., `User`, `calculate_total_price`).
+            * **Type:** The kind of element (e.g., `Class`, `Function`, `Method`, `Variable`).
+            * **Data Type / Signature:** For variables, their data type (e.g., `str`, `int`, `list[dict]`). For functions/methods, their signature including parameters and return types (e.g., `def calculate_total(items: list) -> float:`). For classes, list their primary attributes and types.
+            * **Description:** A brief, one-sentence explanation of the element's purpose.
+            * **Example Data Dictionary Table:**
+            | Name | Type | Data Type / Signature | Description |
+            | :--- | :--- | :--- | :--- |
+            | `Product` | Class | Attributes: `id (int)`, `name (str)`, `price (float)` | Represents a single product in the inventory. |
+            | `add_to_cart` | Function | `def add_to_cart(cart: dict, product: Product, quantity: int) -> dict:` | Adds a specified quantity of a product to the shopping cart. |
+
+      4.  **For Programming Projects - Define File Tree:**
+
+            * After the Data Dictionary, provide a file tree for the program. This tree should list ALL necessary code files and any crucial asset files (e.g., `main.py`, `utils/helper.py`, `assets/icon.png`).
+            * For each file in the tree, you MUST provide:
+            * The filename relative to the project root (e.g., `main.py`, `utils/helper.py`).
+            * A brief, clear statement about the purpose of that specific file.
+            * Explicitly state the correct way to import the file/module using absolute imports from the project root (e.g., `from src import app`, `import src.models.user`). Assume the project root is added to PYTHONPATH.
+            * **Important Considerations for File Tree:**
+            * Lean towards creating FEWER files and folders while maintaining organization. Avoid overly nested structures unless strictly necessary.
+            * Focus on simplicity.
+
+      5.  **Output Format:**
+
+            * The output must be in markdown format.
+            * The output should start with the expanded description (if a programming project) or the direct task (if non-coding).
+            * This should be followed by the **Data Dictionary** and then the **File Tree** section, clearly delineated.
+            * Do NOT include any conversational preamble, your own comments about the process, or any text beyond the structured task definition itself.
+            * **Example structure for a programming project:**
+            ```
+            [Expanded Description of the project, including decisions made...]
+
+            **Data Dictionary**
+            | Name      | Type     | Data Type / Signature        | Description                               |
+            |-----------|----------|------------------------------|-------------------------------------------|
+            | `User`    | Class    | Attributes: `id`, `username` | Represents a user.                        |
+            | `get_user`| Function | `def get_user(id: int) -> User:` | Retrieves a user by their unique ID.      |
+
+            **File Tree**
+            - ./
+            - main.py (Purpose: Main entry point of the application. Import: `import main`)
+            - models/
+                  - __init__.py (Purpose: Marks 'models' as a package. Import: `from models import User`)
+                  - user.py (Purpose: Contains the User class definition. Import: `from models.user import User`)
+            ```
+
+      Now, process the user's original request based on these instructions.
+      
+      """
 
     formatted_revision_prompt = detailed_revision_prompt_template.format(user_request=prompt_text)
 
@@ -123,13 +155,13 @@ async def call_llm_for_task_revision(prompt_text: str, client: OpenAI, model: st
                 logger.warning(f"LLM task revision is much shorter than original. Original: '{prompt_text[:100]}...', Revised: '{revised_task[:100]}...'. Using original.")
                 return prompt_text
 
-            logger.info(f"Task successfully revised by LLM ({model}): '{revised_task[:100]}...'")
+            logger.info(f"Task successfully revised by LLM ({model}): '{revised_task[:100]}...' ")
             return revised_task
         else:
-            logger.warning(f"LLM task revision ({model}) returned empty or invalid response. Using original task: '{prompt_text[:100]}...'")
+            logger.warning(f"LLM task revision ({model}) returned empty or invalid response. Using original task: '{prompt_text[:100]}...'.")
             return prompt_text
     except Exception as e:
-        logger.error(f"Error during LLM task revision with model {model}: {e}. Using original task: '{prompt_text[:100]}...'", exc_info=True)
+        logger.error(f"Error during LLM task revision with model {model}: {e}. Using original task: '{prompt_text[:100]}...' ", exc_info=True)
         return prompt_text
 
 
@@ -140,7 +172,7 @@ class Agent:
         TASK constant, and returns the revised task.
         """
         revised_task_from_llm = await call_llm_for_task_revision(initial_task, self.client, MAIN_MODEL)
-        logger.info(f"Task revision result: '{initial_task[:100]}...' -> '{revised_task_from_llm[:100]}...'")
+        logger.info(f"Task revision result: '{initial_task[:100]}...' -> '{revised_task_from_llm[:100]}...' ")
 
         # Use the LOGS_DIR constant from config
         logs_dir = get_constant("LOGS_DIR")
@@ -467,27 +499,73 @@ class Agent:
                     {"role": "tool", "tool_call_id": tc.id, "content": result_text}
                 )
         else:
-            # No tool calls were returned. Only prompt for additional
-            # instructions when using an interactive display like the
-            # console or web UI. This avoids test failures when a simple
-            # DummyDisplay is used.
-            # self.display.add_message(msg_type="assistant", msg.content or "")
-            wait_func = getattr(self.display, "wait_for_user_input", None)
-            if wait_func and asyncio.iscoroutinefunction(wait_func):
-                should_prompt = True
-                if self.display.__class__.__name__ == "DummyDisplay" and not isinstance(
-                    wait_func, AsyncMock
-                ):
-                    should_prompt = False
-                if should_prompt:
+            # No tool calls. Time for evaluation.
+            evaluation_prompt = f'''
+YouAreAnAutomatedProjectManager.YourJobIsToEvaluateTheProgressOfAnAIAgentTaskedWithDevelopingASoftwareApplication.
+
+TheInitialTaskWas:
+---
+{self.task}
+---
+
+ReviewTheConversationHistory.TheAgent'sLastMessageWas:
+---
+{self.messages[-1]['content'] if self.messages[-1]['content'] else 'NoContentInLastMessage.'}
+---
+
+HasTheAgentSuccessfullyRunTheApplicationAndProvidedEvidence(e.g.,logs,output)ThatItWorksAsIntendedAndIsFreeOfErrors?
+
+-IfNO:TheTaskIsNotComplete.GenerateAConciseUserMessageForTheAgent.ThisMessageMustNotBeConversational.ItShouldClearlyStateWhyTheTaskIsIncompleteAndProvideSpecific,ActionableNextStepsForTheAgentToTake(e.g.,"TheApplicationCrashed.AnalyzeTheErrorMessageAndFixTheBugInFileX.","YouHaveWrittenTheCode,NowYouMustRunItToVerifyItWorks.").
+
+-IfYES:TheTaskAppearsToBeComplete.RespondWithTheSinglePhrase:`TASK_COMPLETE`
+'''
+            evaluation_messages = self.messages + [{"role": "user", "content": evaluation_prompt}]
+
+            try:
+                response = self.client.chat.completions.create(
+                    model=MAIN_MODEL,
+                    messages=evaluation_messages,
+                    max_tokens=MAX_SUMMARY_TOKENS,
+                )
+                evaluation_response = response.choices[0].message.content or ""
+
+                if "TASK_COMPLETE" in evaluation_response:
+                    self.display.add_message("assistant", "Evaluation result: Task is complete.")
+                    wait_func = getattr(self.display, "wait_for_user_input", None)
+                    if wait_func and asyncio.iscoroutinefunction(wait_func):
+                        user_input = await wait_func(
+                            "Agent believes task is complete. Enter new instructions or type 'exit' to quit: "
+                        )
+                        if user_input:
+                            if user_input.strip().lower() in {"exit", "quit"}:
+                                return False
+                            self.messages.append({"role": "user", "content": user_input})
+                elif evaluation_response:
+                    self.messages.append({"role": "user", "content": evaluation_response})
+                    self.display.add_message("user", f"Auto-Correction: {evaluation_response}")
+                else:
+                    # Fallback to old behavior if evaluation fails to produce content
+                    wait_func = getattr(self.display, "wait_for_user_input", None)
+                    if wait_func and asyncio.iscoroutinefunction(wait_func):
+                        user_input = await wait_func(
+                            "No tool calls and evaluation failed. Enter instructions or type 'exit' to quit: "
+                        )
+                        if user_input:
+                            if user_input.strip().lower() in {"exit", "quit"}:
+                                return False
+                            self.messages.append({"role": "user", "content": user_input})
+
+            except Exception as e:
+                self.display.add_message("assistant", f"Evaluation LLM call failed: {e}")
+                # Fallback to old behavior
+                wait_func = getattr(self.display, "wait_for_user_input", None)
+                if wait_func and asyncio.iscoroutinefunction(wait_func):
                     user_input = await wait_func(
-                        "No tool calls. Enter instructions or type 'exit' to quit: "
+                        "No tool calls and evaluation failed. Enter instructions or type 'exit' to quit: "
                     )
                     if user_input:
                         if user_input.strip().lower() in {"exit", "quit"}:
                             return False
-                        self.messages.append(
-                            {"role": "user", "content": user_input}
-                        )
+                        self.messages.append({"role": "user", "content": user_input})
 
         return True
