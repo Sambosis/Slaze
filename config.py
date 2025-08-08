@@ -84,6 +84,7 @@ qwencoder = "qwen/qwen3-coder:nitro"
 zai45 = "z-ai/glm-4.5"
 halfa = "openrouter/horizon-beta"
 autor = "meta-llama/llama-4-maverick"
+
 openaiopen ="openai/gpt-oss-120b"
 SUMMARY_MODEL = openaiopen  # Model for summaries
 MAIN_MODEL = openaiopen  # Primary model for main agent operations

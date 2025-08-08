@@ -141,7 +141,7 @@ async def call_llm_for_task_revision(prompt_text: str, client: OpenAI, model: st
         # Otherwise, it will use MAIN_MODEL as per current Agent._revise_and_save_task.
 
         response = client.chat.completions.create(
-            model=model,
+            model=MAIN_MODEL,
             messages=[{"role": "user", "content": formatted_revision_prompt}],
             temperature=0.3, # Lower temperature for more focused, less creative revision
             n=1,
