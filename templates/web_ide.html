@@ -111,9 +111,35 @@
             border-left: 4px solid #4CAF50;
         }
 
-        .assistant-message {
-            background-color: var(--accent-color);
-            color: white;
+        .console-message {
+            margin-bottom: 8px;
+            padding: 4px 0;
+            max-width: 100%;
+            overflow-wrap: break-word;
+            word-break: break-word;
+        }
+
+        .console-message pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            overflow-x: auto;
+            margin: 0;
+        }
+
+        .console-message.assistant {
+            color: #4ec9b0;
+        }
+
+        .console-message.tool {
+            color: #dcdcaa;
+        }
+
+        .console-message.error {
+            color: #f44747;
+        }
+
+        .console-message.info {
+            color: #569cd6;
         }
 
         .tool-message {
@@ -343,9 +369,7 @@
                 <button class="tab-button active" onclick="switchTab('user')" id="user-tab">
                     User <span class="badge" id="user-count">0</span>
                 </button>
-                <button class="tab-button" onclick="switchTab('assistant')" id="assistant-tab">
-                    Assistant <span class="badge" id="assistant-count">0</span>
-                </button>
+                
                 <button class="tab-button" onclick="switchTab('tool')" id="tool-tab">
                     Tools <span class="badge" id="tool-count">0</span>
                 </button>
@@ -355,13 +379,9 @@
                 <div id="user-messages"></div>
             </div>
             
-            <div class="tab-content" id="assistant-content">
-                <div id="assistant-messages"></div>
-            </div>
             
-            <div class="tab-content" id="tool-content">
-                <div id="tool-messages"></div>
-            </div>
+            
+            
         </div>
 
         <div class="resizer vertical-resizer" id="sidebar-resizer"></div>
@@ -429,7 +449,7 @@
 
         socket.on('agent_prompt', function(data) {
             if (data.message) {
-                updateMainDisplay(`<h3>🤔 Agent is thinking...</h3><p>${escapeHtml(data.message)}</p>`);
+                addConsoleMessage(data.message, 'info');
             }
         });
 
@@ -474,17 +494,15 @@
                 });
             }
             
-            // Update assistant messages
-            const assistantMessagesDiv = document.getElementById('assistant-messages');
-            assistantMessagesDiv.innerHTML = '';
+            // Assistant messages are now routed to the console
+            const consoleMessagesDiv = document.getElementById('console-messages');
+            consoleMessagesDiv.innerHTML = ''; // Clear the console for fresh messages
+
             if (data.assistant.length === 0) {
-                assistantMessagesDiv.innerHTML = '<div class="empty-state">No assistant messages yet</div>';
+                consoleMessagesDiv.innerHTML = '<div class="empty-state">No assistant messages yet</div>';
             } else {
                 data.assistant.forEach(function(msg) {
-                    const messageDiv = document.createElement('div');
-                    messageDiv.className = 'message assistant-message';
-                    messageDiv.innerHTML = marked.parse(msg);
-                    assistantMessagesDiv.appendChild(messageDiv);
+                    addConsoleMessage(msg, 'assistant');
                 });
             }
             
@@ -504,7 +522,6 @@
             
             // Update badge counts
             document.getElementById('user-count').textContent = data.user.length;
-            document.getElementById('assistant-count').textContent = data.assistant.length;
             document.getElementById('tool-count').textContent = data.tool.length;
             
             // Scroll current tab to bottom
@@ -521,6 +538,24 @@
 
         function updateMainDisplay(html) {
             document.getElementById('main-display').innerHTML = html;
+        }
+
+        function addConsoleMessage(message, type = 'info') {
+            const consoleContent = document.getElementById('console-messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `console-message ${type}`;
+            const emptyState = consoleContent.querySelector('.empty-state');
+            if (emptyState) {
+                emptyState.remove();
+            }
+            
+            if (type === 'assistant') {
+                message = message.replace(/```console|```/g, '');
+            }
+
+            messageDiv.innerHTML = `<pre>${escapeHtml(message)}</pre>`;
+            consoleContent.appendChild(messageDiv);
+            consoleContent.scrollTop = consoleContent.scrollHeight;
         }
 
         function escapeHtml(text) {

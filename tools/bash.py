@@ -61,7 +61,7 @@ class BashTool(BaseTool):
         if command is not None:
             if self.display is not None:
                 try:
-                    self.display.add_message("user",
+                    self.display.add_message("assistant",
                                              f"Executing command: {command}")
                 except Exception as e:
                     return ToolResult(error=str(e),
