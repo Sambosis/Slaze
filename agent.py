@@ -501,24 +501,24 @@ class Agent:
         else:
             # No tool calls. Time for evaluation.
             evaluation_prompt = f'''
-YouAreAnAutomatedProjectManager.YourJobIsToEvaluateTheProgressOfAnAIAgentTaskedWithDevelopingASoftwareApplication.
+                YouAreAnAutomatedProjectManager.YourJobIsToEvaluateTheProgressOfAnAIAgentTaskedWithDevelopingASoftwareApplication.
 
-TheInitialTaskWas:
----
-{self.task}
----
+                TheInitialTaskWas:
+                ---
+                {self.task}
+                ---
 
-ReviewTheConversationHistory.TheAgent'sLastMessageWas:
----
-{self.messages[-1]['content'] if self.messages[-1]['content'] else 'NoContentInLastMessage.'}
----
+                ReviewTheConversationHistory.TheAgent'sLastMessageWas:
+                ---
+                {self.messages[-1]['content'] if self.messages[-1]['content'] else 'NoContentInLastMessage.'}
+                ---
 
-HasTheAgentSuccessfullyRunTheApplicationAndProvidedEvidence(e.g.,logs,output)ThatItWorksAsIntendedAndIsFreeOfErrors?
+                HasTheAgentSuccessfullyRunTheApplicationAndProvidedEvidence(e.g.,logs,output)ThatItWorksAsIntendedAndIsFreeOfErrors?
 
--IfNO:TheTaskIsNotComplete.GenerateAConciseUserMessageForTheAgent.ThisMessageMustNotBeConversational.ItShouldClearlyStateWhyTheTaskIsIncompleteAndProvideSpecific,ActionableNextStepsForTheAgentToTake(e.g.,"TheApplicationCrashed.AnalyzeTheErrorMessageAndFixTheBugInFileX.","YouHaveWrittenTheCode,NowYouMustRunItToVerifyItWorks.").
+                -IfNO:TheTaskIsNotComplete.GenerateAConciseUserMessageForTheAgent.ThisMessageMustNotBeConversational.ItShouldClearlyStateWhyTheTaskIsIncompleteAndProvideSpecific,ActionableNextStepsForTheAgentToTake(e.g.,"TheApplicationCrashed.AnalyzeTheErrorMessageAndFixTheBugInFileX.","YouHaveWrittenTheCode,NowYouMustRunItToVerifyItWorks.").
 
--IfYES:TheTaskAppearsToBeComplete.RespondWithTheSinglePhrase:`TASK_COMPLETE`
-'''
+                -IfYES:TheTaskAppearsToBeComplete.RespondWithTheSinglePhrase:`TASK_COMPLETE`
+                '''
             evaluation_messages = self.messages + [{"role": "user", "content": evaluation_prompt}]
 
             try:

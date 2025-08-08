@@ -84,10 +84,11 @@ qwencoder = "qwen/qwen3-coder:nitro"
 zai45 = "z-ai/glm-4.5"
 halfa = "openrouter/horizon-beta"
 autor = "meta-llama/llama-4-maverick"
-openaiopen = "openai/gpt-oss-120b"
-SUMMARY_MODEL = googleflashlite  # Model for summaries
-MAIN_MODEL = googleflashlite  # Primary model for main agent operations
-CODE_MODEL = googleflashlite  # Model for code generation tasks
+
+openaiopen ="openai/gpt-oss-120b"
+SUMMARY_MODEL = openaiopen  # Model for summaries
+MAIN_MODEL = openaiopen  # Primary model for main agent operations
+CODE_MODEL = openaiopen  # Model for code generation tasks
 
 # Feature flag constants
 COMPUTER_USE_BETA_FLAG = "computer-use-2024-10-22"
