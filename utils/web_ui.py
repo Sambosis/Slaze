@@ -312,6 +312,12 @@ class WebUI:
                 result=result_text,
             )
 
+        @self.app.route("/web_ide")
+        def web_ide_route():
+            """Serve the web IDE page directly."""
+            logging.info("Serving web IDE page")
+            return render_template("web_ide.html")
+
         @self.app.route("/browser")
         def file_browser_route():
             """Serve the VS Code-style file browser interface."""

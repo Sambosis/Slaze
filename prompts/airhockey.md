@@ -1,0 +1,1 @@
+Create a air hockey game.  Have 2 competing RL models train against each other.  use pygame to show every 5th game to the screen. do not use sound.
