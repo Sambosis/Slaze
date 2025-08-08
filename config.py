@@ -89,9 +89,9 @@ open5 = "openai/gpt-5"
 open5mini="openai/gpt-5-mini"
 
 # Model constants
-SUMMARY_MODEL = open5mini  # Model for summaries
-MAIN_MODEL = open5mini  # Primary model for main agent operations
-CODE_MODEL = open5mini  # Model for code generation tasks
+SUMMARY_MODEL = open5  # Model for summaries
+MAIN_MODEL = open5  # Primary model for main agent operations
+CODE_MODEL = open5  # Model for code generation tasks
 
 # Feature flag constants
 COMPUTER_USE_BETA_FLAG = "computer-use-2024-10-22"
