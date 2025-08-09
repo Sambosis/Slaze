@@ -18,7 +18,7 @@
             --primary-bg: #1e1e1e;
             --secondary-bg: #252526;
             --tertiary-bg: #333333;
-            --text-color: #cccccc;
+            --text-color: #dbcee7;
             --accent-color: #007acc;
         }
 
@@ -64,40 +64,7 @@
             background-color: var(--tertiary-bg);
         }
 
-        .tab-nav {
-            display: flex;
-            background-color: var(--tertiary-bg);
-        }
-
-        .tab-button {
-            flex: 1;
-            padding: 10px;
-            background: none;
-            border: none;
-            color: var(--text-color);
-            cursor: pointer;
-            transition: background-color 0.2s;
-        }
-
-        .tab-button.active {
-            background-color: var(--secondary-bg);
-            color: var(--accent-color);
-        }
-
-        .tab-button:hover {
-            background-color: var(--secondary-bg);
-        }
-
-        .tab-content {
-            padding: 10px;
-            height: calc(100% - 40px);
-            overflow-y: auto;
-            display: none;
-        }
-
-        .tab-content.active {
-            display: block;
-        }
+    /* Removed tab navigation styles (tool tab & editor removed) */
 
         .message {
             margin-bottom: 15px;
@@ -111,7 +78,7 @@
             border-left: 4px solid #4CAF50;
         }
 
-        .console-message {
+        .console-message { 
             margin-bottom: 8px;
             padding: 4px 0;
             max-width: 100%;
@@ -127,7 +94,11 @@
         }
 
         .console-message.assistant {
-            color: #4ec9b0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-size: 15px;
+            font-weight: 500;
+            color: #93fbe6;
+            padding: 1em;
         }
 
         .console-message.tool {
@@ -316,41 +287,39 @@
             position: relative;
         }
 
-        .sidebar {
-            width: 300px;
-            min-width: 200px;
-            max-width: 50%;
-            background-color: var(--secondary-bg);
-            border-right: 1px solid var(--tertiary-bg);
-            overflow-y: auto;
-        }
-
-        .main-content {
+        /* New split pane layout */
+        .split-row {
             flex: 1;
             display: flex;
+            width: 100%;
+            overflow: hidden;
+        }
+        .pane {
+            display: flex;
             flex-direction: column;
-            background-color: var(--primary-bg);
-            position: relative;
-        }
-
-        .editor-area {
-            flex: 1;
-            min-height: 200px;
-            padding: 20px;
-            overflow-y: auto;
-        }
-
-        .console-area {
-            height: 200px;
-            min-height: 100px;
-            max-height: 60%;
+            overflow: hidden;
             background-color: var(--secondary-bg);
-            border-top: 1px solid var(--tertiary-bg);
-            padding: 10px 20px;
-            overflow-y: auto;
-            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-            font-size: 14px;
         }
+        .pane-header {
+            padding: 8px 12px;
+            font-weight: 600;
+            border-bottom: 1px solid var(--tertiary-bg);
+            background-color: var(--tertiary-bg);
+        }
+        .pane-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px 12px;
+        }
+        .left-pane { flex: 0 0 50%; }
+        .right-pane { flex: 1 1 50%; }
+        .console-area { /* reuse class for message styling */
+            background-color: var(--secondary-bg);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-size: 14px;
+            padding: 0 0 10px 0;
+        }
+    /* input-area retained below */
     </style>
 </head>
 <body>
@@ -363,52 +332,26 @@
         </div>
     </div>
 
-    <div class="container">
-        <div class="sidebar">
-            <div class="tab-nav">
-                <button class="tab-button active" onclick="switchTab('user')" id="user-tab">
-                    User <span class="badge" id="user-count">0</span>
-                </button>
-                
-                <button class="tab-button" onclick="switchTab('tool')" id="tool-tab">
-                    Tools <span class="badge" id="tool-count">0</span>
-                </button>
-            </div>
-            
-            <div class="tab-content active" id="user-content">
-                <div id="user-messages"></div>
-            </div>
-            
-            
-            
-            
-        </div>
-
-        <div class="resizer vertical-resizer" id="sidebar-resizer"></div>
-
-        <div class="main-content">
-            <div class="editor-area">
-                <div id="main-display">
-                    <div class="empty-state">
-                        <h3>🤖 Agent Starting...</h3>
-                        <p>The agent is initializing and will begin processing your task shortly.</p>
-                    </div>
+    <div class="container" style="flex-direction:column;">
+        <div class="split-row" id="split-row">
+            <div class="pane left-pane" id="left-pane">
+                <div class="pane-header">User Messages <span class="badge" id="user-count">0</span></div>
+                <div class="pane-content" id="user-messages">
+                    <div class="empty-state">No user messages yet</div>
                 </div>
             </div>
-
-            <div class="resizer horizontal-resizer" id="console-resizer"></div>
-
-            <div class="console-area">
-                <div id="console-messages">
+            <div class="resizer vertical-resizer" id="sidebar-resizer"></div>
+            <div class="pane right-pane" id="right-pane">
+                <div class="pane-header">Console</div>
+                <div class="pane-content console-area" id="console-messages">
                     <div class="empty-state">Console output will appear here</div>
                 </div>
             </div>
-
-            <div class="input-area">
-                <textarea id="user_input" placeholder="Type your message to the agent..."></textarea>
-                <button onclick="sendMessage()" id="send-btn">Send</button>
-                <button onclick="interruptAgent()" id="interrupt-btn">Stop</button>
-            </div>
+        </div>
+        <div class="input-area">
+            <textarea id="user_input" placeholder="Type your message to the agent..."></textarea>
+            <button onclick="sendMessage()" id="send-btn">Send</button>
+            <button onclick="interruptAgent()" id="interrupt-btn">Stop</button>
         </div>
     </div>
 
@@ -430,17 +373,16 @@
 
     <script>
         // Initialize the WebSocket connection and UI
-        const socket = io();
-        let currentTab = 'user';
+    const socket = io();
 
         socket.on('connect', function() {
             console.log('Connected to agent');
-            updateMainDisplay('<h3>✅ Connected to Agent</h3><p>Agent is ready to process your task.</p>');
+            addConsoleMessage('✅ Connected to Agent', 'info');
         });
 
         socket.on('disconnect', function() {
             console.log('Disconnected from agent');
-            updateMainDisplay('<h3>❌ Disconnected from Agent</h3><p>Connection lost. Please refresh the page.</p>');
+            addConsoleMessage('❌ Disconnected from Agent - refresh the page to reconnect', 'error');
         });
 
         socket.on('update', function(data) {
@@ -461,83 +403,201 @@
             hideToolPrompt();
         });
 
-        function switchTab(tabName) {
-            // Hide all tab contents
-            document.querySelectorAll('.tab-content').forEach(function(content) {
-                content.classList.remove('active');
-            });
-            
-            // Remove active class from all tab buttons
-            document.querySelectorAll('.tab-button').forEach(function(button) {
-                button.classList.remove('active');
-            });
-            
-            // Show selected tab content and activate button
-            document.getElementById(tabName + '-content').classList.add('active');
-            document.getElementById(tabName + '-tab').classList.add('active');
-            
-            currentTab = tabName;
-        }
+        // --- Typewriter effect for user messages ---
+        let userMessagesRendered = []; // stores already rendered user messages (raw text)
+        let typingQueue = [];
+        let isTypingUser = false;
+
+    // --- Typewriter effect for console (assistant/tool) messages ---
+    let consoleAssistantRendered = 0; // how many assistant messages we've rendered
+    let consoleTypingQueue = [];
+    let isTypingConsole = false;
 
         function updateMessages(data) {
-            // Update user messages
             const userMessagesDiv = document.getElementById('user-messages');
-            userMessagesDiv.innerHTML = '';
+            if (!userMessagesDiv) return;
+
+            // If no user messages
             if (data.user.length === 0) {
+                userMessagesRendered = [];
                 userMessagesDiv.innerHTML = '<div class="empty-state">No user messages yet</div>';
             } else {
-                data.user.forEach(function(msg) {
-                    const messageDiv = document.createElement('div');
-                    messageDiv.className = 'message user-message';
-                    messageDiv.innerHTML = marked.parse(msg);
-                    userMessagesDiv.appendChild(messageDiv);
-                });
+                // Detect reset (e.g., count shrank or first load with existing messages)
+                const resetNeeded = data.user.length < userMessagesRendered.length || (userMessagesRendered.length === 0 && data.user.length > 1);
+                if (resetNeeded) {
+                    userMessagesDiv.innerHTML = '';
+                    userMessagesRendered = [];
+                    // Render older messages (all but newest) instantly, newest will type.
+                    // We want newest at TOP, so we add older messages in reverse order so oldest ends up at bottom.
+                    const lastIndex = data.user.length - 1;
+                    for (let i = lastIndex - 1; i >= 0; i--) {
+                        const div = document.createElement('div');
+                        div.className = 'message user-message';
+                        div.innerHTML = marked.parse(data.user[i]);
+                        userMessagesDiv.appendChild(div); // appending builds from newest-1 downwards; final visual top will be the most recent older message
+                        userMessagesRendered.push(data.user[i]);
+                    }
+                    // Enqueue newest (last element) for typing at the top
+                    enqueueUserMessageForTyping(data.user[lastIndex]);
+                } else {
+                    // Add only new messages
+                    for (let i = userMessagesRendered.length; i < data.user.length; i++) {
+                        enqueueUserMessageForTyping(data.user[i]);
+                    }
+                }
             }
-            
-            // Assistant messages are now routed to the console
-            const consoleMessagesDiv = document.getElementById('console-messages');
-            consoleMessagesDiv.innerHTML = ''; // Clear the console for fresh messages
 
-            if (data.assistant.length === 0) {
-                consoleMessagesDiv.innerHTML = '<div class="empty-state">No assistant messages yet</div>';
-            } else {
-                data.assistant.forEach(function(msg) {
-                    addConsoleMessage(msg, 'assistant');
-                });
+            // Assistant messages -> console (incremental with typewriter)
+            const consoleMessagesDiv = document.getElementById('console-messages');
+            if (consoleMessagesDiv) {
+                // Reset case (assistant list shrank or first load with >1)
+                const resetNeeded = data.assistant.length < consoleAssistantRendered || (consoleAssistantRendered === 0 && data.assistant.length > 1);
+                if (resetNeeded) {
+                    consoleMessagesDiv.innerHTML = '';
+                    if (data.assistant.length === 0) {
+                        consoleMessagesDiv.innerHTML = '<div class="empty-state">No assistant messages yet</div>';
+                        consoleAssistantRendered = 0;
+                    } else {
+                        // render all but newest instantly
+                        for (let i = 0; i < data.assistant.length - 1; i++) {
+                            addConsoleMessage(data.assistant[i], 'assistant');
+                        }
+                        consoleAssistantRendered = data.assistant.length - 1;
+                        enqueueConsoleMessageForTyping(data.assistant[data.assistant.length - 1], 'assistant');
+                    }
+                } else {
+                    // enqueue any new messages
+                    for (let i = consoleAssistantRendered; i < data.assistant.length; i++) {
+                        enqueueConsoleMessageForTyping(data.assistant[i], 'assistant');
+                    }
+                }
             }
-            
-            // Update tool messages
-            const toolMessagesDiv = document.getElementById('tool-messages');
-            toolMessagesDiv.innerHTML = '';
-            if (data.tool.length === 0) {
-                toolMessagesDiv.innerHTML = '<div class="empty-state">No tool results yet</div>';
-            } else {
-                data.tool.forEach(function(msg) {
-                    const messageDiv = document.createElement('div');
-                    messageDiv.className = 'message tool-message';
-                    messageDiv.innerHTML = msg;
-                    toolMessagesDiv.appendChild(messageDiv);
-                });
-            }
-            
-            // Update badge counts
-            document.getElementById('user-count').textContent = data.user.length;
-            document.getElementById('tool-count').textContent = data.tool.length;
-            
-            // Scroll current tab to bottom
-            const currentMessagesDiv = document.getElementById(currentTab + '-messages');
-            if (currentMessagesDiv) {
-                currentMessagesDiv.scrollTop = currentMessagesDiv.scrollHeight;
-            }
-            
-            // Re-highlight code blocks
-            if (typeof Prism !== 'undefined') {
-                Prism.highlightAll();
-            }
+
+            // Update user count badge
+            const badge = document.getElementById('user-count');
+            if (badge) badge.textContent = data.user.length;
         }
 
-        function updateMainDisplay(html) {
-            document.getElementById('main-display').innerHTML = html;
+    function enqueueUserMessageForTyping(rawMsg) {
+            // Large messages: skip typing to avoid performance issues
+            const MAX_TYPE_LENGTH = 4000; // characters
+            const userMessagesDiv = document.getElementById('user-messages');
+            if (!userMessagesDiv) return;
+
+            // Remove empty state if present
+            const emptyState = userMessagesDiv.querySelector('.empty-state');
+            if (emptyState) emptyState.remove();
+
+            if (rawMsg.length > MAX_TYPE_LENGTH) {
+                // Render instantly
+                const div = document.createElement('div');
+                div.className = 'message user-message';
+                div.innerHTML = marked.parse(rawMsg);
+        // Prepend newest on top
+        userMessagesDiv.insertBefore(div, userMessagesDiv.firstChild);
+                userMessagesRendered.push(rawMsg);
+                if (typeof Prism !== 'undefined') Prism.highlightAllUnder ? Prism.highlightAllUnder(div) : Prism.highlightAll();
+        userMessagesDiv.scrollTop = 0; // keep view at top
+                return;
+            }
+
+            // Queue for typing
+            const div = document.createElement('div');
+            div.className = 'message user-message';
+            div.dataset.full = rawMsg; // store raw
+            div.textContent = '';
+        userMessagesDiv.insertBefore(div, userMessagesDiv.firstChild);
+            typingQueue.push(div);
+            userMessagesRendered.push(rawMsg);
+            if (!isTypingUser) processTypingQueue();
+        }
+
+        function processTypingQueue() {
+            if (typingQueue.length === 0) {
+                isTypingUser = false;
+                return;
+            }
+            isTypingUser = true;
+            const div = typingQueue.shift();
+            const raw = div.dataset.full || '';
+            // Type raw text first, then replace with markdown-rendered content to avoid broken HTML mid-type
+            typeOutRaw(div, raw, 0, () => {
+                // Replace with rendered markdown
+                div.innerHTML = marked.parse(raw);
+                if (typeof Prism !== 'undefined') Prism.highlightAllUnder ? Prism.highlightAllUnder(div) : Prism.highlightAll();
+                // Continue with next
+                processTypingQueue();
+            });
+        }
+
+        function typeOutRaw(div, text, idx, done) {
+            const SPEED = 15; // ms per char
+            if (idx >= text.length) {
+                done();
+                return;
+            }
+            // Add next chunk (opt: speed up for long strings)
+            const CHUNK = text.length > 1200 ? 3 : 1; // accelerate for long messages
+            const slice = text.slice(idx, idx + CHUNK);
+            div.textContent += slice;
+            const parent = div.parentElement;
+            if (parent) parent.scrollTop = 0; // keep newest (typing) visible at top
+            setTimeout(() => typeOutRaw(div, text, idx + CHUNK, done), SPEED);
+        }
+
+        // ---- Console (assistant/tool) typewriter helpers ----
+        function enqueueConsoleMessageForTyping(rawMsg, type) {
+            const consoleContent = document.getElementById('console-messages');
+            if (!consoleContent) return;
+
+            const emptyState = consoleContent.querySelector('.empty-state');
+            if (emptyState) emptyState.remove();
+
+            // strip console fences (they were used for formatting upstream)
+            if (type === 'assistant') {
+                rawMsg = rawMsg.replace(/```console|```/g, '');
+            }
+
+            const MAX_TYPE_LENGTH = 6000;
+            if (rawMsg.length > MAX_TYPE_LENGTH) {
+                addConsoleMessage(rawMsg, type);
+                consoleAssistantRendered += 1;
+                return;
+            }
+
+            const wrapper = document.createElement('div');
+            wrapper.className = `console-message ${type}`;
+            const pre = document.createElement('pre');
+            pre.textContent = '';
+            pre.dataset.full = rawMsg;
+            wrapper.appendChild(pre);
+            consoleContent.appendChild(wrapper);
+            consoleTypingQueue.push(pre);
+            consoleAssistantRendered += 1;
+            if (!isTypingConsole) processConsoleTypingQueue();
+        }
+
+        function processConsoleTypingQueue() {
+            if (consoleTypingQueue.length === 0) {
+                isTypingConsole = false;
+                return;
+            }
+            isTypingConsole = true;
+            const pre = consoleTypingQueue.shift();
+            const full = pre.dataset.full || '';
+            typeOutConsole(pre, full, 0, () => {
+                processConsoleTypingQueue();
+            });
+        }
+
+        function typeOutConsole(node, text, idx, done) {
+            const SPEED = 8; // ms per char (console a bit faster)
+            if (idx >= text.length) { done(); return; }
+            const CHUNK = text.length > 1500 ? 4 : 1;
+            node.textContent += text.slice(idx, idx + CHUNK);
+            const consoleContent = document.getElementById('console-messages');
+            if (consoleContent) consoleContent.scrollTop = consoleContent.scrollHeight;
+            setTimeout(() => typeOutConsole(node, text, idx + CHUNK, done), SPEED);
         }
 
         function addConsoleMessage(message, type = 'info') {
@@ -583,7 +643,7 @@
 
         function interruptAgent() {
             socket.emit('interrupt_agent');
-            updateMainDisplay('<h3>⏹️ Agent Interrupted</h3><p>The agent has been stopped.</p>');
+            addConsoleMessage('⏹️ Agent Interrupted', 'info');
         }
 
         function showToolPrompt(data) {
@@ -623,50 +683,24 @@
 
         // Handle Escape key to close modal
         document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape') {
-                hideToolPrompt();
-            }
+            if (e.key === 'Escape') hideToolPrompt();
         });
 
         // Handle click outside modal to close
         document.getElementById('tool_prompt_modal').addEventListener('click', function(e) {
-            if (e.target === this) {
-                hideToolPrompt();
-            }
+            if (e.target === this) hideToolPrompt();
         });
 
-        // Handle custom element conflicts
-        window.addEventListener('error', function(e) {
-            if (e.message && e.message.includes('custom element') && e.message.includes('already been defined')) {
-                console.warn('Custom element conflict detected, but continuing execution:', e.message);
-                e.preventDefault();
-                return true;
-            }
-        });
-
-        // Prevent duplicate custom element registration
-        const originalDefine = customElements.define;
-        customElements.define = function(name, constructor, options) {
-            if (!customElements.get(name)) {
-                originalDefine.call(this, name, constructor, options);
-            } else {
-                console.warn(`Custom element '${name}' already defined, skipping redefinition`);
-            }
-        };
-
-        // Drag-to-resize functionality
+        // Resizing logic
         let isResizing = false;
         let currentResizer = null;
 
         function initializeResizers() {
             const sidebarResizer = document.getElementById('sidebar-resizer');
-            const consoleResizer = document.getElementById('console-resizer');
-            const sidebar = document.querySelector('.sidebar');
-            const mainContent = document.querySelector('.main-content');
-            const editorArea = document.querySelector('.editor-area');
-            const consoleArea = document.querySelector('.console-area');
+            const leftPane = document.getElementById('left-pane');
+            const rightPane = document.getElementById('right-pane');
+            const container = document.getElementById('split-row');
 
-            // Sidebar resizer
             sidebarResizer.addEventListener('mousedown', function(e) {
                 isResizing = true;
                 currentResizer = 'sidebar';
@@ -675,74 +709,40 @@
                 e.preventDefault();
             });
 
-            // Console resizer
-            consoleResizer.addEventListener('mousedown', function(e) {
-                isResizing = true;
-                currentResizer = 'console';
-                consoleResizer.classList.add('resizing');
-                document.body.style.cursor = 'row-resize';
-                e.preventDefault();
-            });
-
-            // Mouse move handler
             document.addEventListener('mousemove', function(e) {
-                if (!isResizing) return;
-
-                if (currentResizer === 'sidebar') {
-                    const containerRect = document.querySelector('.container').getBoundingClientRect();
-                    const newWidth = e.clientX - containerRect.left;
-                    const minWidth = 200;
-                    const maxWidth = containerRect.width * 0.5;
-                    
-                    if (newWidth >= minWidth && newWidth <= maxWidth) {
-                        sidebar.style.width = newWidth + 'px';
-                    }
-                } else if (currentResizer === 'console') {
-                    const mainContentRect = mainContent.getBoundingClientRect();
-                    const inputArea = document.querySelector('.input-area');
-                    const inputAreaHeight = inputArea.getBoundingClientRect().height;
-                    const availableHeight = mainContentRect.height - inputAreaHeight;
-                    const newConsoleHeight = mainContentRect.bottom - e.clientY - inputAreaHeight;
-                    const minConsoleHeight = 100;
-                    const maxConsoleHeight = availableHeight * 0.6;
-                    
-                    if (newConsoleHeight >= minConsoleHeight && newConsoleHeight <= maxConsoleHeight) {
-                        consoleArea.style.height = newConsoleHeight + 'px';
-                    }
-                }
+                if (!isResizing || currentResizer !== 'sidebar') return;
+                const rect = container.getBoundingClientRect();
+                const minWidth = 200;
+                const maxWidth = rect.width - 200; // ensure right pane min width
+                let newWidth = e.clientX - rect.left;
+                if (newWidth < minWidth) newWidth = minWidth;
+                if (newWidth > maxWidth) newWidth = maxWidth;
+                const percent = (newWidth / rect.width) * 100;
+                leftPane.style.flex = `0 0 ${percent}%`;
+                rightPane.style.flex = `1 1 ${100 - percent}%`;
             });
 
-            // Mouse up handler
             document.addEventListener('mouseup', function() {
                 if (isResizing) {
                     isResizing = false;
                     currentResizer = null;
-                    document.body.style.cursor = '';
                     sidebarResizer.classList.remove('resizing');
-                    consoleResizer.classList.remove('resizing');
+                    document.body.style.cursor = '';
                 }
             });
 
-            // Prevent text selection during resize
             document.addEventListener('selectstart', function(e) {
-                if (isResizing) {
-                    e.preventDefault();
-                }
+                if (isResizing) e.preventDefault();
             });
         }
 
         // Initialize resizers when page loads
         window.addEventListener('load', function() {
             initializeResizers();
-            
             fetch('/messages')
-                .then(response => response.json())
-                .then(data => {
-                    updateMessages(data);
-                })
-                .catch(error => {
-                    console.error('Error loading initial messages:', error);
-                });
+                .then(r => r.json())
+                .then(data => updateMessages(data))
+                .catch(err => console.error('Error loading initial messages:', err));
         });
     </script>
 </body>

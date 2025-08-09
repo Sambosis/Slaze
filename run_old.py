@@ -108,7 +108,8 @@ if __name__ == "__main__":
     async def run_console_app():
         # AgentDisplayConsole.select_prompt_console() is an async method.
         task = await display.select_prompt_console()
-
+        output = f"The users original task is: {task}\n#Refining Now..."
+        display.add_message(msg_type="user", output)
         if task:
             print("\n--- Starting Agent with Task ---")
             # AgentDisplayConsole is expected to be compatible with run_sampling_loop

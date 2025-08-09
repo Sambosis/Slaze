@@ -87,11 +87,13 @@ autor = "meta-llama/llama-4-maverick"
 openaiopen = "openai/gpt-oss-120b"
 open5 = "openai/gpt-5"
 open5mini="openai/gpt-5-mini"
+open5nano = "openai/gpt-5-nano"
 
 # Model constants
-SUMMARY_MODEL = open5  # Model for summaries
-MAIN_MODEL = open5  # Primary model for main agent operations
-CODE_MODEL = open5  # Model for code generation tasks
+ALL_MODELS= open5
+SUMMARY_MODEL = ALL_MODELS  # Model for summaries
+MAIN_MODEL = ALL_MODELS  # Primary model for main agent operations
+CODE_MODEL = ALL_MODELS  # Model for code generation tasks
 
 # Feature flag constants
 COMPUTER_USE_BETA_FLAG = "computer-use-2024-10-22"

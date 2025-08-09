@@ -31,16 +31,14 @@
 
         .vscode-container {
             display: grid;
-            grid-template-columns: 250px 4px 1fr 4px 300px;
-            grid-template-rows: 60px 1fr 4px 200px;
+            grid-template-columns: 250px 4px 1fr;
+            grid-template-rows: 60px 1fr;
             height: 100vh;
             width: 100vw;
             overflow: hidden;
-            grid-template-areas: 
-                "header header header header header"
-                "sidebar sidebar-resizer editor editor-resizer right-sidebar"
-                "sidebar console-resizer console-resizer console-resizer right-sidebar"
-                "sidebar console-bottom console-bottom console-bottom right-sidebar";
+            grid-template-areas:
+                "header header header"
+                "sidebar sidebar-resizer editor";
         }
 
         /* Header */
@@ -225,77 +223,7 @@
             opacity: 0.5;
         }
 
-        /* Bottom Console Panel */
-        .console {
-            grid-area: console-bottom;
-            background: #1e1e1e;
-            border-top: 1px solid #2d2d30;
-            display: flex;
-            flex-direction: column;
-            min-height: 0;
-            min-width: 0;
-            overflow: hidden;
-        }
-
-        .console-header {
-            background: #2d2d30;
-            padding: 8px 16px;
-            font-size: 13px;
-            color: #cccccc;
-            border-bottom: 1px solid #3e3e42;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .console-content {
-            flex: 1;
-            padding: 8px 16px;
-            overflow-y: auto;
-            overflow-x: auto;
-            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-            font-size: 12px;
-            line-height: 1.4;
-            height: 0;
-            min-height: 0;
-            max-height: 100%;
-            word-wrap: break-word;
-            white-space: pre-wrap;
-        }
-
-        /* Right Sidebar - User Messages */
-        .right-sidebar {
-            grid-area: right-sidebar;
-            background: #252526;
-            border-left: 1px solid #2d2d30;
-            display: flex;
-            flex-direction: column;
-            min-height: 0;
-            min-width: 0;
-            overflow: hidden;
-        }
-
-        .right-sidebar-header {
-            padding: 8px 16px;
-            font-size: 11px;
-            font-weight: 600;
-            color: #cccccc;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            background: #2d2d30;
-            border-bottom: 1px solid #3e3e42;
-        }
-
-        .user-messages {
-            flex: 1;
-            padding: 8px;
-            overflow-y: auto;
-            overflow-x: hidden;
-            height: 0;
-            min-height: 0;
-            max-height: 100%;
-            word-wrap: break-word;
-        }
+    /* (Console & user messages removed) */
 
         /* File type icons */
         .file-icon-python { color: #3776ab; }
@@ -338,15 +266,7 @@
             scrollbar-color: #424242 #1e1e1e;
         }
 
-        .console-content {
-            scrollbar-width: thin;
-            scrollbar-color: #424242 #1e1e1e;
-        }
-
-        .user-messages {
-            scrollbar-width: thin;
-            scrollbar-color: #424242 #1e1e1e;
-        }
+    /* Removed console & user message scrollbar settings */
 
         .sidebar {
             scrollbar-width: thin;
@@ -382,37 +302,7 @@
             box-sizing: border-box;
         }
 
-        /* Console message styling */
-        .console-message {
-            margin-bottom: 8px;
-            padding: 4px 0;
-            max-width: 100%;
-            overflow-wrap: break-word;
-            word-break: break-word;
-        }
-
-        .console-message pre {
-            white-space: pre-wrap;
-            word-wrap: break-word;
-            overflow-x: auto;
-            margin: 0;
-        }
-
-        .console-message.assistant {
-            color: #4ec9b0;
-        }
-
-        .console-message.tool {
-            color: #dcdcaa;
-        }
-
-        .console-message.error {
-            color: #f44747;
-        }
-
-        .console-message.info {
-            color: #569cd6;
-        }
+    /* Removed console message styling */
 
         /* User message styling - matching web_ide.html */
         .message {
@@ -484,21 +374,7 @@
             cursor: col-resize;
         }
 
-        .horizontal-resizer {
-            cursor: row-resize;
-        }
-
-        .sidebar-resizer {
-            grid-area: sidebar-resizer;
-        }
-
-        .editor-resizer {
-            grid-area: editor-resizer;
-        }
-
-        .console-resizer {
-            grid-area: console-resizer;
-        }
+    .sidebar-resizer { grid-area: sidebar-resizer; }
     </style>
 </head>
 <body>
@@ -510,6 +386,8 @@
                 <a href="/">🏠 Home</a>
                 <a href="/web_ide">🚀 Web IDE</a>
                 <a href="/tools">🔧 Tools</a>
+                <button id="download-zip-btn" style="background:#007acc;border:none;color:#fff;padding:6px 12px;border-radius:4px;cursor:pointer;">Download All (zip)</button>
+                <button id="download-file-btn" style="background:#444;border:none;color:#fff;padding:6px 12px;border-radius:4px;cursor:pointer;display:none;">Download File</button>
             </div>
         </div>
 
@@ -549,79 +427,29 @@
             </div>
         </div>
 
-        <!-- Editor Resizer -->
-        <div class="resizer vertical-resizer editor-resizer" id="editor-resizer"></div>
-
-        <!-- Console Resizer -->
-        <div class="resizer horizontal-resizer console-resizer" id="console-resizer"></div>
-
-        <!-- Bottom Console Panel -->
-        <div class="console">
-            <div class="console-header">
-                <span><i class="fas fa-terminal"></i> Console</span>
-                <button onclick="clearConsole()" style="background: none; border: none; color: #cccccc; cursor: pointer;">
-                    <i class="fas fa-trash"></i>
-                </button>
-            </div>
-            <div class="console-content" id="console-content">
-                <!-- Console messages will appear here -->
-            </div>
-        </div>
-
-        <!-- Right Sidebar - User Messages -->
-        <div class="right-sidebar">
-            <div class="right-sidebar-header">
-                <i class="fas fa-comments"></i> User Messages
-            </div>
-            <div class="user-messages" id="user-messages">
-                <!-- User messages will appear here -->
-            </div>
-        </div>
+    <!-- Removed console & user messages panels -->
     </div>
 
     <script>
-        let openTabs = [];
-        let activeTab = null;
-        let fileContents = {};
-        let socket = null;
-        let expandedFolders = new Set(); // Track expanded folders
+    let openTabs = [];
+    let activeTab = null;
+    let fileContents = {};
+    let socket = null;
+    let expandedFolders = new Set();
 
         // Initialize Socket.IO connection
         function initSocket() {
             socket = io();
             
-            socket.on('connect', function() {
-                console.log('Connected to server');
-                addConsoleMessage('Connected to Slazy Agent server', 'info');
-            });
-
-            socket.on('disconnect', function() {
-                console.log('Disconnected from server');
-                addConsoleMessage('Disconnected from server', 'error');
-            });
-
-            socket.on('assistant_message', function(data) {
-                addConsoleMessage(data.content, 'assistant');
-            });
-
-            socket.on('tool_result', function(data) {
-                addConsoleMessage(`Tool: ${data.tool_name}\nResult: ${data.result}`, 'tool');
-            });
-
-            socket.on('user_message', function(data) {
-                addUserMessage(data.content);
-            });
+            socket.on('connect', () => console.log('Connected to server'));
+            socket.on('disconnect', () => console.log('Disconnected from server'));
 
             socket.on('file_tree_update', function(data) {
                 console.log('File tree update received');
                 loadFileTree();
             });
 
-            socket.on('tool_result', function(data) {
-                addConsoleMessage(`Tool: ${data.tool_name}\nResult: ${data.result}`, 'tool');
-                // Refresh file tree after tool execution (files might have been created/modified)
-                setTimeout(loadFileTree, 1000);
-            });
+            socket.on('tool_result', function() { setTimeout(loadFileTree, 800); });
         }
 
         // Load file tree
@@ -632,15 +460,11 @@
                 renderFileTree(fileTree, document.getElementById('root-contents'));
             } catch (error) {
                 console.error('Error loading file tree:', error);
-                addConsoleMessage('Error loading file tree: ' + error.message, 'error');
             }
         }
 
         // Refresh file tree manually
-        function refreshFileTree() {
-            addConsoleMessage('Refreshing file tree...', 'info');
-            loadFileTree();
-        }
+    function refreshFileTree() { console.log('Refreshing file tree...'); loadFileTree(); }
 
         // Auto-refresh file tree periodically
         function startAutoRefresh() {
@@ -809,7 +633,6 @@
                 
             } catch (error) {
                 console.error('Error opening file:', error);
-                addConsoleMessage(`Error opening file ${fileName}: ${error.message}`, 'error');
             }
         }
 
@@ -850,6 +673,13 @@
             
             // Re-highlight syntax
             Prism.highlightAll();
+
+            // Show single file download button
+            const dlBtn = document.getElementById('download-file-btn');
+            if (dlBtn) {
+                dlBtn.style.display = 'inline-block';
+                dlBtn.dataset.path = tab.path;
+            }
         }
 
         // Close tab
@@ -909,30 +739,7 @@
             return div.innerHTML;
         }
 
-        // Add console message
-        function addConsoleMessage(message, type = 'info') {
-            const consoleContent = document.getElementById('console-content');
-            const messageDiv = document.createElement('div');
-            messageDiv.className = `console-message ${type}`;
-            messageDiv.innerHTML = `<pre>${escapeHtml(message)}</pre>`;
-            consoleContent.appendChild(messageDiv);
-            consoleContent.scrollTop = consoleContent.scrollHeight;
-        }
-
-        // Add user message - matching web_ide.html approach
-        function addUserMessage(message) {
-            const userMessages = document.getElementById('user-messages');
-            const messageDiv = document.createElement('div');
-            messageDiv.className = 'message user-message';
-            messageDiv.innerHTML = marked.parse(message);
-            userMessages.appendChild(messageDiv);
-            userMessages.scrollTop = userMessages.scrollHeight;
-        }
-
-        // Clear console
-        function clearConsole() {
-            document.getElementById('console-content').innerHTML = '';
-        }
+    // Removed console & user message handling
 
         // Handle custom element conflicts - add this before DOMContentLoaded
         window.addEventListener('error', function(e) {
@@ -958,14 +765,9 @@
         // Drag-to-resize functionality
         let isResizing = false;
         let currentResizer = null;
-
         function initializeResizers() {
             const sidebarResizer = document.getElementById('sidebar-resizer');
-            const editorResizer = document.getElementById('editor-resizer');
-            const consoleResizer = document.getElementById('console-resizer');
             const container = document.querySelector('.vscode-container');
-
-            // Sidebar resizer (left sidebar width)
             sidebarResizer.addEventListener('mousedown', function(e) {
                 isResizing = true;
                 currentResizer = 'sidebar';
@@ -973,85 +775,25 @@
                 document.body.style.cursor = 'col-resize';
                 e.preventDefault();
             });
-
-            // Editor resizer (right sidebar width)
-            editorResizer.addEventListener('mousedown', function(e) {
-                isResizing = true;
-                currentResizer = 'editor';
-                editorResizer.classList.add('resizing');
-                document.body.style.cursor = 'col-resize';
-                e.preventDefault();
-            });
-
-            // Console resizer (console height)
-            consoleResizer.addEventListener('mousedown', function(e) {
-                isResizing = true;
-                currentResizer = 'console';
-                consoleResizer.classList.add('resizing');
-                document.body.style.cursor = 'row-resize';
-                e.preventDefault();
-            });
-
-            // Mouse move handler
             document.addEventListener('mousemove', function(e) {
-                if (!isResizing) return;
-
-                const containerRect = container.getBoundingClientRect();
-
-                if (currentResizer === 'sidebar') {
-                    const newWidth = e.clientX - containerRect.left;
-                    const minWidth = 150;
-                    const maxWidth = containerRect.width * 0.4;
-                    
-                    if (newWidth >= minWidth && newWidth <= maxWidth) {
-                        const columns = container.style.gridTemplateColumns || '250px 4px 1fr 4px 300px';
-                        const parts = columns.split(' ');
-                        parts[0] = newWidth + 'px';
-                        container.style.gridTemplateColumns = parts.join(' ');
-                    }
-                } else if (currentResizer === 'editor') {
-                    const newRightWidth = containerRect.right - e.clientX;
-                    const minWidth = 150;
-                    const maxWidth = containerRect.width * 0.4;
-                    
-                    if (newRightWidth >= minWidth && newRightWidth <= maxWidth) {
-                        const columns = container.style.gridTemplateColumns || '250px 4px 1fr 4px 300px';
-                        const parts = columns.split(' ');
-                        parts[4] = newRightWidth + 'px';
-                        container.style.gridTemplateColumns = parts.join(' ');
-                    }
-                } else if (currentResizer === 'console') {
-                    const newConsoleHeight = containerRect.bottom - e.clientY;
-                    const minHeight = 100;
-                    const maxHeight = containerRect.height * 0.6;
-                    
-                    if (newConsoleHeight >= minHeight && newConsoleHeight <= maxHeight) {
-                        const rows = container.style.gridTemplateRows || '35px 1fr 4px 200px';
-                        const parts = rows.split(' ');
-                        parts[3] = newConsoleHeight + 'px';
-                        container.style.gridTemplateRows = parts.join(' ');
-                    }
+                if (!isResizing || currentResizer !== 'sidebar') return;
+                const rect = container.getBoundingClientRect();
+                const newWidth = e.clientX - rect.left;
+                const minWidth = 150;
+                const maxWidth = rect.width * 0.6;
+                if (newWidth >= minWidth && newWidth <= maxWidth) {
+                    container.style.gridTemplateColumns = `${newWidth}px 4px 1fr`;
                 }
             });
-
-            // Mouse up handler
             document.addEventListener('mouseup', function() {
                 if (isResizing) {
                     isResizing = false;
                     currentResizer = null;
                     document.body.style.cursor = '';
                     sidebarResizer.classList.remove('resizing');
-                    editorResizer.classList.remove('resizing');
-                    consoleResizer.classList.remove('resizing');
                 }
             });
-
-            // Prevent text selection during resize
-            document.addEventListener('selectstart', function(e) {
-                if (isResizing) {
-                    e.preventDefault();
-                }
-            });
+            document.addEventListener('selectstart', function(e) { if (isResizing) e.preventDefault(); });
         }
 
         // Initialize the application
@@ -1060,7 +802,19 @@
             loadFileTree();
             startAutoRefresh();
             initializeResizers();
-            addConsoleMessage('File browser initialized with auto-refresh and drag-to-resize', 'info');
+            console.log('File browser initialized');
+
+            const zipBtn = document.getElementById('download-zip-btn');
+            zipBtn.addEventListener('click', () => {
+                window.location.href = '/api/download-zip';
+            });
+            const fileBtn = document.getElementById('download-file-btn');
+            fileBtn.addEventListener('click', () => {
+                const p = fileBtn.dataset.path;
+                if (p) {
+                    window.location.href = '/api/download?path=' + encodeURIComponent(p);
+                }
+            });
         });
     </script>
 </body>

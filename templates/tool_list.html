@@ -1,33 +1,146 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Toolbox</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Slazy Agent - Tools</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet" />
     <style>
-        body { font-family: sans-serif; margin: 0; padding: 20px; background-color: #f4f4f4; }
-        .container { max-width: 900px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        .tool { border: 1px solid #ddd; padding: 15px; margin-bottom: 15px; border-radius: 6px; }
-        button { padding: 8px 12px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
-        button:hover { background-color: #0056b3; }
-        .back-link { display: block; margin-top: 20px; text-decoration: none; color: #007bff; }
-        .back-link:hover { text-decoration: underline; }
+        :root {
+            --primary-bg: #1e1e1e;
+            --secondary-bg: #252526;
+            --tertiary-bg: #333333;
+            --text-color: #cccccc;
+            --accent-color: #007acc;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--primary-bg);
+            color: var(--text-color);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .header {
+            background: var(--secondary-bg);
+            border-bottom: 1px solid var(--tertiary-bg);
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 20px;
+        }
+        .header h1 { margin: 0; font-size: 20px; color: var(--accent-color); font-weight: 600; }
+        .nav-links { display: flex; gap: 15px; }
+        .nav-links a { color: var(--text-color); text-decoration: none; padding: 6px 12px; border-radius: 4px; transition: background .15s; }
+        .nav-links a:hover { background: var(--tertiary-bg); }
+        .layout { flex: 1; display: flex; min-height: 0; }
+        .content-wrapper { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+        .tools-scroll { flex: 1; overflow-y: auto; padding: 24px clamp(16px,2vw,40px); display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 18px; }
+        .tool-card {
+            background: var(--secondary-bg);
+            border: 1px solid var(--tertiary-bg);
+            border-radius: 8px;
+            padding: 16px 18px 18px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            position: relative;
+            transition: border-color .15s, transform .15s, background .15s;
+        }
+        .tool-card:hover { border-color: var(--accent-color); transform: translateY(-2px); background: #2b2b2b; }
+        .tool-card h2 { font-size: 16px; margin: 0; color: #ffffff; display: flex; align-items: center; gap: 8px; }
+        .tool-card p { margin: 0; font-size: 13px; line-height: 1.4; color: #aaaaaa; }
+        .tool-actions { margin-top: auto; display: flex; gap: 8px; }
+        button, .btn-link {
+            background: var(--accent-color);
+            color: #fff;
+            border: none;
+            padding: 8px 14px;
+            font-size: 13px;
+            line-height: 1.2;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        button:hover, .btn-link:hover { background: #005999; }
+        .secondary-btn { background: #3a3d41; }
+        .secondary-btn:hover { background: #484c50; }
+        .footer-links { padding: 12px 24px; border-top: 1px solid var(--tertiary-bg); background: var(--secondary-bg); display: flex; gap: 20px; flex-wrap: wrap; }
+        .footer-links a { color: var(--text-color); text-decoration: none; font-size: 13px; opacity: .85; }
+        .footer-links a:hover { opacity: 1; text-decoration: underline; }
+        .empty { grid-column: 1 / -1; text-align: center; padding: 60px 20px; opacity: .6; font-style: italic; }
+        .search-bar { padding: 16px clamp(16px,2vw,40px) 8px; }
+        .search-bar input { width: 100%; background: var(--secondary-bg); border: 1px solid var(--tertiary-bg); color: var(--text-color); padding: 10px 12px; border-radius: 6px; font-size: 14px; }
+        .search-bar input:focus { outline: 1px solid var(--accent-color); }
+        ::-webkit-scrollbar { width: 10px; }
+        ::-webkit-scrollbar-track { background: var(--primary-bg); }
+        ::-webkit-scrollbar-thumb { background: var(--tertiary-bg); border-radius: 5px; }
+        ::-webkit-scrollbar-thumb:hover { background: #555; }
+        @media (max-width: 700px) { .tools-scroll { grid-template-columns: 1fr; } .nav-links { gap: 8px; } .nav-links a { padding: 4px 8px; font-size: 13px; } }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Available Tools</h1>
-        {% for tool in tools %}
-        <div class="tool">
-            <h2>{{ tool.name }}</h2>
-            <p>{{ tool.description }}</p>
-            <form action="{{ url_for('run_tool_route', tool_name=tool.name) }}" method="get">
-                <button type="submit">Use {{ tool.name }}</button>
-            </form>
+    <div class="header">
+        <h1>🔧 Slazy Agent - Tools</h1>
+        <div class="nav-links">
+            <a href="/">🏠 Home</a>
+            <a href="/web_ide">🚀 Web IDE</a>
+            <a href="/browser">📁 File Browser</a>
         </div>
-        {% endfor %}
-        <a href="/" class="back-link">🏠 Back to Task Selection</a>
-        <a href="/classic" class="back-link">📝 Classic Interface</a>
     </div>
+    <div class="layout">
+        <div class="content-wrapper">
+            <div class="search-bar">
+                <input type="text" id="tool-search" placeholder="Search tools..." oninput="filterTools()" />
+            </div>
+            <div class="tools-scroll" id="tools-container">
+                {% if tools|length == 0 %}
+                    <div class="empty">No tools available</div>
+                {% else %}
+                {% for tool in tools %}
+                <div class="tool-card" data-name="{{ tool.name|lower }} {{ tool.description|lower }}">
+                    <h2><i class="fas fa-wrench"></i>{{ tool.name }}</h2>
+                    <p>{{ tool.description }}</p>
+                    <div class="tool-actions">
+                        <form action="{{ url_for('run_tool_route', tool_name=tool.name) }}" method="get" style="margin:0;">
+                            <button type="submit" title="Open tool"><i class="fas fa-terminal"></i> Use</button>
+                        </form>
+                    </div>
+                </div>
+                {% endfor %}
+                {% endif %}
+            </div>
+            <div class="footer-links">
+                <a href="/classic">📝 Classic Interface</a>
+                <a href="/">🏠 Task Selection</a>
+            </div>
+        </div>
+    </div>
+    <script>
+        function filterTools() {
+            const q = document.getElementById('tool-search').value.trim().toLowerCase();
+            const cards = document.querySelectorAll('.tool-card');
+            let visible = 0;
+            cards.forEach(c => {
+                if (!q || c.dataset.name.includes(q)) { c.style.display = 'flex'; visible++; } else { c.style.display = 'none'; }
+            });
+            // Show empty state if needed
+            let emptyDiv = document.querySelector('.tools-scroll .empty');
+            if (!emptyDiv) {
+                emptyDiv = document.createElement('div');
+                emptyDiv.className = 'empty';
+                emptyDiv.textContent = 'No matching tools';
+                emptyDiv.style.display = 'none';
+                document.getElementById('tools-container').appendChild(emptyDiv);
+            }
+            emptyDiv.style.display = visible === 0 ? 'block' : 'none';
+        }
+    </script>
 </body>
 </html>

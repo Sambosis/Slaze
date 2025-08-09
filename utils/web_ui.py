@@ -2,8 +2,10 @@ import asyncio
 import os
 import logging
 import json
+import io
+import zipfile
 from queue import Queue
-from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template, jsonify, request, send_file
 from flask_socketio import SocketIO
 from config import (
     LOGS_DIR,
@@ -397,6 +399,47 @@ class WebUI:
             except Exception as e:
                 logging.error(f"Error reading file {file_path}: {e}")
                 return f"Error reading file: {str(e)}", 500
+
+        @self.app.route("/api/download")
+        def api_download_file():
+            """Download a single file from the current repository."""
+            rel_path = request.args.get("path", "")
+            if not rel_path:
+                return jsonify({"error": "Missing path parameter"}), 400
+            try:
+                repo_dir = Path(get_constant("REPO_DIR"))
+                if not repo_dir:
+                    return jsonify({"error": "REPO_DIR not configured"}), 500
+                target_path = (repo_dir / os.path.normpath(rel_path)).resolve()
+                if not target_path.is_file() or not target_path.is_relative_to(repo_dir.resolve()):
+                    return jsonify({"error": "File not found"}), 404
+                return send_file(str(target_path), as_attachment=True, download_name=target_path.name)
+            except Exception as e:
+                logging.error(f"Error downloading file {rel_path}: {e}")
+                return jsonify({"error": "Error downloading file"}), 500
+
+        @self.app.route("/api/download-zip")
+        def api_download_zip():
+            """Download a zip archive of the entire current repository directory."""
+            try:
+                repo_dir = Path(get_constant("REPO_DIR"))
+                if not repo_dir or not repo_dir.exists():
+                    return jsonify({"error": "REPO_DIR not configured or missing"}), 500
+                mem_file = io.BytesIO()
+                with zipfile.ZipFile(mem_file, 'w', zipfile.ZIP_DEFLATED) as zf:
+                    for file in repo_dir.rglob('*'):
+                        if file.is_file():
+                            arcname = file.relative_to(repo_dir)
+                            try:
+                                zf.write(file, arcname.as_posix())
+                            except Exception as write_err:
+                                logging.warning(f"Skipping file in zip ({file}): {write_err}")
+                mem_file.seek(0)
+                zip_name = f"{repo_dir.name}.zip"
+                return send_file(mem_file, as_attachment=True, download_name=zip_name, mimetype='application/zip')
+            except Exception as e:
+                logging.error(f"Error creating zip archive: {e}")
+                return jsonify({"error": "Error creating zip archive"}), 500
 
         logging.info("Routes set up")
 

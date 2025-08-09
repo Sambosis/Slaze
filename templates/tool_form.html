@@ -1,51 +1,105 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ tool_name }}</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tool: {{ tool_name }}</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet" />
     <style>
-        body { font-family: sans-serif; margin: 0; padding: 20px; background-color: #f4f4f4; }
-        .container { max-width: 900px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        form div { margin-bottom: 15px; }
-        label { display: block; margin-bottom: 5px; font-weight: bold; }
-        input[type="text"], textarea, select { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
-        textarea { min-height: 100px; resize: vertical; }
-        button { padding: 10px 15px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
-        button:hover { background-color: #0056b3; }
-        pre { background: #f0f0f0; padding: 10px; border-radius: 4px; }
-        .back-link { display: block; margin-top: 20px; text-decoration: none; color: #007bff; }
-        .back-link:hover { text-decoration: underline; }
+        :root {
+            --primary-bg: #1e1e1e;
+            --secondary-bg: #252526;
+            --tertiary-bg: #333333;
+            --text-color: #cccccc;
+            --accent-color: #007acc;
+            --danger-color: #d13438;
+        }
+        * { box-sizing: border-box; }
+        body { margin:0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--primary-bg); color: var(--text-color); height:100vh; display:flex; flex-direction:column; }
+        .header { background: var(--secondary-bg); border-bottom: 1px solid var(--tertiary-bg); height:60px; display:flex; align-items:center; justify-content:space-between; padding:10px 20px; }
+        .header h1 { margin:0; font-size:20px; font-weight:600; color: var(--accent-color); }
+        .nav-links { display:flex; gap:15px; }
+        .nav-links a { color: var(--text-color); text-decoration:none; padding:6px 12px; border-radius:4px; transition: background .15s; }
+        .nav-links a:hover { background: var(--tertiary-bg); }
+        .layout { flex:1; display:flex; min-height:0; }
+        .form-container { flex:1; display:flex; flex-direction:column; padding: 24px clamp(16px,2vw,50px); overflow-y:auto; }
+        h2 { margin-top:32px; font-size:18px; color:#ffffff; }
+        form { max-width: 780px; display:flex; flex-direction:column; gap:18px; }
+        .field { display:flex; flex-direction:column; gap:6px; }
+        .field label { font-weight:500; font-size:13px; letter-spacing:.5px; text-transform:uppercase; color:#bbbbbb; }
+        .hint { font-size:11px; opacity:.65; }
+        input[type=text], textarea, select { background: var(--secondary-bg); border:1px solid var(--tertiary-bg); color: var(--text-color); padding:10px 12px; font-size:14px; border-radius:6px; font-family: inherit; resize: vertical; }
+        input[type=text]:focus, textarea:focus, select:focus { outline:1px solid var(--accent-color); }
+        textarea { min-height:120px; }
+        .actions { display:flex; gap:12px; margin-top:10px; }
+        button { background: var(--accent-color); color:#fff; border:none; padding:10px 18px; border-radius:5px; cursor:pointer; font-weight:500; display:inline-flex; gap:8px; align-items:center; font-size:14px; }
+        button:hover { background:#005999; }
+        .secondary { background:#3a3d41; }
+        .secondary:hover { background:#484c50; }
+        pre { background: #1b1b1b; border:1px solid var(--tertiary-bg); padding:16px; border-radius:8px; overflow:auto; font-size:13px; line-height:1.45; max-width:100%; }
+        .result-header { display:flex; align-items:center; gap:10px; margin:32px 0 12px; font-size:18px; font-weight:600; }
+        .back-links { margin-top:32px; display:flex; gap:20px; flex-wrap:wrap; }
+        .back-links a { color: var(--text-color); text-decoration:none; font-size:13px; opacity:.85; }
+        .back-links a:hover { opacity:1; text-decoration:underline; }
+        .badge { background: var(--accent-color); color:#fff; padding:2px 8px; font-size:11px; border-radius:12px; font-weight:500; }
+        .enum-select { max-width:320px; }
+        .array-field textarea { font-family: 'Consolas','Monaco','Courier New',monospace; }
+        .no-params { font-style: italic; opacity: .6; }
+        ::-webkit-scrollbar { width: 10px; }
+        ::-webkit-scrollbar-track { background: var(--primary-bg); }
+        ::-webkit-scrollbar-thumb { background: var(--tertiary-bg); border-radius: 5px; }
+        ::-webkit-scrollbar-thumb:hover { background: #555; }
+        @media (max-width: 700px) { form { width:100%; } .nav-links { gap:8px; } .nav-links a { padding:4px 8px; font-size:13px; } }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>{{ tool_name }}</h1>
-        <form method="post">
-            {% for param, info in params.properties.items() %}
-            <div>
-                <label for="{{ param }}">{{ param }}</label>
-                {% if info.enum %}
-                <select name="{{ param }}" id="{{ param }}">
-                    {% for opt in info.enum %}
-                    <option value="{{ opt }}">{{ opt }}</option>
-                    {% endfor %}
-                </select>
-                {% elif info.type == 'array' %}
-                <textarea name="{{ param }}" id="{{ param }}" placeholder="Enter JSON array"></textarea>
-                {% else %}
-                <input type="text" name="{{ param }}" id="{{ param }}">
+    <div class="header">
+        <h1>🔧 Tool: {{ tool_name }}</h1>
+        <div class="nav-links">
+            <a href="/">🏠 Home</a>
+            <a href="/web_ide">🚀 Web IDE</a>
+            <a href="/browser">📁 File Browser</a>
+            <a href="/tools">🔧 Tools</a>
+        </div>
+    </div>
+    <div class="layout">
+        <div class="form-container">
+            <form method="post">
+                {% if params.properties|length == 0 %}
+                    <div class="no-params">This tool takes no parameters.</div>
                 {% endif %}
+                {% for param, info in params.properties.items() %}
+                <div class="field {% if info.type == 'array' %}array-field{% endif %}">
+                    <label for="{{ param }}">{{ param }}{% if info.type %} <span class="badge">{{ info.type }}</span>{% endif %}</label>
+                    {% if info.description %}<div class="hint">{{ info.description }}</div>{% endif %}
+                    {% if info.enum %}
+                        <select class="enum-select" name="{{ param }}" id="{{ param }}">
+                            {% for opt in info.enum %}
+                            <option value="{{ opt }}">{{ opt }}</option>
+                            {% endfor %}
+                        </select>
+                    {% elif info.type == 'array' %}
+                        <textarea name="{{ param }}" id="{{ param }}" placeholder='Enter JSON array, e.g. ["a", "b"]'></textarea>
+                    {% else %}
+                        <input type="text" name="{{ param }}" id="{{ param }}" placeholder="Enter {{ param }}" />
+                    {% endif %}
+                </div>
+                {% endfor %}
+                <div class="actions">
+                    <button type="submit"><i class="fas fa-play"></i> Run {{ tool_name }}</button>
+                    <a href="{{ url_for('tools_route') }}" class="secondary" style="text-decoration:none;padding:10px 18px;border-radius:5px;display:inline-flex;align-items:center;gap:8px;">⬅ Back</a>
+                </div>
+            </form>
+            {% if result %}
+            <div class="result-header"><i class="fas fa-stream"></i> Result</div>
+            <pre>{{ result }}</pre>
+            {% endif %}
+            <div class="back-links">
+                <a href="{{ url_for('tools_route') }}">🔧 Tools</a>
+                <a href="/">🏠 Task Selection</a>
+                <a href="/classic">📝 Classic Interface</a>
             </div>
-            {% endfor %}
-            <button type="submit">Run {{ tool_name }}</button>
-        </form>
-        {% if result %}
-        <h2>Result</h2>
-        <pre>{{ result }}</pre>
-        {% endif %}
-        <a href="{{ url_for('tools_route') }}" class="back-link">🔧 Back to Tools</a>
-        <a href="/" class="back-link">🏠 Back to Task Selection</a>
+        </div>
     </div>
 </body>
 </html>

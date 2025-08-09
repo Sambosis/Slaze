@@ -30,7 +30,7 @@ import re
 import shutil
 import subprocess
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -78,13 +78,18 @@ class EditTool(BaseTool):
     """Cross‑platform editor designed for codebases."""
 
     api_type = "text_editor_20250124"
-    name = "str_replace_editor"
 
-    description = (
-        "A cross‑platform file editor that can view, create, edit, lint, and "
-        "format files inside the project sandbox. Supports regex / fuzzy code "
-        "replacements for safer refactors."
-    )
+    @property
+    def name(self) -> str:  # satisfies BaseTool contract
+        return "str_replace_editor"
+
+    @property
+    def description(self) -> str:  # satisfies BaseTool contract
+        return (
+            "A cross‑platform file editor that can view, create, edit, lint, and "
+            "format files inside the project sandbox. Supports regex / fuzzy code "
+            "replacements for safer refactors."
+        )
 
     # ------------------------------------------------------------------
     # Construction / schema
@@ -150,28 +155,35 @@ class EditTool(BaseTool):
         _path = self._resolve_path(path)
         try:
             if cmd_enum is Command.CREATE:
-                return self._cmd_create(_path, file_text)
-            if cmd_enum is Command.VIEW:
-                return await self._cmd_view(_path, view_range)
-            if cmd_enum is Command.STR_REPLACE:
-                return self._cmd_str_replace(_path, old_str, new_str, match_mode)
-            if cmd_enum is Command.INSERT:
-                return self._cmd_insert(_path, insert_line, new_str)
-            if cmd_enum is Command.UNDO_EDIT:
-                return self._cmd_undo(_path)
-            if cmd_enum is Command.LINT:
-                return self._cmd_lint(_path)
-            if cmd_enum is Command.FORMAT:
-                return self._cmd_format(_path)
-            raise ToolError(f"Unhandled command {cmd_enum}")
+                result = self._cmd_create(_path, file_text)
+            elif cmd_enum is Command.VIEW:
+                result = await self._cmd_view(_path, view_range)
+            elif cmd_enum is Command.STR_REPLACE:
+                result = self._cmd_str_replace(_path, old_str, new_str, match_mode)
+            elif cmd_enum is Command.INSERT:
+                result = self._cmd_insert(_path, insert_line, new_str)
+            elif cmd_enum is Command.UNDO_EDIT:
+                result = self._cmd_undo(_path)
+            elif cmd_enum is Command.LINT:
+                result = self._cmd_lint(_path)
+            elif cmd_enum is Command.FORMAT:
+                result = self._cmd_format(_path)
+            else:
+                raise ToolError(f"Unhandled command {cmd_enum}")
+
+            # Add assistant console-style display if configured
+            self._maybe_display(cmd_enum, _path, result)
+            return result
         except Exception as exc:
             _LOG.error("EditTool failure", exc_info=True)
-            return ToolResult(
+            error_result = ToolResult(
                 output=f"EditTool error running {command} on {_path}: {exc}",
                 error=str(exc),
                 tool_name=self.name,
                 command=command,
             )
+            self._maybe_display(cmd_enum, _path, error_result, is_error=True)
+            return error_result
 
     # ------------------------------------------------------------------
     # Command validation
@@ -241,6 +253,92 @@ class EditTool(BaseTool):
         return ToolResult(output=f"black {status}: {path}\n{err or ''}")
 
     # ------------------------------------------------------------------
+    # Display helpers (console-style formatting similar to bash/write_code)
+    # ------------------------------------------------------------------
+
+    def _maybe_display(
+        self,
+        cmd_enum: Command,
+        path: Path,
+        result: ToolResult,
+        *,
+        is_error: bool = False,
+    ) -> None:
+        if self.display is None:
+            return
+        try:
+            formatted = self._format_terminal_output(cmd_enum, path, result, is_error=is_error)
+            if formatted:
+                # send as assistant message so it appears in console like other tools
+                self.display.add_message("assistant", formatted)
+        except Exception:  # pragma: no cover - display issues shouldn't break tool
+            pass
+
+    def _format_terminal_output(
+        self,
+        cmd_enum: Command,
+        path: Path,
+        result: ToolResult,
+        *,
+        is_error: bool = False,
+        max_lines: int = 20,
+        max_chars: int = 2_000,
+    ) -> str:
+        """Return a fenced console block showing the invoked edit command and its output.
+
+        Mirrors style: ```console + $ command + stdout/stderr lines + ```
+        Truncates excessive output similar to other tools.
+        """
+        try:
+            rel_path: str
+            try:
+                rel_path = str(path.relative_to(self._repo_dir))
+            except Exception:
+                rel_path = str(path)
+            invoked = f"$ edit {cmd_enum.value} {rel_path}".rstrip()
+            lines: List[str] = ["```console", invoked]
+            out_text = result.output or ""
+            err_text = result.error or ""
+
+            # If output already contains multiple lines, preserve them; else single line ok
+            combined = out_text
+            if err_text and err_text not in combined:
+                if combined:
+                    combined = combined.rstrip() + ("\n" if not combined.endswith("\n") else "") + err_text
+                else:
+                    combined = err_text
+
+            if is_error and not err_text and not out_text:
+                combined = "Error occurred but no output captured"
+
+            # Truncate by chars first
+            truncated = False
+            if len(combined) > max_chars:
+                combined = (
+                    combined[: max_chars // 2]
+                    + "\n… (truncated) …\n"
+                    + combined[-max_chars // 2 :]
+                )
+                truncated = True
+            # Split to lines and limit
+            original_lines = combined.splitlines()
+            if len(original_lines) > max_lines:
+                head = original_lines[: max_lines // 2]
+                tail = original_lines[-max_lines // 2 :]
+                omitted = len(original_lines) - len(head) - len(tail)
+                combined_lines = head + [f"… ({omitted} lines omitted) …"] + tail
+                truncated = True
+            else:
+                combined_lines = original_lines
+            lines.extend(combined_lines)
+            if truncated:
+                lines.append("[output truncated]")
+            lines.append("```")
+            return "\n".join(lines)
+        except Exception:
+            return ""
+
+    # ------------------------------------------------------------------
     # Path helpers
     # ------------------------------------------------------------------
 
@@ -271,7 +369,7 @@ class EditTool(BaseTool):
         with portalocker.Lock(str(tmp), "w", timeout=5) as fp:
             fp.write(content)
         # Windows‑safe timestamp (no ':')
-        timestamp = datetime.utcnow().strftime("%Y%m%dT%H%M%S")
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S")
         backup = path.with_suffix(path.suffix + f".bak.{timestamp}")
         if path.exists():
             shutil.copy2(path, backup)
@@ -387,7 +485,7 @@ class EditTool(BaseTool):
     # ------------------------------------------------------------------
 
     def _numbered(self, lines: List[str], *, offset: int = 1) -> List[str]:
-        return [f"{i + offset:6}\t{l}" for i, l in enumerate(lines)]
+        return [f"{idx + offset:6}\t{line}" for idx, line in enumerate(lines)]
 
     def _snippet(self, text: str, start: int, end: int) -> str:
         # Compute line numbers around the replaced region

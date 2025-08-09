@@ -1,0 +1,1 @@
+Create a python desktop 2d fighter game similar to Mortal Kombat.
