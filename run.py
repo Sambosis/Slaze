@@ -21,7 +21,7 @@ async def run_agent_async(task, display, manual_tools=False):
     output = f"The users original task is: {task}\n"
     display.add_message("user", output)
     output = "# Refining Now..."
-    display.add_message("assistant", output)
+    display.add_message("user", output)
     agent = Agent(task=task, display=display, manual_tool_confirmation=manual_tools)
     await agent._revise_and_save_task(agent.task)
     agent.messages.append({"role": "user", "content": agent.task})

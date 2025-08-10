@@ -90,7 +90,7 @@ open5mini="openai/gpt-5-mini"
 open5nano = "openai/gpt-5-nano"
 
 # Model constants
-ALL_MODELS= open5
+ALL_MODELS= googleflash
 SUMMARY_MODEL = ALL_MODELS  # Model for summaries
 MAIN_MODEL = ALL_MODELS  # Primary model for main agent operations
 CODE_MODEL = ALL_MODELS  # Model for code generation tasks
