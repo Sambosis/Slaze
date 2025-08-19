@@ -41,7 +41,8 @@ class WebUI:
         # More robust path for templates
         template_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'templates'))
         logging.info(f"Template directory set to: {template_dir}")
-        self.app = Flask(__name__, template_folder=template_dir)
+        static_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'public'))
+        self.app = Flask(__name__, template_folder=template_dir, static_folder=static_dir)
         self.app.config["SECRET_KEY"] = "secret!"
         self.socketio = SocketIO(self.app, async_mode="threading", cookie=None)
         self.user_messages = []
@@ -282,8 +283,9 @@ class WebUI:
             tool = self.tool_collection.tools.get(tool_name)
             if not tool:
                 return "Tool not found", 404
+
             params = tool.to_params()["function"]["parameters"]
-            result_text = None
+
             if request.method == "POST":
                 tool_input = {}
                 for param in params.get("properties", {}):
@@ -305,13 +307,16 @@ class WebUI:
                 try:
                     result = asyncio.run(self.tool_collection.run(tool_name, tool_input))
                     result_text = result.output or result.error
+                    return jsonify({"success": True, "result": result_text})
                 except Exception as exc:
-                    result_text = str(exc)
+                    return jsonify({"success": False, "error": str(exc)})
+
+            # For GET requests, just render the form partial
             return render_template(
                 "tool_form.html",
                 tool_name=tool_name,
                 params=params,
-                result=result_text,
+                result=None, # No result on initial load
             )
 
         @self.app.route("/web_ide")
