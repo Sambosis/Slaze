@@ -63,9 +63,10 @@
             padding: 5px 10px;
             border-radius: 4px;
             transition: background-color 0.2s;
+            cursor: pointer;
         }
 
-        .nav-links a:hover {
+        .nav-links a:hover, .nav-links a.active {
             background-color: var(--tertiary-bg);
         }
 
@@ -317,7 +318,7 @@
             padding: 10px 12px;
         }
         .left-pane { flex: 0 0 50%; }
-        .right-pane { flex: 1 1 50%; }
+        #main-content-area { flex: 1 1 50%; } /* Changed from .right-pane */
         .console-area { /* reuse class for message styling */
             background-color: var(--secondary-bg);
             font-family: 'Noto Sans', sans-serif;
@@ -331,9 +332,9 @@
     <div class="header">
         <h1>🚀 Slazy Agent - Task Running</h1>
         <div class="nav-links">
-            <a href="/">🏠 Home</a>
-            <a href="/browser">📁 File Browser</a>
-            <a href="/tools">🔧 Tools</a>
+            <a href="#" onclick="loadPage('home')" id="nav-home" class="active">🏠 Console</a>
+            <a href="#" onclick="loadPage('browser')" id="nav-browser">📁 File Browser</a>
+            <a href="#" onclick="loadPage('tools')" id="nav-tools">🔧 Tools</a>
         </div>
     </div>
 
@@ -346,11 +347,8 @@
                 </div>
             </div>
             <div class="resizer vertical-resizer" id="sidebar-resizer"></div>
-            <div class="pane right-pane" id="right-pane">
-                <div class="pane-header">Console</div>
-                <div class="pane-content console-area" id="console-messages">
-                    <div class="empty-state">Console output will appear here</div>
-                </div>
+            <div class="pane" id="main-content-area">
+                <!-- Content will be loaded here -->
             </div>
         </div>
         <div class="input-area">
@@ -377,7 +375,74 @@
     </div>
 
     <script>
-        // Initialize the WebSocket connection and UI
+    // --- SPA Navigation ---
+    function loadCss(url) {
+        const link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = url;
+        link.className = 'page-specific-asset';
+        document.head.appendChild(link);
+    }
+
+    function loadJs(url) {
+        const script = document.createElement('script');
+        script.src = url;
+        script.className = 'page-specific-asset';
+        document.body.appendChild(script);
+    }
+
+    const mainContentArea = document.getElementById('main-content-area');
+    const homeContent = `
+        <div class="pane-header">Console</div>
+        <div class="pane-content console-area" id="console-messages">
+            <div class="empty-state">Console output will appear here</div>
+        </div>
+    `;
+
+    async function loadPage(page) {
+        // Clean up previous page's assets
+        document.querySelectorAll('.page-specific-asset').forEach(el => el.remove());
+
+        // Update active nav link
+        document.querySelectorAll('.nav-links a').forEach(link => link.classList.remove('active'));
+        document.getElementById(`nav-${page}`).classList.add('active');
+
+        mainContentArea.innerHTML = '<div class="empty-state">Loading...</div>';
+
+        if (page === 'home') {
+            mainContentArea.innerHTML = homeContent;
+            fetch('/messages').then(r => r.json()).then(data => updateMessages(data));
+            return;
+        }
+
+        try {
+            // Load page-specific assets
+            if (page === 'browser') {
+                loadCss('{{ url_for("static", filename="css/file_browser.css") }}');
+            } else if (page === 'tools') {
+                loadCss('{{ url_for("static", filename="css/tool_list.css") }}');
+            }
+
+            // Load HTML
+            const response = await fetch(`/${page}`);
+            if (!response.ok) throw new Error(`Failed to load page: ${response.statusText}`);
+            const content = await response.text();
+            mainContentArea.innerHTML = content;
+
+            // Load page-specific JS
+            if (page === 'browser') {
+                loadJs('{{ url_for("static", filename="js/file_browser.js") }}');
+            } else if (page === 'tools') {
+                loadJs('{{ url_for("static", filename="js/tool_list.js") }}');
+            }
+        } catch (error) {
+            mainContentArea.innerHTML = `<div class="empty-state">Error loading page: ${error.message}</div>`;
+            console.error('Error in loadPage:', error);
+        }
+    }
+
+
+    // --- Existing script ---
     const socket = io();
 
         socket.on('connect', function() {
@@ -607,6 +672,7 @@
 
         function addConsoleMessage(message, type = 'info') {
             const consoleContent = document.getElementById('console-messages');
+            if (!consoleContent) return; // Exit if console is not on the page
             const messageDiv = document.createElement('div');
             messageDiv.className = `console-message ${type}`;
             const emptyState = consoleContent.querySelector('.empty-state');
@@ -703,7 +769,7 @@
         function initializeResizers() {
             const sidebarResizer = document.getElementById('sidebar-resizer');
             const leftPane = document.getElementById('left-pane');
-            const rightPane = document.getElementById('right-pane');
+            const mainContent = document.getElementById('main-content-area');
             const container = document.getElementById('split-row');
 
             sidebarResizer.addEventListener('mousedown', function(e) {
@@ -724,7 +790,7 @@
                 if (newWidth > maxWidth) newWidth = maxWidth;
                 const percent = (newWidth / rect.width) * 100;
                 leftPane.style.flex = `0 0 ${percent}%`;
-                rightPane.style.flex = `1 1 ${100 - percent}%`;
+                mainContent.style.flex = `1 1 ${100 - percent}%`;
             });
 
             document.addEventListener('mouseup', function() {
@@ -744,10 +810,8 @@
         // Initialize resizers when page loads
         window.addEventListener('load', function() {
             initializeResizers();
-            fetch('/messages')
-                .then(r => r.json())
-                .then(data => updateMessages(data))
-                .catch(err => console.error('Error loading initial messages:', err));
+            // Load home page by default
+            loadPage('home');
         });
     </script>
 </body>

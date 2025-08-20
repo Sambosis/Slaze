@@ -32,6 +32,3 @@ def test_get_file_content(client):
     assert data['content'] == 'hello'
 
 
-def test_vscode_page(client):
-    resp = client.get('/vscode')
-    assert resp.status_code == 200

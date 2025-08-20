@@ -41,37 +41,41 @@ class WebUI:
         # More robust path for templates
         template_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'templates'))
         logging.info(f"Template directory set to: {template_dir}")
-        self.app = Flask(__name__, template_folder=template_dir)
+
+        # Serve files from the project's public/static directory so URLs like
+        # /static/css/file_browser.css map to <repo>/public/static/css/file_browser.css
+        static_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'public', 'static'))
+        self.app = Flask(__name__, template_folder=template_dir, static_folder=static_dir)
         self.app.config["SECRET_KEY"] = "secret!"
         self.socketio = SocketIO(self.app, async_mode="threading", cookie=None)
         self.user_messages = []
         self.assistant_messages = []
         self.tool_results = []
+
         # Using a standard Queue for cross-thread communication
         self.input_queue = Queue()
         self.tool_queue = Queue()
         self.agent_runner = agent_runner
+
         # Import tools lazily to avoid circular imports
         from tools import (
-            # BashTool,
-            # OpenInterpreterTool,
             ProjectSetupTool,
             WriteCodeTool,
             PictureGenerationTool,
             EditTool,
             ToolCollection,
-            BashTool
+            BashTool,
         )
 
         self.tool_collection = ToolCollection(
             WriteCodeTool(display=self),
             ProjectSetupTool(display=self),
             BashTool(display=self),
-            # OpenInterpreterTool(display=self),  # Uncommented and enabled for testing
             PictureGenerationTool(display=self),
             EditTool(display=self),
             display=self,
         )
+
         self.setup_routes()
         self.setup_socketio_events()
         logging.info("WebUI initialized")
@@ -282,8 +286,9 @@ class WebUI:
             tool = self.tool_collection.tools.get(tool_name)
             if not tool:
                 return "Tool not found", 404
+
             params = tool.to_params()["function"]["parameters"]
-            result_text = None
+
             if request.method == "POST":
                 tool_input = {}
                 for param in params.get("properties", {}):
@@ -305,13 +310,16 @@ class WebUI:
                 try:
                     result = asyncio.run(self.tool_collection.run(tool_name, tool_input))
                     result_text = result.output or result.error
+                    return jsonify({"success": True, "result": result_text})
                 except Exception as exc:
-                    result_text = str(exc)
+                    return jsonify({"success": False, "error": str(exc)})
+
+            # For GET requests, just render the form partial
             return render_template(
                 "tool_form.html",
                 tool_name=tool_name,
                 params=params,
-                result=result_text,
+                result=None, # No result on initial load
             )
 
         @self.app.route("/web_ide")
