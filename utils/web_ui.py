@@ -41,38 +41,41 @@ class WebUI:
         # More robust path for templates
         template_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'templates'))
         logging.info(f"Template directory set to: {template_dir}")
-        static_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'public'))
+
+        # Serve files from the project's public/static directory so URLs like
+        # /static/css/file_browser.css map to <repo>/public/static/css/file_browser.css
+        static_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'public', 'static'))
         self.app = Flask(__name__, template_folder=template_dir, static_folder=static_dir)
         self.app.config["SECRET_KEY"] = "secret!"
         self.socketio = SocketIO(self.app, async_mode="threading", cookie=None)
         self.user_messages = []
         self.assistant_messages = []
         self.tool_results = []
+
         # Using a standard Queue for cross-thread communication
         self.input_queue = Queue()
         self.tool_queue = Queue()
         self.agent_runner = agent_runner
+
         # Import tools lazily to avoid circular imports
         from tools import (
-            # BashTool,
-            # OpenInterpreterTool,
             ProjectSetupTool,
             WriteCodeTool,
             PictureGenerationTool,
             EditTool,
             ToolCollection,
-            BashTool
+            BashTool,
         )
 
         self.tool_collection = ToolCollection(
             WriteCodeTool(display=self),
             ProjectSetupTool(display=self),
             BashTool(display=self),
-            # OpenInterpreterTool(display=self),  # Uncommented and enabled for testing
             PictureGenerationTool(display=self),
             EditTool(display=self),
             display=self,
         )
+
         self.setup_routes()
         self.setup_socketio_events()
         logging.info("WebUI initialized")

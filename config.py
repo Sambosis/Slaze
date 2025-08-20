@@ -80,17 +80,17 @@ googleflash = "google/gemini-2.5-flash"
 googleflashlite = "google/gemini-2.5-flash-lite-preview-06-17"
 grok4 = "x-ai/grok-4"
 qwen3 = "qwen/qwen3-235b-a22b-07-25"
-qwencoder = "qwen/qwen3-coder:nitro"
+qwencoder = "qwen/qwen3-coder:free"
 zai45 = "z-ai/glm-4.5"
 halfa = "openrouter/horizon-beta"
-autor = "meta-llama/llama-4-maverick"
+autor = "deepseek/deepseek-r1-0528:free"
 openaiopen = "openai/gpt-oss-120b"
 open5 = "openai/gpt-5"
 open5mini="openai/gpt-5-mini"
 open5nano = "openai/gpt-5-nano"
 
 # Model constants
-ALL_MODELS= zai45
+ALL_MODELS= googleflashlite
 SUMMARY_MODEL = ALL_MODELS  # Model for summaries
 MAIN_MODEL = ALL_MODELS  # Primary model for main agent operations
 CODE_MODEL = ALL_MODELS  # Model for code generation tasks
