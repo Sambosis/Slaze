@@ -34,6 +34,8 @@ gevent==24.11.1
 greenlet==3.1.1
 grpcio==1.70.0
 gunicorn==23.0.0
+eventlet==0.36.1
+gevent-websocket==0.10.1
 h11==0.14.0
 httpcore==1.0.7
 httpx==0.28.1
