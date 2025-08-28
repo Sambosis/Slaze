@@ -88,9 +88,9 @@ openaiopen = "openai/gpt-oss-120b"
 open5 = "openai/gpt-5"
 open5mini="openai/gpt-5-mini"
 open5nano = "openai/gpt-5-nano"
-
+grokfast = "x-ai/grok-code-fast-1"
 # Model constants
-ALL_MODELS= googleflash
+ALL_MODELS= grokfast
 SUMMARY_MODEL = ALL_MODELS  # Model for summaries
 MAIN_MODEL = ALL_MODELS  # Primary model for main agent operations
 CODE_MODEL = ALL_MODELS  # Model for code generation tasks
