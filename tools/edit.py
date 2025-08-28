@@ -1,5 +1,5 @@
 """
-edit_tool_robust.py — v7  (complete, self‑contained)
+edit_tool_robust.py — v8 (complete, self‑contained)
 ====================================================
 Cross‑platform file editor geared for **code refactoring & debugging**.
 
@@ -10,16 +10,18 @@ view • create • str_replace • insert • undo_edit • lint • format
 Highlights
 ~~~~~~~~~~
 * **Code‑aware replacement** (`str_replace`) with three modes:
-  • exact  (default) – literal match.
-  • regex            – `old_str` interpreted as a Python regex.
-  • fuzzy            – whitespace‑agnostic pattern built automatically.
+  • exact  (default) – literal match.
+  • regex            – `old_str` interpreted as a Python regex.
+  • fuzzy            – whitespace‑agnostic pattern built automatically.
 
 * Atomic, lock‑safe writes with `portalocker`, size‑guarded reads
-  (≤ 512 KiB per file).
+  (≤ 512 KiB per file).
 
 * Built‑in lint (`ruff`→`pylint`) and formatter (`black`).
 
-* Strict path sandboxing: files stay under `REPO_DIR`.
+* Strict path sandboxing: files stay under `REPO_DIR`.
+
+* **Fixed newline handling** - no more extra newlines in output or file content.
 """
 
 from __future__ import annotations
@@ -46,7 +48,7 @@ from utils.file_logger import log_file_operation
 # ---------------------------------------------------------------------------
 
 _LOG = logging.getLogger(__name__)
-MAX_FILE_BYTES = 512 * 1024  # 512 KiB file size cap
+MAX_FILE_BYTES = 512 * 1024  # 512 KiB file size cap
 MAX_STDOUT = 10_000  # cap subprocess output in chars
 SNIPPET_LINES = 4  # context lines around edits
 
@@ -362,8 +364,13 @@ class EditTool(BaseTool):
         return data.decode("utf-8", errors="replace")
 
     def _write_file(self, path: Path, content: str):
+        """Write content to file with proper newline handling."""
         if len(content.encode()) > MAX_FILE_BYTES:
-            raise ToolError("Refusing to write >512 KiB file")
+            raise ToolError("Refusing to write >512 KiB file")
+        
+        # Ensure content is properly normalized (no extra newlines)
+        content = self._normalize_content(content)
+        
         tmp = path.with_suffix(path.suffix + ".tmp")
         tmp.parent.mkdir(parents=True, exist_ok=True)
         with portalocker.Lock(str(tmp), "w", timeout=5) as fp:
@@ -376,6 +383,27 @@ class EditTool(BaseTool):
             self._file_history[path].append(self._read_file(path))
         shutil.move(tmp, path)
         log_file_operation(path, "modify")
+
+    def _normalize_content(self, content: str) -> str:
+        """Normalize content to prevent extra newlines and ensure consistent formatting."""
+        if not content:
+            return ""
+        
+        # Split into lines
+        lines = content.splitlines()
+        
+        # Remove trailing empty lines only
+        while lines and not lines[-1].strip():
+            lines.pop()
+        
+        # Join lines with newlines
+        normalized = "\n".join(lines)
+        
+        # Preserve original trailing newline behavior if content had one
+        if content.endswith('\n'):
+            normalized += '\n'
+        
+        return normalized
 
     # ------------------------------------------------------------------
     # Directory listing
@@ -454,18 +482,28 @@ class EditTool(BaseTool):
         lines = current.splitlines()
         if line > len(lines):
             raise ToolError("insert_line beyond EOF")
-        new_lines = lines[:line] + text.splitlines() + lines[line:]
-        new_content = "\n".join(new_lines) + ("\n" if current.endswith("\n") else "")
+        
+        # Split the text to insert into lines
+        text_lines = text.splitlines()
+        
+        # Insert the new lines
+        new_lines = lines[:line] + text_lines + lines[line:]
+        
+        # Reconstruct content with proper newline handling
+        new_content = self._normalize_content("\n".join(new_lines))
+        
+        # Preserve original file's trailing newline behavior
+        if current.endswith('\n'):
+            new_content += '\n'
+        
         self._write_file(path, new_content)
+        
+        # Generate snippet for the inserted content
+        snippet_lines = new_lines[
+            max(0, line - SNIPPET_LINES) : line + SNIPPET_LINES + len(text_lines)
+        ]
         snippet = "\n".join(
-            self._numbered(
-                new_lines[
-                    max(0, line - SNIPPET_LINES) : line
-                    + SNIPPET_LINES
-                    + len(text.splitlines())
-                ],
-                offset=max(1, line - SNIPPET_LINES + 1),
-            )
+            self._numbered(snippet_lines, offset=max(1, line - SNIPPET_LINES + 1))
         )
         return ToolResult(output=f"Inserted text in {path}\n{snippet}")
 
