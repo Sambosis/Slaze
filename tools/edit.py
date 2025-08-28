@@ -430,12 +430,21 @@ class EditTool(BaseTool):
         if not matches:
             raise ToolError("No match found for replacement")
         if len(matches) > 1:
-            raise ToolError("Multiple matches found; make pattern more specific")
+            # Report line numbers of all matches to help caller refine pattern
+            line_numbers: List[int] = []
+            for m in matches:
+                line_numbers.append(text.count("\n", 0, m.start()) + 1)
+            raise ToolError(
+                "Multiple matches found; make pattern more specific. Matches at lines: "
+                + ", ".join(str(n) for n in line_numbers)
+            )
         m = matches[0]
-        new_text = text[: m.start()] + new + text[m.end() :]
-        self._write_file(path, new_text)
+        candidate_text = text[: m.start()] + new + text[m.end() :]
+        # Normalize EOLs to match original file style and trailing newline policy
+        normalized_text = self._normalize_to_original_newlines(original=text, modified=candidate_text)
+        self._write_file(path, normalized_text)
         # create context diff
-        snippet = self._snippet(new_text, m.start(), m.start() + len(new))
+        snippet = self._snippet(normalized_text, m.start(), m.start() + len(new))
         return ToolResult(output=f"Replaced code in {path}\n{snippet}")
 
     def _build_fuzzy_regex(self, s: str) -> str:
@@ -454,17 +463,18 @@ class EditTool(BaseTool):
         lines = current.splitlines()
         if line > len(lines):
             raise ToolError("insert_line beyond EOF")
-        new_lines = lines[:line] + text.splitlines() + lines[line:]
-        new_content = "\n".join(new_lines) + ("\n" if current.endswith("\n") else "")
+        inserted_lines = text.splitlines()
+        candidate_content = "\n".join(lines[:line] + inserted_lines + lines[line:])
+        # Normalize to original file's newline convention and trailing newline policy
+        new_content = self._normalize_to_original_newlines(original=current, modified=candidate_content)
         self._write_file(path, new_content)
+        new_lines_all = new_content.splitlines()
+        snippet_start = max(0, line - SNIPPET_LINES)
+        snippet_end = line + SNIPPET_LINES + len(inserted_lines)
         snippet = "\n".join(
             self._numbered(
-                new_lines[
-                    max(0, line - SNIPPET_LINES) : line
-                    + SNIPPET_LINES
-                    + len(text.splitlines())
-                ],
-                offset=max(1, line - SNIPPET_LINES + 1),
+                new_lines_all[snippet_start:snippet_end],
+                offset=max(1, snippet_start + 1),
             )
         )
         return ToolResult(output=f"Inserted text in {path}\n{snippet}")
@@ -502,6 +512,43 @@ class EditTool(BaseTool):
         out = proc.stdout[:MAX_STDOUT]
         err = proc.stderr[:MAX_STDOUT]
         return out, err, proc.returncode
+
+    # ------------------------------------------------------------------
+    # Newline normalization helpers
+    # ------------------------------------------------------------------
+
+    def _detect_original_newline(self, text: str) -> Tuple[str, bool]:
+        """Detect the predominant newline sequence and trailing newline policy in original text.
+
+        Returns a tuple of (newline_sequence, has_trailing_newline).
+        newline_sequence is "\r\n" if the file consistently uses CRLF, otherwise "\n".
+        """
+        uses_crlf = "\r\n" in text
+        stray_lf_present = "\n" in text.replace("\r\n", "")
+        newline_seq = "\r\n" if uses_crlf and not stray_lf_present else "\n"
+        trailing = text.endswith(("\r\n", "\n"))
+        return newline_seq, trailing
+
+    def _normalize_to_original_newlines(self, *, original: str, modified: str) -> str:
+        """Normalize newline characters in modified text to match the original file.
+
+        - Preserves the original file's newline sequence (LF vs CRLF)
+        - Preserves whether the file ended with a trailing newline
+        - Avoids introducing extra blank lines at EOF
+        """
+        newline_seq, trailing = self._detect_original_newline(original)
+
+        logical_lines = modified.splitlines()
+        normalized = newline_seq.join(logical_lines)
+        if trailing:
+            if not normalized.endswith(newline_seq):
+                normalized += newline_seq
+        else:
+            if normalized.endswith("\r\n"):
+                normalized = normalized[:-2]
+            elif normalized.endswith("\n"):
+                normalized = normalized[:-1]
+        return normalized
 
 
 # ---------------------------------------------------------------------------
