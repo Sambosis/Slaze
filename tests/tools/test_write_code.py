@@ -71,15 +71,17 @@ class TestWriteCodeTool:
         # Check required fields
         required_fields = params["function"]["parameters"]["required"]
         assert "command" in required_fields
-        assert "files" in required_fields
+        # files is no longer required globally (only for write_codebase), so do not assert it here
         
         # Check properties structure
         properties = params["function"]["parameters"]["properties"]
         assert "command" in properties
         assert "files" in properties
         
-        # Check command enum
-        assert properties["command"]["enum"] == [CodeCommand.WRITE_CODEBASE.value]
+        # Check command enum includes both commands
+        cmd_enum = properties["command"]["enum"]
+        assert CodeCommand.WRITE_CODEBASE.value in cmd_enum
+        assert CodeCommand.SCAFFOLD_WEB_APP.value in cmd_enum
 
     @pytest.mark.asyncio
     async def test_unsupported_command(self, write_code_tool: WriteCodeTool):
@@ -408,7 +410,49 @@ Some additional text.
     def test_code_command_enum(self):
         """Test the CodeCommand enum."""
         assert CodeCommand.WRITE_CODEBASE.value == "write_codebase"
+        assert CodeCommand.SCAFFOLD_WEB_APP.value == "scaffold_web_app"
         assert str(CodeCommand.WRITE_CODEBASE) == "CodeCommand.WRITE_CODEBASE"
+
+    @pytest.mark.asyncio
+    @patch('tools.write_code.get_constant')
+    @patch('tools.write_code.AsyncOpenAI')
+    async def test_scaffold_web_app_react(self, mock_openai_class, mock_get_constant,
+                                          write_code_tool: WriteCodeTool, mock_openai_client, mock_display):
+        """Scaffold a React app and ensure files are generated."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            mock_get_constant.return_value = temp_dir
+            mock_openai_class.return_value = mock_openai_client
+            write_code_tool.display = mock_display
+
+            result = await write_code_tool(
+                command=CodeCommand.SCAFFOLD_WEB_APP,
+                framework="react",
+                project_name="webapp",
+                routes=["about", "contact"],
+                components=["Header", "Footer"],
+                use_typescript=True,
+                css_framework="none",
+            )
+
+            assert isinstance(result, ToolResult)
+            assert result.error is None
+            # Verify key files exist (limited to 5 files total by tool)
+            assert (Path(temp_dir) / "webapp" / "package.json").exists()
+            # At least one src file should exist
+            src_dir = Path(temp_dir) / "webapp" / "src"
+            assert src_dir.exists()
+            # Display should be called
+            mock_display.add_message.assert_called()
+
+    @pytest.mark.asyncio
+    async def test_scaffold_missing_params(self, write_code_tool: WriteCodeTool):
+        """Scaffold should error when required params are missing."""
+        result = await write_code_tool(
+            command=CodeCommand.SCAFFOLD_WEB_APP,
+        )
+        assert isinstance(result, ToolResult)
+        assert result.error is not None
+        assert "missing required parameters" in result.error.lower()
 
 
 if __name__ == "__main__":
