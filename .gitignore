@@ -13,6 +13,7 @@ ignore/
 llm_gen_code/
 repo/
 *.json
+requirements.txt
 # *.lock
 # *.toml
 .env
