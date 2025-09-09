@@ -220,10 +220,22 @@ class EditTool(BaseTool):
         if old is None:
             raise ToolError("`old_str` required for str_replace")
         if mode not in {"exact", "regex", "fuzzy"}:
-            # set mode to fuzzy if it is not correctly specified
-            mode = "fuzzy"
-            #raise ToolError("match_mode must be exact/regex/fuzzy")
-        return self._file_str_replace(path, old, new or "", mode)
+            mode = "exact"
+
+        try:
+            return self._file_str_replace(path, old, new or "", mode)
+        except ToolError as err:
+            # If exact match fails to find a match, automatically retry with fuzzy matching
+            message = str(err)
+            if mode == "exact" and ("No match" in message or "No match found" in message):
+                fallback_result = self._file_str_replace(path, old, new or "", "fuzzy")
+                # Prepend a brief note so the user understands why it succeeded
+                if fallback_result.output:
+                    fallback_result.output = (
+                        "[fallback to fuzzy match]\n" + fallback_result.output
+                    )
+                return fallback_result
+            raise
 
     def _cmd_insert(
         self, path: Path, line: Optional[int], text: Optional[str]
@@ -448,9 +460,23 @@ class EditTool(BaseTool):
         return ToolResult(output=f"Replaced code in {path}\n{snippet}")
 
     def _build_fuzzy_regex(self, s: str) -> str:
-        # collapse any whitespace sequence to \s+
-        collapsed = re.sub(r"\s+", "\\s+", s.strip())
-        return collapsed
+        """Construct a regex that matches the given string with flexible whitespace.
+
+        - All non-whitespace characters are escaped literally
+        - Any run of whitespace (spaces, tabs, newlines) becomes \\s+
+        This avoids accidental regex metacharacter greediness that can span many lines.
+        """
+        parts = re.findall(r"\s+|\S+", s)
+        escaped_segments: List[str] = []
+        for part in parts:
+            if part.isspace():
+                escaped_segments.append(r"\s+")
+            else:
+                escaped_segments.append(re.escape(part))
+        pattern = "".join(escaped_segments)
+        # Coalesce any accidental consecutive \s+ tokens
+        pattern = re.sub(r"(?:\\s\+){2,}", r"\\s+", pattern)
+        return pattern
 
     # ------------------------------------------------------------------
     # Insert
