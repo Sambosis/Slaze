@@ -150,6 +150,32 @@ class ProjectSetupTool(BaseAnthropicTool):
 
         return "\n".join(output_lines)
 
+    def _check_uv_availability(self) -> bool:
+        """Check if uv is available in PATH, try to add common paths if not found."""
+        import shutil
+        
+        # First check if uv is already available
+        if shutil.which("uv"):
+            return True
+            
+        # Try to add common uv installation paths to PATH
+        possible_paths = [
+            os.path.expanduser("~/.cargo/bin"),
+            os.path.expanduser("~/.local/bin"),
+            os.path.expanduser("~/bin")
+        ]
+        
+        for path in possible_paths:
+            uv_path = os.path.join(path, "uv")
+            if os.path.exists(uv_path):
+                # Add to PATH for this session
+                current_path = os.environ.get("PATH", "")
+                if path not in current_path:
+                    os.environ["PATH"] = f"{path}{os.pathsep}{current_path}"
+                return True
+                
+        return False
+
     def _run_subprocess_with_display(
             self,
             cmd: list,
@@ -194,6 +220,20 @@ class ProjectSetupTool(BaseAnthropicTool):
 
         repo_path = Path(host_repo_dir)
         installed_packages = []
+
+        # Check if uv is available
+        if not self._check_uv_availability():
+            error_result = {
+                "command": "setup_project", 
+                "status": "error",
+                "error": "uv package manager is not available. Please ensure uv is installed and in PATH.",
+                "repo_path": str(repo_path),
+            }
+            return ToolResult(
+                error="uv package manager is not available",
+                message=self.format_output(error_result),
+                command="setup_project",
+                tool_name=self.name)
 
         repo_path.mkdir(parents=True, exist_ok=True)
         venv_dir = repo_path / ".venv"

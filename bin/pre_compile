@@ -30,11 +30,20 @@ else
     fi
 fi
 
-# Ensure the .profile.d directory exists
-mkdir -p $HOME/.profile.d
+# Ensure the .profile.d directory exists for runtime PATH
+mkdir -p $BUILD_DIR/.profile.d
 
-# Export PATH for subsequent build steps and runtime
-echo "export PATH=\"\$HOME/.cargo/bin:\$PATH\"" > $HOME/.profile.d/uv.sh
-echo "export PATH=\"\$HOME/.local/bin:\$PATH\"" >> $HOME/.profile.d/uv.sh
+# Export PATH for runtime - Heroku sources files from .profile.d/ at runtime
+echo "export PATH=\"\$HOME/.cargo/bin:\$PATH\"" > $BUILD_DIR/.profile.d/uv.sh
+echo "export PATH=\"\$HOME/.local/bin:\$PATH\"" >> $BUILD_DIR/.profile.d/uv.sh
+
+# Also create symlinks in /app/bin for easier access
+mkdir -p $BUILD_DIR/bin
+if [ -f "$HOME/.local/bin/uv" ]; then
+    ln -sf $HOME/.local/bin/uv $BUILD_DIR/bin/uv
+fi
+if [ -f "$HOME/.cargo/bin/uv" ]; then
+    ln -sf $HOME/.cargo/bin/uv $BUILD_DIR/bin/uv
+fi
 
 echo "       uv setup complete!"

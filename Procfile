@@ -1,1 +1,1 @@
-web: gunicorn -k eventlet -w 1 --bind 0.0.0.0:$PORT wsgi:app
+web: export PATH="$HOME/.cargo/bin:$HOME/.local/bin:$PATH" && gunicorn -k eventlet -w 1 --bind 0.0.0.0:$PORT wsgi:app
