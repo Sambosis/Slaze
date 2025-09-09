@@ -13,7 +13,7 @@ ignore/
 llm_gen_code/
 repo/
 *.json
-*.lock
+# *.lock
 # *.toml
 .env
 ## virtual environments in subdirectories
