@@ -3415,7 +3415,6 @@ dependencies = [
     { name = "six" },
     { name = "sniffio" },
     { name = "soupsieve" },
-    { name = "symbex" },
     { name = "tenacity" },
     { name = "torch" },
     { name = "tqdm" },
@@ -3528,7 +3527,6 @@ requires-dist = [
     { name = "six", specifier = "==1.17.0" },
     { name = "sniffio", specifier = "==1.3.1" },
     { name = "soupsieve", specifier = "==2.6" },
-    { name = "symbex", specifier = ">=2.0" },
     { name = "tenacity", specifier = "==9.0.0" },
     { name = "torch", specifier = ">=2.6.0" },
     { name = "tqdm", specifier = "==4.67.1" },
@@ -3583,18 +3581,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/28/e3/55dcc2cfbc3ca9c29519eb6884dd1415ecb53b0e934862d3559ddcb7e20b/stack_data-0.6.3.tar.gz", hash = "sha256:836a778de4fec4dcd1dcd89ed8abff8a221f58308462e1c4aa2a3cf30148f0b9", size = 44707 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/f1/7b/ce1eafaf1a76852e2ec9b22edecf1daa58175c090266e9f6c64afcd81d91/stack_data-0.6.3-py3-none-any.whl", hash = "sha256:d5558e0c25a4cb0853cddad3d77da9891a08cb85dd9f9f91b9f8cd66e511e695", size = 24521 },
-]
-
-[[package]]
-name = "symbex"
-version = "2.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "click" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/75/1d/0795ed1970db8bf0aba3eb5f6ae7d6f454ea93785bfab01046fd7bbf5a60/symbex-2.0.tar.gz", hash = "sha256:dfa2054893b07a7c99072798137be16477cf5071828b0b380373c0cf8d726b87", size = 31015 }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/48/f9/03742d19afb9f525f711e1f02ed7fe721ae88abf0fb40d8fe55d8bbc56db/symbex-2.0-py3-none-any.whl", hash = "sha256:4a59c472a94117182aefecd19f6fe1932b20f4c22ff59ebce582e3342e5255cd", size = 20730 },
 ]
 
 [[package]]
