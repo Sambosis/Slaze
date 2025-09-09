@@ -153,6 +153,14 @@ class EditTool(BaseTool):
     ) -> ToolResult:
         cmd_enum = self._validate_command(command)
         _path = self._resolve_path(path)
+        call_args = {
+            "command": cmd_enum.value,
+            "path": str(_path),
+            "match_mode": match_mode,
+            "old_str": old_str,
+            "new_str": new_str,
+            "insert_line": insert_line,
+        }
         try:
             if cmd_enum is Command.CREATE:
                 result = self._cmd_create(_path, file_text)
@@ -172,7 +180,7 @@ class EditTool(BaseTool):
                 raise ToolError(f"Unhandled command {cmd_enum}")
 
             # Add assistant console-style display if configured
-            self._maybe_display(cmd_enum, _path, result)
+            self._maybe_display(cmd_enum, _path, result, call_args=call_args)
             return result
         except Exception as exc:
             _LOG.error("EditTool failure", exc_info=True)
@@ -182,7 +190,7 @@ class EditTool(BaseTool):
                 tool_name=self.name,
                 command=command,
             )
-            self._maybe_display(cmd_enum, _path, error_result, is_error=True)
+            self._maybe_display(cmd_enum, _path, error_result, is_error=True, call_args=call_args)
             return error_result
 
     # ------------------------------------------------------------------
@@ -275,11 +283,12 @@ class EditTool(BaseTool):
         result: ToolResult,
         *,
         is_error: bool = False,
+        call_args: Optional[Dict[str, Any]] = None,
     ) -> None:
         if self.display is None:
             return
         try:
-            formatted = self._format_terminal_output(cmd_enum, path, result, is_error=is_error)
+            formatted = self._format_terminal_output(cmd_enum, path, result, is_error=is_error, call_args=call_args)
             if formatted:
                 # send as assistant message so it appears in console like other tools
                 self.display.add_message("assistant", formatted)
@@ -295,6 +304,7 @@ class EditTool(BaseTool):
         is_error: bool = False,
         max_lines: int = 20,
         max_chars: int = 2_000,
+        call_args: Optional[Dict[str, Any]] = None,
     ) -> str:
         """Return a fenced console block showing the invoked edit command and its output.
 
@@ -307,8 +317,31 @@ class EditTool(BaseTool):
                 rel_path = str(path.relative_to(self._repo_dir))
             except Exception:
                 rel_path = str(path)
-            invoked = f"$ edit {cmd_enum.value} {rel_path}".rstrip()
+            mode_arg = ""
+            if call_args and cmd_enum is Command.STR_REPLACE:
+                mm = call_args.get("match_mode") or "exact"
+                mode_arg = f" --mode={mm}"
+            invoked = f"$ edit {cmd_enum.value} {rel_path}{mode_arg}".rstrip()
             lines: List[str] = ["```console", invoked]
+
+            # For str_replace, include previews of old/new strings attempted
+            if call_args and cmd_enum is Command.STR_REPLACE:
+                def _preview(label: str, value: Optional[str]) -> List[str]:
+                    if value is None:
+                        return [f"{label}: <none>"]
+                    text = value
+                    LIMIT = 400
+                    if len(text) > LIMIT:
+                        text = text[: LIMIT // 2] + "\n… (truncated) …\n" + text[-LIMIT // 2 :]
+                    return [
+                        f"{label} (len={len(value)}):",
+                        "<<<",
+                        text,
+                        ">>>",
+                    ]
+
+                lines.extend(_preview("old_str", call_args.get("old_str")))
+                lines.extend(_preview("new_str", call_args.get("new_str")))
             out_text = result.output or ""
             err_text = result.error or ""
 
