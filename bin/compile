@@ -18,29 +18,24 @@ if [ -d "$ENV_DIR" ]; then
 fi
 
 # Ensure uv is in PATH
-export PATH="$HOME/.cargo/bin:$PATH"
+export PATH="$HOME/.cargo/bin:$HOME/.local/bin:$PATH"
 
-# Check if uv is available
+# Check if uv is available and copy it to app bin directory for runtime access
 if command -v uv &> /dev/null; then
     echo "       Using uv for dependency management"
+    
+    # Copy uv to build directory bin for runtime access
+    mkdir -p $BUILD_DIR/bin
+    UV_PATH=$(which uv)
+    cp "$UV_PATH" "$BUILD_DIR/bin/uv"
+    echo "       Copied uv to $BUILD_DIR/bin/uv for runtime access"
     
     # Change to build directory
     cd $BUILD_DIR
     
-    # Install dependencies using uv
-    if [ -f "pyproject.toml" ]; then
-        echo "       Installing from pyproject.toml with uv..."
-        uv pip install --system -e .
-    elif [ -f "requirements.txt" ]; then
-        echo "       Installing from requirements.txt with uv..."
-        uv pip install --system -r requirements.txt
-    fi
+    # Don't install dependencies here - let the Python buildpack handle it
+    echo "       Letting Python buildpack handle dependency installation"
     
-    echo "       Dependencies installed successfully with uv!"
 else
-    echo "       WARNING: uv not found, falling back to pip"
-    # Fallback to standard pip installation
-    if [ -f "requirements.txt" ]; then
-        pip install -r requirements.txt
-    fi
+    echo "       WARNING: uv not found during compile"
 fi
