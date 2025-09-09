@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# This script runs before Python dependencies are installed
+# It installs uv package manager in the Heroku environment
+
+set -eo pipefail
+
+echo "-----> Installing uv package manager..."
+
+# Check if uv is already installed
+if command -v uv &> /dev/null; then
+    echo "       uv is already installed: $(uv --version)"
+else
+    # Install uv using the official installation script
+    echo "       Downloading and installing uv..."
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+    
+    # Add uv to PATH for the current build
+    export PATH="$HOME/.cargo/bin:$PATH"
+    
+    # Also try the .local/bin path as a fallback
+    export PATH="$HOME/.local/bin:$PATH"
+    
+    # Verify uv installation
+    if command -v uv &> /dev/null; then
+        echo "       uv version: $(uv --version)"
+        echo "       uv installed successfully!"
+    else
+        echo "       ERROR: uv installation failed"
+        exit 1
+    fi
+fi
+
+# Ensure the .profile.d directory exists
+mkdir -p $HOME/.profile.d
+
+# Export PATH for subsequent build steps and runtime
+echo "export PATH=\"\$HOME/.cargo/bin:\$PATH\"" > $HOME/.profile.d/uv.sh
+echo "export PATH=\"\$HOME/.local/bin:\$PATH\"" >> $HOME/.profile.d/uv.sh
+
+echo "       uv setup complete!"
