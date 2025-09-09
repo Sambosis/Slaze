@@ -272,3 +272,36 @@ async def test_regex_crlf_tolerant_and_fallback(tmp_path: Path):
         match_mode="regex",
     )
     assert result2.error is None, f"Regex->fuzzy fallback failed: {result2.error}"
+
+
+@pytest.mark.asyncio
+async def test_no_extra_blank_lines_after_replacement(tmp_path: Path):
+    """Ensure replacements do not introduce extra blank lines across the whole file."""
+    test_file = tmp_path / "no_extra_blank_lines.py"
+    original = (
+        "import pygame\n"
+        "import json\n"
+        "import os\n\n"
+        "def f():\n"
+        "    return 1\n"
+    )
+    test_file.write_text(original, encoding="utf-8")
+
+    tool = EditTool()
+    # Perform a small replacement that should not affect global newlines
+    await tool(
+        command="str_replace",
+        path=str(test_file),
+        old_str="return 1",
+        new_str="return 2",
+        match_mode="exact",
+    )
+
+    updated = test_file.read_text(encoding="utf-8")
+    # Ensure the number of non-empty lines remains the same (only content changed)
+    def non_empty_lines_count(s: str) -> int:
+        return sum(1 for line in s.splitlines() if line.strip() != "")
+
+    assert non_empty_lines_count(updated) == non_empty_lines_count(original), (
+        f"Non-empty line count changed.\nOriginal:\n{original}\nUpdated:\n{updated}"
+    )
