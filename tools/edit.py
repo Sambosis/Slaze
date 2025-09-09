@@ -153,6 +153,14 @@ class EditTool(BaseTool):
     ) -> ToolResult:
         cmd_enum = self._validate_command(command)
         _path = self._resolve_path(path)
+        call_args = {
+            "command": cmd_enum.value,
+            "path": str(_path),
+            "match_mode": match_mode,
+            "old_str": old_str,
+            "new_str": new_str,
+            "insert_line": insert_line,
+        }
         try:
             if cmd_enum is Command.CREATE:
                 result = self._cmd_create(_path, file_text)
@@ -172,7 +180,7 @@ class EditTool(BaseTool):
                 raise ToolError(f"Unhandled command {cmd_enum}")
 
             # Add assistant console-style display if configured
-            self._maybe_display(cmd_enum, _path, result)
+            self._maybe_display(cmd_enum, _path, result, call_args=call_args)
             return result
         except Exception as exc:
             _LOG.error("EditTool failure", exc_info=True)
@@ -182,7 +190,7 @@ class EditTool(BaseTool):
                 tool_name=self.name,
                 command=command,
             )
-            self._maybe_display(cmd_enum, _path, error_result, is_error=True)
+            self._maybe_display(cmd_enum, _path, error_result, is_error=True, call_args=call_args)
             return error_result
 
     # ------------------------------------------------------------------
@@ -220,10 +228,22 @@ class EditTool(BaseTool):
         if old is None:
             raise ToolError("`old_str` required for str_replace")
         if mode not in {"exact", "regex", "fuzzy"}:
-            # set mode to fuzzy if it is not correctly specified
-            mode = "fuzzy"
-            #raise ToolError("match_mode must be exact/regex/fuzzy")
-        return self._file_str_replace(path, old, new or "", mode)
+            mode = "exact"
+
+        try:
+            return self._file_str_replace(path, old, new or "", mode)
+        except ToolError as err:
+            # If exact/regex match fails to find a match, automatically retry with fuzzy matching
+            message = str(err)
+            if mode in {"exact", "regex"} and ("No match" in message or "No match found" in message):
+                fallback_result = self._file_str_replace(path, old, new or "", "fuzzy")
+                # Prepend a brief note so the user understands why it succeeded
+                if fallback_result.output:
+                    fallback_result.output = (
+                        "[fallback to fuzzy match]\n" + fallback_result.output
+                    )
+                return fallback_result
+            raise
 
     def _cmd_insert(
         self, path: Path, line: Optional[int], text: Optional[str]
@@ -263,11 +283,12 @@ class EditTool(BaseTool):
         result: ToolResult,
         *,
         is_error: bool = False,
+        call_args: Optional[Dict[str, Any]] = None,
     ) -> None:
         if self.display is None:
             return
         try:
-            formatted = self._format_terminal_output(cmd_enum, path, result, is_error=is_error)
+            formatted = self._format_terminal_output(cmd_enum, path, result, is_error=is_error, call_args=call_args)
             if formatted:
                 # send as assistant message so it appears in console like other tools
                 self.display.add_message("assistant", formatted)
@@ -283,6 +304,7 @@ class EditTool(BaseTool):
         is_error: bool = False,
         max_lines: int = 20,
         max_chars: int = 2_000,
+        call_args: Optional[Dict[str, Any]] = None,
     ) -> str:
         """Return a fenced console block showing the invoked edit command and its output.
 
@@ -295,8 +317,31 @@ class EditTool(BaseTool):
                 rel_path = str(path.relative_to(self._repo_dir))
             except Exception:
                 rel_path = str(path)
-            invoked = f"$ edit {cmd_enum.value} {rel_path}".rstrip()
+            mode_arg = ""
+            if call_args and cmd_enum is Command.STR_REPLACE:
+                mm = call_args.get("match_mode") or "exact"
+                mode_arg = f" --mode={mm}"
+            invoked = f"$ edit {cmd_enum.value} {rel_path}{mode_arg}".rstrip()
             lines: List[str] = ["```console", invoked]
+
+            # For str_replace, include previews of old/new strings attempted
+            if call_args and cmd_enum is Command.STR_REPLACE:
+                def _preview(label: str, value: Optional[str]) -> List[str]:
+                    if value is None:
+                        return [f"{label}: <none>"]
+                    text = value
+                    LIMIT = 400
+                    if len(text) > LIMIT:
+                        text = text[: LIMIT // 2] + "\n… (truncated) …\n" + text[-LIMIT // 2 :]
+                    return [
+                        f"{label} (len={len(value)}):",
+                        "<<<",
+                        text,
+                        ">>>",
+                    ]
+
+                lines.extend(_preview("old_str", call_args.get("old_str")))
+                lines.extend(_preview("new_str", call_args.get("new_str")))
             out_text = result.output or ""
             err_text = result.error or ""
 
@@ -363,11 +408,12 @@ class EditTool(BaseTool):
 
     def _write_file(self, path: Path, content: str):
         if len(content.encode()) > MAX_FILE_BYTES:
-            raise ToolError("Refusing to write >512 KiB file")
+            raise ToolError("Refusing to write >512 KiB file")
         tmp = path.with_suffix(path.suffix + ".tmp")
         tmp.parent.mkdir(parents=True, exist_ok=True)
-        with portalocker.Lock(str(tmp), "w", timeout=5) as fp:
-            fp.write(content)
+        # Write bytes to avoid platform newline translation (prevents accidental blank lines)
+        with portalocker.Lock(str(tmp), "wb", timeout=5) as fp:
+            fp.write(content.encode("utf-8"))
         # Windows‑safe timestamp (no ':')
         timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S")
         backup = path.with_suffix(path.suffix + f".bak.{timestamp}")
@@ -421,9 +467,12 @@ class EditTool(BaseTool):
         pattern: str
         flags = re.DOTALL
         if mode == "exact":
+            # Escape all characters, then allow CRLF/LF equivalence by turning literal newlines into \r?\n
             pattern = re.escape(old)
+            pattern = self._crlf_tolerant(pattern)
         elif mode == "regex":
-            pattern = old
+            # Respect user regex but make line breaks CRLF/LF tolerant
+            pattern = self._crlf_tolerant(old)
         else:  # fuzzy
             pattern = self._build_fuzzy_regex(old)
         matches = list(re.finditer(pattern, text, flags))
@@ -448,9 +497,34 @@ class EditTool(BaseTool):
         return ToolResult(output=f"Replaced code in {path}\n{snippet}")
 
     def _build_fuzzy_regex(self, s: str) -> str:
-        # collapse any whitespace sequence to \s+
-        collapsed = re.sub(r"\s+", "\\s+", s.strip())
-        return collapsed
+        """Construct a regex that matches the given string with flexible whitespace.
+
+        - All non-whitespace characters are escaped literally
+        - Any run of whitespace (spaces, tabs, newlines) becomes \\s+
+        This avoids accidental regex metacharacter greediness that can span many lines.
+        """
+        parts = re.findall(r"\s+|\S+", s)
+        escaped_segments: List[str] = []
+        for part in parts:
+            if part.isspace():
+                escaped_segments.append(r"\s+")
+            else:
+                escaped_segments.append(re.escape(part))
+        pattern = "".join(escaped_segments)
+        # Coalesce any accidental consecutive \s+ tokens
+        pattern = re.sub(r"(?:\\s\+){2,}", r"\\s+", pattern)
+        return pattern
+
+    def _crlf_tolerant(self, pattern: str) -> str:
+        """Convert literal newlines in a pattern to a regex that matches either LF or CRLF.
+
+        This replaces actual newline characters in the pattern with the regex sequence
+        \\r?\\n so the same pattern will match files regardless of line ending style.
+        """
+        # First normalize any explicit CRLF in the pattern, then standalone LF
+        pattern = pattern.replace("\r\n", r"\r?\n")
+        pattern = pattern.replace("\n", r"\r?\n")
+        return pattern
 
     # ------------------------------------------------------------------
     # Insert

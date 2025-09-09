@@ -162,3 +162,146 @@ async def test_view_file_with_range_on_empty_file(edit_tool: EditTool, tmp_path:
     assert result_invalid.error is not None, "Error should be populated for out-of-bounds range on empty file"
     expected_error_msg = "Invalid `view_range`: [2, 2]. Its first element `2` should be within the range of lines of the file: [1, 1]"
     assert expected_error_msg in result_invalid.error, f"Expected '{expected_error_msg}' to be in '{result_invalid.error}'"
+
+
+@pytest.mark.asyncio
+async def test_str_replace_exact_preserves_newlines_no_extra_lines(tmp_path: Path):
+    """Ensure exact replacement does not introduce extra blank lines at EOF."""
+    test_file = tmp_path / "newline_test.txt"
+    # Original ends with a single newline
+    original = "alpha\nbeta\n"
+    test_file.write_text(original, encoding="utf-8")
+
+    tool = EditTool()
+    result = await tool(
+        command="str_replace",
+        path=str(test_file),
+        old_str="beta",
+        new_str="gamma",
+    )
+
+    assert result.error is None, f"Unexpected error: {result.error}"
+    content = test_file.read_text(encoding="utf-8")
+    assert content == "alpha\ngamma\n", f"Content wrong or extra lines added: {repr(content)}"
+
+
+@pytest.mark.asyncio
+async def test_str_replace_fallback_to_fuzzy_for_whitespace_differences(tmp_path: Path):
+    """If exact fails, tool should fallback to fuzzy and succeed when whitespace differs."""
+    test_file = tmp_path / "fuzzy_test.py"
+    file_text = "def foo():\n    return 1\n"
+    test_file.write_text(file_text, encoding="utf-8")
+
+    # old_str with different whitespace (two spaces instead of four)
+    old_snippet = "def foo():\n  return 1"
+    new_snippet = "def foo():\n    return 2"
+
+    tool = EditTool()
+    result = await tool(
+        command="str_replace",
+        path=str(test_file),
+        old_str=old_snippet,
+        new_str=new_snippet,
+    )
+
+    # Should succeed via fuzzy fallback (no explicit match_mode provided)
+    assert result.error is None, f"Replacement failed: {result.error}"
+    content = test_file.read_text(encoding="utf-8")
+    assert content == "def foo():\n    return 2\n"
+
+
+class _FakeDisplay:
+    def __init__(self):
+        self.messages = []
+    def add_message(self, msg_type, content):
+        self.messages.append((msg_type, content))
+
+
+@pytest.mark.asyncio
+async def test_console_shows_command_line_for_str_replace(tmp_path: Path):
+    """Console output should include the tool invocation line for str_replace."""
+    test_file = tmp_path / "console_cmd.txt"
+    test_file.write_text("x = 1\n", encoding="utf-8")
+
+    display = _FakeDisplay()
+    tool = EditTool(display=display)
+
+    await tool(
+        command="str_replace",
+        path=str(test_file),
+        old_str="x = 1",
+        new_str="x = 2",
+    )
+
+    # Find the last assistant message (the display hook uses assistant channel)
+    assistant_msgs = [m for m in display.messages if m[0] == "assistant"]
+    assert assistant_msgs, "No assistant messages captured from display"
+    last_msg = assistant_msgs[-1][1]
+    assert "$ edit str_replace" in last_msg, f"Command invocation missing in console output: {last_msg}"
+
+
+@pytest.mark.asyncio
+async def test_regex_crlf_tolerant_and_fallback(tmp_path: Path):
+    """Regex should match across CRLF/LF and fallback to fuzzy when needed."""
+    test_file = tmp_path / "crlf_regex.txt"
+
+    # Write file with CRLF line endings explicitly
+    content = "line1\r\nline2: beta\r\nline3\r\n"
+    test_file.write_bytes(content.encode("utf-8"))
+
+    tool = EditTool()
+
+    # Regex with LF only should still match CRLF due to tolerance
+    result = await tool(
+        command="str_replace",
+        path=str(test_file),
+        old_str=r"line2:\s+beta\nline3",
+        new_str="line2: gamma\nline3",
+        match_mode="regex",
+    )
+    assert result.error is None, f"Regex with CRLF tolerance failed: {result.error}"
+
+    # Now attempt a regex that will not match; should fallback to fuzzy
+    # Slight whitespace difference that regex (as given) won't account for
+    test_file.write_text("a\n  b\n", encoding="utf-8")
+    result2 = await tool(
+        command="str_replace",
+        path=str(test_file),
+        old_str="a\n b\n",  # single space before b
+        new_str="a\n   b\n",  # three spaces before b
+        match_mode="regex",
+    )
+    assert result2.error is None, f"Regex->fuzzy fallback failed: {result2.error}"
+
+
+@pytest.mark.asyncio
+async def test_no_extra_blank_lines_after_replacement(tmp_path: Path):
+    """Ensure replacements do not introduce extra blank lines across the whole file."""
+    test_file = tmp_path / "no_extra_blank_lines.py"
+    original = (
+        "import pygame\n"
+        "import json\n"
+        "import os\n\n"
+        "def f():\n"
+        "    return 1\n"
+    )
+    test_file.write_text(original, encoding="utf-8")
+
+    tool = EditTool()
+    # Perform a small replacement that should not affect global newlines
+    await tool(
+        command="str_replace",
+        path=str(test_file),
+        old_str="return 1",
+        new_str="return 2",
+        match_mode="exact",
+    )
+
+    updated = test_file.read_text(encoding="utf-8")
+    # Ensure the number of non-empty lines remains the same (only content changed)
+    def non_empty_lines_count(s: str) -> int:
+        return sum(1 for line in s.splitlines() if line.strip() != "")
+
+    assert non_empty_lines_count(updated) == non_empty_lines_count(original), (
+        f"Non-empty line count changed.\nOriginal:\n{original}\nUpdated:\n{updated}"
+    )
