@@ -238,3 +238,37 @@ async def test_console_shows_command_line_for_str_replace(tmp_path: Path):
     assert assistant_msgs, "No assistant messages captured from display"
     last_msg = assistant_msgs[-1][1]
     assert "$ edit str_replace" in last_msg, f"Command invocation missing in console output: {last_msg}"
+
+
+@pytest.mark.asyncio
+async def test_regex_crlf_tolerant_and_fallback(tmp_path: Path):
+    """Regex should match across CRLF/LF and fallback to fuzzy when needed."""
+    test_file = tmp_path / "crlf_regex.txt"
+
+    # Write file with CRLF line endings explicitly
+    content = "line1\r\nline2: beta\r\nline3\r\n"
+    test_file.write_bytes(content.encode("utf-8"))
+
+    tool = EditTool()
+
+    # Regex with LF only should still match CRLF due to tolerance
+    result = await tool(
+        command="str_replace",
+        path=str(test_file),
+        old_str=r"line2:\s+beta\nline3",
+        new_str="line2: gamma\nline3",
+        match_mode="regex",
+    )
+    assert result.error is None, f"Regex with CRLF tolerance failed: {result.error}"
+
+    # Now attempt a regex that will not match; should fallback to fuzzy
+    # Slight whitespace difference that regex (as given) won't account for
+    test_file.write_text("a\n  b\n", encoding="utf-8")
+    result2 = await tool(
+        command="str_replace",
+        path=str(test_file),
+        old_str="a\n b\n",  # single space before b
+        new_str="a\n   b\n",  # three spaces before b
+        match_mode="regex",
+    )
+    assert result2.error is None, f"Regex->fuzzy fallback failed: {result2.error}"

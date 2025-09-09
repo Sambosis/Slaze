@@ -233,9 +233,9 @@ class EditTool(BaseTool):
         try:
             return self._file_str_replace(path, old, new or "", mode)
         except ToolError as err:
-            # If exact match fails to find a match, automatically retry with fuzzy matching
+            # If exact/regex match fails to find a match, automatically retry with fuzzy matching
             message = str(err)
-            if mode == "exact" and ("No match" in message or "No match found" in message):
+            if mode in {"exact", "regex"} and ("No match" in message or "No match found" in message):
                 fallback_result = self._file_str_replace(path, old, new or "", "fuzzy")
                 # Prepend a brief note so the user understands why it succeeded
                 if fallback_result.output:
@@ -466,9 +466,12 @@ class EditTool(BaseTool):
         pattern: str
         flags = re.DOTALL
         if mode == "exact":
+            # Escape all characters, then allow CRLF/LF equivalence by turning literal newlines into \r?\n
             pattern = re.escape(old)
+            pattern = self._crlf_tolerant(pattern)
         elif mode == "regex":
-            pattern = old
+            # Respect user regex but make line breaks CRLF/LF tolerant
+            pattern = self._crlf_tolerant(old)
         else:  # fuzzy
             pattern = self._build_fuzzy_regex(old)
         matches = list(re.finditer(pattern, text, flags))
@@ -509,6 +512,17 @@ class EditTool(BaseTool):
         pattern = "".join(escaped_segments)
         # Coalesce any accidental consecutive \s+ tokens
         pattern = re.sub(r"(?:\\s\+){2,}", r"\\s+", pattern)
+        return pattern
+
+    def _crlf_tolerant(self, pattern: str) -> str:
+        """Convert literal newlines in a pattern to a regex that matches either LF or CRLF.
+
+        This replaces actual newline characters in the pattern with the regex sequence
+        \\r?\\n so the same pattern will match files regardless of line ending style.
+        """
+        # First normalize any explicit CRLF in the pattern, then standalone LF
+        pattern = pattern.replace("\r\n", r"\r?\n")
+        pattern = pattern.replace("\n", r"\r?\n")
         return pattern
 
     # ------------------------------------------------------------------
