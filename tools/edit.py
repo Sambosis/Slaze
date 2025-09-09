@@ -172,7 +172,12 @@ class EditTool(BaseTool):
                 raise ToolError(f"Unhandled command {cmd_enum}")
 
             # Add assistant console-style display if configured
-            self._maybe_display(cmd_enum, _path, result)
+            # Pass the original parameters for display
+            self._maybe_display(
+                cmd_enum, _path, result,
+                old_str=old_str, new_str=new_str, match_mode=match_mode,
+                insert_line=insert_line, view_range=view_range
+            )
             return result
         except Exception as exc:
             _LOG.error("EditTool failure", exc_info=True)
@@ -182,7 +187,11 @@ class EditTool(BaseTool):
                 tool_name=self.name,
                 command=command,
             )
-            self._maybe_display(cmd_enum, _path, error_result, is_error=True)
+            self._maybe_display(
+                cmd_enum, _path, error_result, is_error=True,
+                old_str=old_str, new_str=new_str, match_mode=match_mode,
+                insert_line=insert_line, view_range=view_range
+            )
             return error_result
 
     # ------------------------------------------------------------------
@@ -263,11 +272,12 @@ class EditTool(BaseTool):
         result: ToolResult,
         *,
         is_error: bool = False,
+        **kwargs,
     ) -> None:
         if self.display is None:
             return
         try:
-            formatted = self._format_terminal_output(cmd_enum, path, result, is_error=is_error)
+            formatted = self._format_terminal_output(cmd_enum, path, result, is_error=is_error, **kwargs)
             if formatted:
                 # send as assistant message so it appears in console like other tools
                 self.display.add_message("assistant", formatted)
@@ -283,6 +293,7 @@ class EditTool(BaseTool):
         is_error: bool = False,
         max_lines: int = 20,
         max_chars: int = 2_000,
+        **kwargs,
     ) -> str:
         """Return a fenced console block showing the invoked edit command and its output.
 
@@ -295,7 +306,39 @@ class EditTool(BaseTool):
                 rel_path = str(path.relative_to(self._repo_dir))
             except Exception:
                 rel_path = str(path)
-            invoked = f"$ edit {cmd_enum.value} {rel_path}".rstrip()
+            
+            # Build the command line with actual parameters
+            invoked = f"$ edit {cmd_enum.value} {rel_path}"
+            
+            # Add command-specific parameters to the display
+            if cmd_enum == Command.STR_REPLACE:
+                old_str = kwargs.get('old_str', '')
+                new_str = kwargs.get('new_str', '')
+                match_mode = kwargs.get('match_mode', 'exact')
+                # Truncate long strings for display
+                if old_str and len(old_str) > 50:
+                    old_str_display = old_str[:47] + '...'
+                else:
+                    old_str_display = old_str
+                if new_str and len(new_str) > 50:
+                    new_str_display = new_str[:47] + '...'
+                else:
+                    new_str_display = new_str
+                invoked += f" --mode={match_mode}"
+                if old_str_display:
+                    invoked += f" --old='{old_str_display}'"
+                if new_str_display:
+                    invoked += f" --new='{new_str_display}'"
+            elif cmd_enum == Command.INSERT:
+                insert_line = kwargs.get('insert_line')
+                if insert_line is not None:
+                    invoked += f" --line={insert_line}"
+            elif cmd_enum == Command.VIEW:
+                view_range = kwargs.get('view_range')
+                if view_range:
+                    invoked += f" --range={view_range[0]}:{view_range[1]}"
+            
+            invoked = invoked.rstrip()
             lines: List[str] = ["```console", invoked]
             out_text = result.output or ""
             err_text = result.error or ""
@@ -420,12 +463,27 @@ class EditTool(BaseTool):
         text = self._read_file(path)
         pattern: str
         flags = re.DOTALL
+        
         if mode == "exact":
+            # For exact mode, use simple string search first to check if pattern exists
+            if old not in text:
+                # Try to provide helpful error message
+                # Check if a similar pattern exists with different whitespace
+                fuzzy_pattern = self._build_fuzzy_regex(old)
+                fuzzy_matches = list(re.finditer(fuzzy_pattern, text, flags))
+                if fuzzy_matches:
+                    raise ToolError(
+                        f"No exact match found for replacement. Found {len(fuzzy_matches)} "
+                        f"similar match(es) with different whitespace. Consider using fuzzy mode."
+                    )
+                else:
+                    raise ToolError("No match found for replacement")
             pattern = re.escape(old)
         elif mode == "regex":
             pattern = old
         else:  # fuzzy
             pattern = self._build_fuzzy_regex(old)
+        
         matches = list(re.finditer(pattern, text, flags))
         if not matches:
             raise ToolError("No match found for replacement")
@@ -448,9 +506,22 @@ class EditTool(BaseTool):
         return ToolResult(output=f"Replaced code in {path}\n{snippet}")
 
     def _build_fuzzy_regex(self, s: str) -> str:
-        # collapse any whitespace sequence to \s+
-        collapsed = re.sub(r"\s+", "\\s+", s.strip())
-        return collapsed
+        """Build a fuzzy regex pattern that's more forgiving about whitespace and formatting.
+        
+        This helps find code even when indentation or spacing differs slightly.
+        """
+        # First escape special regex characters except whitespace
+        escaped = re.escape(s.strip())
+        
+        # Now replace escaped whitespace sequences with flexible patterns
+        # This allows matching with different amounts/types of whitespace
+        pattern = re.sub(r'\\s+', r'\\s+', escaped)
+        
+        # Also make it more forgiving at the boundaries
+        # Allow optional whitespace at start/end
+        pattern = r'\\s*' + pattern + r'\\s*'
+        
+        return pattern
 
     # ------------------------------------------------------------------
     # Insert
@@ -538,16 +609,25 @@ class EditTool(BaseTool):
         """
         newline_seq, trailing = self._detect_original_newline(original)
 
-        logical_lines = modified.splitlines()
-        normalized = newline_seq.join(logical_lines)
+        # First normalize all newlines to \n for consistent processing
+        # This prevents issues with mixed line endings
+        normalized = modified.replace('\r\n', '\n').replace('\r', '\n')
+        
+        # Now convert to the target newline sequence if needed
+        if newline_seq == "\r\n":
+            normalized = normalized.replace('\n', '\r\n')
+        
+        # Handle trailing newline
         if trailing:
             if not normalized.endswith(newline_seq):
                 normalized += newline_seq
         else:
+            # Remove trailing newline if original didn't have one
             if normalized.endswith("\r\n"):
                 normalized = normalized[:-2]
             elif normalized.endswith("\n"):
                 normalized = normalized[:-1]
+        
         return normalized
 
 
