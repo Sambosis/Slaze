@@ -27,6 +27,7 @@ dependencies = [
     "cycler==0.12.1",
     "datasets>=4.0.0",
     "distro==1.9.0",
+    "eventlet>=0.24.1",
     "executing==2.2.0",
     "farama-notifications==0.0.4",
     "filelock==3.17.0",
