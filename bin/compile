@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+# This is an optional compile script that can override the default Python buildpack behavior
+# It ensures uv is available and used for dependency installation
+
+set -eo pipefail
+
+BUILD_DIR=$1
+CACHE_DIR=$2
+ENV_DIR=$3
+
+echo "-----> Custom compile script with uv support"
+
+# Export environment variables from ENV_DIR
+if [ -d "$ENV_DIR" ]; then
+    for e in $(ls $ENV_DIR); do
+        export "$e=$(cat $ENV_DIR/$e)"
+    done
+fi
+
+# Ensure uv is in PATH
+export PATH="$HOME/.cargo/bin:$PATH"
+
+# Check if uv is available
+if command -v uv &> /dev/null; then
+    echo "       Using uv for dependency management"
+    
+    # Change to build directory
+    cd $BUILD_DIR
+    
+    # Install dependencies using uv
+    if [ -f "pyproject.toml" ]; then
+        echo "       Installing from pyproject.toml with uv..."
+        uv pip install --system -e .
+    elif [ -f "requirements.txt" ]; then
+        echo "       Installing from requirements.txt with uv..."
+        uv pip install --system -r requirements.txt
+    fi
+    
+    echo "       Dependencies installed successfully with uv!"
+else
+    echo "       WARNING: uv not found, falling back to pip"
+    # Fallback to standard pip installation
+    if [ -f "requirements.txt" ]; then
+        pip install -r requirements.txt
+    fi
+fi

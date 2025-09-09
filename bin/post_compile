@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# This script runs after Python dependencies are installed
+# It can be used to sync dependencies with uv if needed
+
+set -eo pipefail
+
+echo "-----> Post-compile: Setting up uv environment..."
+
+# Add uv to PATH
+export PATH="$HOME/.cargo/bin:$PATH"
+
+# Check if uv.lock exists and sync if it does
+if [ -f "uv.lock" ]; then
+    echo "       Found uv.lock, syncing dependencies with uv..."
+    uv sync --frozen
+    echo "       uv sync completed successfully!"
+elif [ -f "pyproject.toml" ]; then
+    echo "       Found pyproject.toml, installing dependencies with uv..."
+    # Install dependencies from pyproject.toml
+    uv pip install -e .
+    echo "       uv pip install completed successfully!"
+else
+    echo "       No uv.lock or pyproject.toml found, skipping uv sync"
+fi
+
+echo "       Post-compile complete!"
