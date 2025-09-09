@@ -28,3 +28,4 @@ stls/3d_lspo/
 node_modules/   
 # Ignore Python bytecode files
 *.pyc
+requirements.txt
