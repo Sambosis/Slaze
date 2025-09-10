@@ -411,7 +411,15 @@
 
         if (page === 'home') {
             mainContentArea.innerHTML = homeContent;
-            fetch('/messages').then(r => r.json()).then(data => updateMessages(data));
+            fetch('/messages')
+                .then(r => r.json())
+                .then(data => {
+                    console.log('📥 Initial messages loaded:', data);
+                    updateMessages(data);
+                })
+                .catch(error => {
+                    console.error('❌ Error loading initial messages:', error);
+                });
             return;
         }
 
@@ -446,7 +454,7 @@
     const socket = io();
 
         socket.on('connect', function() {
-            console.log('Connected to agent');
+            console.log('✅ Socket.IO connected successfully with ID:', socket.id);
             addConsoleMessage('✅ Connected to Agent', 'info');
         });
 
@@ -456,7 +464,11 @@
         });
 
         socket.on('update', function(data) {
+            console.log('📨 Received update event with data:', data);
+            console.log('📊 User messages count:', data.user ? data.user.length : 0);
+            console.log('📊 Assistant messages count:', data.assistant ? data.assistant.length : 0);
             updateMessages(data);
+            console.log('✅ Update event processing completed');
         });
 
         socket.on('agent_prompt', function(data) {
@@ -473,6 +485,16 @@
             hideToolPrompt();
         });
 
+        // Test basic connectivity
+        setTimeout(function() {
+            console.log('🧪 Testing WebSocket connectivity...');
+            socket.emit('test', { message: 'Hello from web_ide client' });
+        }, 2000);
+
+        socket.on('test_response', function(data) {
+            console.log('✅ Test response received:', data);
+        });
+
         // --- Typewriter effect for user messages ---
         let userMessagesRendered = []; // stores already rendered user messages (raw text)
         let typingQueue = [];
@@ -484,8 +506,12 @@
     let isTypingConsole = false;
 
         function updateMessages(data) {
+            console.log('🔄 updateMessages called with:', data);
             const userMessagesDiv = document.getElementById('user-messages');
-            if (!userMessagesDiv) return;
+            if (!userMessagesDiv) {
+                console.error('❌ user-messages div not found');
+                return;
+            }
 
             // If no user messages
             if (data.user.length === 0) {
@@ -520,6 +546,7 @@
             // Assistant messages -> console (incremental with typewriter)
             const consoleMessagesDiv = document.getElementById('console-messages');
             if (consoleMessagesDiv) {
+                console.log('📝 Processing assistant messages, count:', data.assistant.length);
                 // Reset case (assistant list shrank or first load with >1)
                 const resetNeeded = data.assistant.length < consoleAssistantRendered || (consoleAssistantRendered === 0 && data.assistant.length > 1);
                 if (resetNeeded) {

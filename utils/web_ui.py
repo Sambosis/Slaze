@@ -475,6 +475,12 @@ class WebUI:
             logging.info(f"Received tool response: {data.get('action', 'execute')}")
             self.tool_queue.put(params)
 
+        @self.socketio.on("interrupt_agent")
+        def handle_interrupt_agent():
+            logging.info("Received interrupt agent request")
+            # This could be used to signal the agent to stop processing
+            self.input_queue.put("INTERRUPT")
+
         @self.socketio.on("test")
         def handle_test(data):
             logging.info(f"Received test message: {data}")
