@@ -194,6 +194,9 @@ def write_constants_to_file():
         "MAX_SUMMARY_TOKENS": MAX_SUMMARY_TOKENS,
         "PROMPT_NAME": PROMPT_NAME if PROMPT_NAME else "",
         "TASK": "NOT YET CREATED", # Default task, can be updated by set_constant
+        # Edit tool LLM settings
+        "EDIT_WITH_LLM": False,
+        "EDIT_LLM_MODEL": str(MAIN_MODEL),
     }
     # Ensure CACHE_DIR exists before writing
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
