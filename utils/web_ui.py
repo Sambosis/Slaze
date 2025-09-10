@@ -47,7 +47,7 @@ class WebUI:
         static_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'public', 'static'))
         self.app = Flask(__name__, template_folder=template_dir, static_folder=static_dir)
         self.app.config["SECRET_KEY"] = "secret!"
-        self.socketio = SocketIO(self.app, cookie=None)
+        self.socketio = SocketIO(self.app, cookie=None, cors_allowed_origins="*")
         self.user_messages = []
         self.assistant_messages = []
         self.tool_results = []
@@ -475,11 +475,10 @@ class WebUI:
             logging.info(f"Received tool response: {data.get('action', 'execute')}")
             self.tool_queue.put(params)
 
-        @self.socketio.on("interrupt_agent")
-        def handle_interrupt_agent():
-            logging.info("Received interrupt agent request")
-            # This could be used to signal the agent to stop processing
-            self.input_queue.put("INTERRUPT")
+        @self.socketio.on("test")
+        def handle_test(data):
+            logging.info(f"Received test message: {data}")
+            self.socketio.emit("test_response", {"message": "Hello from server!", "received": data})
         logging.info("SocketIO events set up")
 
     def start_server(self, host="0.0.0.0", port=5002):
@@ -518,14 +517,17 @@ class WebUI:
 
     def broadcast_update(self):
         logging.info("Broadcasting update to clients")
+        data = {
+            "user": self.user_messages,
+            "assistant": self.assistant_messages,
+            "tool": self.tool_results,
+        }
+        logging.info(f"Sending data: user={len(data['user'])}, assistant={len(data['assistant'])}, tool={len(data['tool'])}")
         self.socketio.emit(
             "update",
-            {
-                "user": self.user_messages,
-                "assistant": self.assistant_messages,
-                "tool": self.tool_results,
-            },
+            data,
         )
+        logging.info("Update broadcast completed")
 
     async def wait_for_user_input(self, prompt_message: str | None = None) -> str:
         """Await the next user input sent via the web UI input queue."""

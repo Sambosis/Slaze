@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Slazy Agent - Web IDE</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.0/socket.io.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/4.3.0/marked.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
@@ -91,8 +91,35 @@
             font-weight: bold;
         }
 
-        .file-tree .file:hover {
-            text-decoration: underline;
+        .header {
+            background-color: var(--secondary-bg);
+            padding: 10px;
+            border-bottom: 1px solid var(--tertiary-bg);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .connection-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+        }
+
+        .status-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: #ff6b6b;
+        }
+
+        .status-indicator.connected {
+            background-color: #51cf66;
+        }
+
+        .status-indicator.connecting {
+            background-color: #ffd43b;
         }
 
     </style>
@@ -102,10 +129,16 @@
     <div class="container">
         <div class="header">
             <h1>Slazy Agent</h1>
-            <a href="/">🏠 Task Selection</a>
-                            <a href="/tools" style="margin-left:15px;">🔧 Toolbox</a>
+            <div class="connection-status">
+                <div id="status-indicator" class="status-indicator"></div>
+                <span id="status-text">Connecting...</span>
+            </div>
+            <div>
+                <a href="/">🏠 Task Selection</a>
+                <a href="/tools" style="margin-left:15px;">🔧 Toolbox</a>
                 <a href="/browser" style="margin-left:15px;">📁 File Browser</a>
-            <a href="/classic" style="margin-left:15px;">📝 Classic Interface</a>
+                <a href="/classic" style="margin-left:15px;">📝 Classic Interface</a>
+            </div>
         </div>
         <div class="main-content">
             <div class="editor-area">
@@ -128,7 +161,57 @@
     </div>
 
     <script>
-        const socket = io();
+        console.log('Initializing Socket.IO connection...');
+        
+        // Initialize Socket.IO with explicit configuration
+        const socket = io({
+            transports: ['websocket', 'polling'],
+            upgrade: true,
+            rememberUpgrade: true,
+            timeout: 20000
+        });
+
+        // Connection status monitoring
+        const statusIndicator = document.getElementById('status-indicator');
+        const statusText = document.getElementById('status-text');
+
+        function updateConnectionStatus(status, text) {
+            statusIndicator.className = 'status-indicator ' + status;
+            statusText.textContent = text;
+            console.log('Connection status:', status, text);
+        }
+
+        socket.on('connect', function() {
+            console.log('✅ Socket.IO connected successfully with ID:', socket.id);
+            updateConnectionStatus('connected', 'Connected');
+            document.title = 'Slazy Agent - Connected';
+        });
+
+        socket.on('disconnect', function(reason) {
+            console.log('❌ Socket.IO disconnected:', reason);
+            updateConnectionStatus('', 'Disconnected');
+            document.title = 'Slazy Agent - Disconnected';
+        });
+
+        socket.on('connect_error', function(error) {
+            console.error('🚨 Socket.IO connection error:', error);
+            updateConnectionStatus('', 'Connection Error');
+        });
+
+        socket.on('reconnect', function(attemptNumber) {
+            console.log('🔄 Socket.IO reconnected after', attemptNumber, 'attempts');
+            updateConnectionStatus('connected', 'Reconnected');
+        });
+
+        socket.on('reconnect_error', function(error) {
+            console.error('🔄 Socket.IO reconnection error:', error);
+            updateConnectionStatus('', 'Reconnecting...');
+        });
+
+        socket.on('reconnect_failed', function() {
+            console.error('❌ Socket.IO reconnection failed');
+            updateConnectionStatus('', 'Reconnection Failed');
+        });
 
         function renderFileTree(files, container) {
             const ul = document.createElement('ul');
@@ -173,30 +256,44 @@
             });
 
         socket.on('update', function(data) {
-            console.log('Received update:', data); // Debug log
+            console.log('📨 Received update event with data:', data);
+            console.log('📊 User messages count:', data.user ? data.user.length : 0);
+            console.log('📊 Assistant messages count:', data.assistant ? data.assistant.length : 0);
             
             const userMessagesDiv = document.getElementById('user-messages');
             userMessagesDiv.innerHTML = '';
-            if (data.user.length === 0) {
+            if (!data.user || data.user.length === 0) {
                 userMessagesDiv.innerHTML = '<div class="empty-state">No user messages yet</div>';
             } else {
-                data.user.forEach(function(msg) {
+                data.user.forEach(function(msg, index) {
+                    console.log('👤 Processing user message', index, ':', msg);
                     userMessagesDiv.innerHTML += '<div class="message user-message">' + marked.parse(msg) + '</div>';
                 });
             }
 
             const assistantMessagesDiv = document.getElementById('assistant-messages');
             assistantMessagesDiv.innerHTML = '';
-            if (data.assistant.length === 0) {
+            if (!data.assistant || data.assistant.length === 0) {
                 assistantMessagesDiv.innerHTML = '<div class="empty-state">No assistant messages yet</div>';
             } else {
-                data.assistant.forEach(function(msg) {
+                data.assistant.forEach(function(msg, index) {
+                    console.log('🤖 Processing assistant message', index, ':', msg);
                     assistantMessagesDiv.innerHTML += '<div class="message assistant-message">' + marked.parse(msg) + '</div>';
                 });
             }
+            
+            console.log('✅ Update event processing completed');
         });
 
-        // Load initial messages on page load
+        // Test basic connectivity
+        setTimeout(function() {
+            console.log('🧪 Testing WebSocket connectivity...');
+            socket.emit('test', { message: 'Hello from client' });
+        }, 2000);
+
+        socket.on('test_response', function(data) {
+            console.log('✅ Test response received:', data);
+        });
         fetch('/messages')
             .then(response => response.json())
             .then(data => {
