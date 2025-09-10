@@ -414,12 +414,7 @@
         if (page === 'home') {
             mainContentArea.innerHTML = homeContent;
             
-            // Ensure socket is connected before fetching
-            if (!socket || !socket.connected) {
-                console.log('🔄 Socket not connected, reinitializing...');
-                socket = initializeSocket();
-            }
-            
+            // Don't reinitialize socket - just use existing connection
             fetch('/messages')
                 .then(r => {
                     console.log('🌐 Fetch response status:', r.status);
@@ -468,31 +463,31 @@
 
 
     // --- Existing script ---
-    // Prevent multiple Socket.IO connections
+    // Single Socket.IO connection - no reconnection loops
     let socket = null;
+    let socketInitialized = false;
     
     function initializeSocket() {
-        if (socket && socket.connected) {
-            console.log('🔄 Socket already connected, reusing existing connection');
+        if (socketInitialized && socket && socket.connected) {
+            console.log('🔄 Socket already connected, skipping initialization');
             return socket;
         }
         
-        if (socket) {
-            console.log('🧹 Cleaning up old socket connection');
-            socket.disconnect();
+        if (socketInitialized) {
+            console.log('⚠️ Socket already being initialized, skipping duplicate');
+            return socket;
         }
         
-        console.log('🚀 Creating new Socket.IO connection');
+        socketInitialized = true;
+        console.log('🚀 Creating single Socket.IO connection');
+        
         socket = io({
-            forceNew: true,  // Force a new connection
-            reconnection: true,
-            reconnectionAttempts: 5,
-            reconnectionDelay: 1000
+            autoConnect: true,
+            reconnection: false  // Disable automatic reconnection to prevent loops
         });
 
         socket.on('connect', function() {
             console.log('✅ Socket.IO connected successfully with ID:', socket.id);
-            console.log('🔍 Total active connections:', performance.getEntriesByType('navigation').length);
             console.log('🔍 Checking DOM elements on connect:');
             console.log('  - console-messages div:', document.getElementById('console-messages'));
             console.log('  - user-messages div:', document.getElementById('user-messages'));
@@ -500,15 +495,10 @@
             addConsoleMessage('✅ Connected to Agent (ID: ' + socket.id + ')', 'info');
         });
         
-        return socket;
-    }
-    
-    // Initialize socket on first load
-    socket = initializeSocket();
-
-        socket.on('disconnect', function() {
-            console.log('Disconnected from agent');
+        socket.on('disconnect', function(reason) {
+            console.log('❌ Socket disconnected:', reason);
             addConsoleMessage('❌ Disconnected from Agent - refresh the page to reconnect', 'error');
+            socketInitialized = false; // Allow reinitializing if needed
         });
 
         socket.on('update', function(data) {
@@ -533,15 +523,25 @@
             hideToolPrompt();
         });
 
-        // Test basic connectivity
-        setTimeout(function() {
-            console.log('🧪 Testing WebSocket connectivity...');
-            socket.emit('test', { message: 'Hello from web_ide client' });
-        }, 2000);
-
         socket.on('test_response', function(data) {
             console.log('✅ Test response received:', data);
         });
+        
+        // Test basic connectivity after connection
+        setTimeout(function() {
+            if (socket && socket.connected) {
+                console.log('🧪 Testing WebSocket connectivity...');
+                socket.emit('test', { message: 'Hello from web_ide client' });
+            }
+        }, 2000);
+        
+        return socket;
+    }
+    
+    // Initialize socket on first load
+    socket = initializeSocket();
+
+
 
         // --- Typewriter effect for user messages ---
         let userMessagesRendered = []; // stores already rendered user messages (raw text)
@@ -918,17 +918,6 @@
             console.log('🧹 Page unloading, disconnecting socket');
             if (socket && socket.connected) {
                 socket.disconnect();
-            }
-        });
-        
-        // Prevent multiple connections when visibility changes
-        document.addEventListener('visibilitychange', function() {
-            if (document.visibilityState === 'visible') {
-                console.log('👀 Page became visible, checking socket connection');
-                if (!socket || !socket.connected) {
-                    console.log('🔄 Reconnecting socket');
-                    socket = initializeSocket();
-                }
             }
         });
     </script>
