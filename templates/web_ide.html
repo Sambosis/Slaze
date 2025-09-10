@@ -507,17 +507,26 @@
 
         function updateMessages(data) {
             console.log('🔄 updateMessages called with:', data);
+            console.log('🔍 Data structure:', {
+                user: data.user ? data.user.length : 'undefined',
+                assistant: data.assistant ? data.assistant.length : 'undefined',
+                dataKeys: Object.keys(data)
+            });
+            
             const userMessagesDiv = document.getElementById('user-messages');
             if (!userMessagesDiv) {
                 console.error('❌ user-messages div not found');
                 return;
             }
+            console.log('✅ user-messages div found:', userMessagesDiv);
 
             // If no user messages
-            if (data.user.length === 0) {
+            if (!data.user || data.user.length === 0) {
+                console.log('🔍 No user messages, setting empty state');
                 userMessagesRendered = [];
                 userMessagesDiv.innerHTML = '<div class="empty-state">No user messages yet</div>';
             } else {
+                console.log('👤 Processing user messages, count:', data.user.length);
                 // Detect reset (e.g., count shrank or first load with existing messages)
                 const resetNeeded = data.user.length < userMessagesRendered.length || (userMessagesRendered.length === 0 && data.user.length > 1);
                 if (resetNeeded) {
@@ -545,8 +554,17 @@
 
             // Assistant messages -> console (incremental with typewriter)
             const consoleMessagesDiv = document.getElementById('console-messages');
+            console.log('🎯 Looking for console-messages div:', consoleMessagesDiv);
             if (consoleMessagesDiv) {
-                console.log('📝 Processing assistant messages, count:', data.assistant.length);
+                console.log('📝 Processing assistant messages, count:', data.assistant ? data.assistant.length : 'undefined');
+                
+                if (!data.assistant || data.assistant.length === 0) {
+                    console.log('🔍 No assistant messages, setting empty state');
+                    consoleMessagesDiv.innerHTML = '<div class="empty-state">Console output will appear here</div>';
+                    consoleAssistantRendered = 0;
+                    return;
+                }
+                
                 // Reset case (assistant list shrank or first load with >1)
                 const resetNeeded = data.assistant.length < consoleAssistantRendered || (consoleAssistantRendered === 0 && data.assistant.length > 1);
                 if (resetNeeded) {
@@ -572,7 +590,9 @@
 
             // Update user count badge
             const badge = document.getElementById('user-count');
-            if (badge) badge.textContent = data.user.length;
+            if (badge) badge.textContent = data.user ? data.user.length : 0;
+            
+            console.log('🏁 updateMessages finished successfully');
         }
 
     function enqueueUserMessageForTyping(rawMsg) {
