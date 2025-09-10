@@ -47,7 +47,7 @@ class WebUI:
         static_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'public', 'static'))
         self.app = Flask(__name__, template_folder=template_dir, static_folder=static_dir)
         self.app.config["SECRET_KEY"] = "secret!"
-        self.socketio = SocketIO(self.app, cookie=None, cors_allowed_origins="*")
+        self.socketio = SocketIO(self.app, cookie=None)
         self.user_messages = []
         self.assistant_messages = []
         self.tool_results = []
