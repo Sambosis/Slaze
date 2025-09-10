@@ -173,6 +173,8 @@
             });
 
         socket.on('update', function(data) {
+            console.log('Received update:', data); // Debug log
+            
             const userMessagesDiv = document.getElementById('user-messages');
             userMessagesDiv.innerHTML = '';
             if (data.user.length === 0) {
@@ -194,30 +196,39 @@
             }
         });
 
+        // Load initial messages on page load
         fetch('/messages')
             .then(response => response.json())
             .then(data => {
-                socket.on('update', function(data) {
+                console.log('Initial messages loaded:', data); // Debug log
+                // Manually call the update handler with initial data
+                const updateHandler = function(updateData) {
                     const userMessagesDiv = document.getElementById('user-messages');
                     userMessagesDiv.innerHTML = '';
-                    if (data.user.length === 0) {
+                    if (updateData.user.length === 0) {
                         userMessagesDiv.innerHTML = '<div class="empty-state">No user messages yet</div>';
                     } else {
-                        data.user.forEach(function(msg) {
+                        updateData.user.forEach(function(msg) {
                             userMessagesDiv.innerHTML += '<div class="message user-message">' + marked.parse(msg) + '</div>';
                         });
                     }
 
                     const assistantMessagesDiv = document.getElementById('assistant-messages');
                     assistantMessagesDiv.innerHTML = '';
-                    if (data.assistant.length === 0) {
+                    if (updateData.assistant.length === 0) {
                         assistantMessagesDiv.innerHTML = '<div class="empty-state">No assistant messages yet</div>';
                     } else {
-                        data.assistant.forEach(function(msg) {
+                        updateData.assistant.forEach(function(msg) {
                             assistantMessagesDiv.innerHTML += '<div class="message assistant-message">' + marked.parse(msg) + '</div>';
                         });
                     }
-                });
+                };
+
+                // Load initial data
+                updateHandler(data);
+            })
+            .catch(error => {
+                console.error('Error loading initial messages:', error);
             });
     </script>
 </body>
