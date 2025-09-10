@@ -497,7 +497,7 @@ class WebUI:
         if msg_type == "user":
             self.user_messages.append(content)
             # Also emit to file browser
-            self.socketio.emit("user_message", {"content": content})
+            self.socketio.emit("user_message", {"content": content}, broadcast=True)
         elif msg_type == "assistant":
             self.assistant_messages.append(content)
             # Also emit to file browser
@@ -532,6 +532,7 @@ class WebUI:
         self.socketio.emit(
             "update",
             data,
+            broadcast=True,
         )
         logging.info("Update broadcast completed")
 
