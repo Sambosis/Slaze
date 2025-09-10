@@ -412,9 +412,17 @@
         if (page === 'home') {
             mainContentArea.innerHTML = homeContent;
             fetch('/messages')
-                .then(r => r.json())
+                .then(r => {
+                    console.log('🌐 Fetch response status:', r.status);
+                    return r.json();
+                })
                 .then(data => {
                     console.log('📥 Initial messages loaded:', data);
+                    console.log('🔍 Initial data structure:', {
+                        user: data.user ? data.user.length : 'undefined',
+                        assistant: data.assistant ? data.assistant.length : 'undefined',
+                        tool: data.tool ? data.tool.length : 'undefined'
+                    });
                     updateMessages(data);
                 })
                 .catch(error => {
@@ -455,6 +463,10 @@
 
         socket.on('connect', function() {
             console.log('✅ Socket.IO connected successfully with ID:', socket.id);
+            console.log('🔍 Checking DOM elements on connect:');
+            console.log('  - console-messages div:', document.getElementById('console-messages'));
+            console.log('  - user-messages div:', document.getElementById('user-messages'));
+            console.log('  - main-content-area div:', document.getElementById('main-content-area'));
             addConsoleMessage('✅ Connected to Agent', 'info');
         });
 
@@ -719,7 +731,11 @@
 
         function addConsoleMessage(message, type = 'info') {
             const consoleContent = document.getElementById('console-messages');
-            if (!consoleContent) return; // Exit if console is not on the page
+            if (!consoleContent) {
+                console.error('❌ console-messages div not found in addConsoleMessage');
+                return; // Exit if console is not on the page
+            }
+            console.log('📝 Adding console message:', type, message.substring(0, 50) + '...');
             const messageDiv = document.createElement('div');
             messageDiv.className = `console-message ${type}`;
             const emptyState = consoleContent.querySelector('.empty-state');
