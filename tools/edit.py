@@ -34,12 +34,14 @@ from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
+import difflib
 
 import portalocker  # type: ignore
 
 from .base import BaseTool, ToolError, ToolResult
 from config import get_constant
 from utils.file_logger import log_file_operation
+from utils.llm_client import create_llm_client
 
 # ---------------------------------------------------------------------------
 # Configuration & constants
@@ -128,6 +130,14 @@ class EditTool(BaseTool):
                             "enum": ["exact", "regex", "fuzzy"],
                             "description": "Replacement strategy for str_replace (default exact).",
                         },
+                        "use_llm": {
+                            "type": "boolean",
+                            "description": "If true, perform the edit via LLM and save the returned full file",
+                        },
+                        "llm_model": {
+                            "type": "string",
+                            "description": "Override model for LLM editing (defaults to EDIT_LLM_MODEL or MAIN_MODEL)",
+                        },
                     },
                     "required": ["command", "path"],
                 },
@@ -149,6 +159,8 @@ class EditTool(BaseTool):
         new_str: Optional[str] = None,
         insert_line: Optional[int] = None,
         match_mode: str = "exact",
+        use_llm: Optional[bool] = None,
+        llm_model: Optional[str] = None,
         **kwargs,
     ) -> ToolResult:
         cmd_enum = self._validate_command(command)
@@ -160,6 +172,7 @@ class EditTool(BaseTool):
             "old_str": old_str,
             "new_str": new_str,
             "insert_line": insert_line,
+            "use_llm": use_llm,
         }
         try:
             if cmd_enum is Command.CREATE:
@@ -167,9 +180,25 @@ class EditTool(BaseTool):
             elif cmd_enum is Command.VIEW:
                 result = await self._cmd_view(_path, view_range)
             elif cmd_enum is Command.STR_REPLACE:
-                result = self._cmd_str_replace(_path, old_str, new_str, match_mode)
+                effective_use_llm = (
+                    bool(use_llm)
+                    if use_llm is not None
+                    else bool(get_constant("EDIT_WITH_LLM", False))
+                )
+                if effective_use_llm:
+                    result = await self._cmd_str_replace_llm(_path, old_str, new_str, match_mode, llm_model)
+                else:
+                    result = self._cmd_str_replace(_path, old_str, new_str, match_mode)
             elif cmd_enum is Command.INSERT:
-                result = self._cmd_insert(_path, insert_line, new_str)
+                effective_use_llm = (
+                    bool(use_llm)
+                    if use_llm is not None
+                    else bool(get_constant("EDIT_WITH_LLM", False))
+                )
+                if effective_use_llm:
+                    result = await self._cmd_insert_llm(_path, insert_line, new_str, llm_model)
+                else:
+                    result = self._cmd_insert(_path, insert_line, new_str)
             elif cmd_enum is Command.UNDO_EDIT:
                 result = self._cmd_undo(_path)
             elif cmd_enum is Command.LINT:
@@ -251,6 +280,35 @@ class EditTool(BaseTool):
         if line is None or text is None:
             raise ToolError("insert_line and new_str required for insert")
         return self._file_insert(path, line, text)
+
+    async def _cmd_insert_llm(
+        self, path: Path, line: Optional[int], text: Optional[str], model: Optional[str]
+    ) -> ToolResult:
+        if line is None or text is None:
+            raise ToolError("insert_line and new_str required for insert")
+        current = self._read_file(path)
+        instructions = (
+            "Insert the provided text at the specified line number. "
+            "Preserve all other content and formatting exactly."
+        )
+        request_details = (
+            f"Operation: insert\n"
+            f"File: {self._rel_path(path)}\n"
+            f"Insert line (0-based index means before line 1 is 0): {line}\n"
+            f"Inserted text follows between <<<INSERT>>> markers.\n"
+            f"<<<INSERT>>>\n{text}\n<<<INSERT>>>\n"
+        )
+        updated = await self._call_llm_full_file(
+            model=model,
+            path=path,
+            instructions=instructions,
+            request_details=request_details,
+            current_content=current,
+        )
+        normalized = self._normalize_to_original_newlines(original=current, modified=updated)
+        self._write_file(path, normalized)
+        snippet = self._diff_snippet(current, normalized)
+        return ToolResult(output=f"Inserted text in {path} via LLM\n{snippet}")
 
     def _cmd_undo(self, path: Path) -> ToolResult:
         return self._file_undo(path)
@@ -496,6 +554,43 @@ class EditTool(BaseTool):
         snippet = self._snippet(normalized_text, m.start(), m.start() + len(new))
         return ToolResult(output=f"Replaced code in {path}\n{snippet}")
 
+    async def _cmd_str_replace_llm(
+        self, path: Path, old: Optional[str], new: Optional[str], mode: str, model: Optional[str]
+    ) -> ToolResult:
+        if old is None:
+            raise ToolError("`old_str` required for str_replace")
+        new_text = new or ""
+        current = self._read_file(path)
+        if mode not in {"exact", "regex", "fuzzy"}:
+            mode = "exact"
+
+        instructions = (
+            "Replace text in the file according to the details provided. "
+            "Keep all unrelated content identical. Preserve indentation characters (tabs vs spaces), widths, and avoid reformatting."
+        )
+        request_details = (
+            f"Operation: str_replace\n"
+            f"File: {self._rel_path(path)}\n"
+            f"Match mode: {mode}\n"
+            f"Old snippet follows between <<<OLD>>> markers.\n"
+            f"<<<OLD>>>\n{old}\n<<<OLD>>>\n"
+            f"New snippet follows between <<<NEW>>> markers.\n"
+            f"<<<NEW>>>\n{new_text}\n<<<NEW>>>\n"
+            "Apply the replacement to the single correct location in the file."
+        )
+
+        updated = await self._call_llm_full_file(
+            model=model,
+            path=path,
+            instructions=instructions,
+            request_details=request_details,
+            current_content=current,
+        )
+        normalized = self._normalize_to_original_newlines(original=current, modified=updated)
+        self._write_file(path, normalized)
+        snippet = self._diff_snippet(current, normalized)
+        return ToolResult(output=f"Replaced code in {path} via LLM\n{snippet}")
+
     def _build_fuzzy_regex(self, s: str) -> str:
         """Construct a regex that matches the given string with flexible whitespace.
 
@@ -623,6 +718,100 @@ class EditTool(BaseTool):
             elif normalized.endswith("\n"):
                 normalized = normalized[:-1]
         return normalized
+
+    # ------------------------------------------------------------------
+    # LLM edit helpers
+    # ------------------------------------------------------------------
+
+    async def _call_llm_full_file(
+        self,
+        *,
+        model: Optional[str],
+        path: Path,
+        instructions: str,
+        request_details: str,
+        current_content: str,
+    ) -> str:
+        """Call an LLM with a prompt that includes full file content and returns full updated file.
+
+        The LLM is instructed to return ONLY the updated file content (no fences or explanations).
+        """
+        selected_model = model or get_constant("EDIT_LLM_MODEL", None) or get_constant("MAIN_MODEL", "anthropic/claude-sonnet-4")
+        client = create_llm_client(str(selected_model))
+
+        rel = self._rel_path(path)
+        system_msg = (
+            "You are a code editing engine. Apply the requested change precisely to the provided file. "
+            "Return ONLY the complete updated file content. Do not include code fences, diffs, or explanations. "
+            "Preserve original indentation characters (tabs vs spaces) and indentation widths. "
+            "Preserve all unaffected lines exactly."
+        )
+        user_msg = (
+            f"Instructions:\n{instructions}\n\n"
+            f"Details:\n{request_details}\n\n"
+            f"Current file ({rel}) content between <<<FILE>>> markers follows. Modify it and return the entire updated file with no extra text.\n"
+            f"<<<FILE>>>\n{current_content}\n<<<FILE>>>\n"
+            "Output policy: Return only the updated file content, nothing else."
+        )
+
+        # Build messages in OpenAI-style format
+        messages: List[Dict[str, str]] = [
+            {"role": "system", "content": system_msg},
+            {"role": "user", "content": user_msg},
+        ]
+
+        # Use generous max tokens since file can be large; client will enforce provider limits.
+        llm_response = await client.call(messages=messages, max_tokens=200000, temperature=0.0)
+        cleaned = self._extract_updated_content(llm_response)
+        if not cleaned:
+            raise ToolError("LLM returned empty content for updated file")
+        return cleaned
+
+    def _extract_updated_content(self, text: str) -> str:
+        """Extract the updated file content from an LLM response.
+
+        If the model included code fences or markers despite instructions, extract the most plausible block.
+        """
+        stripped = text.strip()
+        # If fenced block exists, prefer the largest fenced block
+        fence_matches = list(re.finditer(r"```[a-zA-Z0-9_+-]*\n([\s\S]*?)\n```", stripped))
+        if fence_matches:
+            largest = max(fence_matches, key=lambda m: len(m.group(1)))
+            return largest.group(1)
+        # If markers exist
+        m = re.search(r"<<<FILE>>>\n([\s\S]*?)\n<<<FILE>>>", stripped)
+        if m:
+            return m.group(1)
+        # Otherwise return as-is
+        return stripped
+
+    def _diff_snippet(self, before: str, after: str, context: int = SNIPPET_LINES) -> str:
+        """Produce a compact unified diff snippet for display."""
+        before_lines = before.splitlines()
+        after_lines = after.splitlines()
+        diff_lines = list(
+            difflib.unified_diff(
+                before_lines,
+                after_lines,
+                fromfile="before",
+                tofile="after",
+                n=context,
+                lineterm="",
+            )
+        )
+        # Limit diff to a reasonable length
+        MAX_DIFF_LINES = 200
+        if len(diff_lines) > MAX_DIFF_LINES:
+            head = diff_lines[: MAX_DIFF_LINES // 2]
+            tail = diff_lines[-MAX_DIFF_LINES // 2 :]
+            diff_lines = head + ["… (diff truncated) …"] + tail
+        return "\n".join(diff_lines)
+
+    def _rel_path(self, path: Path) -> str:
+        try:
+            return str(path.relative_to(self._repo_dir))
+        except Exception:
+            return str(path)
 
 
 # ---------------------------------------------------------------------------
