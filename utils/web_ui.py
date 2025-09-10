@@ -150,6 +150,11 @@ class WebUI:
                 write_constants_to_file()
                 
                 logging.info(f"Starting agent runner in background thread for task: {prompt_name}")
+                # Clear any existing messages from previous runs
+                self.user_messages = []
+                self.assistant_messages = []
+                self.tool_results = []
+                # Start the agent
                 coro = self.agent_runner(task, self)
                 self.socketio.start_background_task(asyncio.run, coro)
                 return render_template("web_ide.html")
@@ -456,7 +461,16 @@ class WebUI:
 
         @self.socketio.on("connect")
         def handle_connect():
-            logging.info("Client connected")
+            logging.info("Client connected - sending all existing messages")
+            # Always send all existing messages when a client connects
+            data = {
+                "user": self.user_messages,
+                "assistant": self.assistant_messages,
+                "tool": self.tool_results,
+            }
+            logging.info(f"Sending initial data to connected client: user={len(data['user'])}, assistant={len(data['assistant'])}, tool={len(data['tool'])}")
+            # Emit directly to the connected client
+            self.socketio.emit("update", data)
 
         @self.socketio.on("disconnect")
         def handle_disconnect():
@@ -492,16 +506,24 @@ class WebUI:
         self.socketio.run(self.app, host=host, port=port, use_reloader=False, allow_unsafe_werkzeug=True)
 
     def add_message(self, msg_type, content):
-        logging.info(f"Adding message of type {msg_type}")
+        logging.info(f"Adding message of type {msg_type}: {content[:100] if content else 'empty'}...")
         log_message(msg_type, content)
+        
+        # Always store messages in arrays regardless of WebSocket state
         if msg_type == "user":
             self.user_messages.append(content)
-            # Also emit to file browser
-            self.socketio.emit("user_message", {"content": content})
+            # Try to emit to connected clients
+            try:
+                self.socketio.emit("user_message", {"content": content})
+            except Exception as e:
+                logging.warning(f"Failed to emit user_message: {e}")
         elif msg_type == "assistant":
             self.assistant_messages.append(content)
-            # Also emit to file browser
-            self.socketio.emit("assistant_message", {"content": content})
+            # Try to emit to connected clients
+            try:
+                self.socketio.emit("assistant_message", {"content": content})
+            except Exception as e:
+                logging.warning(f"Failed to emit assistant_message: {e}")
         elif msg_type == "tool":
             self.tool_results.append(content)
             # Parse tool result for file browser
@@ -512,13 +534,17 @@ class WebUI:
                     first_line = lines[0].strip()
                     if first_line.startswith('Tool:'):
                         tool_name = first_line.replace('Tool:', '').strip()
-                self.socketio.emit("tool_result", {"tool_name": tool_name, "result": content})
+                try:
+                    self.socketio.emit("tool_result", {"tool_name": tool_name, "result": content})
+                except Exception as e:
+                    logging.warning(f"Failed to emit tool_result: {e}")
                 
                 # Check if this tool might have created/modified files
                 if any(keyword in content.lower() for keyword in ['created', 'wrote', 'generated', 'saved', 'modified', 'updated']):
-                    # Emit file tree update after a short delay asynchronously
-                    self.socketio.start_background_task(self._emit_file_tree_update)
+                    # Note: _emit_file_tree_update method doesn't exist, commenting out for now
+                    pass
                     
+        # Always try to broadcast the update
         self.broadcast_update()
 
     def broadcast_update(self):
@@ -529,11 +555,15 @@ class WebUI:
             "tool": self.tool_results,
         }
         logging.info(f"Sending data: user={len(data['user'])}, assistant={len(data['assistant'])}, tool={len(data['tool'])}")
-        self.socketio.emit(
-            "update",
-            data,
-        )
-        logging.info("Update broadcast completed")
+        try:
+            self.socketio.emit(
+                "update",
+                data,
+            )
+            logging.info("Update broadcast completed successfully")
+        except Exception as e:
+            logging.error(f"Failed to broadcast update: {e}")
+            # Messages are still stored in arrays, so clients can fetch them via /messages endpoint
 
     async def wait_for_user_input(self, prompt_message: str | None = None) -> str:
         """Await the next user input sent via the web UI input queue."""
