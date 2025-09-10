@@ -400,6 +400,8 @@
     `;
 
     async function loadPage(page) {
+        console.log('📄 Loading page:', page, 'Socket connected:', socket ? socket.connected : 'no socket');
+        
         // Clean up previous page's assets
         document.querySelectorAll('.page-specific-asset').forEach(el => el.remove());
 
@@ -411,6 +413,13 @@
 
         if (page === 'home') {
             mainContentArea.innerHTML = homeContent;
+            
+            // Ensure socket is connected before fetching
+            if (!socket || !socket.connected) {
+                console.log('🔄 Socket not connected, reinitializing...');
+                socket = initializeSocket();
+            }
+            
             fetch('/messages')
                 .then(r => {
                     console.log('🌐 Fetch response status:', r.status);
@@ -459,16 +468,43 @@
 
 
     // --- Existing script ---
-    const socket = io();
+    // Prevent multiple Socket.IO connections
+    let socket = null;
+    
+    function initializeSocket() {
+        if (socket && socket.connected) {
+            console.log('🔄 Socket already connected, reusing existing connection');
+            return socket;
+        }
+        
+        if (socket) {
+            console.log('🧹 Cleaning up old socket connection');
+            socket.disconnect();
+        }
+        
+        console.log('🚀 Creating new Socket.IO connection');
+        socket = io({
+            forceNew: true,  // Force a new connection
+            reconnection: true,
+            reconnectionAttempts: 5,
+            reconnectionDelay: 1000
+        });
 
         socket.on('connect', function() {
             console.log('✅ Socket.IO connected successfully with ID:', socket.id);
+            console.log('🔍 Total active connections:', performance.getEntriesByType('navigation').length);
             console.log('🔍 Checking DOM elements on connect:');
             console.log('  - console-messages div:', document.getElementById('console-messages'));
             console.log('  - user-messages div:', document.getElementById('user-messages'));
             console.log('  - main-content-area div:', document.getElementById('main-content-area'));
-            addConsoleMessage('✅ Connected to Agent', 'info');
+            addConsoleMessage('✅ Connected to Agent (ID: ' + socket.id + ')', 'info');
         });
+        
+        return socket;
+    }
+    
+    // Initialize socket on first load
+    socket = initializeSocket();
 
         socket.on('disconnect', function() {
             console.log('Disconnected from agent');
@@ -875,6 +911,25 @@
             initializeResizers();
             // Load home page by default
             loadPage('home');
+        });
+        
+        // Cleanup socket connections on page unload
+        window.addEventListener('beforeunload', function() {
+            console.log('🧹 Page unloading, disconnecting socket');
+            if (socket && socket.connected) {
+                socket.disconnect();
+            }
+        });
+        
+        // Prevent multiple connections when visibility changes
+        document.addEventListener('visibilitychange', function() {
+            if (document.visibilityState === 'visible') {
+                console.log('👀 Page became visible, checking socket connection');
+                if (!socket || !socket.connected) {
+                    console.log('🔄 Reconnecting socket');
+                    socket = initializeSocket();
+                }
+            }
         });
     </script>
 </body>
