@@ -47,7 +47,8 @@ class WebUI:
         static_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'public', 'static'))
         self.app = Flask(__name__, template_folder=template_dir, static_folder=static_dir)
         self.app.config["SECRET_KEY"] = "secret!"
-        self.socketio = SocketIO(self.app, cookie=None)
+        # Enable cross-origin Socket.IO in local/dev and ensure compatibility
+        self.socketio = SocketIO(self.app, cookie=None, cors_allowed_origins="*")
         self.user_messages = []
         self.assistant_messages = []
         self.tool_results = []
@@ -497,11 +498,11 @@ class WebUI:
         if msg_type == "user":
             self.user_messages.append(content)
             # Also emit to file browser
-            self.socketio.emit("user_message", {"content": content})
+            self.socketio.emit("user_message", {"content": content}, broadcast=True)
         elif msg_type == "assistant":
             self.assistant_messages.append(content)
             # Also emit to file browser
-            self.socketio.emit("assistant_message", {"content": content})
+            self.socketio.emit("assistant_message", {"content": content}, broadcast=True)
         elif msg_type == "tool":
             self.tool_results.append(content)
             # Parse tool result for file browser
@@ -512,7 +513,7 @@ class WebUI:
                     first_line = lines[0].strip()
                     if first_line.startswith('Tool:'):
                         tool_name = first_line.replace('Tool:', '').strip()
-                self.socketio.emit("tool_result", {"tool_name": tool_name, "result": content})
+                self.socketio.emit("tool_result", {"tool_name": tool_name, "result": content}, broadcast=True)
                 
                 # Check if this tool might have created/modified files
                 if any(keyword in content.lower() for keyword in ['created', 'wrote', 'generated', 'saved', 'modified', 'updated']):
@@ -532,6 +533,7 @@ class WebUI:
         self.socketio.emit(
             "update",
             data,
+            broadcast=True,
         )
         logging.info("Update broadcast completed")
 
@@ -539,14 +541,14 @@ class WebUI:
         """Await the next user input sent via the web UI input queue."""
         if prompt_message:
             logging.info(f"Emitting agent_prompt: {prompt_message}")
-            self.socketio.emit("agent_prompt", {"message": prompt_message})
+            self.socketio.emit("agent_prompt", {"message": prompt_message}, broadcast=True)
 
         loop = asyncio.get_running_loop()
         user_response = await loop.run_in_executor(None, self.input_queue.get)
 
         # Clear the prompt after input is received
         logging.info("Emitting agent_prompt_clear")
-        self.socketio.emit("agent_prompt_clear")
+        self.socketio.emit("agent_prompt_clear", broadcast=True)
 
         return user_response
 
@@ -555,9 +557,10 @@ class WebUI:
         self.socketio.emit(
             "tool_prompt",
             {"tool": tool_name, "values": args, "schema": schema},
+            broadcast=True,
         )
         loop = asyncio.get_running_loop()
         params = await loop.run_in_executor(None, self.tool_queue.get)
-        self.socketio.emit("tool_prompt_clear")
+        self.socketio.emit("tool_prompt_clear", broadcast=True)
         return params
 
