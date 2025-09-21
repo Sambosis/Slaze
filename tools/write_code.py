@@ -159,6 +159,8 @@ class CodeCommand(str, Enum):
 
 
 class FileDetail(BaseModel):
+    model_config = {"extra": "forbid"}
+    
     filename: str
     code_description: str
     external_imports: Optional[List[str]] = None
@@ -1258,6 +1260,35 @@ Please analyze each version and select the one that:
                 f"Failed to log generated {output_type} for {file_path.name} to {get_constant('CODE_FILE')}: {file_error}",
                 exc_info=True)
 
+    def _format_terminal_output(self, 
+                               command: str, 
+                               files: List[str] = None, 
+                               result: str = None, 
+                               error: str = None,
+                               additional_info: str = None) -> str:
+        """Format write code operations to look like terminal output."""
+        lines = ["```console"]
+        
+        # Add command line
+        if files:
+            files_str = " ".join(files) if len(files) <= 3 else f"{files[0]} ... +{len(files)-1} more"
+            lines.append(f"$ write_code {command} {files_str}")
+        else:
+            lines.append(f"$ write_code {command}")
+        
+        # Add result or error
+        if error:
+            lines.append(f"Error: {error}")
+        elif result:
+            lines.append(result)
+        
+        # Add additional info if provided
+        if additional_info:
+            lines.extend(additional_info.split('\n'))
+        
+        lines.append("```")
+        return '\n'.join(lines)
+
     def extract_code_block(
             self,
             text: str,
@@ -1276,15 +1307,8 @@ Please analyze each version and select the one that:
 
         start_marker = text.find("```")
         if start_marker == -1:
-            # No backticks, try guessing language from content
-            try:
-                language = guess_lexer(text).aliases[0]
-                # Return the whole text as the code block
-                return text.strip(), language
-            except Exception:  # pygments.util.ClassNotFound or others
-                logger.warning(
-                    "Could not guess language for code without backticks.")
-                return text.strip(), "unknown"  # Return unknown if guess fails
+            # No backticks, assume it's plain text and return unknown language
+            return text.strip(), "unknown"
 
         # Found opening backticks ```
         language_line_end = text.find("\n", start_marker)
