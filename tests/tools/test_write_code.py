@@ -1,9 +1,43 @@
+import json
 import pytest
 import tempfile
 from pathlib import Path
+from typing import Any, Dict, Optional
 from unittest.mock import patch, MagicMock, AsyncMock
+
 from tools.write_code import WriteCodeTool, CodeCommand, FileDetail, LLMResponseError
 from tools.base import ToolResult
+
+
+DEFAULT_CODE_MODELS = [
+    "openai/gpt-5",
+    "x-ai/grok-code-fast-1",
+    "openai/gpt-4.1",
+]
+
+
+def build_get_constant_side_effect(
+    repo_dir: str, extra: Optional[Dict[str, Any]] = None
+):
+    """Create a side effect function for get_constant mocks."""
+
+    extra = extra or {}
+
+    def _side_effect(name: str, default=None):
+        mapping = {
+            "REPO_DIR": repo_dir,
+            "CODE_LIST": extra.get("CODE_LIST", DEFAULT_CODE_MODELS),
+            "CODE_MODEL": extra.get("CODE_MODEL", "x-ai/grok-code-fast-1"),
+            "CODE_GEN_MODEL": extra.get("CODE_GEN_MODEL", None),
+            "TASK": extra.get("TASK", "NOT YET CREATED"),
+            "LOG_FILE": extra.get("LOG_FILE", None),
+        }
+        return mapping.get(name, default)
+
+    return _side_effect
+
+
+pytest_plugins = ("pytest_asyncio",)
 
 
 @pytest.fixture
@@ -43,10 +77,31 @@ def sample_files():
 def mock_openai_client():
     """Fixture to mock the OpenAI client."""
     mock_client = AsyncMock()
-    mock_response = MagicMock()
-    mock_response.choices = [MagicMock()]
-    mock_response.choices[0].message.content = "# Sample generated code\nprint('Hello World')"
-    mock_client.chat.completions.create.return_value = mock_response
+
+    sample_code = "# Sample generated code\nprint('Hello World')"
+    selection_payload = json.dumps(
+        {
+            "selected_model": DEFAULT_CODE_MODELS[0],
+            "selected_code": sample_code,
+            "reason": "Preferred candidate for testing",
+        }
+    )
+
+    def make_completion(content: str):
+        completion = MagicMock()
+        completion.choices = [MagicMock()]
+        completion.choices[0].message.content = content
+        return completion
+
+    def response_generator():
+        while True:
+            for _ in range(len(DEFAULT_CODE_MODELS)):
+                yield make_completion(sample_code)
+            yield make_completion(selection_payload)
+
+    mock_client.chat.completions.create = AsyncMock(
+        side_effect=response_generator()
+    )
     return mock_client
 
 
@@ -206,7 +261,7 @@ class TestWriteCodeTool:
         """Test successful code generation and file writing."""
         # Setup mocks
         with tempfile.TemporaryDirectory() as temp_dir:
-            mock_get_constant.return_value = temp_dir
+            mock_get_constant.side_effect = build_get_constant_side_effect(temp_dir)
             mock_openai_class.return_value = mock_openai_client
             write_code_tool.display = mock_display
             
@@ -235,7 +290,7 @@ class TestWriteCodeTool:
                                     write_code_tool: WriteCodeTool, sample_files):
         """Test handling of LLM errors during code generation."""
         with tempfile.TemporaryDirectory() as temp_dir:
-            mock_get_constant.return_value = temp_dir
+            mock_get_constant.side_effect = build_get_constant_side_effect(temp_dir)
             
             # Mock OpenAI client to raise an exception
             mock_client = AsyncMock()
@@ -257,7 +312,7 @@ class TestWriteCodeTool:
     async def test_file_creation_logging(self, mock_get_constant, write_code_tool: WriteCodeTool):
         """Test that file creation is properly logged."""
         with tempfile.TemporaryDirectory() as temp_dir:
-            mock_get_constant.return_value = temp_dir
+            mock_get_constant.side_effect = build_get_constant_side_effect(temp_dir)
             
             # Create a mock log file
             log_file = Path(temp_dir) / "logs" / "file_log.json"
@@ -301,7 +356,7 @@ class TestWriteCodeTool:
                                  write_code_tool: WriteCodeTool, sample_files, mock_openai_client):
         """Test that project paths are resolved correctly."""
         with tempfile.TemporaryDirectory() as temp_dir:
-            mock_get_constant.return_value = temp_dir
+            mock_get_constant.side_effect = build_get_constant_side_effect(temp_dir)
             mock_openai_class.return_value = mock_openai_client
             
             result = await write_code_tool(
@@ -317,7 +372,7 @@ class TestWriteCodeTool:
     async def test_directory_creation(self, mock_get_constant, write_code_tool: WriteCodeTool, sample_files):
         """Test that directories are created when they don't exist."""
         with tempfile.TemporaryDirectory() as temp_dir:
-            mock_get_constant.return_value = temp_dir
+            mock_get_constant.side_effect = build_get_constant_side_effect(temp_dir)
             
             # Use a nested project path that doesn't exist
             with patch('tools.write_code.AsyncOpenAI') as mock_openai_class:
@@ -368,7 +423,7 @@ Some additional text.
                                      mock_openai_client, mock_display):
         """Test that display integration works correctly."""
         with tempfile.TemporaryDirectory() as temp_dir:
-            mock_get_constant.return_value = temp_dir
+            mock_get_constant.side_effect = build_get_constant_side_effect(temp_dir)
             mock_openai_class.return_value = mock_openai_client
             write_code_tool.display = mock_display
             

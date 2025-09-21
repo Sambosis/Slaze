@@ -1,8 +1,10 @@
 # ignore: type
 """Utility tool for generating codebases via LLM calls."""
 import asyncio
+import json
 import logging
 import os
+import re
 import time
 from enum import Enum
 from pathlib import Path
@@ -19,7 +21,7 @@ from openai import (
     InternalServerError,
     RateLimitError,
 )
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 # from icecream import ic  # type: ignore # Removed
 from pygments import highlight  # type: ignore
@@ -35,7 +37,7 @@ from tenacity import (
     wait_exponential,
 )
 
-from config import CODE_MODEL, get_constant
+from config import CODE_LIST, CODE_MODEL, get_constant
 from system_prompt.code_prompts import code_prompt_generate
 from tools.base import BaseAnthropicTool, ToolResult
 
@@ -120,6 +122,7 @@ class CodeCommand(str, Enum):
 
 
 class FileDetail(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     filename: str
     code_description: str
     external_imports: Optional[List[str]] = None
@@ -134,6 +137,7 @@ class WriteCodeTool(BaseAnthropicTool):
         "This is the tool to use to generate code files for a codebase, can create up to 5 files at a time. "
         "Use this tool to generate init files."
         "Generates full code asynchronously, writing to the host filesystem."
+        "Generates a codebase from structured descriptions and import specifications."
     )
 
     def __init__(self, display=None):
@@ -985,12 +989,21 @@ class WriteCodeTool(BaseAnthropicTool):
         agent_task = self._get_task_description()
         log_content = self._get_file_creation_log_content()
 
+        existing_code = ""
+        if file_path.exists():
+            try:
+                existing_code = file_path.read_text(encoding="utf-8")
+            except Exception as read_error:
+                logger.warning(
+                    "Unable to read existing file %s for additional context: %s",
+                    file_path,
+                    read_error,
+                )
+
         prepared_messages = code_prompt_generate(
-            current_code_base=
-            "",  # Assuming current_code_base is handled or intentionally empty
+            current_code_base=existing_code,
             code_description=code_description,
-            research_string=
-            "",  # Assuming research_string is handled or intentionally empty
+            research_string="",
             agent_task=agent_task,
             external_imports=external_imports,
             internal_imports=internal_imports,
@@ -999,47 +1012,446 @@ class WriteCodeTool(BaseAnthropicTool):
         )
 
         model_to_use = get_constant("CODE_GEN_MODEL") or MODEL_STRING
-        final_code_string = (
-            f"# Error: Code generation failed for {file_path.name} after all retries."
+        models_to_run = self._get_code_generation_models(model_to_use)
+
+        candidate_results = await self._generate_code_candidates(
+            prepared_messages=prepared_messages,
+            file_path=file_path,
+            models=models_to_run,
         )
 
+        successful_candidates = [
+            candidate for candidate in candidate_results
+            if candidate.get("code")
+        ]
+
+        if not successful_candidates:
+            error_messages = [
+                candidate.get("error") or "Unknown error"
+                for candidate in candidate_results
+            ]
+            combined_error = "; ".join(error_messages) if error_messages else "Unknown"
+            final_code_string = (
+                f"# Error generating code for {file_path.name}: {combined_error}"
+            )
+            self._log_generated_output(final_code_string, file_path, "Code")
+            return final_code_string
+
+        selection_details = None
         try:
-            final_code_string = await self._llm_generate_code_core_with_retry(
-                prepared_messages=prepared_messages,
+            selection_details = await self._select_best_code_version(
                 file_path=file_path,
-                model_to_use=model_to_use,
+                code_description=code_description,
+                agent_task=agent_task,
+                external_imports=external_imports,
+                internal_imports=internal_imports,
+                log_content=log_content,
+                existing_code=existing_code,
+                candidates=candidate_results,
             )
-        except LLMResponseError as e:
+        except Exception as selection_error:
             logger.error(
-                f"LLMResponseError for {file_path.name} after all retries: {e}",
-                exc_info=True)
-            # rr( # Replaced by logger
-            #     f"[bold red]LLM generated invalid content for {file_path.name} after retries: {e}[/bold red]"
-            # )
-            final_code_string = f"# Error generating code for {file_path.name}: LLMResponseError - {str(e)}"
-        except APIError as e:  # Catch specific OpenAI errors
-            logger.error(
-                f"OpenAI APIError for {file_path.name} after all retries: {type(e).__name__} - {e}",
-                exc_info=True)
-            # rr( # Replaced by logger
-            #     f"[bold red]LLM call failed due to APIError for {file_path.name} after retries: {e}[/bold red]"
-            # )
-            final_code_string = (
-                f"# Error generating code for {file_path.name}: API Error - {str(e)}"
+                "Code selection model failed for %s: %s",
+                file_path,
+                selection_error,
+                exc_info=True,
             )
-        except Exception as e:
-            logger.critical(
-                f"Unexpected error during code generation for {file_path.name} after retries: {type(e).__name__} - {e}",
-                exc_info=True)
-            # rr( # Replaced by logger
-            #     f"[bold red]LLM call ultimately failed for {file_path.name} due to unexpected error: {e}[/bold red]"
-            # )
-            final_code_string = (
-                f"# Error generating code for {file_path.name} (final): {str(e)}"
+
+        if selection_details and selection_details.get("selected_code"):
+            final_code_string = selection_details["selected_code"]
+            selected_model = selection_details.get("selected_model")
+            selection_reason = selection_details.get("reason")
+        else:
+            fallback_candidate = successful_candidates[0]
+            final_code_string = fallback_candidate.get("code", "")
+            selected_model = fallback_candidate.get("model")
+            selection_reason = (
+                "Falling back to first successful candidate due to selection "
+                "model failure or empty response."
             )
+
+        if not final_code_string:
+            final_code_string = (
+                f"# Error generating code for {file_path.name}: Empty content after selection"
+            )
+
+        logger.info(
+            "Selected code for %s using model %s",
+            file_path.name,
+            selected_model or "unknown",
+        )
+
+        if selection_details and selection_details.get("raw_response"):
+            logger.debug(
+                "Selection model raw response for %s: %s",
+                file_path.name,
+                selection_details["raw_response"],
+            )
+
+        if selection_reason:
+            logger.info(
+                "Selection reason for %s: %s",
+                file_path.name,
+                selection_reason,
+            )
+
+        if self.display:
+            additional_info_lines = []
+            if selected_model:
+                additional_info_lines.append(f"Model: {selected_model}")
+            if selection_reason:
+                additional_info_lines.append(
+                    f"Reason: {self._truncate_text(selection_reason, limit=300)}"
+                )
+            console_output = self._format_terminal_output(
+                command="select_best_code",
+                files=[file_path.name],
+                result="Selected best generated code candidate",
+                additional_info="\n".join(additional_info_lines) if additional_info_lines else None,
+            )
+            self.display.add_message("assistant", console_output)
 
         self._log_generated_output(final_code_string, file_path, "Code")
         return final_code_string
+
+    def _get_code_generation_models(self, default_model: str) -> List[str]:
+        """Return the list of models to use for code generation."""
+
+        configured_models = get_constant("CODE_LIST", CODE_LIST)
+        raw_models: List[Any] = []
+
+        if isinstance(configured_models, list):
+            raw_models = configured_models
+        elif isinstance(configured_models, str):
+            stripped_value = configured_models.strip()
+            if stripped_value.startswith("[") and stripped_value.endswith("]"):
+                try:
+                    parsed = json.loads(stripped_value)
+                    if isinstance(parsed, list):
+                        raw_models = parsed
+                except json.JSONDecodeError:
+                    raw_models = []
+            if not raw_models:
+                raw_models = [
+                    item.strip() for item in stripped_value.split(",") if item.strip()
+                ]
+        elif configured_models is None:
+            raw_models = []
+        else:
+            raw_models = [configured_models]
+
+        models: List[str] = []
+        for model in raw_models:
+            if not isinstance(model, str):
+                continue
+            model_str = model.strip()
+            if not model_str:
+                continue
+            try:
+                potential_path = Path(model_str)
+                if potential_path.exists():
+                    # Ignore filesystem paths that may have been provided accidentally.
+                    continue
+            except OSError:
+                pass
+            if model_str not in models:
+                models.append(model_str)
+
+        if not models:
+            for model in CODE_LIST:
+                if isinstance(model, str) and model and model not in models:
+                    models.append(model)
+
+        if default_model and default_model not in models:
+            models.append(default_model)
+
+        return models
+
+    async def _generate_code_candidates(
+        self,
+        *,
+        prepared_messages: List[Dict[str, str]],
+        file_path: Path,
+        models: List[str],
+    ) -> List[Dict[str, Any]]:
+        """Run code generation for each model in parallel."""
+
+        if not models:
+            return []
+
+        tasks = [
+            self._generate_code_for_model(
+                prepared_messages=prepared_messages,
+                file_path=file_path,
+                model=model,
+            )
+            for model in models
+        ]
+
+        return await asyncio.gather(*tasks)
+
+    async def _generate_code_for_model(
+        self,
+        *,
+        prepared_messages: List[Dict[str, str]],
+        file_path: Path,
+        model: str,
+    ) -> Dict[str, Any]:
+        """Generate code for a single model with retry handling."""
+
+        start_time = time.time()
+        try:
+            code_string = await self._llm_generate_code_core_with_retry(
+                prepared_messages=prepared_messages,
+                file_path=file_path,
+                model_to_use=model,
+            )
+            elapsed = time.time() - start_time
+            logger.info(
+                "Generated candidate code for %s using model %s in %.2fs",
+                file_path.name,
+                model,
+                elapsed,
+            )
+            return {"model": model, "code": code_string, "error": None}
+        except Exception as exc:
+            elapsed = time.time() - start_time
+            logger.error(
+                "Code generation error for %s using model %s after %.2fs: %s",
+                file_path.name,
+                model,
+                elapsed,
+                exc,
+                exc_info=True,
+            )
+            return {"model": model, "code": "", "error": str(exc)}
+
+    @retry(
+        wait=wait_exponential(multiplier=1, min=4, max=60),
+        stop=stop_after_attempt(3),
+        retry=retry_if_exception(should_retry_llm_call),
+        reraise=True,
+        before_sleep=_log_llm_retry_attempt,
+    )
+    async def _call_selection_model(
+        self,
+        *,
+        messages: List[Dict[str, str]],
+        model: str,
+        file_path: Path,
+    ) -> str:
+        """Call the selection model to choose the best candidate."""
+
+        OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+        if not OPENROUTER_API_KEY:
+            raise ValueError("OPENROUTER_API_KEY environment variable not set.")
+
+        client = AsyncOpenAI(
+            base_url="https://openrouter.ai/api/v1",
+            api_key=OPENROUTER_API_KEY,
+        )
+
+        logger.info(
+            "Selection model %s evaluating candidates for %s",
+            model,
+            file_path.name,
+        )
+
+        completion = await client.chat.completions.create(
+            model=model,
+            messages=messages,
+        )
+
+        if not (
+            completion
+            and completion.choices
+            and completion.choices[0].message
+            and completion.choices[0].message.content
+        ):
+            logger.error(
+                "Invalid or empty selection response for %s", file_path.name
+            )
+            raise LLMResponseError(
+                f"Invalid or empty selection response for {file_path.name}"
+            )
+
+        return completion.choices[0].message.content
+
+    def _parse_selection_response(self, response: str) -> Dict[str, Any]:
+        """Parse the JSON response from the selection model."""
+
+        if not response or not response.strip():
+            raise LLMResponseError("Empty response from selection model")
+
+        stripped_response = response.strip()
+        try:
+            return json.loads(stripped_response)
+        except json.JSONDecodeError:
+            json_match = re.search(r"\{.*\}", stripped_response, re.DOTALL)
+            if json_match:
+                try:
+                    return json.loads(json_match.group(0))
+                except json.JSONDecodeError as exc:
+                    logger.error("Failed to parse selection JSON: %s", exc)
+            raise
+
+    async def _select_best_code_version(
+        self,
+        *,
+        file_path: Path,
+        code_description: str,
+        agent_task: str,
+        external_imports: List[str],
+        internal_imports: List[str],
+        log_content: str,
+        existing_code: str,
+        candidates: List[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        """Use CODE_MODEL to select the best candidate implementation."""
+
+        selector_model = get_constant("CODE_MODEL") or CODE_MODEL
+        valid_candidates = [candidate for candidate in candidates if candidate.get("code")]
+
+        if not valid_candidates:
+            raise ValueError("No valid code candidates were generated.")
+
+        candidate_sections = []
+        for index, candidate in enumerate(candidates, start=1):
+            model_name = candidate.get("model", f"candidate_{index}")
+            header = f"Candidate {index} - Model {model_name}"
+            if candidate.get("code"):
+                truncated_code = self._truncate_text(candidate["code"], limit=12000)
+                candidate_sections.append(
+                    f"{header}\n```\n{truncated_code}\n```"
+                )
+            else:
+                candidate_sections.append(
+                    f"{header} encountered an error: {candidate.get('error', 'Unknown error')}"
+                )
+
+        existing_excerpt = (
+            self._truncate_text(existing_code, limit=4000)
+            if existing_code
+            else "(No existing file content)"
+        )
+        log_excerpt = (
+            self._truncate_text(log_content, limit=4000)
+            if log_content
+            else "(No recent file log entries available)"
+        )
+
+        agent_task_excerpt = (
+            self._truncate_text(agent_task, limit=2000)
+            if agent_task
+            else "(No agent task provided)"
+        )
+
+        context_lines = [
+            f"File path: {file_path}",
+            f"File description: {code_description}",
+            f"Agent task: {agent_task_excerpt}",
+            "External imports: "
+            + (", ".join(external_imports) if external_imports else "None"),
+            "Internal imports: "
+            + (", ".join(internal_imports) if internal_imports else "None"),
+        ]
+
+        user_message = (
+            "You must pick the best candidate implementation for the target file.\n"
+            + "\n".join(context_lines)
+            + "\n\nExisting file content (if present):\n```")
+        user_message += existing_excerpt + "\n```\n\n"
+        user_message += "Recent file creation log excerpt:\n```\n"
+        user_message += log_excerpt + "\n```\n\n"
+        user_message += "Candidate implementations:\n\n"
+        user_message += "\n\n".join(candidate_sections)
+        user_message += (
+            "\n\nRespond with a JSON object containing the keys "
+            "'selected_model', 'selected_code', and 'reason'. Use one of the provided "
+            "model identifiers exactly and prefer candidates that match the project "
+            "requirements."
+        )
+
+        messages = [
+            {
+                "role": "system",
+                "content": (
+                    "You are an expert software engineer reviewing multiple code implementations. "
+                    "Evaluate correctness, completeness, and integration with the project. "
+                    "Return only valid JSON with fields 'selected_model', 'selected_code', and 'reason'."
+                ),
+            },
+            {"role": "user", "content": user_message},
+        ]
+
+        raw_response = await self._call_selection_model(
+            messages=messages,
+            model=selector_model,
+            file_path=file_path,
+        )
+
+        parsed_response = self._parse_selection_response(raw_response)
+        selected_model = (
+            parsed_response.get("selected_model")
+            or parsed_response.get("winner_model")
+            or parsed_response.get("model")
+        )
+        selected_code = parsed_response.get("selected_code") or parsed_response.get("code")
+        selection_reason = (
+            parsed_response.get("reason")
+            or parsed_response.get("justification")
+            or parsed_response.get("rationale")
+            or ""
+        )
+
+        selected_index = (
+            parsed_response.get("selected_index")
+            or parsed_response.get("winner_index")
+            or parsed_response.get("index")
+        )
+
+        if (not selected_model) and selected_index is not None:
+            try:
+                index_value = int(selected_index)
+            except (ValueError, TypeError):
+                index_value = None
+            if index_value and 1 <= index_value <= len(valid_candidates):
+                candidate = valid_candidates[index_value - 1]
+                selected_model = candidate.get("model")
+                if not selected_code:
+                    selected_code = candidate.get("code")
+
+        candidate_map = {
+            candidate.get("model"): candidate for candidate in valid_candidates if candidate.get("model")
+        }
+
+        if selected_model in candidate_map:
+            if not selected_code:
+                selected_code = candidate_map[selected_model].get("code")
+        else:
+            fallback_candidate = valid_candidates[0]
+            selected_model = fallback_candidate.get("model")
+            if not selected_code:
+                selected_code = fallback_candidate.get("code")
+
+        return {
+            "selected_model": selected_model,
+            "selected_code": selected_code,
+            "reason": selection_reason,
+            "raw_response": raw_response,
+        }
+
+    @staticmethod
+    def _truncate_text(text: str, *, limit: int = 4000) -> str:
+        """Truncate long text to keep prompts manageable."""
+
+        if text is None:
+            return ""
+        if len(text) <= limit:
+            return text
+        return text[:limit] + (
+            f"\n... (truncated, original length {len(text)} characters)"
+        )
 
     @retry(
         wait=wait_exponential(multiplier=1, min=4, max=60),
@@ -1147,6 +1559,8 @@ class WriteCodeTool(BaseAnthropicTool):
             # No backticks, try guessing language from content
             try:
                 language = guess_lexer(text).aliases[0]
+                if language in {"text", "text only"}:
+                    language = "unknown"
                 # Return the whole text as the code block
                 return text.strip(), language
             except Exception:  # pygments.util.ClassNotFound or others
@@ -1182,6 +1596,9 @@ class WriteCodeTool(BaseAnthropicTool):
 
         # If language is still empty, default to 'unknown'
         if not language:
+            language = "unknown"
+
+        if language in {"text", "text only"}:
             language = "unknown"
 
         return code_block if code_block else "No Code Found", language

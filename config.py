@@ -94,8 +94,9 @@ ALL_MODELS= grokfast
 SUMMARY_MODEL = ALL_MODELS  # Model for summaries
 MAIN_MODEL = ALL_MODELS  # Primary model for main agent operations
 CODE_MODEL = ALL_MODELS  # Model for code generation tasks
-CODE_MODEL1=open5
-CODE_MODEL2=grokfast
+CODE_MODEL1 = open5
+CODE_MODEL2 = grokfast
+CODE_LIST = [CODE_MODEL1, CODE_MODEL2, openai41]
 # Feature flag constants
 COMPUTER_USE_BETA_FLAG = "computer-use-2024-10-22"
 PROMPT_CACHING_BETA_FLAG = "prompt-caching-2024-07-31"
@@ -189,6 +190,10 @@ def write_constants_to_file():
         "OS_NAME": OS_NAME,
         "SUMMARY_MODEL": SUMMARY_MODEL,
         "MAIN_MODEL": MAIN_MODEL,
+        "CODE_MODEL": CODE_MODEL,
+        "CODE_MODEL1": CODE_MODEL1,
+        "CODE_MODEL2": CODE_MODEL2,
+        "CODE_LIST": CODE_LIST,
         "COMPUTER_USE_BETA_FLAG": COMPUTER_USE_BETA_FLAG,
         "PROMPT_CACHING_BETA_FLAG": PROMPT_CACHING_BETA_FLAG,
         "MAX_SUMMARY_MESSAGES": MAX_SUMMARY_MESSAGES,
