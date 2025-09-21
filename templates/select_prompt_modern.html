@@ -770,60 +770,36 @@
 
         function submitNewTask() {
             const form = document.getElementById('newTaskFormElement');
-            const formData = new FormData(form);
-            formData.append('choice', 'new');
+            form.action = '/run_agent';
+            form.method = 'POST';
             
-            // Submit to server
-            fetch('/run_agent', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => {
-                if (response.ok) {
-                    return response.text();
-                } else {
-                    throw new Error('Error creating task');
-                }
-            })
-            .then(html => {
-                // Replace the current page content with the agent execution interface
-                document.open();
-                document.write(html);
-                document.close();
-            })
-            .catch(error => {
-                console.error('Error submitting task:', error);
-                alert('Error submitting task');
-            });
+            let choiceInput = form.querySelector('input[name="choice"]');
+            if (!choiceInput) {
+                choiceInput = document.createElement('input');
+                choiceInput.type = 'hidden';
+                choiceInput.name = 'choice';
+                form.appendChild(choiceInput);
+            }
+            choiceInput.value = 'new';
+            
+            form.submit();
         }
 
         function runSelectedTask() {
             if (!selectedTask) return;
             
-            const formData = new FormData();
-            formData.append('choice', selectedTask.filename);
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '/run_agent';
             
-            fetch('/run_agent', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => {
-                if (response.ok) {
-                    return response.text();
-                } else {
-                    throw new Error('Error running task');
-                }
-            })
-            .then(html => {
-                // Replace the current page content with the agent execution interface
-                document.open();
-                document.write(html);
-                document.close();
-            })
-            .catch(error => {
-                console.error('Error running task:', error);
-                alert('Error running task');
-            });
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'choice';
+            input.value = selectedTask.filename;
+            form.appendChild(input);
+            
+            document.body.appendChild(form);
+            form.submit();
         }
 
         function editSelectedTask() {

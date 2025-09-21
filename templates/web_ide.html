@@ -483,7 +483,10 @@
         
         socket = io({
             autoConnect: true,
-            reconnection: false  // Disable automatic reconnection to prevent loops
+            reconnection: true,
+            reconnectionAttempts: 5,
+            reconnectionDelay: 1000,
+            transports: ['websocket', 'polling']
         });
 
         socket.on('connect', function() {
@@ -493,6 +496,16 @@
             console.log('  - user-messages div:', document.getElementById('user-messages'));
             console.log('  - main-content-area div:', document.getElementById('main-content-area'));
             addConsoleMessage('✅ Connected to Agent (ID: ' + socket.id + ')', 'info');
+        });
+        
+        socket.on('connect_error', function(error) {
+            console.error('❌ Socket.IO connection error:', error);
+            addConsoleMessage('❌ Connection error: ' + error.message, 'error');
+        });
+        
+        socket.on('connect_timeout', function(timeout) {
+            console.error('❌ Socket.IO connection timeout:', timeout);
+            addConsoleMessage('❌ Connection timeout', 'error');
         });
         
         socket.on('disconnect', function(reason) {
@@ -538,8 +551,10 @@
         return socket;
     }
     
-    // Initialize socket on first load
-    socket = initializeSocket();
+    // Initialize socket after DOM is loaded
+    document.addEventListener('DOMContentLoaded', function() {
+        socket = initializeSocket();
+    });
 
 
 

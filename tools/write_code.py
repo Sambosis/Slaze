@@ -1,15 +1,17 @@
-# ignore: type
-"""Utility tool for generating codebases via LLM calls."""
+from __future__ import annotations
 import asyncio
-import logging
 import os
 import time
-from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Dict, List, Optional, TYPE_CHECKING, Literal
+
+if TYPE_CHECKING:
+    from agent_display import AgentDisplay
 
 import ftfy
 
+import logging
+from enum import Enum
 # pyright: ignore[reportMissingImports]
 from openai import (
     APIConnectionError,
@@ -28,11 +30,12 @@ from pygments.lexers import get_lexer_by_name, guess_lexer  # type: ignore
 
 # from rich import print as rr # Removed
 from tenacity import (
-    RetryCallState,
+    RetryError,
     retry,
-    retry_if_exception,
     stop_after_attempt,
     wait_exponential,
+    retry_if_exception,
+    RetryCallState,
 )
 
 from config import CODE_MODEL, get_constant
@@ -108,7 +111,43 @@ def should_retry_llm_call(exception: Exception) -> bool:
     return False
 
 
-# --- LLMResponseError (already provided by you) ---
+def _log_llm_retry_attempt(retry_state: RetryCallState):
+    """Logs information about the current retry attempt."""
+    # The function being retried
+    fn_name = retry_state.fn.__name__ if retry_state.fn else "LLM_call"
+
+    # Extract file path from kwargs for better logging context
+    file_path_for_log = "unknown_file"
+    if retry_state.kwargs:
+        fp_arg = retry_state.kwargs.get("file_path") or retry_state.kwargs.get("target_file_path")
+        if isinstance(fp_arg, Path):
+            file_path_for_log = fp_arg.name
+
+    log_prefix = f"[bold magenta]Retry Log ({file_path_for_log})[/bold magenta] | "
+
+    # Check if the retry is happening after a failure
+    if retry_state.outcome and retry_state.outcome.failed:
+        exc = retry_state.outcome.exception()
+        stop_condition = retry_state.retry_object.stop
+        max_attempts_str = str(stop_condition.max_attempt_number) if hasattr(stop_condition, "max_attempt_number") else "N/A"
+
+        # Safely check for the next action and sleep duration
+        wait_time = f"Waiting {retry_state.next_action.sleep:.2f}s..." if retry_state.next_action else "No further retries."
+
+        log_msg = (
+            f"{log_prefix}Retrying {fn_name} due to {type(exc).__name__}: {str(exc)[:150]}. "
+            f"Attempt {retry_state.attempt_number} of {max_attempts_str}. {wait_time}"
+        )
+    else:
+        # Case for retries not directly caused by an exception in the outcome
+        wait_time = f"Waiting {retry_state.next_action.sleep:.2f}s..." if retry_state.next_action else "No further retries."
+        log_msg = (
+            f"{log_prefix}Retrying {fn_name}. "
+            f"Attempt {retry_state.attempt_number}. {wait_time}"
+        )
+    logger.info(log_msg)
+
+
 class LLMResponseError(Exception):
     """Custom exception for invalid or unusable responses from the LLM."""
 
@@ -127,219 +166,26 @@ class FileDetail(BaseModel):
 
 
 class WriteCodeTool(BaseAnthropicTool):
-    name: Literal["write_codebase_tool"] = "write_codebase_tool"
-    api_type: Literal["custom"] = "custom"
-    description: str = (
-        "Generates a full or partial codebase consisting of up to 5 files based on descriptions and import lists. "
-        "This is the tool to use to generate code files for a codebase, can create up to 5 files at a time. "
-        "Use this tool to generate init files."
-        "Generates full code asynchronously, writing to the host filesystem."
-    )
-
-    def __init__(self, display=None):
-        super().__init__(input_schema=None, display=display)
-        logger.debug("Initializing WriteCodeTool")
-        # Initialize PictureGenerationTool for handling image files
+    """
+    A tool for writing code to files, including generating code from descriptions.
+    """
+    
+    def __init__(self, display: "AgentDisplay" = None):
+        super().__init__(display=display)
         self.picture_tool = PictureGenerationTool(display=display)
-
-    def _format_terminal_output(self, 
-                               command: str, 
-                               files: List[str] = None, 
-                               result: str = None, 
-                               error: str = None,
-                               additional_info: str = None) -> str:
-        """Format write code operations to look like terminal output."""
-        output_lines = ["```console"]
-        
-        # Format the command with a pseudo-shell prompt
-        if files:
-            files_str = " ".join(files)
-            output_lines.append(f"$ write_code {command} {files_str}")
-        else:
-            output_lines.append(f"$ write_code {command}")
-        
-        # Add the result/output if provided
-        if result:
-            output_lines.extend(result.rstrip().split('\n'))
-        
-        # Add error if provided
-        if error:
-            output_lines.append(f"Error: {error}")
-        
-        # Add additional info if provided
-        if additional_info:
-            output_lines.extend(additional_info.rstrip().split('\n'))
-        
-        # End console formatting
-        output_lines.append("```")
-        
-        return "\n".join(output_lines)
-
-    def to_params(self) -> dict:
-        logger.debug(
-            f"WriteCodeTool.to_params called with api_type: {self.api_type}")
-        params = {
-            "type": "function",
-            "function": {
-                "name": self.name,
-                "description": self.description,
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "command": {
-                            "type":
-                            "string",
-                            "enum": [CodeCommand.WRITE_CODEBASE.value],
-                            "description":
-                            "Command to perform. Only 'write_codebase' is supported.",
-                        },
-                        "files": {
-                            "type":
-                            "array",
-                            "items": {
-                                "type": "object",
-                                "properties": {
-                                    "filename": {
-                                        "type":
-                                        "string",
-                                        "description":
-                                        " The relative path for the file. The main entry point to the code should NOT have a directory structure, e.g., just `main.py`. Any other files that you would like to be in a directory structure should be specified with their relative paths, e.g., `/utils/helpers.py`.",
-                                    },
-                                    "code_description": {
-                                        "type":
-                                        "string",
-                                        "description":
-                                        "Detailed description of the code for this file.  This should be a comprehensive overview of the file's purpose, functionality, and any important details. It should include a general overview of the files implementation as well as how it interacts with the rest of the codebase.",
-                                    },
-                                    "external_imports": {
-                                        "type": "array",
-                                        "items": {
-                                            "type": "string"
-                                        },
-                                        "description":
-                                        "List of external libraries/packages required specifically for this file.",
-                                        "default": [],
-                                    },
-                                    "internal_imports": {
-                                        "type": "array",
-                                        "items": {
-                                            "type": "string"
-                                        },
-                                        "description":
-                                        "List of internal modules/files within the codebase imported specifically by this file.",
-                                        "default": [],
-                                    },
-                                },
-                                "required": ["filename", "code_description"],
-                            },
-                            "description":
-                            "List of files to generate, each with a filename, description, and optional specific imports.",
-                        },
-                        # Deprecated project_path removed. Files are now written
-                        # directly relative to REPO_DIR.
-                    },
-                    "required": ["command", "files"],
-                },
-            },
-        }
-        logger.debug(f"WriteCodeTool params: {params}")
-        return params
-
-    def _get_file_creation_log_content(self) -> str:
-        """Reads the file creation log and returns its content."""
-        import logging
-        from pathlib import Path
-
-        from config import get_constant
-
-        logger = logging.getLogger(__name__)
-
-        try:
-            log_file_env_var = get_constant("LOG_FILE")
-            if log_file_env_var:
-                LOG_FILE_PATH = Path(log_file_env_var)
-            else:
-                # Default path relative to project root if constant is not set or None
-                LOG_FILE_PATH = Path("logs") / "file_log.json"
-        except KeyError:
-            # Constant not found, use default
-            LOG_FILE_PATH = Path("logs") / "file_log.json"
-            logger.warning(
-                "LOG_FILE constant not found in config, defaulting to %s",
-                LOG_FILE_PATH,
-            )
-        except Exception as e:
-            # Other potential errors from get_constant or Path()
-            LOG_FILE_PATH = Path("logs") / "file_log.json"
-            logger.error(
-                "Error determining LOG_FILE_PATH, defaulting to %s: %s",
-                LOG_FILE_PATH,
-                e,
-                exc_info=True,
-            )
-
-        try:
-            if LOG_FILE_PATH.exists() and LOG_FILE_PATH.is_file():
-                content = LOG_FILE_PATH.read_text(encoding="utf-8")
-                if not content.strip():
-                    logger.warning("File creation log %s is empty.",
-                                   LOG_FILE_PATH)
-                    return "File creation log is empty."
-                return content
-            else:
-                logger.warning(
-                    "File creation log not found or is not a file: %s",
-                    LOG_FILE_PATH)
-                return "File creation log not found or is not a file."
-        except IOError as e:
-            logger.error(
-                "IOError reading file creation log %s: %s",
-                LOG_FILE_PATH,
-                e,
-                exc_info=True,
-            )
-            return f"Error reading file creation log: {e}"
-        except Exception as e:
-            logger.error(
-                "Unexpected error reading file creation log %s: %s",
-                LOG_FILE_PATH,
-                e,
-                exc_info=True,
-            )
-            return f"Unexpected error reading file creation log: {e}"
-
-    # --- Logging Callback for Retries ---
-    def _log_llm_retry_attempt(self, retry_state: RetryCallState):
-        """Logs information about the current retry attempt."""
-        fn_name = retry_state.fn.__name__ if retry_state.fn else "LLM_call"
-
-        file_path_for_log = "unknown_file"
-        # Try to get file_path or target_file_path from kwargs for contextual logging
-        if retry_state.kwargs:
-            fp_arg = retry_state.kwargs.get(
-                "file_path") or retry_state.kwargs.get("target_file_path")
-            if isinstance(fp_arg, Path):
-                file_path_for_log = fp_arg.name
-
-        log_prefix = f"[bold magenta]Retry Log ({file_path_for_log})[/bold magenta] | "
-
-        if retry_state.outcome and retry_state.outcome.failed:
-            exc = retry_state.outcome.exception()
-            max_attempts_str = "N/A"
-            stop_condition = retry_state.retry_object.stop
-            if hasattr(stop_condition, "max_attempt_number"):
-                max_attempts_str = str(stop_condition.max_attempt_number)
-
-            log_msg = (
-                f"{log_prefix}Retrying {fn_name} due to {type(exc).__name__}: {str(exc)[:150]}. "
-                f"Attempt {retry_state.attempt_number} of {max_attempts_str}. "
-                f"Waiting {retry_state.next_action.sleep:.2f}s...")
-        else:
-            log_msg = (
-                f"{log_prefix}Retrying {fn_name} (no direct exception, or outcome not yet available). "
-                f"Attempt {retry_state.attempt_number}. Waiting {retry_state.next_action.sleep:.2f}s..."
-            )
-        logger.info(log_msg)  # Rich text formatting removed
+    
+    @property
+    def name(self) -> str:
+        return "write_codebase_tool"
+    
+    @property
+    def description(self) -> str:
+        return (
+            "Generates a full or partial codebase consisting of up to 5 files based on descriptions and import lists. "
+            "This is the tool to use to generate code files for a codebase, can create up to 5 files at a time. "
+            "Use this tool to generate init files. "
+            "Generates full code asynchronously, writing to the host filesystem."
+        )
 
     async def __call__(
         self,
@@ -854,11 +700,6 @@ class WriteCodeTool(BaseAnthropicTool):
                               command=command)
 
     # --- Helper for logging final output ---
-    def _log_generated_output(self, content: str, file_path: Path,
-                              output_type: str):
-        """Helper to log the final generated content to CODE_FILE."""
-        try:
-            code_log_file_path_str = get_constant("CODE_FILE")
             if code_log_file_path_str:
                 CODE_FILE = Path(code_log_file_path_str)
                 CODE_FILE.parent.mkdir(parents=True, exist_ok=True)
