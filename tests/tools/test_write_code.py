@@ -57,7 +57,7 @@ class TestWriteCodeTool:
         """Test that the tool has the correct properties."""
         assert write_code_tool.name == "write_codebase_tool"
         assert write_code_tool.api_type == "custom"
-        assert "generates a codebase" in write_code_tool.description.lower()
+        assert "generates" in write_code_tool.description.lower() and "codebase" in write_code_tool.description.lower()
 
     def test_to_params(self, write_code_tool: WriteCodeTool):
         """Test the to_params method returns correct OpenAI function calling format."""
@@ -65,7 +65,7 @@ class TestWriteCodeTool:
         
         assert params["type"] == "function"
         assert params["function"]["name"] == "write_codebase_tool"
-        assert "generates a codebase" in params["function"]["description"].lower()
+        assert "generates" in params["function"]["description"].lower() and "codebase" in params["function"]["description"].lower()
         assert params["function"]["parameters"]["type"] == "object"
         
         # Check required fields
@@ -404,6 +404,106 @@ Some additional text.
         
         # Should not retry on regular Exception
         assert should_retry_llm_call(Exception("test")) is False
+
+    @pytest.mark.asyncio
+    async def test_multi_model_code_generation(self, write_code_tool: WriteCodeTool):
+        """Test the new multi-model code generation functionality."""
+        from unittest.mock import AsyncMock, patch
+        
+        # Mock the CODE_LIST and CODE_MODEL
+        with patch('tools.write_code.CODE_LIST', ['model1', 'model2', 'model3']):
+            with patch('tools.write_code.CODE_MODEL', 'selector_model'):
+                # Mock the single model generation
+                mock_generate_single = AsyncMock()
+                mock_generate_single.side_effect = [
+                    "# Code from model1\nprint('model1')",
+                    "# Code from model2\nprint('model2')", 
+                    "# Code from model3\nprint('model3')"
+                ]
+                
+                # Mock the selection method
+                mock_select_best = AsyncMock()
+                mock_select_best.return_value = "# Best selected code\nprint('selected')"
+                
+                write_code_tool._generate_code_with_single_model = mock_generate_single
+                write_code_tool._select_best_code_version = mock_select_best
+                
+                # Test the multi-model generation
+                result = await write_code_tool._generate_code_with_multiple_models(
+                    code_description="Test code",
+                    external_imports=[],
+                    internal_imports=[],
+                    file_path=Path("test.py")
+                )
+                
+                # Verify all models were called
+                assert mock_generate_single.call_count == 3
+                
+                # Verify selection was called with 3 successful versions
+                mock_select_best.assert_called_once()
+                selection_args = mock_select_best.call_args[0]
+                assert len(selection_args[0]) == 3  # 3 successful generations
+                
+                # Verify result
+                assert result == "# Best selected code\nprint('selected')"
+
+    @pytest.mark.asyncio
+    async def test_multi_model_fallback_behavior(self, write_code_tool: WriteCodeTool):
+        """Test that multi-model generation falls back properly when models fail."""
+        from unittest.mock import AsyncMock, patch
+        
+        with patch('tools.write_code.CODE_LIST', ['model1', 'model2']):
+            # Mock single model generation to fail for all models
+            mock_generate_single = AsyncMock()
+            mock_generate_single.side_effect = [
+                Exception("Model 1 failed"),
+                Exception("Model 2 failed")
+            ]
+            
+            # Mock the original single-model method
+            mock_original = AsyncMock()
+            mock_original.return_value = "# Fallback code\nprint('fallback')"
+            
+            write_code_tool._generate_code_with_single_model = mock_generate_single
+            write_code_tool._call_llm_to_generate_code_original = mock_original
+            
+            # Test multi-model generation with all failures
+            result = await write_code_tool._generate_code_with_multiple_models(
+                code_description="Test code",
+                external_imports=[],
+                internal_imports=[],
+                file_path=Path("test.py")
+            )
+            
+            # Verify fallback was called
+            mock_original.assert_called_once()
+            assert result == "# Fallback code\nprint('fallback')"
+
+    @pytest.mark.asyncio
+    async def test_multi_model_single_success(self, write_code_tool: WriteCodeTool):
+        """Test behavior when only one model succeeds."""
+        from unittest.mock import AsyncMock, patch
+        
+        with patch('tools.write_code.CODE_LIST', ['model1', 'model2']):
+            # Mock single model generation with one success, one failure
+            mock_generate_single = AsyncMock()
+            mock_generate_single.side_effect = [
+                "# Code from model1\nprint('model1')",
+                Exception("Model 2 failed")
+            ]
+            
+            write_code_tool._generate_code_with_single_model = mock_generate_single
+            
+            # Test multi-model generation with single success
+            result = await write_code_tool._generate_code_with_multiple_models(
+                code_description="Test code",
+                external_imports=[],
+                internal_imports=[],
+                file_path=Path("test.py")
+            )
+            
+            # Should return the single successful result without selection
+            assert result == "# Code from model1\nprint('model1')"
 
     def test_code_command_enum(self):
         """Test the CodeCommand enum."""

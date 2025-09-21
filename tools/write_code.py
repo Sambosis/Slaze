@@ -38,7 +38,7 @@ from tenacity import (
     RetryCallState,
 )
 
-from config import CODE_MODEL, get_constant
+from config import CODE_MODEL, CODE_LIST, get_constant
 from system_prompt.code_prompts import code_prompt_generate
 from tools.base import BaseAnthropicTool, ToolResult
 
@@ -159,6 +159,8 @@ class CodeCommand(str, Enum):
 
 
 class FileDetail(BaseModel):
+    model_config = {"extra": "forbid"}
+    
     filename: str
     code_description: str
     external_imports: Optional[List[str]] = None
@@ -171,7 +173,7 @@ class WriteCodeTool(BaseAnthropicTool):
     """
     
     def __init__(self, display: "AgentDisplay" = None):
-        super().__init__(display=display)
+        super().__init__(input_schema=None, display=display)
         self.picture_tool = PictureGenerationTool(display=display)
     
     @property
@@ -186,6 +188,57 @@ class WriteCodeTool(BaseAnthropicTool):
             "Use this tool to generate init files. "
             "Generates full code asynchronously, writing to the host filesystem."
         )
+
+    def to_params(self) -> dict:
+        """Return the parameters for OpenAI function calling."""
+        return {
+            "type": "function",
+            "function": {
+                "name": self.name,
+                "description": self.description,
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "command": {
+                            "type": "string",
+                            "enum": [CodeCommand.WRITE_CODEBASE.value],
+                            "description": "The command to execute. Must be 'write_codebase'."
+                        },
+                        "files": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "filename": {
+                                        "type": "string",
+                                        "description": "The name of the file to create (with extension)."
+                                    },
+                                    "code_description": {
+                                        "type": "string",
+                                        "description": "Detailed description of the code for this file. This should be a comprehensive overview of the file's purpose, functionality, and any important details. It should include a general overview of the files implementation as well as how it interacts with the rest of the codebase."
+                                    },
+                                    "external_imports": {
+                                        "type": "array",
+                                        "items": {"type": "string"},
+                                        "description": "List of external libraries/packages required specifically for this file.",
+                                        "default": []
+                                    },
+                                    "internal_imports": {
+                                        "type": "array",
+                                        "items": {"type": "string"},
+                                        "description": "List of internal modules/files within the codebase imported specifically by this file.",
+                                        "default": []
+                                    }
+                                },
+                                "required": ["filename", "code_description"]
+                            },
+                            "description": "List of files to generate. Each file should have a filename and code_description."
+                        }
+                    },
+                    "required": ["command", "files"]
+                }
+            }
+        }
 
     async def __call__(
         self,
@@ -821,17 +874,230 @@ class WriteCodeTool(BaseAnthropicTool):
         internal_imports: List[str],
         file_path: Path,
     ) -> str:
-        """Generate full file content for the target file."""
+        """Generate full file content for the target file using multiple models from CODE_LIST."""
+        
+        # Use the new multi-model approach
+        return await self._generate_code_with_multiple_models(
+            code_description=code_description,
+            external_imports=external_imports,
+            internal_imports=internal_imports,
+            file_path=file_path
+        )
 
+    async def _generate_code_with_multiple_models(
+        self,
+        code_description: str,
+        external_imports: List[str],
+        internal_imports: List[str],
+        file_path: Path,
+    ) -> str:
+        """Generate code using multiple models from CODE_LIST in parallel, then select the best version."""
+        
+        # Prepare messages once for all models
+        agent_task = self._get_task_description()
+        log_content = self._get_file_creation_log_content()
+        
+        prepared_messages = code_prompt_generate(
+            current_code_base="",
+            code_description=code_description,
+            research_string="",
+            agent_task=agent_task,
+            external_imports=external_imports,
+            internal_imports=internal_imports,
+            target_file=str(file_path.name),
+            file_creation_log_content=log_content,
+        )
+        
+        # Generate code with all models in CODE_LIST in parallel
+        logger.info(f"Generating code for {file_path.name} using {len(CODE_LIST)} models in parallel: {CODE_LIST}")
+        
+        generation_tasks = []
+        for model in CODE_LIST:
+            task = self._generate_code_with_single_model(
+                prepared_messages=prepared_messages,
+                file_path=file_path,
+                model=model
+            )
+            generation_tasks.append(task)
+        
+        # Execute all generation tasks in parallel
+        generation_results = await asyncio.gather(*generation_tasks, return_exceptions=True)
+        
+        # Filter successful results
+        successful_generations = []
+        for i, result in enumerate(generation_results):
+            if isinstance(result, Exception):
+                logger.warning(f"Model {CODE_LIST[i]} failed for {file_path.name}: {result}")
+            elif result and not result.startswith("# Error"):
+                successful_generations.append({
+                    "model": CODE_LIST[i],
+                    "code": result
+                })
+                logger.info(f"Model {CODE_LIST[i]} successfully generated {len(result)} characters for {file_path.name}")
+        
+        # If no successful generations, fall back to original method
+        if not successful_generations:
+            logger.warning(f"All models failed for {file_path.name}, falling back to original single-model approach")
+            return await self._call_llm_to_generate_code_original(
+                code_description, external_imports, internal_imports, file_path
+            )
+        
+        # If only one successful generation, use it directly
+        if len(successful_generations) == 1:
+            logger.info(f"Only one model succeeded for {file_path.name}, using result from {successful_generations[0]['model']}")
+            return successful_generations[0]["code"]
+        
+        # Multiple successful generations - use CODE_MODEL to select the best one
+        logger.info(f"Selecting best code from {len(successful_generations)} successful generations for {file_path.name}")
+        best_code = await self._select_best_code_version(
+            successful_generations, code_description, file_path, agent_task
+        )
+        
+        return best_code
+
+    async def _generate_code_with_single_model(
+        self,
+        prepared_messages: List[Dict[str, str]],
+        file_path: Path,
+        model: str,
+    ) -> str:
+        """Generate code using a single model without retry logic for parallel execution."""
+        try:
+            OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+            if not OPENROUTER_API_KEY:
+                raise ValueError("OPENROUTER_API_KEY environment variable not set.")
+
+            client = AsyncOpenAI(base_url="https://openrouter.ai/api/v1",
+                                 api_key=OPENROUTER_API_KEY)
+
+            logger.debug(f"Calling model {model} for {file_path.name}")
+
+            completion = await client.chat.completions.create(
+                model=model, messages=prepared_messages)
+
+            if not (completion and completion.choices
+                    and completion.choices[0].message
+                    and completion.choices[0].message.content):
+                raise LLMResponseError(f"Invalid or empty completion content from {model}")
+
+            raw_code_string = completion.choices[0].message.content
+            code_string, detected_language = self.extract_code_block(raw_code_string, file_path)
+
+            if code_string == "No Code Found":
+                raise LLMResponseError(f"No code found in response from {model}")
+
+            if code_string.startswith(f"# Error: Code generation failed"):
+                raise LLMResponseError(f"Model {model} returned error placeholder")
+
+            return code_string
+
+        except Exception as e:
+            logger.warning(f"Model {model} failed for {file_path.name}: {e}")
+            raise e
+
+    async def _select_best_code_version(
+        self,
+        code_versions: List[Dict[str, str]],
+        code_description: str,
+        file_path: Path,
+        agent_task: str,
+    ) -> str:
+        """Use CODE_MODEL to select the best code version from multiple generated versions."""
+        
+        # Prepare the selection prompt
+        versions_text = ""
+        for i, version in enumerate(code_versions, 1):
+            versions_text += f"\n=== VERSION {i} (from {version['model']}) ===\n"
+            versions_text += version['code']
+            versions_text += f"\n=== END VERSION {i} ===\n"
+        
+        # Get current codebase context (simplified - could be enhanced)
+        current_codebase = self._get_current_codebase_context()
+        
+        selection_prompt = f"""You are tasked with selecting the best code implementation from multiple versions generated for the same requirements.
+
+**File:** {file_path.name}
+**Requirements:** {code_description}
+**Project Context:** {agent_task}
+
+**Current Codebase Context:**
+{current_codebase}
+
+**Generated Code Versions:**
+{versions_text}
+
+Please analyze each version and select the one that:
+1. Best fulfills the requirements
+2. Has the highest code quality (readability, maintainability, error handling)
+3. Integrates best with the existing codebase
+4. Follows Python best practices
+
+**Respond with ONLY the number (1, 2, 3, etc.) of the best version. Do not include any explanation.**"""
+
+        try:
+            # Use CODE_MODEL to make the selection
+            OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+            if not OPENROUTER_API_KEY:
+                logger.warning("OPENROUTER_API_KEY not set, defaulting to first version")
+                return code_versions[0]["code"]
+
+            client = AsyncOpenAI(base_url="https://openrouter.ai/api/v1",
+                                 api_key=OPENROUTER_API_KEY)
+
+            selection_messages = [{"role": "user", "content": selection_prompt}]
+            
+            completion = await client.chat.completions.create(
+                model=CODE_MODEL, 
+                messages=selection_messages,
+                max_tokens=10,
+                temperature=0.1
+            )
+
+            if completion and completion.choices and completion.choices[0].message:
+                selection_response = completion.choices[0].message.content.strip()
+                try:
+                    selected_index = int(selection_response) - 1
+                    if 0 <= selected_index < len(code_versions):
+                        selected_version = code_versions[selected_index]
+                        logger.info(f"Selected version {selected_index + 1} from {selected_version['model']} for {file_path.name}")
+                        return selected_version["code"]
+                except (ValueError, IndexError):
+                    logger.warning(f"Invalid selection response: {selection_response}, defaulting to first version")
+
+        except Exception as e:
+            logger.warning(f"Code selection failed: {e}, defaulting to first version")
+
+        # Fallback to first version if selection fails
+        logger.info(f"Using first version from {code_versions[0]['model']} for {file_path.name}")
+        return code_versions[0]["code"]
+
+    def _get_current_codebase_context(self) -> str:
+        """Get current codebase context for code selection. This is a simplified version."""
+        try:
+            # Try to get recent file creation log for context
+            log_content = self._get_file_creation_log_content()
+            if log_content:
+                return f"Recent file operations:\n{log_content[:1000]}..."
+            return "No recent codebase context available."
+        except Exception:
+            return "No codebase context available."
+
+    async def _call_llm_to_generate_code_original(
+        self,
+        code_description: str,
+        external_imports: List[str],
+        internal_imports: List[str],
+        file_path: Path,
+    ) -> str:
+        """Original single-model code generation method (renamed for fallback)."""
+        
         agent_task = self._get_task_description()
         log_content = self._get_file_creation_log_content()
 
         prepared_messages = code_prompt_generate(
-            current_code_base=
-            "",  # Assuming current_code_base is handled or intentionally empty
+            current_code_base="",
             code_description=code_description,
-            research_string=
-            "",  # Assuming research_string is handled or intentionally empty
+            research_string="",
             agent_task=agent_task,
             external_imports=external_imports,
             internal_imports=internal_imports,
@@ -854,17 +1120,11 @@ class WriteCodeTool(BaseAnthropicTool):
             logger.error(
                 f"LLMResponseError for {file_path.name} after all retries: {e}",
                 exc_info=True)
-            # rr( # Replaced by logger
-            #     f"[bold red]LLM generated invalid content for {file_path.name} after retries: {e}[/bold red]"
-            # )
             final_code_string = f"# Error generating code for {file_path.name}: LLMResponseError - {str(e)}"
-        except APIError as e:  # Catch specific OpenAI errors
+        except APIError as e:
             logger.error(
                 f"OpenAI APIError for {file_path.name} after all retries: {type(e).__name__} - {e}",
                 exc_info=True)
-            # rr( # Replaced by logger
-            #     f"[bold red]LLM call failed due to APIError for {file_path.name} after retries: {e}[/bold red]"
-            # )
             final_code_string = (
                 f"# Error generating code for {file_path.name}: API Error - {str(e)}"
             )
@@ -872,9 +1132,6 @@ class WriteCodeTool(BaseAnthropicTool):
             logger.critical(
                 f"Unexpected error during code generation for {file_path.name} after retries: {type(e).__name__} - {e}",
                 exc_info=True)
-            # rr( # Replaced by logger
-            #     f"[bold red]LLM call ultimately failed for {file_path.name} due to unexpected error: {e}[/bold red]"
-            # )
             final_code_string = (
                 f"# Error generating code for {file_path.name} (final): {str(e)}"
             )
@@ -967,6 +1224,71 @@ class WriteCodeTool(BaseAnthropicTool):
         return code_string
 
 
+    def _get_file_creation_log_content(self) -> str:
+        """
+        Retrieve the content of the file creation log for providing context to LLM.
+        Returns a string representation of recent file operations.
+        """
+        try:
+            log_file_path = get_constant("LOG_FILE")
+            if not log_file_path or not Path(log_file_path).exists():
+                return ""
+            
+            with open(log_file_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+                return content
+        except Exception as e:
+            logger.warning(f"Failed to read file creation log: {e}")
+            return ""
+
+    def _log_generated_output(self, content: str, file_path: Path, output_type: str):
+        """Helper to log the final generated content to CODE_FILE."""
+        try:
+            code_log_file_path_str = get_constant("CODE_FILE")
+            if code_log_file_path_str:
+                CODE_FILE = Path(code_log_file_path_str)
+                CODE_FILE.parent.mkdir(parents=True, exist_ok=True)
+                with open(CODE_FILE, "a", encoding="utf-8") as f:
+                    f.write(
+                        f"\n--- Generated {output_type} for: {str(file_path)} ({time.strftime('%Y-%m-%d %H:%M:%S')}) ---\n"
+                    )
+                    f.write(f"{content}\n")
+                    f.write(
+                        f"--- End {output_type} for: {str(file_path)} ---\n")
+        except Exception as file_error:
+            logger.error(
+                f"Failed to log generated {output_type} for {file_path.name} to {get_constant('CODE_FILE')}: {file_error}",
+                exc_info=True)
+
+    def _format_terminal_output(self, 
+                               command: str, 
+                               files: List[str] = None, 
+                               result: str = None, 
+                               error: str = None,
+                               additional_info: str = None) -> str:
+        """Format write code operations to look like terminal output."""
+        lines = ["```console"]
+        
+        # Add command line
+        if files:
+            files_str = " ".join(files) if len(files) <= 3 else f"{files[0]} ... +{len(files)-1} more"
+            lines.append(f"$ write_code {command} {files_str}")
+        else:
+            lines.append(f"$ write_code {command}")
+        
+        # Add result or error
+        if error:
+            lines.append(f"Error: {error}")
+        elif result:
+            lines.append(result)
+        
+        # Add additional info if provided
+        if additional_info:
+            lines.extend(additional_info.split('\n'))
+        
+        lines.append("```")
+        return '\n'.join(lines)
+
     def extract_code_block(
             self,
             text: str,
@@ -985,15 +1307,8 @@ class WriteCodeTool(BaseAnthropicTool):
 
         start_marker = text.find("```")
         if start_marker == -1:
-            # No backticks, try guessing language from content
-            try:
-                language = guess_lexer(text).aliases[0]
-                # Return the whole text as the code block
-                return text.strip(), language
-            except Exception:  # pygments.util.ClassNotFound or others
-                logger.warning(
-                    "Could not guess language for code without backticks.")
-                return text.strip(), "unknown"  # Return unknown if guess fails
+            # No backticks, assume it's plain text and return unknown language
+            return text.strip(), "unknown"
 
         # Found opening backticks ```
         language_line_end = text.find("\n", start_marker)
