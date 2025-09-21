@@ -36,7 +36,7 @@ from tenacity import (
 )
 
 from config import CODE_MODEL, get_constant
-from system_prompt.code_prompts import code_prompt_generate, code_skeleton_prompt
+from system_prompt.code_prompts import code_prompt_generate
 from tools.base import BaseAnthropicTool, ToolResult
 
 # Import PictureGenerationTool for handling image files
@@ -130,10 +130,10 @@ class WriteCodeTool(BaseAnthropicTool):
     name: Literal["write_codebase_tool"] = "write_codebase_tool"
     api_type: Literal["custom"] = "custom"
     description: str = (
-        "Generates a full or partial codebase consisting of up to 5 files based on descriptions, skeletons, and import lists. "
-        "This is the tool to use to generate a code files for a codebase, can create up to 5 files at a time. "
+        "Generates a full or partial codebase consisting of up to 5 files based on descriptions and import lists. "
+        "This is the tool to use to generate code files for a codebase, can create up to 5 files at a time. "
         "Use this tool to generate init files."
-        "Creates skeletons first, then generates full code asynchronously, writing to the host filesystem."
+        "Generates full code asynchronously, writing to the host filesystem."
     )
 
     def __init__(self, display=None):
@@ -493,7 +493,7 @@ class WriteCodeTool(BaseAnthropicTool):
             # Update file_details to only include code files for the rest of the process
             file_details = code_files
 
-            # --- Step 1: Generate Skeletons Asynchronously ---
+            # --- Generate Code Asynchronously ---
             if file_details:  # Only proceed if there are code files to process
                 if self.display:
                     code_filenames = [file.filename for file in file_details]
@@ -505,40 +505,9 @@ class WriteCodeTool(BaseAnthropicTool):
                     )
                     self.display.add_message("assistant", console_output)
 
-                # CHANGE: Update the call to pass file_detail and all file_details
-                skeleton_tasks = [
-                    self._call_llm_for_code_skeleton(
-                        file,  # Pass the FileDetail object for the current file
-                        repo_path_obj /
-                        file.filename,  # Pass the intended final host path
-                        file_details,  # Pass the list of ALL FileDetail objects
-                    ) for file in
-                    file_details  # Iterate through the validated FileDetail objects
-                ]
-                skeleton_results = await asyncio.gather(*skeleton_tasks,
-                                                        return_exceptions=True)
-
-                skeletons: Dict[str, str] = {}
-                errors_skeleton = []
-                for i, result in enumerate(skeleton_results):
-                    filename_key = file_details[
-                        i].filename  # Use the relative filename
-                    if isinstance(result, Exception):
-                        error_msg = (
-                            f"Error generating skeleton for {filename_key}: {result}"
-                        )
-                        logger.error(error_msg, exc_info=True)
-                        errors_skeleton.append(error_msg)
-                        skeletons[filename_key] = (
-                            f"# Error generating skeleton: {result}"  # Placeholder
-                        )
-
-                # --- Step 2: Generate Full Code Asynchronously ---
-
                 code_gen_tasks = [
                     self._call_llm_to_generate_code(
                         file.code_description,
-                        skeletons,
                         file.external_imports or [],
                         file.internal_imports or [],
                         # Pass the intended final host path to the code generator for context
@@ -548,7 +517,7 @@ class WriteCodeTool(BaseAnthropicTool):
                 code_results = await asyncio.gather(*code_gen_tasks,
                                                     return_exceptions=True)
 
-                # --- Step 3: Write Files ---
+                # --- Write Files ---
                 write_results = []
                 errors_code_gen = []
                 errors_write = []
@@ -556,7 +525,6 @@ class WriteCodeTool(BaseAnthropicTool):
             else:
                 # Initialize variables when there are no code files to process
                 write_results = []
-                errors_skeleton = []
                 errors_code_gen = []
                 errors_write = []
                 success_count = 0
@@ -593,7 +561,11 @@ class WriteCodeTool(BaseAnthropicTool):
                             )
                             absolute_path.parent.mkdir(parents=True,
                                                        exist_ok=True)
-                            error_content = f"# Code generation failed: {result}\n\n# Skeleton:\n{skeletons.get(filename, '# Skeleton not available')}"
+                            error_content = (
+                                f"# Code generation failed for {filename}: {result}\n\n"
+                                "# Code description:\n"
+                                f"{file_detail.code_description}"
+                            )
                             absolute_path.write_text(error_content,
                                                      encoding="utf-8",
                                                      errors="replace")
@@ -700,9 +672,6 @@ class WriteCodeTool(BaseAnthropicTool):
                                     metadata={
                                         "code_description":
                                         file_detail.code_description,
-                                        "skeleton": skeletons.get(
-                                            filename
-                                        ),  # Use relative filename key
                                     },
                                 )
                                 logger.debug(
@@ -772,7 +741,7 @@ class WriteCodeTool(BaseAnthropicTool):
 
             # --- Step 4: Format and Return Result ---
             final_status = "success"
-            if errors_skeleton or errors_code_gen or errors_write:
+            if errors_code_gen or errors_write:
                 final_status = "partial_success" if success_count > 0 else "error"
 
             # Calculate image generation results
@@ -789,8 +758,6 @@ class WriteCodeTool(BaseAnthropicTool):
             else:
                 output_message = f"Codebase generation finished. Status: {final_status}. {success_count}/{len(file_details)} files written successfully to HOST path '{repo_path_obj}'."
 
-            if errors_skeleton:
-                output_message += f"\nSkeleton Errors: {len(errors_skeleton)}"
             if errors_code_gen:
                 output_message += f"\nCode Generation Errors: {len(errors_code_gen)}"
             if errors_write:
@@ -832,7 +799,7 @@ class WriteCodeTool(BaseAnthropicTool):
                 "image_files_successful": image_success_count,
                 "write_path": str(repo_path_obj),
                 "results": write_results,
-                "errors": errors_skeleton + errors_code_gen + errors_write,
+                "errors": errors_code_gen + errors_write,
             }
 
             # Display final completion message
@@ -889,7 +856,7 @@ class WriteCodeTool(BaseAnthropicTool):
     # --- Helper for logging final output ---
     def _log_generated_output(self, content: str, file_path: Path,
                               output_type: str):
-        """Helper to log the final generated content (code or skeleton) to CODE_FILE."""
+        """Helper to log the final generated content to CODE_FILE."""
         try:
             code_log_file_path_str = get_constant("CODE_FILE")
             if code_log_file_path_str:
@@ -1009,16 +976,12 @@ class WriteCodeTool(BaseAnthropicTool):
     async def _call_llm_to_generate_code(
         self,
         code_description: str,
-        all_skeletons: Dict[str, str],
         external_imports: List[str],
         internal_imports: List[str],
         file_path: Path,
     ) -> str:
-        """Generate full file content using provided skeletons."""
+        """Generate full file content for the target file."""
 
-        skeleton_context = "\n\n---\n\n".join(
-            f"### Skeleton for {fname}:\n```\n{skel}\n```"
-            for fname, skel in all_skeletons.items())
         agent_task = self._get_task_description()
         log_content = self._get_file_creation_log_content()
 
@@ -1029,7 +992,6 @@ class WriteCodeTool(BaseAnthropicTool):
             research_string=
             "",  # Assuming research_string is handled or intentionally empty
             agent_task=agent_task,
-            skeletons=skeleton_context,
             external_imports=external_imports,
             internal_imports=internal_imports,
             target_file=str(file_path.name),
@@ -1163,159 +1125,6 @@ class WriteCodeTool(BaseAnthropicTool):
 
         return code_string
 
-    # --- Refactored Skeleton Generation Method ---
-    async def _call_llm_for_code_skeleton(
-        self,
-        file_detail: FileDetail,
-        file_path: Path,
-        all_file_details: List[
-            FileDetail],  # This parameter is no longer used directly by code_skeleton_prompt but might be kept for other reasons or future use.
-    ) -> str:
-        """Request a skeleton from the LLM for the target file."""
-        target_file_name = file_path.name
-
-        log_content = self._get_file_creation_log_content()
-        agent_task = self._get_task_description()
-
-        external_imports = file_detail.external_imports
-        internal_imports = file_detail.internal_imports
-        # all_files_dict_list = [f.model_dump() for f in all_file_details] # Removed as per requirement
-
-        prepared_messages = code_skeleton_prompt(
-            code_description=file_detail.code_description,
-            target_file=target_file_name,
-            agent_task=agent_task,
-            external_imports=external_imports,
-            internal_imports=internal_imports,
-            file_creation_log_content=log_content,
-        )
-
-        model_to_use = get_constant("SKELETON_GEN_MODEL") or MODEL_STRING
-        final_skeleton_string = f"# Error: Skeleton generation failed for {target_file_name} after all retries."
-
-        try:
-            final_skeleton_string = await self._llm_generate_skeleton_core_with_retry(
-                prepared_messages=prepared_messages,
-                target_file_path=file_path,
-                model_to_use=model_to_use,
-            )
-        except LLMResponseError as e:
-            logger.error(
-                f"LLMResponseError for skeleton {target_file_name} after all retries: {e}",
-                exc_info=True)
-            logger.error(
-                f"[bold red]LLM generated invalid skeleton for {target_file_name} after retries: {e}[/bold red]"
-            )
-            final_skeleton_string = f"# Error generating skeleton for {target_file_name}: LLMResponseError - {str(e)}"
-        except APIError as e:  # Catch specific OpenAI errors
-            logger.error(
-                f"OpenAI APIError for skeleton {target_file_name} after all retries: {type(e).__name__} - {e}",
-                exc_info=True)
-            final_skeleton_string = f"# Error generating skeleton for {target_file_name}: API Error - {str(e)}"
-        except Exception as e:
-            logger.critical(
-                f"Unexpected error during skeleton generation for {target_file_name} after retries: {type(e).__name__} - {e}",
-                exc_info=True)
-            # rr( # Replaced by logger
-            #     f"[bold red]LLM skeleton call ultimately failed for {target_file_name} due to unexpected error: {e}[/bold red]"
-            # )
-            final_skeleton_string = (
-                f"# Error generating skeleton for {target_file_name} (final): {str(e)}"
-            )
-
-        self._log_generated_output(final_skeleton_string, file_path,
-                                   "Skeleton")
-        logger.debug(
-            f"Final Skeleton for {target_file_name}:\n{final_skeleton_string[:300]}..."
-        )  # Log snippet
-        return final_skeleton_string
-
-    @retry(
-        wait=wait_exponential(multiplier=1, min=4, max=60),
-        stop=stop_after_attempt(3),
-        retry=retry_if_exception(should_retry_llm_call),
-        reraise=True,
-        before_sleep=_log_llm_retry_attempt,
-    )
-    async def _llm_generate_skeleton_core_with_retry(
-        self,
-        prepared_messages: List[Dict[str, str]],
-        target_file_path: Path,
-        model_to_use: str,
-    ) -> str:
-        """Generate a file skeleton with retry logic."""
-        OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-        if not OPENROUTER_API_KEY:
-            raise ValueError(
-                "OPENROUTER_API_KEY environment variable not set.")
-
-        client = AsyncOpenAI(base_url="https://openrouter.ai/api/v1",
-                             api_key=OPENROUTER_API_KEY)
-
-        current_attempt = getattr(
-            self._llm_generate_skeleton_core_with_retry.retry.statistics,
-            "attempt_number",
-            1,
-        )
-        logger.info(
-            f"LLM Skeleton Gen for {target_file_path.name}: Model {model_to_use}, Attempt {current_attempt}"
-        )
-
-        completion = await client.chat.completions.create(
-            model=model_to_use, messages=prepared_messages)
-
-        if not (completion and completion.choices
-                and completion.choices[0].message
-                and completion.choices[0].message.content):
-            logger.error(
-                f"No valid skeleton completion content received for {target_file_path.name}"
-            )
-            # rr( # Replaced by logger
-            #     f"[bold red]Invalid or empty skeleton completion content from LLM for {target_file_path.name}[/bold red]"
-            # )
-            raise LLMResponseError(
-                f"Invalid or empty skeleton completion from LLM for {target_file_path.name}"
-            )
-
-        raw_skeleton = completion.choices[0].message.content
-        # Assuming self.extract_code_block is defined
-        skeleton_string, detected_language = self.extract_code_block(
-            raw_skeleton, target_file_path)
-
-        logger.info(
-            f"Extracted skeleton for {target_file_path.name}. Lang: {detected_language}. Raw len: {len(raw_skeleton)}, Extracted len: {len(skeleton_string or '')}"
-        )
-
-        if skeleton_string == "No Code Found":  # Critical check
-            if raw_skeleton.strip():
-                logger.error(
-                    f"Could not extract skeleton for {target_file_path.name}, raw response was not empty."
-                )
-                raise LLMResponseError(
-                    f"Extracted 'No Code Found' for skeleton {target_file_path.name}. Raw: '{raw_skeleton[:100]}...'"
-                )
-            else:
-                logger.error(
-                    f"LLM response for skeleton {target_file_path.name} was effectively empty (raw string)."
-                )
-                raise LLMResponseError(
-                    f"LLM response for skeleton {target_file_path.name} was effectively empty (raw string)."
-                )
-
-        if skeleton_string.startswith(
-                f"# Error: Skeleton generation failed for {target_file_path.name}"
-        ) or skeleton_string.startswith(
-                f"# Failed to generate skeleton for {target_file_path.name}"):
-            logger.error(
-                f"LLM returned a placeholder error for skeleton {target_file_path.name}: {skeleton_string[:100]}"
-            )
-            raise LLMResponseError(
-                f"LLM returned placeholder error for skeleton {target_file_path.name}: {skeleton_string[:100]}"
-            )
-
-        skeleton_string = ftfy.fix_text(
-            skeleton_string)  # Apply ftfy only on success
-        return skeleton_string
 
     def extract_code_block(
             self,
