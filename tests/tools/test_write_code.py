@@ -381,9 +381,9 @@ Some additional text.
             calls = mock_display.add_message.call_args_list
             assert len(calls) > 0
             
-            # Check for skeleton generation messages
+            # Ensure no skeleton generation messages are produced
             skeleton_messages = [call for call in calls if "skeleton" in str(call).lower()]
-            assert len(skeleton_messages) > 0
+            assert len(skeleton_messages) == 0
             
             # Check for code generation messages
             code_messages = [call for call in calls if "generating" in str(call).lower()]
