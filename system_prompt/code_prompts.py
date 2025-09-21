@@ -1,126 +1,18 @@
 from typing import List, Optional
 
 
-def code_skeleton_prompt(
-    code_description: str,
-    target_file: str,
-    agent_task: str,
-    external_imports: Optional[List[str]] = None,
-    internal_imports: Optional[List[str]] = None,
-    file_creation_log_content: Optional[str] = None,
-    ) -> list:
-    """
-    Creates a prompt that asks the LLM to generate code skeleton/structure
-    based on a description, considering the broader project context.
-
-    Args:
-        code_description (str): Detailed description of what code to generate for the target file.
-        target_file (str): The name/path of the file for which the skeleton is being generated.
-        agent_task (str): The overall goal or task of the agent/project.
-        external_imports (Optional[List[str]]): List of external libraries specifically needed for this file.
-        internal_imports (Optional[List[str]]): List of internal modules/files specifically needed by this file.
-        file_creation_log_content (Optional[str]): Content of the file creation log, detailing existing files.
-
-    Returns:
-        list: Formatted messages for the LLM prompt
-    """
-    system_prompt = f"""You are an expert software architect specializing in creating clean, well-structured code skeletons.
-    Your task is to create a comprehensive code structure (skeleton) for a specific file within a larger project.
-    This skeleton should include proper imports, class definitions, method/function signatures, and detailed docstrings, but WITHOUT implementation details (use 'pass' or placeholder comments).
-
-    Overall Project Goal: {agent_task}
-
-    Target File for this Skeleton: {target_file}
-
-    You will be given:
-    1. A detailed description of the code required for the *target file*.
-    2. A list of required *external* libraries/packages *specifically for the target file*.
-    3. A list of required *internal* modules/files within the project *imported specifically by the target file*.
-    4. The content of the `file_creation_log.json`, which details all files created or modified so far in the project.
-
-    Instructions:
-    - Focus *only* on generating the skeleton for the specified *target file*: **{target_file}**.
-    - Include ALL necessary imports at the top, based on the provided lists and the code description. Prioritize the provided lists.
-    - Define ALL necessary classes with proper inheritance (if applicable).
-    - Include ALL necessary functions and methods with proper signatures (parameters with type hints, return types).
-    - Write DETAILED docstrings for all classes, methods, and functions explaining their purpose, args, and returns.
-    - Use proper typing annotations throughout (`typing` module).
-    - Include constructor methods (`__init__`) where appropriate, initializing attributes mentioned or implied in the description.
-    - Use `pass` for the body of functions and methods. Add brief `# TODO: Implement logic` comments if complexity warrants it.
-    - Consider the `file_creation_log.json` content to anticipate necessary interactions or structures, but *only* generate the skeleton for the *target file*.
-    - Follow PEP 8 standards for Python code (or relevant style guides for other languages).
-    - Output *only* the raw code skeleton for the target file, enclosed in a single markdown code block (e.g., ```python ... ```). Do not include explanations or introductory text outside the code block.
-    """
-
-    user_prompt_parts = []
-    # Ensure agent_task (Overall Task Objective) is clearly presented at the beginning of the user prompt
-    user_prompt_parts.append(f"""## Overall Task Objective:
-{agent_task}
-""")
-    user_prompt_parts.append(f"## Target File: {target_file}\n")
-    user_prompt_parts.append(
-        f"## Code Description for Target File Skeleton:\n{code_description}\n"
-    )
-
-    if external_imports:
-        user_prompt_parts.append(
-            f"## Required External Imports (for {target_file}):\n- "
-            + "\n- ".join(external_imports)
-            + "\n"
-        )
-    else:
-        user_prompt_parts.append(
-            f"## No Specific External Imports Provided for {target_file}.\n   (Infer necessary external imports from the description)\n"
-        )
-
-    if internal_imports:
-        user_prompt_parts.append(
-            f"## Required Internal Imports (for {target_file}):\n- "
-            + "\n- ".join(internal_imports)
-            + "\n"
-        )
-    else:
-        user_prompt_parts.append(
-            f"## No Specific Internal Imports Provided for {target_file}.\n   (Infer necessary internal imports from the description and file creation log)\n"
-        )
-
-    # Add file creation log content
-    if file_creation_log_content and file_creation_log_content.strip():
-        user_prompt_parts.append(
-            f"""## File Creation Log (Current Project Context):
-{file_creation_log_content}
-"""
-        )
-    else:
-        user_prompt_parts.append(
-            "## No File Creation Log content available.\n"
-        )
-
-    user_prompt_parts.append(
-        f"Please generate ONLY the complete code skeleton for the target file '{target_file}' based on its description, considering the provided imports and file creation log."
-    )
-
-    user_prompt = "\n".join(user_prompt_parts)
-
-    return [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": user_prompt},
-    ]
-
-
 def code_prompt_generate(
     current_code_base: str,
     code_description: str,
     research_string: str,
     agent_task: str,
-    skeletons: Optional[str] = None,
     external_imports: Optional[List[str]] = None,
     internal_imports: Optional[List[str]] = None,
     target_file: Optional[str] = None,
     file_creation_log_content: Optional[str] = None,
     ) -> list:
     """
-    Generates the prompt messages for code generation, incorporating skeletons, file-specific import lists,
+    Generates the prompt messages for code generation using file-specific import lists
     and the file creation log.
 
     Args:
@@ -128,7 +20,6 @@ def code_prompt_generate(
         code_description (str): Detailed description of what code to generate for the target file.
         research_string (str): Research notes related to the task.
         agent_task (str): The overall goal or task of the agent/project.
-        skeletons (Optional[str]): Code skeletons for all files in the project.
         external_imports (Optional[List[str]]): List of external libraries specifically needed for this file.
         internal_imports (Optional[List[str]]): List of internal modules/files specifically needed by this file.
         target_file (Optional[str]): The name/path of the file for which code is being generated.
@@ -147,15 +38,13 @@ def code_prompt_generate(
     You will be given:
     1.  A detailed description of the code required for the *target file* ({target_file or "unknown"}).
     2.  The content of the `file_creation_log.json`, which details all files created or modified so far in the project (for overall context).
-    3.  Code skeletons for *all* files in the project (if available). These provide the basic structure (classes, functions, imports).
-    4.  A list of required *external* libraries/packages *specifically for the target file*.
-    5.  A list of required *internal* modules/files within the project *imported specifically by the target file*.
-    6.  (Optional) Existing code from the project for context.
-    7.  (Optional) Research notes related to the task.
+    3.  A list of required *external* libraries/packages *specifically for the target file*.
+    4.  A list of required *internal* modules/files within the project *imported specifically by the target file*.
+    5.  (Optional) Existing code from the project for context.
+    6.  (Optional) Research notes related to the task.
 
     Instructions:
     - Focus *only* on generating the complete code for the specified *target file*: **{target_file or "unknown"}**.
-    - Use the provided skeletons as a starting point and fill in the implementation details.
     - Ensure all necessary imports (both external and internal, as provided in the lists *for this file*) are included in the generated code for the target file.
     - Adhere strictly to the requirements outlined in the code description for the target file.
     - Write production-quality code: include comments, docstrings, error handling, and follow best practices for the language.
@@ -182,16 +71,6 @@ def code_prompt_generate(
     else:
         user_prompt_parts.append(
             "## No File Creation Log content available for overall project state.\n"
-        )
-
-    # Add skeletons, clarifying their role for immediate structure
-    if skeletons:
-        user_prompt_parts.append(
-            f"## Code Skeletons (Immediate Structures for Generation):\n{skeletons}\n"
-        )
-    else:
-        user_prompt_parts.append(
-            "## No Code Skeletons Currently Available for direct use.\n"
         )
 
     if external_imports:
@@ -232,8 +111,8 @@ def code_prompt_generate(
         )  # Added handling for no research notes
 
     user_prompt_parts.append(
-        f"Please generate the complete code for the target file '{target_file or 'unknown'}' based on its description and the specific imports listed above, using the provided skeletons and context."
-    )  # Updated final instruction
+        f"Please generate the complete code for the target file '{target_file or 'unknown'}' based on its description and the specific imports listed above, using the provided project context."
+    )
 
     user_prompt = "\n".join(user_prompt_parts)
 

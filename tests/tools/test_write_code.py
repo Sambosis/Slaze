@@ -381,13 +381,13 @@ Some additional text.
             calls = mock_display.add_message.call_args_list
             assert len(calls) > 0
             
-            # Check for skeleton generation messages
-            skeleton_messages = [call for call in calls if "skeleton" in str(call).lower()]
-            assert len(skeleton_messages) > 0
-            
-            # Check for code generation messages
-            code_messages = [call for call in calls if "generating" in str(call).lower()]
-            assert len(code_messages) > 0
+            # Check for code generation start messages
+            code_start_messages = [call for call in calls if "generate_code" in str(call).lower()]
+            assert len(code_start_messages) > 0
+
+            # Check for file write messages
+            write_messages = [call for call in calls if "write_file" in str(call).lower()]
+            assert len(write_messages) > 0
 
     @pytest.mark.asyncio
     async def test_llm_response_error_handling(self, write_code_tool: WriteCodeTool):
