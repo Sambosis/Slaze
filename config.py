@@ -76,8 +76,8 @@ openai41 = "openai/gpt-4.1"
 openaio3 = "openai/o3"
 openaio3pro = "openai/o3-pro"
 googlepro = "google/gemini-2.5-pro-preview"
-googleflash = "google/gemini-2.5-flash"
-googleflashlite = "google/gemini-2.5-flash-lite-preview-06-17"
+googleflash = "google/gemini-2.5-flash-preview-09-2025"
+googleflashlite = "google/gemini-2.5-flash-lite-preview-09-2025"
 grok4 = "x-ai/grok-4"
 qwen3 = "qwen/qwen3-235b-a22b-07-25"
 qwencoder = "qwen/qwen3-coder:free"
@@ -89,12 +89,13 @@ open5 = "openai/gpt-5"
 open5mini="openai/gpt-5-mini"
 open5nano = "openai/gpt-5-nano"
 grokfast = "x-ai/grok-code-fast-1"
+codex = "openai/gpt-5-codex"
 # Model constants
 ALL_MODELS= grokfast
 SUMMARY_MODEL = ALL_MODELS  # Model for summaries
 MAIN_MODEL = ALL_MODELS  # Primary model for main agent operations
 CODE_MODEL = ALL_MODELS  # Model for code generation tasks
-CODE_LIST=[open5,grokfast,googleflashlite]
+CODE_LIST=[codex,grokfast,googleflashlite]
 # Feature flag constants
 COMPUTER_USE_BETA_FLAG = "computer-use-2024-10-22"
 PROMPT_CACHING_BETA_FLAG = "prompt-caching-2024-07-31"
