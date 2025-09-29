@@ -219,31 +219,56 @@ class EditLLMTool(BaseTool):
         if mode != "llm":
             # Fall back to traditional replacement for non-LLM modes
             return await self._cmd_str_replace_traditional(path, old_desc, new_desc, mode)
-        
+
         if not old_desc and not new_desc:
             raise ToolError("At least one of old_str or new_str required for str_replace")
-        
+
+        # Prefer deterministic replacement when both pieces look like concrete code. This keeps
+        # simple replacements reliable while still allowing natural-language edits to use the LLM.
+        if old_desc and self._looks_like_code(old_desc) and (
+            new_desc is None or self._looks_like_code(new_desc)
+        ):
+            try:
+                return self._file_str_replace(path, old_desc, new_desc or "", "exact")
+            except ToolError as err:
+                message = str(err)
+                # If we fail to find a match, retry with fuzzy matching before escalating to LLM
+                if "No match" in message or "No match found" in message:
+                    try:
+                        return self._file_str_replace(path, old_desc, new_desc or "", "fuzzy")
+                    except ToolError:
+                        # Fall through to LLM behaviour
+                        pass
+                elif "Multiple matches" in message:
+                    # Let the LLM handle ambiguous matches where possible
+                    pass
+                else:
+                    # Bubble up any other errors
+                    raise
+
         # Read the current file content
         current_content = self._read_file(path)
-        
+
         # Prepare the prompt for the LLM
         prompt = self._create_replacement_prompt(current_content, old_desc, new_desc)
-        
+
         # Call the LLM to get the modified content
         try:
             modified_content = await self._call_llm_for_edit(prompt)
-            
+
             # Save the history before writing
             self._file_history[path].append(current_content)
-            
+
             # Write the modified content
             self._write_file(path, modified_content)
-            
+
             # Create a summary of changes
-            summary = self._create_change_summary(current_content, modified_content, old_desc, new_desc)
-            
+            summary = self._create_change_summary(
+                current_content, modified_content, old_desc, new_desc
+            )
+
             return ToolResult(output=f"Modified {path} using LLM\n{summary}")
-            
+
         except Exception as e:
             raise ToolError(f"LLM replacement failed: {str(e)}")
 
@@ -413,7 +438,13 @@ Output the complete modified file content with the new content inserted at line 
         
         return cleaned
 
-    def _create_change_summary(self, original: str, modified: str, old_desc: str, new_desc: str) -> str:
+    def _create_change_summary(
+        self,
+        original: str,
+        modified: str,
+        old_desc: Optional[str],
+        new_desc: Optional[str],
+    ) -> str:
         """Create a summary of changes made."""
         original_lines = original.splitlines()
         modified_lines = modified.splitlines()
@@ -435,6 +466,71 @@ Output the complete modified file content with the new content inserted at line 
             summary.append("Lines modified in place")
         
         return "\n".join(summary)
+
+    def _looks_like_code(self, text: str) -> bool:
+        """Heuristically determine whether the provided text resembles source code."""
+        if text is None:
+            return False
+
+        snippet = text.strip()
+        if not snippet:
+            return False
+
+        # Multi-line strings are almost always code snippets.
+        if "\n" in snippet:
+            return True
+
+        lowered = snippet.lower()
+        code_keywords = [
+            "def ",
+            "class ",
+            "return",
+            "import ",
+            "from ",
+            "async ",
+            "await ",
+            "if ",
+            "elif ",
+            "else:",
+            "for ",
+            "while ",
+            "try:",
+            "except",
+            "with ",
+            "switch",
+            "case ",
+            "function ",
+            "var ",
+            "let ",
+            "const ",
+        ]
+        if any(keyword in lowered for keyword in code_keywords):
+            return True
+
+        # Count the presence of non-alphabetic characters that frequently appear in code.
+        code_punctuation = set("{}[]();=:+-*/.<>,""'\\")
+        punctuation_score = sum(1 for ch in snippet if ch in code_punctuation)
+        if punctuation_score >= 2:
+            return True
+
+        # Detect common identifier patterns such as snake_case or camelCase.
+        has_underscore = "_" in snippet
+        has_camel_case = any(
+            ch.islower() and idx + 1 < len(snippet) and snippet[idx + 1].isupper()
+            for idx, ch in enumerate(snippet)
+        )
+        if has_underscore or has_camel_case:
+            return True
+
+        # Basic assignment or attribute access patterns (e.g., "value = 1").
+        if re.match(r"[A-Za-z_][\w\.\[\]\s]*=", snippet):
+            return True
+
+        # Short single-word snippets are likely identifiers rather than prose.
+        if len(snippet.split()) == 1 and len(snippet) <= 40:
+            return True
+
+        return False
 
     # ------------------------------------------------------------------
     # Standard command handlers (unchanged from original)
