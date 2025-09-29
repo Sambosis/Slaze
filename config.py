@@ -90,12 +90,13 @@ open5mini="openai/gpt-5-mini"
 open5nano = "openai/gpt-5-nano"
 grokfast = "x-ai/grok-code-fast-1"
 codex = "openai/gpt-5-codex"
+sonnet45 = "anthropic/claude-sonnet-4.5"
 # Model constants
-ALL_MODELS= grokfast
+ALL_MODELS= sonnet45
 SUMMARY_MODEL = ALL_MODELS  # Model for summaries
 MAIN_MODEL = ALL_MODELS  # Primary model for main agent operations
 CODE_MODEL = ALL_MODELS  # Model for code generation tasks
-CODE_LIST=[codex,grokfast,googleflashlite]
+CODE_LIST=[codex,grokfast,googleflash]
 # Feature flag constants
 COMPUTER_USE_BETA_FLAG = "computer-use-2024-10-22"
 PROMPT_CACHING_BETA_FLAG = "prompt-caching-2024-07-31"

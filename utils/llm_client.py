@@ -152,9 +152,9 @@ class AnthropicClient(LLMClient):
 
 def create_llm_client(model: str) -> LLMClient:
     """Factory function to create appropriate LLM client based on model name."""
-    if model.startswith("anthropic/"):
-        return OpenRouterClient(model)
-    elif model.startswith("openai/"):
+    # if model.startswith("anthropic/"):
+    #     return OpenRouterClient(model)
+    if model.startswith("openai/"):
         return OpenRouterClient(model)
     elif model.startswith("google/"):
         return OpenRouterClient(model)
