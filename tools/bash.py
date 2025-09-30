@@ -34,6 +34,28 @@ class BashTool(BaseTool):
     name: ClassVar[Literal["bash"]] = "bash"
     api_type: ClassVar[Literal["bash_20250124"]] = "bash_20250124"
 
+    def to_params(self) -> dict:
+        logger.debug(f"BashTool.to_params called with api_type: {self.api_type}")
+        params = {
+            "type": "function",
+            "function": {
+                "name": self.name,
+                "description": self.description,
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "command": {
+                            "type": "string",
+                            "description": "The bash command to be executed.",
+                        }
+                    },
+                    "required": ["command"],
+                },
+            },
+        }
+        logger.debug(f"BashTool params: {params}")
+        return params
+
     def _format_terminal_output(self,
                                 command: str,
                                 result: subprocess.CompletedProcess | None = None,
@@ -244,26 +266,3 @@ class BashTool(BaseTool):
                 tool_name=self.name,
                 command=command,
             )
-
-    def to_params(self) -> dict:
-        logger.debug(
-            f"BashTool.to_params called with api_type: {self.api_type}")
-        params = {
-            "type": "function",
-            "function": {
-                "name": self.name,
-                "description": self.description,
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "command": {
-                            "type": "string",
-                            "description": "The bash command to be executed.",
-                        }
-                    },
-                    "required": ["command"],
-                },
-            },
-        }
-        logger.debug(f"BashTool params: {params}")
-        return params

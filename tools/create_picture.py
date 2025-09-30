@@ -1,5 +1,5 @@
 from typing import Literal
-from .base import ToolResult, BaseAnthropicTool
+from .base import ToolResult, BaseTool
 import logging
 from enum import Enum
 from dotenv import load_dotenv
@@ -14,7 +14,7 @@ class PictureCommand(str, Enum):
     CREATE = "create"
 
 
-class PictureGenerationTool(BaseAnthropicTool):
+class PictureGenerationTool(BaseTool):
     """Tool for generating pictures using the Flux Schnell model"""
 
     name: Literal["picture_generation"] = "picture_generation"
