@@ -62,7 +62,7 @@ class WebUI:
             ProjectSetupTool,
             WriteCodeTool,
             PictureGenerationTool,
-            EditTool,
+            ASTCodeEditorTool,
             ToolCollection,
             BashTool,
         )
@@ -72,7 +72,7 @@ class WebUI:
             ProjectSetupTool(display=self),
             BashTool(display=self),
             PictureGenerationTool(display=self),
-            EditTool(display=self),
+            ASTCodeEditorTool(display=self),
             display=self,
         )
 
