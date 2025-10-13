@@ -20,11 +20,11 @@
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet">
     <style>
         :root {
-            --primary-bg: #212021;
-            --secondary-bg: #320d3233;
-            --tertiary-bg: #433143cd;
-            --text-color: #dbcee7;
-            --accent-color: #9e54c3e6;
+            --primary-bg: #1a202c;
+            --secondary-bg: #2d3748;
+            --tertiary-bg: #4a5568;
+            --text-color: #e2e8f0;
+            --accent-color: #3182ce;
         }
 
         body {
@@ -486,7 +486,8 @@
             reconnection: true,
             reconnectionAttempts: 5,
             reconnectionDelay: 1000,
-            transports: ['websocket', 'polling']
+            transports: ['websocket', 'polling'],
+            timeout: 20000 // 20 seconds connection timeout
         });
 
         socket.on('connect', function() {
@@ -711,7 +712,7 @@
         }
 
         function typeOutRaw(div, text, idx, done) {
-            const SPEED = 15; // ms per char
+            const SPEED = 5; // ms per char
             if (idx >= text.length) {
                 done();
                 return;
@@ -771,7 +772,7 @@
         }
 
         function typeOutConsole(node, text, idx, done) {
-            const SPEED = 8; // ms per char (console a bit faster)
+            const SPEED = 3; // ms per char (console a bit faster)
             if (idx >= text.length) { done(); return; }
             const CHUNK = text.length > 1500 ? 4 : 1;
             node.textContent += text.slice(idx, idx + CHUNK);

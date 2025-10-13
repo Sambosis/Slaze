@@ -7,14 +7,21 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/4.3.0/marked.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
     <style>
+        :root {
+            --primary-bg: #1a202c;
+            --secondary-bg: #2d3748;
+            --tertiary-bg: #4a5568;
+            --text-color: #e2e8f0;
+            --accent-color: #3182ce;
+        }
         body, html { margin:0; height:100%; font-family: Arial, sans-serif; }
         .layout { display:flex; height:100vh; }
-        .sidebar { background:#1e1e1e; color:#ccc; overflow:auto; }
+        .sidebar { background:var(--secondary-bg); color:var(--text-color); overflow:auto; }
         .primary { width:250px; }
         .secondary { width:300px; }
         .main { flex:1; display:flex; flex-direction:column; }
-        #editor { flex:1; padding:10px; background:#1e1e1e; color:#fff; overflow:auto; font-family:Menlo, monospace; }
-        #assistant-panel { height:200px; overflow:auto; border-top:1px solid #333; padding:10px; background:#111; }
+        #editor { flex:1; padding:10px; background:var(--primary-bg); color:var(--text-color); overflow:auto; font-family:Menlo, monospace; }
+        #assistant-panel { height:200px; overflow:auto; border-top:1px solid var(--tertiary-bg); padding:10px; background:var(--primary-bg); }
         #assistant-panel .message, #user-panel .message { white-space:pre-wrap; margin-bottom:10px; }
         ul.tree { list-style:none; padding-left:20px; }
         ul.tree li { cursor:pointer; }

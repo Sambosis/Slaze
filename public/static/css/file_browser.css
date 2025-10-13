@@ -13,8 +13,8 @@
 
 #main-content-area .header {
     grid-area: header;
-    background: #252526;
-    border-bottom: 1px solid #2d2d30;
+    background: var(--secondary-bg);
+    border-bottom: 1px solid var(--tertiary-bg);
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -24,13 +24,13 @@
 #main-content-area .header h1 {
     margin: 0;
     font-size: 20px;
-    color: #007acc;
+    color: var(--accent-color);
 }
 
 #main-content-area .sidebar {
     grid-area: sidebar;
-    background: #252526;
-    border-right: 1px solid #2d2d30;
+    background: var(--secondary-bg);
+    border-right: 1px solid var(--tertiary-bg);
     overflow-y: auto;
     overflow-x: hidden;
 }
@@ -39,11 +39,11 @@
         padding: 8px 16px;
         font-size: 11px;
         font-weight: 600;
-        color: #cccccc;
+        color: var(--text-color);
         text-transform: uppercase;
         letter-spacing: 0.5px;
-        background: #2d2d30;
-        border-bottom: 1px solid #3e3e42;
+        background: var(--tertiary-bg);
+        border-bottom: 1px solid var(--tertiary-bg);
 }
 
 #main-content-area .file-tree {
@@ -59,11 +59,11 @@
 }
 
 #main-content-area .file-item:hover, #main-content-area .folder-item:hover {
-    background: #2a2d2e;
+    background: var(--hover-bg);
 }
 
 #main-content-area .file-item.active {
-    background: #094771;
+    background: var(--accent-color);
 }
 
 #main-content-area .folder-contents {
@@ -76,14 +76,14 @@
 
 #main-content-area .editor {
     grid-area: editor;
-    background: #1e1e1e;
+    background: var(--primary-bg);
     display: flex;
     flex-direction: column;
     overflow: hidden;
 }
 
 #main-content-area .editor-tabs {
-    background: #2d2d30;
+    background: var(--tertiary-bg);
     display: flex;
     overflow-x: auto;
 }
@@ -95,7 +95,7 @@
 }
 
 #main-content-area .editor-tab.active {
-    background: #1e1e1e;
+    background: var(--primary-bg);
 }
 
 #main-content-area .editor-content {
@@ -111,11 +111,11 @@
     align-items: center;
     justify-content: center;
     height: 100%;
-    color: #969696;
+    color: var(--text-color);
 }
 
 #main-content-area .resizer.vertical-resizer {
     grid-area: sidebar-resizer;
     cursor: col-resize;
-    background-color: #2d2d30;
+    background-color: var(--tertiary-bg);
 }
