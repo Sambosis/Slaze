@@ -168,7 +168,7 @@
             transports: ['websocket', 'polling'],
             upgrade: true,
             rememberUpgrade: true,
-            timeout: 20000
+            timeout: 360000
         });
 
         // Connection status monitoring
@@ -289,7 +289,7 @@
         setTimeout(function() {
             console.log('🧪 Testing WebSocket connectivity...');
             socket.emit('test', { message: 'Hello from client' });
-        }, 2000);
+        }, 36000);
 
         socket.on('test_response', function(data) {
             console.log('✅ Test response received:', data);

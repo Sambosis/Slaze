@@ -43,7 +43,7 @@ class OpenRouterClient(LLMClient):
                 "https://openrouter.ai/api/v1/chat/completions",
                 headers=headers,
                 json=payload,
-                timeout=aiohttp.ClientTimeout(total=30)
+                timeout=aiohttp.ClientTimeout(total=300)
             ) as response:
                 if response.status != 200:
                     error_text = await response.text()
@@ -83,7 +83,7 @@ class OpenAIClient(LLMClient):
                 "https://api.openai.com/v1/chat/completions",
                 headers=headers,
                 json=payload,
-                timeout=aiohttp.ClientTimeout(total=30)
+                timeout=aiohttp.ClientTimeout(total=300)
             ) as response:
                 if response.status != 200:
                     error_text = await response.text()
@@ -137,7 +137,7 @@ class AnthropicClient(LLMClient):
                 "https://api.anthropic.com/v1/messages",
                 headers=headers,
                 json=payload,
-                timeout=aiohttp.ClientTimeout(total=30)
+                timeout=aiohttp.ClientTimeout(total=300)
             ) as response:
                 if response.status != 200:
                     error_text = await response.text()

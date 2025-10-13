@@ -55,8 +55,8 @@ class WebUI:
             async_mode='eventlet',
             logger=True,
             engineio_logger=True,
-            ping_interval=20,   # seconds between pings (default 25)
-            ping_timeout=120,  # seconds to wait for pong (default 60)
+            ping_interval=10,   # seconds between pings (default 25)
+            ping_timeout=360,  # seconds to wait for pong (default 60)
         )
         self.user_messages = []
         self.assistant_messages = []

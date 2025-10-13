@@ -519,7 +519,7 @@ class EditTool(BaseTool):
         tmp = path.with_suffix(path.suffix + ".tmp")
         tmp.parent.mkdir(parents=True, exist_ok=True)
         # Write bytes to avoid platform newline translation (prevents accidental blank lines)
-        with portalocker.Lock(str(tmp), "wb", timeout=5) as fp:
+        with portalocker.Lock(str(tmp), "wb", timeout=15) as fp:
             fp.write(content.encode("utf-8"))
         # Windows‑safe timestamp (no ':')
         timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S")

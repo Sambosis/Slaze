@@ -486,7 +486,8 @@
             reconnection: true,
             reconnectionAttempts: 5,
             reconnectionDelay: 1000,
-            transports: ['websocket', 'polling']
+            transports: ['websocket', 'polling'],
+            timeout: 20000 // 20 seconds connection timeout
         });
 
         socket.on('connect', function() {

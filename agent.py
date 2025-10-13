@@ -27,6 +27,7 @@ import asyncio
 from utils.context_helpers import format_messages_to_string
 from utils.context_helpers import extract_text_from_content, refresh_context_async
 from utils.output_manager import OutputManager
+from utils.llm_client import OpenRouterClient
 from config import (
     COMPUTER_USE_BETA_FLAG,
     PROMPT_CACHING_BETA_FLAG,
@@ -131,37 +132,63 @@ async def call_llm_for_task_revision(prompt_text: str, client: AsyncOpenAI, mode
 
     formatted_revision_prompt = detailed_revision_prompt_template.format(user_request=prompt_text)
 
-    try:
-        # The user's example used "anthropic/claude-3.7-sonnet:beta".
-        # We should use the model specified or fall back to a strong default like MAIN_MODEL.
-        # For this refinement, let's honor the specific model from the example if available, else MAIN_MODEL.
-        # This requires checking if 'model' param can be overridden or if we add a new constant.
-        # For now, I'll stick to the 'model' parameter passed to this function.
-        # If the calling code passes "anthropic/claude-3.7-sonnet:beta", it will be used.
-        # Otherwise, it will use MAIN_MODEL as per current Agent._revise_and_save_task.
+    model_to_use = model or MAIN_MODEL
 
-        response = await client.chat.completions.create(
-            model=MAIN_MODEL,
-            messages=[{"role": "user", "content": formatted_revision_prompt}],
-            temperature=0.3, # Lower temperature for more focused, less creative revision
-            n=1,
-            stop=None,
+    # Create a fresh AsyncOpenAI client for this specific revision call. This mirrors
+    # the pattern in tools/write_code.py which constructs a client per-call and is
+    # known to work in this codebase even when shared clients sometimes hit quick timeouts.
+    OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY") or os.getenv("OPENAI_API_KEY")
+    local_base = os.getenv("OPENAI_BASE_URL", "https://openrouter.ai/api/v1")
+
+    if OPENROUTER_API_KEY:
+        try:
+            local_client = AsyncOpenAI(base_url=local_base, api_key=OPENROUTER_API_KEY)
+            response = await local_client.chat.completions.create(
+                model=model_to_use,
+                messages=[{"role": "user", "content": formatted_revision_prompt}],
+                temperature=0.3,
+                n=1,
+                stop=None,
+            )
+
+            if (
+                response
+                and getattr(response, "choices", None)
+                and response.choices[0].message
+                and response.choices[0].message.content
+            ):
+                revised_task = response.choices[0].message.content.strip()
+                if len(revised_task) < 0.5 * len(prompt_text) and len(prompt_text) > 50:
+                    logger.warning("LLM task revision is much shorter than original. Using original.")
+                    return prompt_text
+                logger.info(f"Task successfully revised by local AsyncOpenAI ({model_to_use}): '{revised_task[:100]}...'")
+                return revised_task
+            else:
+                logger.warning("Local AsyncOpenAI client returned empty/invalid response. Trying fallback.")
+        except Exception as local_exc:
+            logger.warning(f"Local AsyncOpenAI client failed for model {model_to_use}: {local_exc}. Attempting fallback OpenRouterClient.", exc_info=True)
+
+    # Fallback to aiohttp-based OpenRouterClient (long timeout) if the above failed
+    try:
+        fallback = OpenRouterClient(model_to_use)
+        fallback_resp = await fallback.call(
+            [{"role": "user", "content": formatted_revision_prompt}],
+            max_tokens=1500,
+            temperature=0.3,
         )
 
-        if response.choices and response.choices[0].message and response.choices[0].message.content:
-            revised_task = response.choices[0].message.content.strip()
-            # Basic check to ensure LLM didn't just return an empty string or something very short
-            if len(revised_task) < 0.5 * len(prompt_text) and len(prompt_text) > 50 : # Heuristic: if significantly shorter
-                logger.warning(f"LLM task revision is much shorter than original. Original: '{prompt_text[:100]}...', Revised: '{revised_task[:100]}...'. Using original.")
+        if fallback_resp:
+            revised_task = fallback_resp.strip()
+            if len(revised_task) < 0.5 * len(prompt_text) and len(prompt_text) > 50:
+                logger.warning("Fallback revision is much shorter than original. Using original.")
                 return prompt_text
-
-            logger.info(f"Task successfully revised by LLM ({model}): '{revised_task[:100]}...' ")
+            logger.info(f"Task successfully revised by fallback OpenRouterClient ({model_to_use}): '{revised_task[:100]}...'")
             return revised_task
         else:
-            logger.warning(f"LLM task revision ({model}) returned empty or invalid response. Using original task: '{prompt_text[:100]}...'.")
+            logger.warning(f"Fallback OpenRouterClient returned empty response for model {model_to_use}. Using original task.")
             return prompt_text
-    except Exception as e:
-        logger.error(f"Error during LLM task revision with model {model}: {e}. Using original task: '{prompt_text[:100]}...' ", exc_info=True)
+    except Exception as fallback_exc:
+        logger.error(f"Fallback OpenRouterClient failed for model {model_to_use}: {fallback_exc}. Using original task.", exc_info=True)
         return prompt_text
 
 
@@ -386,15 +413,18 @@ class Agent:
         messages = self.messages
         breakpoints_remaining = 2
         for message in reversed(messages):
-            if message["role"] == "user" and isinstance(
-                content := message["content"], list
-            ):
-                if breakpoints_remaining:
-                    breakpoints_remaining -= 1
-                    content[-1]["cache_control"] = {"type": "ephemeral"}
-                else:
-                    content[-1].pop("cache_control", None)
-                    break
+            if message["role"] == "user":
+                content = message.get("content")
+                # Only operate if content is a list of dicts (our structured format)
+                if isinstance(content, list) and content:
+                    last = content[-1]
+                    if isinstance(last, dict):
+                        if breakpoints_remaining:
+                            breakpoints_remaining -= 1
+                            last["cache_control"] = {"type": "ephemeral"}
+                        else:
+                            last.pop("cache_control", None)
+                            break
 
     def _sanitize_tool_name(self, name: str) -> str:
         """Sanitize tool name to match pattern '^[a-zA-Z0-9_-]{1,64}$'"""
@@ -456,49 +486,33 @@ class Agent:
         )
         tool_msg = tool_response.choices[0].message
 
-        if tool_msg:
-            self.display.add_message("user", tool_msg.content or "")
-
-        if msg.tool_calls:
-            for tc in msg.tool_calls:
+        # If the assistant returned tool_calls, execute them sequentially and
+        # append the tool results into the conversation. Otherwise, run the
+        # evaluation step below.
+        if assistant_msg.get("tool_calls"):
+            for tc in assistant_msg.get("tool_calls", []):
                 try:
-                    args = (
-                        json.loads(tc.function.arguments) if tc.function.arguments else {}
-                    )
-                except json.JSONDecodeError as e:
-                    logger.error(f"Failed to parse tool call arguments: {tc.function.arguments}")
-                    logger.error(f"JSON decode error: {e}")
-                    # Skip this tool call and continue with the next one
-                    self.messages.append({
-                        "role": "tool", 
-                        "tool_call_id": tc.id, 
-                        "content": f"Error: Invalid JSON in tool arguments: {str(e)}"
-                    })
-                    continue
-                    
-                if self.manual_tool_confirmation and hasattr(self.display, "confirm_tool_call"):
-                    tool = self.tool_collection.tools.get(tc.function.name)
-                    if tool:
-                        schema = tool.to_params()["function"]["parameters"]
-                        new_args = await self.display.confirm_tool_call(tc.function.name, args, schema)
-                        if new_args is None:
-                            self.messages.append({"role": "tool", "tool_call_id": tc.id, "content": "Tool execution cancelled"})
-                            continue
-                        args = new_args
-                tool_result = await self.run_tool({"name": tc.function.name, "id": tc.id, "input": args})
-                result_text_parts = []
-                if isinstance(tool_result.get("content"), list):
-                    for content_item in tool_result["content"]:
-                        if (
-                            isinstance(content_item, dict)
-                            and content_item.get("type") == "text"
-                            and "text" in content_item
-                        ):
-                            result_text_parts.append(str(content_item["text"]))
-                result_text = " ".join(result_text_parts)
-                self.messages.append(
-                    {"role": "tool", "tool_call_id": tc.id, "content": result_text}
-                )
+                    # Prepare a content_block compatible with run_tool
+                    content_block = {
+                        "id": tc.get("id") if isinstance(tc, dict) else getattr(tc, "id", "unknown"),
+                        "name": tc.get("name") if isinstance(tc, dict) else getattr(tc, "name", "unknown"),
+                        "input": tc.get("input") if isinstance(tc, dict) else getattr(tc, "input", {}),
+                    }
+                    tool_result = await self.run_tool(content_block)
+
+                    # Merge tool_result content into a single text string for the conversation
+                    result_text_parts = []
+                    if isinstance(tool_result.get("content"), list):
+                        for content_item in tool_result["content"]:
+                            if isinstance(content_item, dict) and content_item.get("type") == "text" and "text" in content_item:
+                                result_text_parts.append(str(content_item["text"]))
+                    result_text = " ".join(result_text_parts) if result_text_parts else ""
+                    self.messages.append({"role": "tool", "tool_call_id": content_block["id"], "content": result_text})
+
+                except Exception as e:
+                    logger.error(f"Error executing tool call {tc}: {e}", exc_info=True)
+                    self.messages.append({"role": "tool", "tool_call_id": content_block.get("id", "unknown"), "content": f"Tool execution failed: {e}"})
+
         else:
             # No tool calls. Time for evaluation.
             evaluation_prompt = f'''
