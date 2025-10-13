@@ -5,6 +5,7 @@ import json
 import io
 import zipfile
 from queue import Queue
+import threading
 from flask import Flask, render_template, jsonify, request, send_file
 from flask_socketio import SocketIO
 from config import (
@@ -150,8 +151,15 @@ class WebUI:
                 write_constants_to_file()
                 
                 logging.info(f"Starting agent runner in background thread for task: {prompt_name}")
+                
+                def run_coro_in_thread(coro):
+                    asyncio.run(coro)
+
                 coro = self.agent_runner(task, self)
-                self.socketio.start_background_task(asyncio.run, coro)
+                thread = threading.Thread(target=run_coro_in_thread, args=(coro,))
+                thread.daemon = True
+                thread.start()
+                
                 return render_template("web_ide.html")
             except FileNotFoundError as e:
                 logging.error(f"File not found in run_agent route: {e}", exc_info=True)

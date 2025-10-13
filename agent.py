@@ -6,7 +6,7 @@ import os
 import re
 import logging
 from typing import Dict, Union
-from openai import OpenAI
+from openai import AsyncOpenAI
 from rich import print as rr
 
 from tools import (
@@ -45,7 +45,7 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 
-async def call_llm_for_task_revision(prompt_text: str, client: OpenAI, model: str) -> str:
+async def call_llm_for_task_revision(prompt_text: str, client: AsyncOpenAI, model: str) -> str:
     """
     Calls an LLM to revise the given prompt_text, incorporating detailed instructions
     for structuring the task, especially for programming projects.
@@ -140,7 +140,7 @@ async def call_llm_for_task_revision(prompt_text: str, client: OpenAI, model: st
         # If the calling code passes "anthropic/claude-3.7-sonnet:beta", it will be used.
         # Otherwise, it will use MAIN_MODEL as per current Agent._revise_and_save_task.
 
-        response = client.chat.completions.create(
+        response = await client.chat.completions.create(
             model=MAIN_MODEL,
             messages=[{"role": "user", "content": formatted_revision_prompt}],
             temperature=0.3, # Lower temperature for more focused, less creative revision
@@ -207,7 +207,7 @@ class Agent:
         logger.info(f"Initial TASK constant set to: {self.task[:100]}...")
 
         # Initialize client and other properties needed by _revise_and_save_task
-        self.client = OpenAI(
+        self.client = AsyncOpenAI(
             api_key=os.getenv("OPENROUTER_API_KEY") or os.getenv("OPENAI_API_KEY"),
             base_url=os.getenv("OPENAI_BASE_URL", "https://openrouter.ai/api/v1"),
         )
@@ -415,7 +415,7 @@ class Agent:
             f.write(format_messages_to_string(messages) + "\n"  )
         tool_choice = "auto" if self.step_count > 20 else "auto"
         try:
-            response = self.client.chat.completions.create(
+            response = await self.client.chat.completions.create(
                 model=MAIN_MODEL,
                 messages=messages,
                 tools=self.tool_params,
@@ -449,7 +449,7 @@ class Agent:
         Please respond with markdown formatted list that contains the actions you will take.
         It should be no more than 2 to 4 items long long and you should use simple statements such as - Create the code for main.py - Run the app - Fix the bugs in the code """
         tool_messages.append({"role": "user", "content": tool_prompt})
-        tool_response = self.client.chat.completions.create(
+        tool_response = await self.client.chat.completions.create(
             model=MAIN_MODEL,
             messages=tool_messages,
             max_tokens=MAX_SUMMARY_TOKENS,
@@ -523,7 +523,7 @@ class Agent:
             evaluation_messages = self.messages + [{"role": "user", "content": evaluation_prompt}]
 
             try:
-                response = self.client.chat.completions.create(
+                response = await self.client.chat.completions.create(
                     model=MAIN_MODEL,
                     messages=evaluation_messages,
                     max_tokens=MAX_SUMMARY_TOKENS,
