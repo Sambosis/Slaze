@@ -48,7 +48,16 @@ class WebUI:
         static_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'public', 'static'))
         self.app = Flask(__name__, template_folder=template_dir, static_folder=static_dir)
         self.app.config["SECRET_KEY"] = "secret!"
-        self.socketio = SocketIO(self.app, cookie=None, cors_allowed_origins="*", async_mode='eventlet', logger=True, engineio_logger=True)
+        self.socketio = SocketIO(
+            self.app,
+            cookie=None,
+            cors_allowed_origins="*",
+            async_mode='eventlet',
+            logger=True,
+            engineio_logger=True,
+            ping_interval=20,   # seconds between pings (default 25)
+            ping_timeout=120,  # seconds to wait for pong (default 60)
+        )
         self.user_messages = []
         self.assistant_messages = []
         self.tool_results = []
@@ -79,7 +88,15 @@ class WebUI:
 
         self.setup_routes()
         self.setup_socketio_events()
+        self.start_keepalive()
         logging.info("WebUI initialized")
+    def start_keepalive(self):
+        import eventlet
+        def keepalive():
+            while True:
+                self.socketio.emit("keepalive", {"msg": "ping"})
+                eventlet.sleep(15)  # every 15 seconds
+        self.socketio.start_background_task(keepalive)
 
     def setup_routes(self):
         logging.info("Setting up routes")

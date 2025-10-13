@@ -352,7 +352,7 @@ async def _make_llm_call_with_retry(client, prompt: str, max_retries: int = 3) -
     """Make LLM call with built-in retry logic."""
     for attempt in range(max_retries):
         try:
-            response = client.chat.completions.create(
+            response = await client.chat.completions.create(
                 model=MAIN_MODEL,
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=get_constant("MAX_SUMMARY_TOKENS", 20000)
@@ -370,7 +370,7 @@ async def _make_llm_call_with_retry(client, prompt: str, max_retries: int = 3) -
         except Exception as e:
             logger.warning(f"LLM call attempt {attempt + 1} failed: {str(e)}")
             if attempt == max_retries - 1:
-                raise
+                raise RuntimeError(f"All LLM call attempts failed: {str(e)}")
             # Wait before retry
             import asyncio
             await asyncio.sleep(2 ** attempt)

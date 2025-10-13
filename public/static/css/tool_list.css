@@ -31,12 +31,12 @@
 #main-content-area .tool-card:hover {
     border-color: var(--accent-color);
     transform: translateY(-2px);
-    background: #2b2b2b;
+    background: var(--hover-bg);
 }
 #main-content-area .tool-card h2 {
     font-size: 16px;
     margin: 0;
-    color: #ffffff;
+    color: var(--text-color);
     display: flex;
     align-items: center;
     gap: 8px;
