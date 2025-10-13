@@ -33,7 +33,7 @@ Incoming payloads are validated with a strict `pydantic` model. The validation s
 presence of the filename and description fields, rejects unexpected keys, and prevents the execution
 path from starting if no files are supplied. 【F:tools/write_code.py†L164-L208】
 
-## High-Level Execution Flow
+## High-Level Exedcution Flow
 1. **Resolve host write path** – The tool obtains `REPO_DIR` from the configuration layer and ensures
    the directory exists before any I/O. This is the only write target; all file paths are resolved
    relative to it. 【F:tools/write_code.py†L234-L248】
