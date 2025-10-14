@@ -476,7 +476,16 @@ class Agent:
                             # OpenAI format: {'id': '...', 'function': {'name': '...', 'arguments': '...'}}
                             tool_id = tc.get("id", "unknown")
                             tool_name = tc.get("function", {}).get("name", "unknown")
-                            tool_input = tc.get("function", {}).get("arguments", {})
+                            # Arguments is a JSON string in OpenAI format, need to parse it
+                            arguments_str = tc.get("function", {}).get("arguments", "{}")
+                            if isinstance(arguments_str, str):
+                                try:
+                                    tool_input = json.loads(arguments_str)
+                                except json.JSONDecodeError:
+                                    logger.error(f"Failed to parse tool arguments: {arguments_str}")
+                                    tool_input = {}
+                            else:
+                                tool_input = arguments_str
                         else:
                             # Direct format: {'id': '...', 'name': '...', 'input': {...}}
                             tool_id = tc.get("id", "unknown")
@@ -487,7 +496,16 @@ class Agent:
                         tool_id = getattr(tc, "id", "unknown")
                         if hasattr(tc, "function"):
                             tool_name = getattr(tc.function, "name", "unknown")
-                            tool_input = getattr(tc.function, "arguments", {})
+                            # Arguments might be a JSON string, need to parse it
+                            arguments_str = getattr(tc.function, "arguments", "{}")
+                            if isinstance(arguments_str, str):
+                                try:
+                                    tool_input = json.loads(arguments_str)
+                                except json.JSONDecodeError:
+                                    logger.error(f"Failed to parse tool arguments: {arguments_str}")
+                                    tool_input = {}
+                            else:
+                                tool_input = arguments_str
                         else:
                             tool_name = getattr(tc, "name", "unknown")
                             tool_input = getattr(tc, "input", {})

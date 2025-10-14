@@ -94,7 +94,8 @@ grokfast = "x-ai/grok-code-fast-1"
 codex = "openai/gpt-5-codex"
 sonnet45 = "anthropic/claude-sonnet-4.5"
 # Model constants
-ALL_MODELS = open5mini
+ALL_MODELS = googleflash
+
 SUMMARY_MODEL = ALL_MODELS  # Model for summaries
 MAIN_MODEL = ALL_MODELS  # Primary model for main agent operations
 CODE_MODEL = ALL_MODELS  # Model for code generation tasks
