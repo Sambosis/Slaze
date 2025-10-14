@@ -52,7 +52,7 @@ async def call_llm_for_task_revision(prompt_text: str, client: AsyncOpenAI, mode
     for structuring the task, especially for programming projects.
     """
     logger.info(f"Attempting to revise/structure task with LLM ({model}): '{prompt_text[:100]}...' ")
-
+    print("Calling LLM for task revision...\n")
     # This combined prompt is based on the user's example
     detailed_revision_prompt_template = """
       Your primary function is to analyze and structure a user's request. Your output will be used as the main task definition for a subsequent AI agent that generates software projects.
@@ -131,103 +131,42 @@ async def call_llm_for_task_revision(prompt_text: str, client: AsyncOpenAI, mode
       """
 
     formatted_revision_prompt = detailed_revision_prompt_template.format(user_request=prompt_text)
-
-    model_to_use = model or MAIN_MODEL
+    print(f"Formatted revision prompt:\n{formatted_revision_prompt}\n")
+    model_to_use= MAIN_MODEL
 
     # First try to use the shared client that the rest of the agent relies on. This client is
     # already configured with any custom base URL, headers, or networking configuration that the
     # user may have provided (for example when routing through a proxy). Reusing it ensures that
     # task revision benefits from the same working configuration as normal LLM calls.
-    if client is not None:
-        try:
-            response = await client.chat.completions.create(
-                model=model_to_use,
-                messages=[{"role": "user", "content": formatted_revision_prompt}],
-                temperature=0.3,
-                n=1,
-                stop=None,
-            )
 
-            if (
-                response
-                and getattr(response, "choices", None)
-                and response.choices[0].message
-                and response.choices[0].message.content
-            ):
-                revised_task = response.choices[0].message.content.strip()
-                if len(revised_task) < 0.5 * len(prompt_text) and len(prompt_text) > 50:
-                    logger.warning("LLM task revision is much shorter than original. Using original.")
-                    return prompt_text
-                logger.info(f"Task successfully revised by shared AsyncOpenAI ({model_to_use}): '{revised_task[:100]}...'")
-                return revised_task
-            else:
-                logger.warning("Shared AsyncOpenAI client returned empty/invalid response. Trying dedicated client.")
-        except Exception as shared_exc:
-            logger.warning(
-                f"Shared AsyncOpenAI client failed for model {model_to_use}: {shared_exc}. Attempting dedicated AsyncOpenAI instance.",
-                exc_info=True,
-            )
+    response = await client.chat.completions.create(
+        model=model_to_use,
+        messages=[
+            {
+                "role": "user",
+                "content": formatted_revision_prompt,
+            }
+        ],
+    )
 
-    # Create a fresh AsyncOpenAI client for this specific revision call as a fallback. This mirrors
-    # the pattern in tools/write_code.py which constructs a client per-call and is known to work in
-    # this codebase even when shared clients sometimes hit quick timeouts. Keeping this fallback means
-    # installations that rely on direct OpenRouter access without extra configuration continue to work.
-    OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY") or os.getenv("OPENAI_API_KEY")
-    local_base = os.getenv("OPENAI_BASE_URL", "https://openrouter.ai/api/v1")
-
-    if OPENROUTER_API_KEY:
-        try:
-            local_client = AsyncOpenAI(base_url=local_base, api_key=OPENROUTER_API_KEY)
-            response = await local_client.chat.completions.create(
-                model=model_to_use,
-                messages=[{"role": "user", "content": formatted_revision_prompt}],
-                temperature=0.3,
-                n=1,
-                stop=None,
-            )
-
-            if (
-                response
-                and getattr(response, "choices", None)
-                and response.choices[0].message
-                and response.choices[0].message.content
-            ):
-                revised_task = response.choices[0].message.content.strip()
-                if len(revised_task) < 0.5 * len(prompt_text) and len(prompt_text) > 50:
-                    logger.warning("LLM task revision is much shorter than original. Using original.")
-                    return prompt_text
-                logger.info(f"Task successfully revised by dedicated AsyncOpenAI ({model_to_use}): '{revised_task[:100]}...'")
-                return revised_task
-            else:
-                logger.warning("Dedicated AsyncOpenAI client returned empty/invalid response. Trying fallback.")
-        except Exception as local_exc:
-            logger.warning(
-                f"Dedicated AsyncOpenAI client failed for model {model_to_use}: {local_exc}. Attempting fallback OpenRouterClient.",
-                exc_info=True,
-            )
-
-    # Fallback to aiohttp-based OpenRouterClient (long timeout) if the above failed
-    try:
-        fallback = OpenRouterClient(model_to_use)
-        fallback_resp = await fallback.call(
-            [{"role": "user", "content": formatted_revision_prompt}],
-            max_tokens=1500,
-            temperature=0.3,
-        )
-
-        if fallback_resp:
-            revised_task = fallback_resp.strip()
-            if len(revised_task) < 0.5 * len(prompt_text) and len(prompt_text) > 50:
-                logger.warning("Fallback revision is much shorter than original. Using original.")
-                return prompt_text
-            logger.info(f"Task successfully revised by fallback OpenRouterClient ({model_to_use}): '{revised_task[:100]}...'")
-            return revised_task
-        else:
-            logger.warning(f"Fallback OpenRouterClient returned empty response for model {model_to_use}. Using original task.")
+    print(f"LLM response for task revision:\n{response}\n")
+    print("That was the response from the shared AsyncOpenAI client.\n")
+    if (
+        response
+        and getattr(response, "choices", None)
+        and response.choices[0].message
+        and response.choices[0].message.content
+    ):
+        revised_task = response.choices[0].message.content.strip()
+        if len(revised_task) < 0.5 * len(prompt_text) and len(prompt_text) > 50:
+            logger.warning("LLM task revision is much shorter than original. Using original.")
             return prompt_text
-    except Exception as fallback_exc:
-        logger.error(f"Fallback OpenRouterClient failed for model {model_to_use}: {fallback_exc}. Using original task.", exc_info=True)
-        return prompt_text
+        logger.info(f"Task successfully revised by shared AsyncOpenAI ({model_to_use}): '{revised_task[:100]}...'")
+        print("Task successfully revised by shared AsyncOpenAI client.\n")
+        return revised_task
+    else:
+        logger.warning("Shared AsyncOpenAI client returned empty/invalid response. Trying dedicated client.")
+        print("Shared AsyncOpenAI client returned empty/invalid response. Trying dedicated client.\n")
 
 
 class Agent:

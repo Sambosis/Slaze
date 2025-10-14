@@ -52,7 +52,7 @@ class WebUI:
             self.app,
             cookie=None,
             cors_allowed_origins="*",
-            async_mode='eventlet',
+            async_mode='threading',
             logger=True,
             engineio_logger=True,
             ping_interval=10,   # seconds between pings (default 25)
@@ -61,6 +61,9 @@ class WebUI:
         self.user_messages = []
         self.assistant_messages = []
         self.tool_results = []
+
+        self.message_lock = threading.Lock()
+        self.message_queue = Queue()
 
         # Using a standard Queue for cross-thread communication
         self.input_queue = Queue()
@@ -89,13 +92,13 @@ class WebUI:
         self.setup_routes()
         self.setup_socketio_events()
         self.start_keepalive()
+        self.start_message_emitter()
         logging.info("WebUI initialized")
     def start_keepalive(self):
-        import eventlet
         def keepalive():
             while True:
                 self.socketio.emit("keepalive", {"msg": "ping"})
-                eventlet.sleep(15)  # every 15 seconds
+                self.socketio.sleep(15)  # every 15 seconds
         self.socketio.start_background_task(keepalive)
 
     def setup_routes(self):
@@ -516,49 +519,52 @@ class WebUI:
         logging.info(f"Starting server on {host}:{port}")
         self.socketio.run(self.app, host=host, port=port, use_reloader=False, allow_unsafe_werkzeug=True)
 
-    def add_message(self, msg_type, content):
-        logging.info(f"Adding message of type {msg_type}")
-        log_message(msg_type, content)
-        if msg_type == "user":
-            self.user_messages.append(content)
-            # Also emit to file browser
-            self.socketio.emit("user_message", {"content": content})
-        elif msg_type == "assistant":
-            self.assistant_messages.append(content)
-            # Also emit to file browser
-            self.socketio.emit("assistant_message", {"content": content})
-        elif msg_type == "tool":
-            self.tool_results.append(content)
-            # Parse tool result for file browser
-            if isinstance(content, str):
-                lines = content.split('\n')
-                tool_name = "Unknown"
-                if lines:
-                    first_line = lines[0].strip()
-                    if first_line.startswith('Tool:'):
-                        tool_name = first_line.replace('Tool:', '').strip()
-                self.socketio.emit("tool_result", {"tool_name": tool_name, "result": content})
+    def start_message_emitter(self):
+        def message_emitter():
+            while True:
+                msg_type, content = self.message_queue.get()
                 
-                # Check if this tool might have created/modified files
-                if any(keyword in content.lower() for keyword in ['created', 'wrote', 'generated', 'saved', 'modified', 'updated']):
-                    # Emit file tree update after a short delay asynchronously
-                    self.socketio.start_background_task(self._emit_file_tree_update)
-                    
-        self.broadcast_update()
+                with self.message_lock:
+                    if msg_type == "user":
+                        self.user_messages.append(content)
+                    elif msg_type == "assistant":
+                        self.assistant_messages.append(content)
+                    elif msg_type == "tool":
+                        self.tool_results.append(content)
 
-    def broadcast_update(self):
-        logging.info("Broadcasting update to clients")
-        data = {
-            "user": self.user_messages,
-            "assistant": self.assistant_messages,
-            "tool": self.tool_results,
-        }
-        logging.info(f"Sending data: user={len(data['user'])}, assistant={len(data['assistant'])}, tool={len(data['tool'])}")
-        self.socketio.emit(
-            "update",
-            data,
-        )
-        logging.info("Update broadcast completed")
+                if msg_type == "user":
+                    self.socketio.emit("user_message", {"content": content})
+                elif msg_type == "assistant":
+                    self.socketio.emit("assistant_message", {"content": content})
+                elif msg_type == "tool":
+                    if isinstance(content, str):
+                        lines = content.split('\n')
+                        tool_name = "Unknown"
+                        if lines:
+                            first_line = lines[0].strip()
+                            if first_line.startswith('Tool:'):
+                                tool_name = first_line.replace('Tool:', '').strip()
+                        self.socketio.emit("tool_result", {"tool_name": tool_name, "result": content})
+                        
+                        if any(keyword in content.lower() for keyword in ['created', 'wrote', 'generated', 'saved', 'modified', 'updated']):
+                            self.socketio.start_background_task(self._emit_file_tree_update)
+                
+                # Now broadcast the update
+                with self.message_lock:
+                    data = {
+                        "user": list(self.user_messages),
+                        "assistant": list(self.assistant_messages),
+                        "tool": list(self.tool_results),
+                    }
+                self.socketio.emit("update", data)
+                logging.info("Update broadcast completed")
+
+        self.socketio.start_background_task(message_emitter)
+
+    def add_message(self, msg_type, content):
+        logging.info(f"Queueing message of type {msg_type}")
+        log_message(msg_type, content)
+        self.message_queue.put((msg_type, content))
 
     async def wait_for_user_input(self, prompt_message: str | None = None) -> str:
         """Await the next user input sent via the web UI input queue."""
