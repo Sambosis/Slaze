@@ -312,8 +312,8 @@ class Agent:
                 if hasattr(result, "output") and result.output
                 else str(result)
             )
-            tool_name = content_block["name"]
-            if len(tool_name) > 64:
+            tool_name = content_block.get("name") or "unknown_tool"
+            if tool_name and len(tool_name) > 64:
                 tool_name = tool_name[:61] + "..."  # Truncate to 61 and add ellipsis
             combined_content = [
                 {
@@ -470,10 +470,32 @@ class Agent:
             for tc in assistant_msg.get("tool_calls", []):
                 try:
                     # Prepare a content_block compatible with run_tool
+                    # Handle both OpenAI format (with 'function' key) and direct format
+                    if isinstance(tc, dict):
+                        if "function" in tc:
+                            # OpenAI format: {'id': '...', 'function': {'name': '...', 'arguments': '...'}}
+                            tool_id = tc.get("id", "unknown")
+                            tool_name = tc.get("function", {}).get("name", "unknown")
+                            tool_input = tc.get("function", {}).get("arguments", {})
+                        else:
+                            # Direct format: {'id': '...', 'name': '...', 'input': {...}}
+                            tool_id = tc.get("id", "unknown")
+                            tool_name = tc.get("name", "unknown")
+                            tool_input = tc.get("input", {})
+                    else:
+                        # Object format
+                        tool_id = getattr(tc, "id", "unknown")
+                        if hasattr(tc, "function"):
+                            tool_name = getattr(tc.function, "name", "unknown")
+                            tool_input = getattr(tc.function, "arguments", {})
+                        else:
+                            tool_name = getattr(tc, "name", "unknown")
+                            tool_input = getattr(tc, "input", {})
+                    
                     content_block = {
-                        "id": tc.get("id") if isinstance(tc, dict) else getattr(tc, "id", "unknown"),
-                        "name": tc.get("name") if isinstance(tc, dict) else getattr(tc, "name", "unknown"),
-                        "input": tc.get("input") if isinstance(tc, dict) else getattr(tc, "input", {}),
+                        "id": tool_id,
+                        "name": tool_name,
+                        "input": tool_input,
                     }
                     tool_result = await self.run_tool(content_block)
 

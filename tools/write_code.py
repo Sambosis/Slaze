@@ -752,22 +752,6 @@ class WriteCodeTool(BaseAnthropicTool):
                               tool_name=self.name,
                               command=command)
 
-    # --- Helper for logging final output ---
-            if code_log_file_path_str:
-                CODE_FILE = Path(code_log_file_path_str)
-                CODE_FILE.parent.mkdir(parents=True, exist_ok=True)
-                with open(CODE_FILE, "a", encoding="utf-8") as f:
-                    f.write(
-                        f"\n--- Generated {output_type} for: {str(file_path)} ({time.strftime('%Y-%m-%d %H:%M:%S')}) ---\n"
-                    )
-                    f.write(f"{content}\n")
-                    f.write(
-                        f"--- End {output_type} for: {str(file_path)} ---\n")
-        except Exception as file_error:
-            logger.error(
-                f"Failed to log generated {output_type} for {file_path.name} to {get_constant('CODE_FILE')}: {file_error}",
-                exc_info=True)
-
     def format_output(self, data: dict) -> str:
         """
         Format the output of the tool for display.
@@ -908,6 +892,15 @@ class WriteCodeTool(BaseAnthropicTool):
             file_creation_log_content=log_content,
         )
         
+        # Validate prepared_messages
+        if prepared_messages is None:
+            logger.error(f"code_prompt_generate returned None for {file_path.name}")
+            raise LLMResponseError("Failed to prepare messages for code generation: code_prompt_generate returned None")
+        
+        if not isinstance(prepared_messages, list):
+            logger.error(f"code_prompt_generate returned invalid type {type(prepared_messages)} for {file_path.name}")
+            raise LLMResponseError(f"Failed to prepare messages for code generation: expected list, got {type(prepared_messages)}")
+        
         # Generate code with all models in CODE_LIST in parallel
         logger.info(f"Generating code for {file_path.name} using {len(CODE_LIST)} models in parallel: {CODE_LIST}")
         
@@ -928,7 +921,7 @@ class WriteCodeTool(BaseAnthropicTool):
         for i, result in enumerate(generation_results):
             if isinstance(result, Exception):
                 logger.warning(f"Model {CODE_LIST[i]} failed for {file_path.name}: {result}")
-            elif result and not result.startswith("# Error"):
+            elif isinstance(result, str) and result and not result.startswith("# Error"):
                 successful_generations.append({
                     "model": CODE_LIST[i],
                     "code": result
@@ -986,7 +979,7 @@ class WriteCodeTool(BaseAnthropicTool):
             if code_string == "No Code Found":
                 raise LLMResponseError(f"No code found in response from {model}")
 
-            if code_string.startswith(f"# Error: Code generation failed"):
+            if code_string.startswith("# Error: Code generation failed"):
                 raise LLMResponseError(f"Model {model} returned error placeholder")
 
             return code_string
@@ -1262,13 +1255,13 @@ Please analyze each version and select the one that:
 
     def _format_terminal_output(self, 
                                command: str, 
-                               files: List[str] = None, 
-                               result: str = None, 
-                               error: str = None,
-                               additional_info: str = None) -> str:
+                               files: Optional[List[str]] = None, 
+                               result: Optional[str] = None, 
+                               error: Optional[str] = None,
+                               additional_info: Optional[str] = None) -> str:
         """Format write code operations to look like terminal output."""
         lines = ["```console"]
-        
+                                                                              
         # Add command line
         if files:
             files_str = " ".join(files) if len(files) <= 3 else f"{files[0]} ... +{len(files)-1} more"
