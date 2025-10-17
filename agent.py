@@ -257,29 +257,36 @@ class Agent:
             tool_name: The name of the tool that was executed
             tool_input: The input provided to the tool
         """
-        with open("./logs/tool.txt", "a", encoding="utf-8") as f:
-            f.write("\n" + "=" * 80 + "\n")
-            f.write(f"TOOL EXECUTION: {tool_name}\n")
-            f.write(f"INPUT: {json.dumps(tool_input, indent=2)}\n")
-            f.write("-" * 80 + "\n")
+        try:
+            logs_path = Path(LOGS_DIR)
+            logs_path.mkdir(parents=True, exist_ok=True)
+            tool_log_file = logs_path / "tool.txt"
+            
+            with open(tool_log_file, "a", encoding="utf-8") as f:
+                f.write("\n" + "=" * 80 + "\n")
+                f.write(f"TOOL EXECUTION: {tool_name}\n")
+                f.write(f"INPUT: {json.dumps(tool_input, indent=2)}\n")
+                f.write("-" * 80 + "\n")
 
-            for item in combined_content:
-                f.write(f"CONTENT TYPE: {item['type']}\n")
-                if item["type"] == "tool_result":
-                    f.write(f"TOOL USE ID: {item['tool_use_id']}\n")
-                    f.write(f"ERROR: {item['is_error']}\n")
-                    if isinstance(item["content"], list):
-                        f.write("CONTENT:\n")
-                        for content_item in item["content"]:
-                            f.write(
-                                f"  - {content_item['type']}: {content_item.get('text', '[non-text content]')}\n"
-                            )
-                    else:
-                        f.write(f"CONTENT: {item['content']}\n")
-                elif item["type"] == "text":
-                    f.write(f"TEXT:\n{item['text']}\n")
-                f.write("-" * 50 + "\n")
-            f.write("=" * 80 + "\n\n")
+                for item in combined_content:
+                    f.write(f"CONTENT TYPE: {item['type']}\n")
+                    if item["type"] == "tool_result":
+                        f.write(f"TOOL USE ID: {item['tool_use_id']}\n")
+                        f.write(f"ERROR: {item['is_error']}\n")
+                        if isinstance(item["content"], list):
+                            f.write("CONTENT:\n")
+                            for content_item in item["content"]:
+                                f.write(
+                                    f"  - {content_item['type']}: {content_item.get('text', '[non-text content]')}\n"
+                                )
+                        else:
+                            f.write(f"CONTENT: {item['content']}\n")
+                    elif item["type"] == "text":
+                        f.write(f"TEXT:\n{item['text']}\n")
+                    f.write("-" * 50 + "\n")
+                f.write("=" * 80 + "\n\n")
+        except Exception as e:
+            logger.warning(f"Failed to write tool.txt: {e}")
 
     async def run_tool(self, content_block):
         result = ToolResult(
@@ -418,8 +425,18 @@ class Agent:
         self.step_count += 1
         messages = self.messages
         rr(f"Step {self.step_count} with {len(messages)} messages")
-        with open(f"{LOGS_DIR}/messages.md", "w", encoding="utf-8") as f:
-            f.write(format_messages_to_string(messages) + "\n"  )
+        
+        # Ensure LOGS_DIR exists and write messages with error handling
+        try:
+            logs_path = Path(LOGS_DIR)
+            logs_path.mkdir(parents=True, exist_ok=True)
+            messages_file = logs_path / "messages.md"
+            with open(messages_file, "w", encoding="utf-8") as f:
+                f.write(format_messages_to_string(messages) + "\n")
+        except Exception as e:
+            logger.warning(f"Failed to write messages.md: {e}")
+            # Continue execution even if logging fails
+        
         tool_choice = "auto" if self.step_count > 20 else "auto"
         try:
             response = await self.client.chat.completions.create(

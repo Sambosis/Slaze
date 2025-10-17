@@ -1053,6 +1053,15 @@ Please analyze each version and select the one that:
                     if 0 <= selected_index < len(code_versions):
                         selected_version = code_versions[selected_index]
                         logger.info(f"Selected version {selected_index + 1} from {selected_version['model']} for {file_path.name}")
+                        if self.display:
+                            model_name = selected_version['model']
+                            console_output = self._format_terminal_output(
+                                command="select_model",
+                                files=[file_path.name],
+                                result=f"Model selected for {file_path.name}",
+                                additional_info=f"Selected model: {model_name}"
+                            )
+                            self.display.add_message("assistant", console_output)
                         return selected_version["code"]
                 except (ValueError, IndexError):
                     logger.warning(f"Invalid selection response: {selection_response}, defaulting to first version")
@@ -1062,6 +1071,15 @@ Please analyze each version and select the one that:
 
         # Fallback to first version if selection fails
         logger.info(f"Using first version from {code_versions[0]['model']} for {file_path.name}")
+        if self.display:
+            model_name = code_versions[0]['model']
+            console_output = self._format_terminal_output(
+                command="select_model",
+                files=[file_path.name],
+                result=f"Model selected for {file_path.name} (fallback)",
+                additional_info=f"Selected model: {model_name}"
+            )
+            self.display.add_message("assistant", console_output)
         return code_versions[0]["code"]
 
     def _get_current_codebase_context(self) -> str:
