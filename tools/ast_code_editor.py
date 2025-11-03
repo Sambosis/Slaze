@@ -355,12 +355,19 @@ class ASTCodeEditorTool(BaseAnthropicTool):
 
         return "\n".join(lines)
 
-    def _emit_console(self, cwd: str, action: str, detail: str = "") -> None:
+    def _emit_console(self, cwd: str, action: str, detail: str = "", path: Optional[str] = None, symbol: Optional[str] = None) -> None:
         if self.display is None:
             return
+
+        command_line = f"$ {action}"
+        if path:
+            command_line += f" path='{path}'"
+        if symbol:
+            command_line += f" symbol='{symbol}'"
+
         block = ["```console"]
         block.append(f"$ cd {cwd}")
-        block.append(f"$ {action}")
+        block.append(command_line)
         if detail:
             block.extend(detail.rstrip().splitlines())
         block.append("```")
@@ -560,7 +567,9 @@ class ASTCodeEditorTool(BaseAnthropicTool):
             if cmd_value == EditorCommand.LIST.value:
                 symbols = self._list_symbols(repo, path)
                 payload = {"command": cmd_value, "status": "success", "path": path, "symbols": symbols}
-                return ToolResult(output="\n".join(f"{s['kind']} {s['symbol']} {s['lines']}" for s in symbols),
+                output_str = "\n".join(f"{s['kind']:7} {s['symbol']:30} lines {s['lines']}" for s in symbols)
+                self._emit_console(str(repo), f"{self.name} {cmd_value}", detail=output_str, path=path)
+                return ToolResult(output=output_str,
                                   message=self.format_output(payload),
                                   command=cmd_value, tool_name=self.name)
 
@@ -569,6 +578,7 @@ class ASTCodeEditorTool(BaseAnthropicTool):
                     return ToolResult(error="Missing 'symbol'", message=self.format_output({"command": cmd_value, "status":"error","error":"Missing 'symbol'","path":path}), tool_name=self.name)
                 show_text = self._show_symbol(repo, path, symbol)
                 payload = {"command": cmd_value, "status": "success", "path": path, "symbol": symbol, "show_text": show_text}
+                self._emit_console(str(repo), f"{self.name} {cmd_value}", detail=show_text, path=path, symbol=symbol)
                 return ToolResult(output=show_text, message=self.format_output(payload), command=cmd_value, tool_name=self.name)
 
             # Mutations
@@ -621,7 +631,7 @@ class ASTCodeEditorTool(BaseAnthropicTool):
                 diff_text = self._apply(repo, path, mutate, dry_run=dry_run)
 
             # Emit console-like block to display (consistent with your tool)
-            self._emit_console(str(repo), f"{self.name} {cmd_value}", detail=(diff_text if dry_run and diff_text else ""))
+            self._emit_console(str(repo), f"{self.name} {cmd_value}", detail=(diff_text if dry_run and diff_text else ""), path=path, symbol=symbol)
 
             payload = {
                 "command": cmd_value,

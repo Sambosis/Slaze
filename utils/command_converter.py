@@ -21,6 +21,9 @@ class CommandConverter:
     
     def _get_system_info(self) -> Dict[str, Any]:
         """Gather system information for command conversion context."""
+        repo_dir = get_constant("REPO_DIR")
+        cwd = str(repo_dir) if repo_dir and Path(repo_dir).exists() else str(Path.cwd())
+
         return {
             "os_name": platform.system(),
             "os_version": platform.version(),
@@ -28,7 +31,7 @@ class CommandConverter:
             "python_version": platform.python_version(),
             "shell": os.environ.get("SHELL", "/bin/bash"),
             "home_dir": str(Path.home()),
-            "current_working_dir": str(Path.cwd()),
+            "current_working_dir": cwd,
             "path_separator": os.pathsep,
             "file_separator": os.sep,
             "environment_vars": {
@@ -66,6 +69,7 @@ Output: echo hello"""
 - For file listing: use "dir" not "ls"
 - For finding files: use "dir /s /b" not "find"
 - Use Windows path separators (\\) when needed
+- When the command refers to a path inside the current working directory, use a relative path. For example, if the working directory is C:\\Users\\Me\\project and you want to list files in C:\\Users\\Me\\project\\data, use "dir data", not "dir C:\\Users\\Me\\project\\data".
 - Hidden files on Windows start with . - filter them when appropriate
 - Ensure the command will work on {os_name}
 - Return ONLY the command, no other text"""
@@ -87,6 +91,7 @@ Output: echo hello"""
 - Keep Linux/Unix commands as-is when they work correctly
 - If a Windows command is used, convert it to the Linux equivalent  
 - For file listing: use "ls" not "dir"
+- When the command refers to a path inside the current working directory, use a relative path. For example, if the working directory is /home/me/project and you want to list files in /home/me/project/data, use "ls data", not "ls /home/me/project/data".
 - Always exclude hidden files/directories in find and ls operations
 - Use Linux path separators (/) when needed
 - Ensure the command will work on {os_name}

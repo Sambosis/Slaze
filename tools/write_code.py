@@ -5,6 +5,7 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, TYPE_CHECKING, Literal
 
+import re
 if TYPE_CHECKING:
     from agent_display import AgentDisplay
 
@@ -183,8 +184,8 @@ class WriteCodeTool(BaseAnthropicTool):
     @property
     def description(self) -> str:
         return (
-            "Generates a full or partial codebase consisting of up to 5 files based on descriptions and import lists. "
-            "This is the tool to use to generate code files for a codebase, can create up to 5 files at a time. "
+            "Generates a full or partial codebase consisting of up to 3 files based on descriptions and import lists. "
+            "This is the tool to use to generate code files for a codebase, can create up to 3 files at a time. "
             "Use this tool to generate init files. "
             "Generates full code asynchronously, writing to the host filesystem."
         )
@@ -1007,26 +1008,22 @@ class WriteCodeTool(BaseAnthropicTool):
         # Get current codebase context (simplified - could be enhanced)
         current_codebase = self._get_current_codebase_context()
         
-        selection_prompt = f"""You are tasked with selecting the best code implementation from multiple versions generated for the same requirements.
+        selection_prompt = f"""You are tasked with selecting the best implementation from multiple versions generated for the same requirements.
 
-**File:** {file_path.name}
-**Requirements:** {code_description}
-**Project Context:** {agent_task}
+    **File:** {file_path.name}
+    **Requirements:** {code_description}
+    **Project Context:** {agent_task}
 
-**Current Codebase Context:**
-{current_codebase}
+    **Current Codebase Context:**
+    {current_codebase}
 
-**Generated Code Versions:**
-{versions_text}
+    **Generated Versions:**
+    {versions_text}
 
-Please analyze each version and select the one that:
-1. Best fulfills the requirements
-2. Has the highest code quality (readability, maintainability, error handling)
-3. Integrates best with the existing codebase
-4. Follows Python best practices
+    Please analyze each version and select the one that best fulfills the requirements. For code files, also consider quality, readability, and integration. For non-code files (like configuration or documentation), focus on accuracy and completeness.
 
-**Respond with ONLY the number (1, 2, 3, etc.) of the best version. Do not include any explanation.**"""
-
+    **Respond with ONLY the number (1, 2, 3, etc.) of the best version. Do not include any explanation.**"""
+        selection_fallback_reason = "Unknown reason"
         try:
             # Use CODE_MODEL to make the selection
             OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
@@ -1042,14 +1039,19 @@ Please analyze each version and select the one that:
             completion = await client.chat.completions.create(
                 model=CODE_MODEL, 
                 messages=selection_messages,
-                max_tokens=10,
+                max_tokens=1000,
                 temperature=0.1
             )
-
+            print(completion)
             if completion and completion.choices and completion.choices[0].message:
                 selection_response = completion.choices[0].message.content.strip()
                 try:
-                    selected_index = int(selection_response) - 1
+                    # Find the first number in the response
+                    match = re.search(r'\d+', selection_response)
+                    if not match:
+                        raise ValueError("No number found in response")
+                    
+                    selected_index = int(match.group(0)) - 1
                     if 0 <= selected_index < len(code_versions):
                         selected_version = code_versions[selected_index]
                         logger.info(f"Selected version {selected_index + 1} from {selected_version['model']} for {file_path.name}")
@@ -1063,21 +1065,25 @@ Please analyze each version and select the one that:
                             )
                             self.display.add_message("assistant", console_output)
                         return selected_version["code"]
+                    else:
+                        raise ValueError("Selected index out of range")
                 except (ValueError, IndexError):
-                    logger.warning(f"Invalid selection response: {selection_response}, defaulting to first version")
+                    selection_fallback_reason = f"Invalid selection response: '{selection_response}' from {CODE_MODEL}"
+                    logger.warning(f"{selection_fallback_reason}, defaulting to first version for {file_path.name}")
 
         except Exception as e:
-            logger.warning(f"Code selection failed: {e}, defaulting to first version")
+            selection_fallback_reason = f"Code selection failed: {e}"
+            logger.warning(f"{selection_fallback_reason}, defaulting to first version for {file_path.name}")
 
         # Fallback to first version if selection fails
-        logger.info(f"Using first version from {code_versions[0]['model']} for {file_path.name}")
+        logger.info(f"Using first version from {code_versions[0]['model']} for {file_path.name} due to selection fallback")
         if self.display:
             model_name = code_versions[0]['model']
             console_output = self._format_terminal_output(
                 command="select_model",
                 files=[file_path.name],
                 result=f"Model selected for {file_path.name} (fallback)",
-                additional_info=f"Selected model: {model_name}"
+                additional_info=f"Selected model: {model_name}\nReason: {selection_fallback_reason}"
             )
             self.display.add_message("assistant", console_output)
         return code_versions[0]["code"]

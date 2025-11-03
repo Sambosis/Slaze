@@ -9,6 +9,7 @@ from typing import Any, Optional
 from dotenv import load_dotenv
 from flask import g
 import openai
+# from prometheus_client import h
 
 # Load environment variables from .env file
 load_dotenv()
@@ -82,7 +83,7 @@ googleflashlite = "google/gemini-2.5-flash-lite-preview-09-2025"
 grok4 = "x-ai/grok-4"
 grok4fast = "x-ai/grok-4-fast"
 qwen3 = "qwen/qwen3-235b-a22b-07-25"
-qwencoder = "qwen/qwen3-coder-30b-a3b-instruct"
+qwencoder = "qwen/qwen3-coder"
 zai45 = "z-ai/glm-4.5"
 halfa = "openrouter/horizon-beta"
 autor = "deepseek/deepseek-r1-0528:free"
@@ -96,13 +97,15 @@ sonnet45 = "anthropic/claude-sonnet-4.5"
 ernie = "baidu/ernie-4.5-21b-a3b-thinking"
 oss20 = "openai/gpt-oss-20b"
 glm46 = "z-ai/glm-4.6"
+haiku45="anthropic/claude-haiku-4.5"
+minimax = "minimax/minimax-m2:free"
 # Model constants
-ALL_MODELS = googlepro
+ALL_MODELS = minimax
 
 SUMMARY_MODEL = ALL_MODELS  # Model for summaries
 MAIN_MODEL = ALL_MODELS  # Primary model for main agent operations
-CODE_MODEL = ALL_MODELS  # Model for code generation tasks
-CODE_LIST = [grokfast, qwencoder, oss20, googleflash , open5mini]
+CODE_MODEL = minimax  # Model for code generation tasks
+CODE_LIST = [minimax, qwencoder, grokfast]
 # Feature flag constants
 COMPUTER_USE_BETA_FLAG = "computer-use-2024-10-22"
 PROMPT_CACHING_BETA_FLAG = "prompt-caching-2024-07-31"

@@ -48,13 +48,15 @@ class WebUI:
         static_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'public', 'static'))
         self.app = Flask(__name__, template_folder=template_dir, static_folder=static_dir)
         self.app.config["SECRET_KEY"] = "secret!"
+        logging.getLogger('socketio').setLevel(logging.ERROR)
+        logging.getLogger('engineio').setLevel(logging.ERROR)        
         self.socketio = SocketIO(
             self.app,
             cookie=None,
             cors_allowed_origins="*",
             async_mode='threading',
-            logger=True,
-            engineio_logger=True,
+            logger=False,
+            engineio_logger=False,
             ping_interval=10,   # seconds between pings (default 25)
             ping_timeout=360,  # seconds to wait for pong (default 60)
         )

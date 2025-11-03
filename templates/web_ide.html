@@ -772,9 +772,9 @@
         }
 
         function typeOutConsole(node, text, idx, done) {
-            const SPEED = 3; // ms per char (console a bit faster)
+            const SPEED = 1; // ms per char (console a bit faster)
             if (idx >= text.length) { done(); return; }
-            const CHUNK = text.length > 1500 ? 4 : 1;
+            const CHUNK = text.length > 1500 ? 50 : 10;
             node.textContent += text.slice(idx, idx + CHUNK);
             const consoleContent = document.getElementById('console-messages');
             if (consoleContent) consoleContent.scrollTop = consoleContent.scrollHeight;

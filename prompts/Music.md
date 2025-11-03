@@ -1,0 +1,1 @@
+make and run a python app that works like a drum machine where the user can adjust tempo, rhythm and sound of various sounds. 

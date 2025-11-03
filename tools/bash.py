@@ -69,10 +69,17 @@ class BashTool(BaseTool):
         output_lines.append(f"$ {command}")
 
         if result is not None:
-            if result.stdout:
-                output_lines.extend(result.stdout.rstrip().split("\n"))
-            if result.stderr:
-                output_lines.extend(result.stderr.rstrip().split("\n"))
+            stdout = result.stdout
+            stderr = result.stderr
+            if stdout and len(stdout) > 3000:
+                stdout = f"{stdout[:1500]} ... [TRUNCATED] ... {stdout[-1500:]}"
+            if stderr and len(stderr) > 3000:
+                stderr = f"{stderr[:1500]} ... [TRUNCATED] ... {stderr[-1500:]}"
+
+            if stdout:
+                output_lines.extend(stdout.rstrip().split("\n"))
+            if stderr:
+                output_lines.extend(stderr.rstrip().split("\n"))
             if result.returncode != 0:
                 output_lines.append(f"[Exit code: {result.returncode}]")
 
@@ -206,11 +213,10 @@ class BashTool(BaseTool):
             error = result.stderr
             success = result.returncode == 0
             terminal_display = f"{output}\n{error}"
-            if len(output) > 200000:
-                output = f"{output[:100000]} ... [TRUNCATED] ... {output[-100000:]}"
-            if len(error) > 200000:
-                error = f"{error[:100000]} ... [TRUNCATED] ... {error[-100000:]}"
-
+            if len(output) > 3000:
+                output = f"{output[:1500]} ... [TRUNCATED] ... {output[-1500:]}"
+            if len(error) > 3000:
+                error = f"{error[:1500]} ... [TRUNCATED] ... {error[-1500:]}"
             formatted_output = (
                 f"command: {command}\n"
                 f"working_directory: {cwd}\n"
@@ -241,6 +247,10 @@ class BashTool(BaseTool):
                 output = e.output or ""
                 stderr = e.stderr or ""
 
+            if len(output) > 3000:
+                output = f"{output[:1500]} ... [TRUNCATED] ... {output[-1500:]}"
+            if len(stderr) > 3000:
+                stderr = f"{stderr[:1500]} ... [TRUNCATED] ... {stderr[-1500:]}"
             formatted_output = (
                 f"command: {command}\n"
                 f"working_directory: {cwd}\n"

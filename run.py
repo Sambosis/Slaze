@@ -85,4 +85,13 @@ def web(port, manual_tools):
 
 if __name__ == "__main__":
     print("Starting Slazy Agent CLI...")
+    import sys
+    commands = ['web', 'console']
+    is_command_present = any(cmd in sys.argv for cmd in commands)
+    
+    # if no command is specified, default to 'web'
+    # if --help is present, we want to show the main help, not web's help
+    if not is_command_present and '--help' not in sys.argv and '-h' not in sys.argv:
+        sys.argv.insert(1, 'web')
+
     cli()

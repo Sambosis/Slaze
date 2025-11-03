@@ -36,7 +36,6 @@ from config import (
     reload_system_prompt,
     LOGS_DIR
 )
-
 from dotenv import load_dotenv
 from pathlib import Path
 from config import set_constant, get_constant
@@ -52,7 +51,7 @@ async def call_llm_for_task_revision(prompt_text: str, client: AsyncOpenAI, mode
     for structuring the task, especially for programming projects.
     """
     logger.info(f"Attempting to revise/structure task with LLM ({model}): '{prompt_text[:100]}...' ")
-    print("Calling LLM for task revision...\n")
+    rr("Calling LLM for task revision...\n")
     # This combined prompt is based on the user's example
     detailed_revision_prompt_template = """
       Your primary function is to analyze and structure a user's request. Your output will be used as the main task definition for a subsequent AI agent that generates software projects.
@@ -131,7 +130,7 @@ async def call_llm_for_task_revision(prompt_text: str, client: AsyncOpenAI, mode
       """
 
     formatted_revision_prompt = detailed_revision_prompt_template.format(user_request=prompt_text)
-    print(f"Formatted revision prompt:\n{formatted_revision_prompt}\n")
+    rr(f"Formatted revision prompt:\n{formatted_revision_prompt}\n")
     model_to_use= MAIN_MODEL
 
     # First try to use the shared client that the rest of the agent relies on. This client is
@@ -149,8 +148,9 @@ async def call_llm_for_task_revision(prompt_text: str, client: AsyncOpenAI, mode
         ],
     )
 
-    print(f"LLM response for task revision:\n{response}\n")
-    print("That was the response from the shared AsyncOpenAI client.\n")
+    rr(f"LLM response for task revision:")
+    rr(response)
+    rr("That was the response from the shared AsyncOpenAI client.\n")
     if (
         response
         and getattr(response, "choices", None)
@@ -162,11 +162,11 @@ async def call_llm_for_task_revision(prompt_text: str, client: AsyncOpenAI, mode
             logger.warning("LLM task revision is much shorter than original. Using original.")
             return prompt_text
         logger.info(f"Task successfully revised by shared AsyncOpenAI ({model_to_use}): '{revised_task[:100]}...'")
-        print("Task successfully revised by shared AsyncOpenAI client.\n")
+        rr("Task successfully revised by shared AsyncOpenAI client.\n")
         return revised_task
     else:
         logger.warning("Shared AsyncOpenAI client returned empty/invalid response. Trying dedicated client.")
-        print("Shared AsyncOpenAI client returned empty/invalid response. Trying dedicated client.\n")
+        rr("Shared AsyncOpenAI client returned empty/invalid response. Trying dedicated client.\n")
 
 
 class Agent:
@@ -423,6 +423,21 @@ class Agent:
     async def step(self):
         """Run one step of the agent using OpenAI."""
         self.step_count += 1
+
+        # Periodically summarize the conversation to save tokens
+        if self.step_count > 1 and self.step_count % 5 == 0:
+            try:
+                self.display.add_message("assistant", "Summarizing conversation to save tokens...")
+                new_context = await refresh_context_async(
+                    self.task, self.messages, self.display, self.client
+                )
+                # Replace messages with summary, keeping the system prompt
+                self.messages = [self.messages[0], {"role": "user", "content": new_context}]
+                self.context_recently_refreshed = True
+                self.display.add_message("assistant", "Conversation summarized.")
+            except Exception as e:
+                self.display.add_message("assistant", f"Failed to summarize conversation: {e}")
+
         messages = self.messages
         rr(f"Step {self.step_count} with {len(messages)} messages")
         
@@ -437,7 +452,7 @@ class Agent:
             logger.warning(f"Failed to write messages.md: {e}")
             # Continue execution even if logging fails
         
-        tool_choice = "auto" if self.step_count > 20 else "auto"
+        tool_choice = "auto"
         try:
             response = await self.client.chat.completions.create(
                 model=MAIN_MODEL,
