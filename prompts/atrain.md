@@ -1,1 +1,0 @@
-train a transformer based LLM using the text from the .py files located in your directory .venv  Display updates on the progress in a python gui window. 

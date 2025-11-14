@@ -1,1 +1,0 @@
-Create a jupyter notebook to train a diffusion based language model using public datasets. show live results of generations as it trains.

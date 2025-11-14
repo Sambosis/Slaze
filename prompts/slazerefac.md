@@ -1,1 +1,0 @@
-clone the repo at github.com/sambosis/Slaze. Find a method to understand its contents. Then continue to improve it continuously.

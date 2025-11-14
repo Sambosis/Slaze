@@ -1,1 +1,0 @@
-create a simple pong game using pygame. No documentation, sound or images need to be created. Just draw the things you need with pygame.  it should have 1 computer playing another computer, no user input.

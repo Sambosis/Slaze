@@ -41,6 +41,9 @@ def _within_repo(repo: Path, target: Path) -> bool:
 def _sha1(s: str) -> str:
     return hashlib.sha1(s.encode("utf-8")).hexdigest()
 
+
+
+
 # ----------------------------
 # AST Chunker (Python-only)
 # ----------------------------
@@ -252,6 +255,9 @@ class ASTCodeEditorTool(BaseAnthropicTool):
     Operates within REPO_DIR; targets symbols: module | func | Class | Class.method.
     """
 
+    MAX_OUTPUT_LENGTH = 3000
+    TRUNCATION_MARKER = " ... [TRUNCATED] ... "
+
     name: Literal["ast_code_editor"] = "ast_code_editor"
     api_type: Literal["custom"] = "custom"
     description: str = (
@@ -263,6 +269,12 @@ class ASTCodeEditorTool(BaseAnthropicTool):
     def __init__(self, display=None):
         super().__init__(display=display)
         self.display = display
+
+    def _truncate_string(self, s: str) -> str:
+        if len(s) > self.MAX_OUTPUT_LENGTH:
+            half = (self.MAX_OUTPUT_LENGTH - len(self.TRUNCATION_MARKER)) // 2
+            return s[:half] + self.TRUNCATION_MARKER + s[-half:]
+        return s
 
     # ---------- API schema ----------
     def to_params(self) -> dict:
@@ -340,13 +352,13 @@ class ASTCodeEditorTool(BaseAnthropicTool):
 
         if "show_text" in data:
             lines.append("\nOutput:")
-            lines.append(data["show_text"])
+            lines.append(self._truncate_string(data["show_text"]))
 
         if "diff" in data:
             lines.append("\nOutput:")
             # wrap diff in console block to match your pattern
             lines.append("```console")
-            lines.extend(data["diff"].splitlines())
+            lines.extend(self._truncate_string(data["diff"]).splitlines())
             lines.append("```")
 
         if "message_lines" in data:

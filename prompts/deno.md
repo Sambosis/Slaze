@@ -1,1 +1,0 @@
-Create a demo Deno app that show's various features. run it locally to show me what it looks like. 
