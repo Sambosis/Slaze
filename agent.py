@@ -494,7 +494,8 @@ class Agent:
             max_tokens=MAX_SUMMARY_TOKENS,
         )
         tool_msg = tool_response.choices[0].message
-
+        # use self.display to show the tool message
+        self.display.add_message("user", f"Planned Actions:\n{tool_msg.content or ''}")
         # If the assistant returned tool_calls, execute them sequentially and
         # append the tool results into the conversation. Otherwise, run the
         # evaluation step below.

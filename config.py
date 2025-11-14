@@ -106,7 +106,7 @@ ALL_MODELS = katcode
 SUMMARY_MODEL = ALL_MODELS  # Model for summaries
 MAIN_MODEL = ALL_MODELS  # Primary model for main agent operations
 CODE_MODEL = katcode  # Model for code generation tasks
-CODE_LIST = [minimax, qwencoder, grokfast, katcode]  # List of models suitable for code generation
+CODE_LIST = [minimax,  grokfast, katcode]  # List of models suitable for code generation
 # Feature flag constants
 COMPUTER_USE_BETA_FLAG = "computer-use-2024-10-22"
 PROMPT_CACHING_BETA_FLAG = "prompt-caching-2024-07-31"
