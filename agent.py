@@ -425,7 +425,7 @@ class Agent:
         self.step_count += 1
 
         # Periodically summarize the conversation to save tokens
-        if self.step_count > 1 and self.step_count % 5 == 0:
+        if self.step_count > 1 and self.step_count %  self.refresh_count == 0:
             try:
                 self.display.add_message("assistant", "Summarizing conversation to save tokens...")
                 new_context = await refresh_context_async(

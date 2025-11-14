@@ -4,7 +4,7 @@ import logging
 import json
 import io
 import zipfile
-from queue import Queue
+from queue import Queue, LifoQueue
 import threading
 from flask import Flask, render_template, jsonify, request, send_file
 from flask_socketio import SocketIO
@@ -65,7 +65,7 @@ class WebUI:
         self.tool_results = []
 
         self.message_lock = threading.Lock()
-        self.message_queue = Queue()
+        self.message_queue = LifoQueue()
 
         # Using a standard Queue for cross-thread communication
         self.input_queue = Queue()
@@ -529,6 +529,8 @@ class WebUI:
                 with self.message_lock:
                     if msg_type == "user":
                         self.user_messages.append(content)
+                        # if len(self.user_messages) > 3:
+                        #     self.user_messages.pop(0)
                     elif msg_type == "assistant":
                         self.assistant_messages.append(content)
                     elif msg_type == "tool":

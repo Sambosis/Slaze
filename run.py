@@ -7,11 +7,32 @@ import click
 from dotenv import load_dotenv
 import webbrowser
 import socket
+import threading
+import time
+import os
+import sys
 
 from agent import Agent
 from utils.agent_display_console import AgentDisplayConsole
 from utils.web_ui import WebUI
 from utils.file_logger import archive_logs
+
+
+def open_browser(url):
+    """
+    Opens the specified URL in a web browser, with special handling for WSL.
+    """
+    if sys.platform == 'linux' and 'WSL_DISTRO_NAME' in os.environ:
+        try:
+            # In WSL, use the host Windows browser
+            return webbrowser.get('windows-default').open(url)
+        except webbrowser.Error:
+            # Fallback if 'windows-default' is not available
+            pass  # Will try the default Linux browser below
+    
+    # Default behavior for non-WSL Linux, Windows, macOS, etc.
+    return webbrowser.open(url)
+
 
 @click.group()
 def cli():
@@ -61,7 +82,6 @@ def console(manual_tools):
 @click.option('--manual-tools', is_flag=True, help='Confirm tool parameters before execution')
 def web(port, manual_tools):
     """Run the agent with a web interface."""
-
     display = WebUI(lambda task, disp: run_agent_async(task, disp, manual_tools))
 
     # Determine the local IP address for convenience when accessing from
@@ -74,11 +94,26 @@ def web(port, manual_tools):
         host_ip = "localhost"
 
     url = f"http://{host_ip}:{port}"
-    print(f"Web server started on port {port}. Opening your browser to {url}")
-    webbrowser.open(url)
-    print("Waiting for user to start a task from the web interface.")
     
-    display.start_server(port=port)
+    # Run the server in a separate thread
+    server_thread = threading.Thread(target=display.start_server, kwargs={'port': port, 'host': '0.0.0.0'})
+    server_thread.daemon = True
+    server_thread.start()
+
+    # Give the server a moment to start up
+    time.sleep(2)
+
+    print(f"Web server started. Opening your browser to {url}")
+    try:
+        if not open_browser(url):
+            print(f"Could not automatically open browser. Please open this URL manually: {url}")
+        else:
+            print("Browser opened. Waiting for user to start a task from the web interface.")
+    except Exception as e:
+        print(f"Could not open browser: {e}. Please open this URL manually: {url}")
+
+    # Keep the main thread alive
+    server_thread.join()
     
     # The Flask-SocketIO server is a blocking call that will keep the application
     # alive. It's started in display.start_server().
