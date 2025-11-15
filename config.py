@@ -101,13 +101,14 @@ haiku45="anthropic/claude-haiku-4.5"
 minimax = "minimax/minimax-m2"
 katcode= "kwaipilot/kat-coder-pro:free"
 liquid = "deepseek/deepseek-v3.1-terminus"
+codex51 = "openai/gpt-5.1-codex"
 # Model constants
-ALL_MODELS = grokfast
+ALL_MODELS = codex51  # Default model for all tasks
 
 SUMMARY_MODEL = ALL_MODELS  # Model for summaries
 MAIN_MODEL = ALL_MODELS  # Primary model for main agent operations
-CODE_MODEL = katcode  # Model for code generation tasks
-CODE_LIST = [grokfast, katcode, liquid]  # List of models suitable for code generation
+CODE_MODEL = ALL_MODELS  # Model for code generation tasks
+CODE_LIST = [grokfast, codex51, liquid]  # List of models suitable for code generation
 # Feature flag constants
 COMPUTER_USE_BETA_FLAG = "computer-use-2024-10-22"
 PROMPT_CACHING_BETA_FLAG = "prompt-caching-2024-07-31"

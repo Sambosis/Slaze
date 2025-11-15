@@ -470,7 +470,7 @@ class Agent:
             self.messages = [{"role": "user", "content": new_context}]
             self.context_recently_refreshed = True
             return True
-
+        # if the me
         msg = response.choices[0].message
         rr(response.choices[0])
         assistant_msg = {"role": "assistant", "content": msg.content or ""}
@@ -483,19 +483,23 @@ class Agent:
         tool_messages = self.messages[:-1]  # All messages except the last assistant message
         # prompt creation that gives all but the last message , then a new user message that explains that given the context so far,
         # Give a couple sentences explanation that you are going to do the actions in assistant_msg["tool_calls"]
-        tool_prompt = f"""Given the context so far, We will be performing the following actions: {assistant_msg['content'] if 'content' in assistant_msg else ''}
-        {assistant_msg['tool_calls'] if 'tool_calls' in assistant_msg else []}
-        Please respond with markdown formatted list that contains the actions you will take.
-        It should be no more than 2 to 4 items long long and you should use simple statements such as - Create the code for main.py - Run the app - Fix the bugs in the code """
-        tool_messages.append({"role": "user", "content": tool_prompt})
-        tool_response = await self.client.chat.completions.create(
-            model=MAIN_MODEL,
-            messages=tool_messages,
-            max_tokens=MAX_SUMMARY_TOKENS,
-        )
-        tool_msg = tool_response.choices[0].message
+        # If the models has a reasononing parameter as part of it's response, then use that as a tool_msg else make the separate LLM call.
+        if response.choices[0].message.reasoning:
+            summ_message = {response.choices[0].message.reasoning or ""}
+        else:
+            tool_prompt = f"""Given the context so far, We will be performing the following actions: {assistant_msg['content'] if 'content' in assistant_msg else ''}
+            {assistant_msg['tool_calls'] if 'tool_calls' in assistant_msg else []}
+            Please respond with markdown formatted list that contains the actions you will take.
+            It should be no more than 2 to 4 items long long and you should use simple statements such as - Create the code for main.py - Run the app - Fix the bugs in the code """
+            tool_messages.append({"role": "user", "content": tool_prompt})
+            tool_response = await self.client.chat.completions.create(
+                model=MAIN_MODEL,
+                messages=tool_messages,
+                max_tokens=MAX_SUMMARY_TOKENS,
+            )
+            summ_message = tool_response.choices[0].message.content
         # use self.display to show the tool message
-        self.display.add_message("user", f"Planned Actions:\n{tool_msg.content or ''}")
+        self.display.add_message("user", f"## {summ_message}") 
         # If the assistant returned tool_calls, execute them sequentially and
         # append the tool results into the conversation. Otherwise, run the
         # evaluation step below.

@@ -1,1 +1,0 @@
-Core Goal: Build a basic pinball game that learns to play itself. Include essential elements: flippers, bumpers, and a ball, then teach it to play using reinforcement learning. All game play should be displayed in real-time. Every training game should be shown live on the screen. No sounds or documentation is needed.

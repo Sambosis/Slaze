@@ -1,1 +1,0 @@
-create a pygame version of the game Battleship.  Do not create any sound. Get a working version where the user plays against the computer. The user should use the mouse to play the game. Make the game look really good.
