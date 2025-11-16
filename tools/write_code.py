@@ -941,9 +941,9 @@ class WriteCodeTool(BaseAnthropicTool):
             logger.info(f"Only one model succeeded for {file_path.name}, using result from {successful_generations[0]['model']}")
             return successful_generations[0]["code"]
         
-        # Multiple successful generations - use CODE_MODEL to select the best one
-        logger.info(f"Selecting best code from {len(successful_generations)} successful generations for {file_path.name}")
-        best_code = await self._select_best_code_version(
+        # Multiple successful generations - use CODE_MODEL to synthesize the best one
+        logger.info(f"Synthesizing best code from {len(successful_generations)} successful generations for {file_path.name}")
+        best_code = await self._synthesize_best_code_version(
             successful_generations, code_description, file_path, agent_task
         )
         
@@ -989,101 +989,104 @@ class WriteCodeTool(BaseAnthropicTool):
             logger.warning(f"Model {model} failed for {file_path.name}: {e}")
             raise e
 
-    async def _select_best_code_version(
+    async def _synthesize_best_code_version(
         self,
         code_versions: List[Dict[str, str]],
         code_description: str,
         file_path: Path,
         agent_task: str,
     ) -> str:
-        """Use CODE_MODEL to select the best code version from multiple generated versions."""
+        """Use CODE_MODEL to synthesize the best code version from multiple generated versions."""
         
-        # Prepare the selection prompt
+        # Prepare the synthesis prompt
         versions_text = ""
         for i, version in enumerate(code_versions, 1):
-            versions_text += f"\n=== VERSION {i} (from {version['model']}) ===\n"
+            versions_text += f"\n=== OPTION {i} (from {version['model']}) ===\n"
             versions_text += version['code']
-            versions_text += f"\n=== END VERSION {i} ===\n"
+            versions_text += f"\n=== END OPTION {i} ===\n"
         
-        # Get current codebase context (simplified - could be enhanced)
         current_codebase = self._get_current_codebase_context()
         
-        selection_prompt = f"""You are tasked with selecting the best implementation from multiple versions generated for the same requirements.
+        synthesis_prompt = f"""As an expert software developer, your task is to create the best possible version of a file by synthesizing from multiple AI-generated options.
 
-    **File:** {file_path.name}
-    **Requirements:** {code_description}
-    **Project Context:** {agent_task}
+**File to Create:** `{file_path.name}`
+**Project Goal:** {agent_task}
+**File Requirements:** {code_description}
 
-    **Current Codebase Context:**
-    {current_codebase}
+**Codebase Context:**
+{current_codebase}
 
-    **Generated Versions:**
-    {versions_text}
+**AI-Generated Options:**
+{versions_text}
 
-    Please analyze each version and select the one that best fulfills the requirements. For code files, also consider quality, readability, and integration. For non-code files (like configuration or documentation), focus on accuracy and completeness.
+**Your Task:**
+1.  **Analyze:** Carefully review each provided option. Identify their strengths (e.g., good structure, correctness, efficiency) and weaknesses (e.g., bugs, poor style, incomplete implementation).
+2.  **Synthesize:** Do **not** just pick one. Create a new, superior version of the code. Combine the best parts of the given options, add your own expert improvements, and ensure the final code is correct, complete, and adheres to best practices.
+3.  **Fit:** Ensure your final version fits seamlessly into the existing codebase structure and meets all stated requirements.
 
-    **Respond with ONLY the number (1, 2, 3, etc.) of the best version. Do not include any explanation.**"""
-        selection_fallback_reason = "Unknown reason"
+**Output ONLY the complete, final code for the file. Do not include any explanations, comments, or markdown formatting.**"""
+        
+        synthesis_fallback_reason = "Unknown reason"
         try:
-            # Use CODE_MODEL to make the selection
+            if self.display:
+                console_output = self._format_terminal_output(
+                    command="synthesize_code",
+                    files=[file_path.name],
+                    result=f"Synthesizing best version for {file_path.name} using {CODE_MODEL}",
+                    additional_info=f"Analyzing {len(code_versions)} generated options."
+                )
+                self.display.add_message("assistant", console_output)
+
             OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
             if not OPENROUTER_API_KEY:
-                logger.warning("OPENROUTER_API_KEY not set, defaulting to first version")
-                return code_versions[0]["code"]
+                raise ValueError("OPENROUTER_API_KEY not set")
 
-            client = AsyncOpenAI(base_url="https://openrouter.ai/api/v1",
-                                 api_key=OPENROUTER_API_KEY)
+            client = AsyncOpenAI(base_url="https://openrouter.ai/api/v1", api_key=OPENROUTER_API_KEY)
 
-            selection_messages = [{"role": "user", "content": selection_prompt}]
+            synthesis_messages = [{"role": "user", "content": synthesis_prompt}]
             
             completion = await client.chat.completions.create(
                 model=CODE_MODEL, 
-                messages=selection_messages,
-                max_tokens=1000,
-                temperature=0.1
+                messages=synthesis_messages,
+                max_tokens=4000, # Allow for larger synthesized files
+                temperature=0.2
             )
-            print(completion)
-            if completion and completion.choices and completion.choices[0].message:
-                selection_response = completion.choices[0].message.content.strip()
-                try:
-                    # Find the first number in the response
-                    match = re.search(r'\d+', selection_response)
-                    if not match:
-                        raise ValueError("No number found in response")
-                    
-                    selected_index = int(match.group(0)) - 1
-                    if 0 <= selected_index < len(code_versions):
-                        selected_version = code_versions[selected_index]
-                        logger.info(f"Selected version {selected_index + 1} from {selected_version['model']} for {file_path.name}")
-                        if self.display:
-                            model_name = selected_version['model']
-                            console_output = self._format_terminal_output(
-                                command="select_model",
-                                files=[file_path.name],
-                                result=f"Model selected for {file_path.name}",
-                                additional_info=f"Selected model: {model_name}"
-                            )
-                            self.display.add_message("assistant", console_output)
-                        return selected_version["code"]
-                    else:
-                        raise ValueError("Selected index out of range")
-                except (ValueError, IndexError):
-                    selection_fallback_reason = f"Invalid selection response: '{selection_response}' from {CODE_MODEL}"
-                    logger.warning(f"{selection_fallback_reason}, defaulting to first version for {file_path.name}")
+            
+            if completion and completion.choices and completion.choices[0].message and completion.choices[0].message.content:
+                synthesized_code = completion.choices[0].message.content.strip()
+                
+                # Extract code block just in case the model wraps it
+                final_code, _ = self.extract_code_block(synthesized_code, file_path)
+
+                if final_code != "No Code Found" and final_code.strip():
+                    logger.info(f"Successfully synthesized a new version for {file_path.name} using {CODE_MODEL}")
+                    if self.display:
+                        console_output = self._format_terminal_output(
+                            command="synthesize_code",
+                            files=[file_path.name],
+                            result=f"Synthesis successful for {file_path.name}",
+                            additional_info=f"Generated new version of {len(final_code)} characters."
+                        )
+                        self.display.add_message("assistant", console_output)
+                    return final_code
+                else:
+                    synthesis_fallback_reason = f"Synthesis from {CODE_MODEL} resulted in empty code."
+            else:
+                synthesis_fallback_reason = f"No content in response from {CODE_MODEL} during synthesis."
 
         except Exception as e:
-            selection_fallback_reason = f"Code selection failed: {e}"
-            logger.warning(f"{selection_fallback_reason}, defaulting to first version for {file_path.name}")
+            synthesis_fallback_reason = f"Code synthesis failed: {e}"
+            logger.warning(f"{synthesis_fallback_reason}, defaulting to first version for {file_path.name}")
 
-        # Fallback to first version if selection fails
-        logger.info(f"Using first version from {code_versions[0]['model']} for {file_path.name} due to selection fallback")
+        # Fallback to first version if synthesis fails
+        logger.info(f"Using first version from {code_versions[0]['model']} for {file_path.name} due to synthesis fallback.")
         if self.display:
             model_name = code_versions[0]['model']
             console_output = self._format_terminal_output(
-                command="select_model",
+                command="synthesize_code",
                 files=[file_path.name],
-                result=f"Model selected for {file_path.name} (fallback)",
-                additional_info=f"Selected model: {model_name}\nReason: {selection_fallback_reason}"
+                result=f"Synthesis failed for {file_path.name}, using fallback.",
+                additional_info=f"Using version from: {model_name}\nReason: {synthesis_fallback_reason}"
             )
             self.display.add_message("assistant", console_output)
         return code_versions[0]["code"]

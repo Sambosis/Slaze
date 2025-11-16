@@ -219,12 +219,12 @@ class Agent:
         self.display = display
         self.manual_tool_confirmation = manual_tool_confirmation
         self.context_recently_refreshed = False
-        self.refresh_count = 45
+        self.refresh_count = 15
         self.refresh_increment = 15  # the number     to increase the refresh count by
         self.tool_collection = ToolCollection(
             WriteCodeTool(display=self.display),
             ProjectSetupTool(display=self.display),
-            BashTool(display=self.display),
+            # BashTool(display=self.display),
             PictureGenerationTool(display=self.display),
             # OpenInterpreterTool(display=self.display),  # Uncommented and enabled for testing
             # EditTool(display=self.display),  # Uncommented and enabled for testing
@@ -485,7 +485,7 @@ class Agent:
         # Give a couple sentences explanation that you are going to do the actions in assistant_msg["tool_calls"]
         # If the models has a reasononing parameter as part of it's response, then use that as a tool_msg else make the separate LLM call.
         if response.choices[0].message.reasoning:
-            summ_message = {response.choices[0].message.reasoning or ""}
+            summ_message = response.choices[0].message.reasoning or ""
         else:
             tool_prompt = f"""Given the context so far, We will be performing the following actions: {assistant_msg['content'] if 'content' in assistant_msg else ''}
             {assistant_msg['tool_calls'] if 'tool_calls' in assistant_msg else []}
@@ -499,7 +499,7 @@ class Agent:
             )
             summ_message = tool_response.choices[0].message.content
         # use self.display to show the tool message
-        self.display.add_message("user", f"## {summ_message}") 
+        self.display.add_message("user", f"### {summ_message}") 
         # If the assistant returned tool_calls, execute them sequentially and
         # append the tool results into the conversation. Otherwise, run the
         # evaluation step below.
