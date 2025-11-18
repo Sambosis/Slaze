@@ -224,7 +224,7 @@ class Agent:
         self.tool_collection = ToolCollection(
             WriteCodeTool(display=self.display),
             ProjectSetupTool(display=self.display),
-            # BashTool(display=self.display),
+            BashTool(display=self.display),
             PictureGenerationTool(display=self.display),
             # OpenInterpreterTool(display=self.display),  # Uncommented and enabled for testing
             # EditTool(display=self.display),  # Uncommented and enabled for testing

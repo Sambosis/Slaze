@@ -86,6 +86,11 @@ class ProjectSetupTool(BaseAnthropicTool):
                             "description": "Name of the file to run",
                             "default": "main.py",
                         },
+                        "argument_string": {
+                            "type": "string",
+                            "description": "Optional arguments to pass to the app",
+                            "default": "",
+                        },
                     },
                     "required": ["command"],
                 },
@@ -452,7 +457,7 @@ class ProjectSetupTool(BaseAnthropicTool):
                               command="add_additional_depends",
                               tool_name=self.name)
 
-    async def run_app(self, filename: str) -> ToolResult:
+    async def run_app(self, filename: str, argument_string: str = "") -> ToolResult:
         """Runs a Python application locally."""
         try:
             repo_dir = get_constant("REPO_DIR")
@@ -461,6 +466,8 @@ class ProjectSetupTool(BaseAnthropicTool):
                                   tool_name=self.name)
             print(f"Running app at {repo_dir} with filename {filename}")
             cmd = ["uv", "run", str(filename)]
+            if argument_string:
+                cmd.extend(argument_string.split())
             print(f"Running command: {' '.join(cmd)} in {repo_dir}")
             try:
                 result = self._run_subprocess_with_display(cmd,
@@ -541,6 +548,7 @@ class ProjectSetupTool(BaseAnthropicTool):
         environment: str = "python",
         packages: List[str] | None = None,
         entry_filename: str = "app.py",
+        argument_string: str = "",
         **kwargs,
     ) -> ToolResult:  # type: ignore[override]
         """Executes the specified command for project management."""
@@ -574,7 +582,7 @@ class ProjectSetupTool(BaseAnthropicTool):
                 result = await self.add_dependencies(packages)
 
             elif command == ProjectCommand.RUN_APP:
-                result = await self.run_app(entry_filename)
+                result = await self.run_app(entry_filename, argument_string)
 
             elif command == ProjectCommand.RUN_PROJECT:
                 result = await self.run_project(entry_filename)

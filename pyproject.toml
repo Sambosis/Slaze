@@ -103,6 +103,7 @@ dependencies = [
     "soupsieve==2.6",
     "symbex>=2.0",
     "tenacity==9.0.0",
+    "torch>=2.9.1",
     "tqdm==4.67.1",
     "typing-extensions==4.12.2",
     "tzdata==2025.1",

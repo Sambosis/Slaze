@@ -102,13 +102,16 @@ minimax = "minimax/minimax-m2"
 katcode= "kwaipilot/kat-coder-pro:free"
 liquid = "deepseek/deepseek-v3.1-terminus"
 codex51 = "openai/gpt-5.1-codex"
+sherthink = "openrouter/sherlock-think-alpha"
+sherdash = "openrouter/sherlock-dash-alpha"
+gemini3pro = "google/gemini-3-pro-preview"
 # Model constants
-ALL_MODELS = codex51  # Default model for all tasks
+ALL_MODELS = gemini3pro  # Default model for all tasks
 
-SUMMARY_MODEL = ALL_MODELS  # Model for summaries
+SUMMARY_MODEL = ALL_MODELS  #   QModel for summaries
 MAIN_MODEL = ALL_MODELS  # Primary model for main agent operations
 CODE_MODEL = ALL_MODELS  # Model for code generation tasks
-CODE_LIST = [grokfast, codex51, liquid]  # List of models suitable for code generation
+CODE_LIST = [sherdash, sherthink, gemini3pro]  # List of models suitable for code generation
 # Feature flag constants
 COMPUTER_USE_BETA_FLAG = "computer-use-2024-10-22"
 PROMPT_CACHING_BETA_FLAG = "prompt-caching-2024-07-31"
