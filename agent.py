@@ -219,8 +219,8 @@ class Agent:
         self.display = display
         self.manual_tool_confirmation = manual_tool_confirmation
         self.context_recently_refreshed = False
-        self.refresh_count = 15
-        self.refresh_increment = 15  # the number     to increase the refresh count by
+        self.refresh_count = 25
+        self.refresh_increment = 25  # the number     to increase the refresh count by
         self.tool_collection = ToolCollection(
             WriteCodeTool(display=self.display),
             ProjectSetupTool(display=self.display),
@@ -454,13 +454,15 @@ class Agent:
         
         tool_choice = "auto"
         try:
-            response = await self.client.chat.completions.create(
+            raw_response = await self.client.chat.completions.with_raw_response.create(
                 model=MAIN_MODEL,
                 messages=messages,
                 tools=self.tool_params,
                 tool_choice=tool_choice,
                 max_tokens=MAX_SUMMARY_TOKENS,
             )
+            response = raw_response.parse()
+            response_json = json.loads(raw_response.content)
 
         except Exception as llm_error:
             self.display.add_message("assistant", f"LLM call failed: {llm_error}")
@@ -473,12 +475,21 @@ class Agent:
         # if the me
         msg = response.choices[0].message
         rr(response.choices[0])
-        assistant_msg = {"role": "assistant", "content": msg.content or ""}
-        if msg.tool_calls:
-            assistant_msg["tool_calls"] = [
-                tc.to_dict() if hasattr(tc, "to_dict") else tc.__dict__
-                for tc in msg.tool_calls
-            ]
+        
+        # Check for tool calls in the raw JSON response first.
+        # The openai library's parser might miss them if the format is slightly off,
+        # as indicated by native_finish_reason='UNEXPECTED_TOOL_CALL'.
+        raw_tool_calls = response_json.get("choices", [{}])[0].get("message", {}).get("tool_calls")
+
+        assistant_msg = {"role": "assistant"}
+
+        if raw_tool_calls:
+            assistant_msg["tool_calls"] = raw_tool_calls
+            assistant_msg["content"] = None
+        else:
+            # Fallback to parsed message content if no tool calls are found in raw response
+            assistant_msg["content"] = msg.content or ""
+
         self.messages.append(assistant_msg)
         tool_messages = self.messages[:-1]  # All messages except the last assistant message
         # prompt creation that gives all but the last message , then a new user message that explains that given the context so far,
