@@ -123,6 +123,30 @@ def _iter_chunks_for_text(src: str, file_path: str = "<memory>") -> List[Chunk]:
     out: List[Chunk] = []
     top_spans: List[Span] = []
 
+    def _recurse(node: ast.AST, parent_symbol: str):
+        nonlocal idx
+        # This helper is for finding nested functions/classes inside other functions/classes
+        # It does NOT subtract spans, it just adds them.
+        if not hasattr(node, "body"): return
+        
+        for child in node.body:
+            if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                sym = f"{parent_symbol}.{child.name}"
+                sp = _span_for(child, src, include_decorators=True)
+                text = _slice_lines(lines, sp)
+                if _nonempty(text):
+                    out.append({"kind":"function","symbol":sym,"span":sp,"text":text,"file_path":file_path,"chunk_index":idx})
+                    idx += 1
+                _recurse(child, sym)
+            elif isinstance(child, ast.ClassDef):
+                sym = f"{parent_symbol}.{child.name}"
+                sp = _span_for(child, src, include_decorators=True)
+                text = _slice_lines(lines, sp)
+                if _nonempty(text):
+                    out.append({"kind":"class","symbol":sym,"span":sp,"text":text,"file_path":file_path,"chunk_index":idx})
+                    idx += 1
+                _recurse(child, sym)
+
     for node in tree.body:
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             sp = _span_for(node, src, include_decorators=True)
@@ -130,6 +154,7 @@ def _iter_chunks_for_text(src: str, file_path: str = "<memory>") -> List[Chunk]:
             if _nonempty(text):
                 out.append({"kind":"function","symbol":node.name,"span":sp,"text":text,"file_path":file_path,"chunk_index":idx}); idx += 1
             top_spans.append(sp)
+            _recurse(node, node.name)
 
         elif isinstance(node, ast.ClassDef):
             class_span = _span_for(node, src, include_decorators=True)
@@ -143,17 +168,36 @@ def _iter_chunks_for_text(src: str, file_path: str = "<memory>") -> List[Chunk]:
                     if _nonempty(text):
                         out.append({"kind":"method","symbol":f"{node.name}.{child.name}","span":sp,"text":text,"file_path":file_path,"chunk_index":idx}); idx += 1
                     inner_spans.append(sp)
+                    _recurse(child, f"{node.name}.{child.name}")
                 elif isinstance(child, ast.ClassDef):
                     sp = _span_for(child, src, include_decorators=True)
                     text = _slice_lines(lines, sp)
                     if _nonempty(text):
                         out.append({"kind":"class","symbol":f"{node.name}.{child.name}","span":sp,"text":text,"file_path":file_path,"chunk_index":idx}); idx += 1
                     inner_spans.append(sp)
+                    _recurse(child, f"{node.name}.{child.name}")
 
             for sp in _subtract(class_span, inner_spans):
                 text = _slice_lines(lines, sp)
                 if _nonempty(text):
                     out.append({"kind":"class","symbol":node.name,"span":sp,"text":text,"file_path":file_path,"chunk_index":idx}); idx += 1
+        
+        elif isinstance(node, ast.Assign):
+            for t in node.targets:
+                if isinstance(t, ast.Name):
+                    sp = _span_for(node, src)
+                    text = _slice_lines(lines, sp)
+                    if _nonempty(text):
+                        out.append({"kind":"variable","symbol":t.id,"span":sp,"text":text,"file_path":file_path,"chunk_index":idx}); idx += 1
+                    top_spans.append(sp)
+        
+        elif isinstance(node, ast.AnnAssign):
+            if isinstance(node.target, ast.Name):
+                sp = _span_for(node, src)
+                text = _slice_lines(lines, sp)
+                if _nonempty(text):
+                    out.append({"kind":"variable","symbol":node.target.id,"span":sp,"text":text,"file_path":file_path,"chunk_index":idx}); idx += 1
+                top_spans.append(sp)
 
     for sp in _subtract((1, len(lines)), top_spans):
         text = _slice_lines(lines, sp)
@@ -178,16 +222,38 @@ def _validate_python(text: str, filename: str = "<edited>") -> None:
 
 def _resolve_symbol_node(tree: ast.Module, symbol: str) -> Optional[ast.AST]:
     parts = symbol.split(".")
+
+    def find_in_scope(scope: List[ast.stmt], name: str) -> Optional[ast.AST]:
+        for stmt in scope:
+            if isinstance(stmt, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
+                if stmt.name == name:
+                    return stmt
+            elif isinstance(stmt, ast.Assign):
+                for t in stmt.targets:
+                    if isinstance(t, ast.Name) and t.id == name:
+                        return stmt
+            elif isinstance(stmt, ast.AnnAssign):
+                if isinstance(stmt.target, ast.Name) and stmt.target.id == name:
+                    return stmt
+        return None
+
     def walk(scope: List[ast.stmt], i: int) -> Optional[ast.AST]:
         if i >= len(parts): return None
         name = parts[i]
-        for stmt in scope:
-            if isinstance(stmt, ast.ClassDef) and stmt.name == name:
-                if i == len(parts) - 1: return stmt
-                return walk(stmt.body, i+1)
-            if i == len(parts) - 1 and isinstance(stmt, (ast.FunctionDef, ast.AsyncFunctionDef)) and stmt.name == name:
-                return stmt
+        node = find_in_scope(scope, name)
+
+        if node is None:
+            return None
+
+        if i == len(parts) - 1:
+            return node
+
+        # Recurse if it's a container
+        if isinstance(node, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
+            return walk(node.body, i+1)
+
         return None
+
     return walk(tree.body, 0)
 
 def _docstring_span(src: str, node: ast.AST) -> Optional[Span]:
@@ -247,7 +313,10 @@ class EditorCommand(str, Enum):
     REPLACE_BODY = "replace_body"
     REPLACE_DOCSTRING = "replace_docstring"
     INSERT_AFTER = "insert_after"
+    INSERT_BEFORE = "insert_before"
     DELETE = "delete_symbol"
+    ADD_IMPORT = "add_import"
+    REMOVE_IMPORT = "remove_import"
 
 class ASTCodeEditorTool(BaseAnthropicTool):
     """
@@ -262,7 +331,7 @@ class ASTCodeEditorTool(BaseAnthropicTool):
     api_type: Literal["custom"] = "custom"
     description: str = (
         "Edit Python source files via AST-perfect spans. "
-        "Commands: list_symbols, show_symbol, replace_whole, replace_body, replace_docstring, insert_after, delete_symbol. "
+        "Commands: list_symbols, show_symbol, replace_whole, replace_body, replace_docstring, insert_after, insert_before, delete_symbol, add_import, remove_import. "
         "All edits are validated by re-parsing before write; supports dry-run diffs."
     )
 
@@ -511,6 +580,90 @@ class ASTCodeEditorTool(BaseAnthropicTool):
         _validate_python(result, filename)
         return result
 
+    def _insert_before(self, src: str, filename: str, symbol: str, new_text: str) -> str:
+        lines = src.splitlines(keepends=True)
+        tree = ast.parse(src, filename=filename)
+        node = _resolve_symbol_node(tree, symbol)
+        if node is None:
+            raise ValueError(f"Symbol not found: {symbol}")
+        span = _span_for(node, src, include_decorators=True)
+        s_idx, _ = _line_to_abs_offsets(lines, span)
+        result = src[:s_idx] + _ensure_trailing_nl(new_text) + src[s_idx:]
+        _validate_python(result, filename)
+        return result
+
+    def _add_import(self, src: str, filename: str, new_import: str) -> str:
+        lines = src.splitlines(keepends=True)
+        tree = ast.parse(src, filename=filename)
+        
+        # Check if already present (naive check)
+        if new_import.strip() in src:
+            # A better check would be AST based, but for now let's trust the user or do a simple string check
+            pass
+
+        last_import_end = 0
+        has_imports = False
+        for node in tree.body:
+            if isinstance(node, (ast.Import, ast.ImportFrom)):
+                has_imports = True
+                span = _span_for(node, src)
+                _, e_idx = _line_to_abs_offsets(lines, span)
+                last_import_end = max(last_import_end, e_idx)
+        
+        if has_imports:
+            result = src[:last_import_end] + _ensure_trailing_nl(new_import) + src[last_import_end:]
+        else:
+            # Insert at top, after docstring if present
+            insert_idx = 0
+            if tree.body and isinstance(tree.body[0], ast.Expr) and isinstance(tree.body[0].value, ast.Constant) and isinstance(tree.body[0].value.value, str):
+                span = _span_for(tree.body[0], src)
+                _, e_idx = _line_to_abs_offsets(lines, span)
+                insert_idx = e_idx
+            
+            result = src[:insert_idx] + _ensure_trailing_nl(new_import) + src[insert_idx:]
+            
+        _validate_python(result, filename)
+        return result
+
+    def _remove_import(self, src: str, filename: str, import_text: str) -> str:
+        # This is tricky because import_text might be "import foo" or "from bar import baz"
+        # We will look for exact line matches or AST matches. 
+        # For simplicity, let's try to find the AST node that generates this source or matches the names.
+        # Actually, simpler: find the node that *contains* the names in import_text?
+        # Let's just do a best-effort AST match.
+        
+        lines = src.splitlines(keepends=True)
+        tree = ast.parse(src, filename=filename)
+        
+        target_node = None
+        
+        # Heuristic: parse the import_text to see what we are looking for
+        try:
+            imp_tree = ast.parse(import_text)
+            if not imp_tree.body: return src
+            imp_node = imp_tree.body[0]
+        except:
+            raise ValueError(f"Invalid import text: {import_text}")
+
+        for node in tree.body:
+            if isinstance(node, (ast.Import, ast.ImportFrom)):
+                # Compare node with imp_node
+                if ast.dump(node) == ast.dump(imp_node):
+                    target_node = node
+                    break
+        
+        if target_node:
+            span = _span_for(target_node, src)
+            s_idx, e_idx = _line_to_abs_offsets(lines, span)
+            # Remove trailing newline if present
+            if e_idx < len(src) and src[e_idx] == '\n':
+                e_idx += 1
+            result = src[:s_idx] + src[e_idx:]
+            _validate_python(result, filename)
+            return result
+            
+        raise ValueError(f"Import not found: {import_text}")
+
     # ---------- Public entry (__call__) ----------
     async def __call__(  # type: ignore[override]
         self,
@@ -549,7 +702,8 @@ class ASTCodeEditorTool(BaseAnthropicTool):
                 EditorCommand.LIST.value, EditorCommand.SHOW.value,
                 EditorCommand.REPLACE_WHOLE.value, EditorCommand.REPLACE_BODY.value,
                 EditorCommand.REPLACE_DOCSTRING.value, EditorCommand.INSERT_AFTER.value,
-                EditorCommand.DELETE.value
+                EditorCommand.INSERT_BEFORE.value, EditorCommand.DELETE.value,
+                EditorCommand.ADD_IMPORT.value, EditorCommand.REMOVE_IMPORT.value
             }
             if needs_path and not path:
                 return ToolResult(error="Missing 'path'", message=self.format_output({"command": cmd_value, "status": "error", "error": "Missing 'path'"}), tool_name=self.name)
@@ -597,6 +751,7 @@ class ASTCodeEditorTool(BaseAnthropicTool):
             if cmd_value in {
                 EditorCommand.REPLACE_WHOLE.value, EditorCommand.REPLACE_BODY.value,
                 EditorCommand.REPLACE_DOCSTRING.value, EditorCommand.INSERT_AFTER.value,
+                EditorCommand.INSERT_BEFORE.value,
                 EditorCommand.DELETE.value
             } and symbol is None and cmd_value != EditorCommand.DELETE.value:
                 return ToolResult(error="Missing 'symbol'", message=self.format_output({"command": cmd_value, "status":"error","error":"Missing 'symbol'","path":path}), tool_name=self.name)
@@ -607,7 +762,10 @@ class ASTCodeEditorTool(BaseAnthropicTool):
                 EditorCommand.REPLACE_WHOLE.value,
                 EditorCommand.REPLACE_BODY.value,
                 EditorCommand.REPLACE_DOCSTRING.value,
-                EditorCommand.INSERT_AFTER.value
+                EditorCommand.INSERT_AFTER.value,
+                EditorCommand.INSERT_BEFORE.value,
+                EditorCommand.ADD_IMPORT.value,
+                EditorCommand.REMOVE_IMPORT.value
             }:
                 edit_text = _load_edit_text()
                 if edit_text is None:
@@ -633,6 +791,21 @@ class ASTCodeEditorTool(BaseAnthropicTool):
             elif cmd_value == EditorCommand.INSERT_AFTER.value:
                 def mutate(before: str, filename: str) -> str:
                     return self._insert_after(before, filename, symbol, edit_text)
+                diff_text = self._apply(repo, path, mutate, dry_run=dry_run)
+
+            elif cmd_value == EditorCommand.INSERT_BEFORE.value:
+                def mutate(before: str, filename: str) -> str:
+                    return self._insert_before(before, filename, symbol, edit_text)
+                diff_text = self._apply(repo, path, mutate, dry_run=dry_run)
+
+            elif cmd_value == EditorCommand.ADD_IMPORT.value:
+                def mutate(before: str, filename: str) -> str:
+                    return self._add_import(before, filename, edit_text)
+                diff_text = self._apply(repo, path, mutate, dry_run=dry_run)
+
+            elif cmd_value == EditorCommand.REMOVE_IMPORT.value:
+                def mutate(before: str, filename: str) -> str:
+                    return self._remove_import(before, filename, edit_text)
                 diff_text = self._apply(repo, path, mutate, dry_run=dry_run)
 
             elif cmd_value == EditorCommand.DELETE.value:

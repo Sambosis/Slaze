@@ -2,6 +2,7 @@ from .base import BaseAnthropicTool, ToolError, ToolResult
 from .bash import BashTool
 # from .edit import EditTool
 from .ast_code_editor import ASTCodeEditorTool
+from .cst_code_editor import CSTCodeEditorTool
 from .collection import ToolCollection
 # from .expert import GetExpertOpinionTool
 # from .playwright import WebNavigatorTool # Removed
@@ -25,6 +26,7 @@ __all__ = [
     # "EditTool",
     "ToolCollection",
     "ASTCodeEditorTool",
+    "CSTCodeEditorTool",
     # "GetExpertOpinionTool",
     # "WebNavigatorTool", # Removed
     "ProjectSetupTool",

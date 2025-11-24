@@ -29,7 +29,7 @@ class ProjectCommand(str, Enum):
     SETUP_PROJECT = "setup_project"
     ADD_DEPENDENCIES = "add_additional_depends"
     RUN_APP = "run_app"
-    RUN_PROJECT = "run_project"
+
 
 
 class ProjectSetupTool(BaseAnthropicTool):
@@ -43,8 +43,7 @@ class ProjectSetupTool(BaseAnthropicTool):
         "A tool for Python project management. "
         "setup_project: create a uv virtual environment and install packages. "
         "add_dependencies: install additional packages. "
-        "run_app: execute a Python file using uv. "
-        "run_project: run the project entry file.")
+        "run_app: execute a Python file using uv.")
 
     def __init__(self, display=None):
         """Initialize the ProjectSetupTool instance."""
@@ -499,47 +498,7 @@ class ProjectSetupTool(BaseAnthropicTool):
                 command="run_app",
                 tool_name=self.name)
 
-    async def run_project(self, entry_filename: str = "app.py") -> ToolResult:
-        """Runs a Python project locally."""
-        try:
-            repo_dir = get_constant("REPO_DIR")
-            if not repo_dir:
-                return ToolResult(error="REPO_DIR is not configured",
-                                  tool_name=self.name)
-            # repo_path = _resolve_map_path(repo_dir)
-            print(
-                f"Running project at {repo_dir} with entry file {entry_filename}"
-            )
 
-            # get the REPO_DIR constant
-            cmd = ["uv", "run", str(entry_filename)]
-            print(f"Running command: {' '.join(cmd)} in {repo_dir}")
-            # Use subprocess to run the command in the repo_dir
-            try:
-                result = self._run_subprocess_with_display(cmd, cwd=repo_dir)
-                return ToolResult(
-                    output=result.stdout,
-                    error=result.stderr if result.stderr else None,
-                    message=f"Project executed successfully at {repo_dir}",
-                    command="run_project",
-                    tool_name=self.name)
-            except subprocess.CalledProcessError as e:
-                return ToolResult(
-                    output=e.stdout,
-                    error=e.stderr,
-                    message=f"Project execution failed at {repo_dir}",
-                    command="run_project",
-                    tool_name=self.name)
-
-        except Exception as e:
-            if self.display is not None:
-                self.display.add_message("assistant",
-                                         f"ProjectSetupTool error: {str(e)}")
-            return ToolResult(
-                error=f"Failed to execute run_project: {str(e)}",
-                message=f"Unexpected error running project at {repo_dir}",
-                command="run_project",
-                tool_name=self.name)
 
     async def __call__(
         self,
@@ -584,8 +543,7 @@ class ProjectSetupTool(BaseAnthropicTool):
             elif command == ProjectCommand.RUN_APP:
                 result = await self.run_app(entry_filename, argument_string)
 
-            elif command == ProjectCommand.RUN_PROJECT:
-                result = await self.run_project(entry_filename)
+
 
             else:
                 return ToolResult(error=f"Unknown command: {command_value}",

@@ -1,0 +1,24 @@
+Testing LIST command...
+[assistant] ```console
+$ cd C:\Users\Machine81\Slazy\repo
+$ cst_code_editor list_symbols path='test_cst_console.py'
+function foo
+```
+
+Testing SHOW command...
+[assistant] ```console
+$ cd C:\Users\Machine81\Slazy\repo
+$ cst_code_editor show_symbol path='test_cst_console.py' symbol='foo'
+def foo():
+    pass
+```
+
+Testing REPLACE_BODY command...
+[assistant] ```console
+$ cd C:\Users\Machine81\Slazy\repo
+$ cst_code_editor replace_body path='test_cst_console.py' symbol='foo'
+(File updated)
+```
+
+--- Verification ---
+SUCCESS: Display messages received.

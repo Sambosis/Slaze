@@ -15,7 +15,7 @@ from tools import (
     ProjectSetupTool,
     WriteCodeTool,
     PictureGenerationTool,
-    ASTCodeEditorTool,
+    CSTCodeEditorTool,
     ToolCollection,
     ToolResult,
     BashTool
@@ -228,7 +228,7 @@ class Agent:
             PictureGenerationTool(display=self.display),
             # OpenInterpreterTool(display=self.display),  # Uncommented and enabled for testing
             # EditTool(display=self.display),  # Uncommented and enabled for testing
-            ASTCodeEditorTool(display=self.display),
+            CSTCodeEditorTool(display=self.display),
             display=self.display,
         )
         self.output_manager = OutputManager(self.display)

@@ -15,7 +15,6 @@ import logging
 from enum import Enum
 # pyright: ignore[reportMissingImports]
 from openai import (
-    APIConnectionError,
     APIError,
     APIStatusError,
     AsyncOpenAI,
@@ -81,7 +80,6 @@ def should_retry_llm_call(exception: Exception) -> bool:
     if isinstance(
             exception,
         (
-            APIConnectionError,  # Network issues
             RateLimitError,  # Rate limits hit
             InternalServerError,  # Server-side errors from OpenAI (500 class)
         ),
@@ -251,49 +249,34 @@ class WriteCodeTool(BaseAnthropicTool):
         """
         Execute the write_codebase command. All files are created relative to
         the configured REPO_DIR.
-
-        Args:
-            command: The command to execute (should always be WRITE_CODEBASE).
-            files: List of file details (filename, code_description, optional external_imports, optional internal_imports).
-            **kwargs: Additional parameters (ignored).
-
-        Returns:
-            A ToolResult object with the result of the operation.
         """
         if command != CodeCommand.WRITE_CODEBASE:
             return ToolResult(
-                error=
-                f"Unsupported command: {command}. Only 'write_codebase' is supported.",
+                error=f"Unsupported command: {command}. Only 'write_codebase' is supported.",
                 tool_name=self.name,
                 command=command,
             )
 
-        repo_path_obj = None  # Initialize to None
+        repo_path_obj = None
 
         try:
             # Determine the root path where files should be written
             host_repo_dir = get_constant("REPO_DIR")
             if not host_repo_dir:
-                raise ValueError(
-                    "REPO_DIR is not configured in config.py. Cannot determine host write path."
-                )
+                raise ValueError("REPO_DIR is not configured in config.py. Cannot determine host write path.")
 
             repo_path_obj = Path(host_repo_dir).resolve()
             if not repo_path_obj.exists():
                 repo_path_obj.mkdir(parents=True, exist_ok=True)
-            logger.info(
-                f"Resolved repository path for writing: {repo_path_obj}")
+            logger.info(f"Resolved repository path for writing: {repo_path_obj}")
 
             # Validate files input
             try:
                 file_details = [FileDetail(**f) for f in files]
             except Exception as pydantic_error:
-                logger.error(
-                    f"Pydantic validation error for 'files': {pydantic_error}",
-                    exc_info=True)
+                logger.error(f"Pydantic validation error for 'files': {pydantic_error}", exc_info=True)
                 return ToolResult(
-                    error=
-                    f"Invalid format for 'files' parameter: {pydantic_error}",
+                    error=f"Invalid format for 'files' parameter: {pydantic_error}",
                     tool_name=self.name,
                     command=command,
                 )
@@ -305,359 +288,51 @@ class WriteCodeTool(BaseAnthropicTool):
                     command=command,
                 )
 
-            # --- Check for image files and handle them with PictureGenerationTool ---
-            image_files = []
-            code_files = []
-            image_results = []
+            # Separate image and code files
+            image_files = [f for f in file_details if is_image_file(f.filename)]
+            code_files = [f for f in file_details if not is_image_file(f.filename)]
 
-            for file_detail in file_details:
-                if is_image_file(file_detail.filename):
-                    image_files.append(file_detail)
-                else:
-                    code_files.append(file_detail)
+            write_results = []
+            errors_code_gen = []
+            errors_write = []
+            success_count = 0
+            image_success_count = 0
+            image_error_count = 0
 
-            # Handle image files with PictureGenerationTool
+            # Handle image files
             if image_files:
-                if self.display:
-                    image_filenames = [file.filename for file in image_files]
-                    console_output = self._format_terminal_output(
-                        command="generate_images",
-                        files=image_filenames,
-                        result="Detected image files, using PictureGenerationTool",
-                        additional_info=f"Files to generate:\n" + "\n".join(f"  - {filename}" for filename in image_filenames)
-                    )
-                    self.display.add_message("assistant", console_output)
+                img_results, img_success, img_errors = await self._handle_image_generation(image_files)
+                write_results.extend(img_results)
+                image_success_count = img_success
+                image_error_count = img_errors
 
-                for image_file in image_files:
-                    try:
-                        # Use the code_description as the prompt for image generation
-                        # Set default dimensions if not specified
-                        width = 1024
-                        height = 1024
-
-                        result = await self.picture_tool(
-                            command=PictureCommand.CREATE,
-                            prompt=image_file.code_description,
-                            output_path=image_file.filename,
-                            width=width,
-                            height=height)
-                        image_results.append(result)
-
-                        if self.display:
-                            console_output = self._format_terminal_output(
-                                command="generate_image",
-                                files=[image_file.filename],
-                                result=f"Image generated successfully",
-                                additional_info=f"Generated: {image_file.filename}"
-                            )
-                            self.display.add_message("assistant", console_output)
-                    except Exception as e:
-                        error_msg = f"Error generating image {image_file.filename}: {str(e)}"
-                        logger.error(error_msg)
-                        image_results.append(
-                            ToolResult(
-                                error=error_msg,
-                                tool_name=self.name,
-                                command=command,
-                            ))
-
-            # If only image files were requested, return the image results
-            if not code_files:
-                if len(image_results) == 1:
-                    return image_results[0]
-                else:
-                    # Combine multiple image results
-                    success_count = sum(1 for r in image_results
-                                        if not r.error)
-                    error_count = len(image_results) - success_count
-
-                    output_messages = []
-                    for i, result in enumerate(image_results):
-                        if result.error:
-                            output_messages.append(
-                                f"Error with {image_files[i].filename}: {result.error}"
-                            )
-                        else:
-                            output_messages.append(
-                                f"Successfully generated {image_files[i].filename}"
-                            )
-
-                    return ToolResult(
-                        output=
-                        f"Generated {success_count} images successfully, {error_count} errors.\n"
-                        + "\n".join(output_messages),
-                        tool_name=self.name,
-                        command=command,
-                    )
-
-            # Update file_details to only include code files for the rest of the process
-            file_details = code_files
-
-            # --- Generate Code Asynchronously ---
-            if file_details:  # Only proceed if there are code files to process
-                if self.display:
-                    code_filenames = [file.filename for file in file_details]
-                    console_output = self._format_terminal_output(
-                        command="generate_code",
-                        files=code_filenames,
-                        result="Starting code generation process",
-                        additional_info=f"Files to generate:\n" + "\n".join(f"  - {filename}" for filename in code_filenames)
-                    )
-                    self.display.add_message("assistant", console_output)
-
-                code_gen_tasks = [
-                    self._call_llm_to_generate_code(
-                        file.code_description,
-                        file.external_imports or [],
-                        file.internal_imports or [],
-                        # Pass the intended final host path to the code generator for context
-                        repo_path_obj / file.filename,
-                    ) for file in file_details
-                ]
-                code_results = await asyncio.gather(*code_gen_tasks,
-                                                    return_exceptions=True)
-
-                # --- Write Files ---
-                write_results = []
-                errors_code_gen = []
-                errors_write = []
-                success_count = 0
-            else:
-                # Initialize variables when there are no code files to process
-                write_results = []
-                errors_code_gen = []
-                errors_write = []
-                success_count = 0
-
-            if file_details:  # Only process code results if there are code files
-                logger.info(
-                    f"Starting file writing phase for {len(code_results)} results to HOST path: {repo_path_obj}"
+            # Handle code files
+            if code_files:
+                code_results, code_gen_errors = await self._handle_code_generation(code_files, repo_path_obj)
+                errors_code_gen.extend(code_gen_errors)
+                
+                # Write code files
+                write_res, write_errs, write_success = self._write_files_to_disk(
+                    code_files, code_results, repo_path_obj
                 )
+                write_results.extend(write_res)
+                errors_write.extend(write_errs)
+                success_count = write_success
 
-                for i, result in enumerate(code_results):
-                    file_detail = file_details[i]
-                    filename = file_detail.filename  # Relative filename
-                    # >>> USE THE CORRECTED HOST PATH FOR WRITING <<<
-                    absolute_path = (
-                        repo_path_obj /
-                        filename).resolve()  # Ensure absolute path
-                    logger.info(
-                        f"Processing result for: {filename} (Host Path: {absolute_path})"
-                    )
-
-                    if isinstance(result, Exception):
-                        error_msg = f"Error generating code for {filename}: {result}"
-                        logger.error(error_msg, exc_info=True)
-                        errors_code_gen.append(error_msg)
-                        write_results.append({
-                            "filename": filename,
-                            "status": "error",
-                            "message": error_msg
-                        })
-                        # Attempt to write error file to the resolved host path
-                        try:
-                            logger.info(
-                                f"Attempting to write error file for {filename} to {absolute_path}"
-                            )
-                            absolute_path.parent.mkdir(parents=True,
-                                                       exist_ok=True)
-                            error_content = (
-                                f"# Code generation failed for {filename}: {result}\n\n"
-                                "# Code description:\n"
-                                f"{file_detail.code_description}"
-                            )
-                            absolute_path.write_text(error_content,
-                                                     encoding="utf-8",
-                                                     errors="replace")
-                            logger.info(
-                                f"Successfully wrote error file for {filename} to {absolute_path}"
-                            )
-                        except Exception as write_err:
-                            logger.error(
-                                f"Failed to write error file for {filename} to {absolute_path}: {write_err}",
-                                exc_info=True)
-
-                    else:  # Code generation successful
-                        code_content = result
-                        logger.info(
-                            f"Code generation successful for {filename}. Attempting to write to absolute host path: {absolute_path}"
-                        )
-
-                        if not code_content or not code_content.strip():
-                            logger.warning(
-                                f"Generated code content for {filename} is empty or whitespace only. Skipping write."
-                            )
-                            write_results.append({
-                                "filename":
-                                filename,
-                                "status":
-                                "error",
-                                "message":
-                                "Generated code was empty",
-                            })
-                            continue  # Skip to next file
-
-                        try:
-                            logger.debug(
-                                f"Ensuring directory exists: {absolute_path.parent}"
-                            )
-                            absolute_path.parent.mkdir(parents=True,
-                                                       exist_ok=True)
-                            operation = "modify" if absolute_path.exists(
-                            ) else "create"
-                            logger.debug(
-                                f"Operation type for {filename}: {operation}")
-
-                            fixed_code = ftfy.fix_text(code_content)
-                            logger.debug(
-                                f"Code content length for {filename} (after ftfy): {len(fixed_code)}"
-                            )
-
-                            # >>> THE WRITE CALL to the HOST path <<<
-                            logger.debug(
-                                f"Executing write_text for: {absolute_path}")
-                            absolute_path.write_text(fixed_code,
-                                                     encoding="utf-8",
-                                                     errors="replace")
-                            logger.info(
-                                f"Successfully executed write_text for: {absolute_path}"
-                            )
-
-                            # File existence and size check
-                            if absolute_path.exists():
-                                logger.info(
-                                    f"CONFIRMED: File exists at {absolute_path} after write."
-                                )
-                                try:
-                                    size = absolute_path.stat().st_size
-                                    logger.info(
-                                        f"CONFIRMED: File size is {size} bytes."
-                                    )
-                                    if size == 0 and len(fixed_code) > 0:
-                                        logger.warning(
-                                            "File size is 0 despite non-empty content being written!"
-                                        )
-                                except Exception as stat_err:
-                                    logger.warning(
-                                        f"Could not get file stats for {absolute_path}: {stat_err}"
-                                    )
-                            else:
-                                logger.error(
-                                    f"FAILED: File DOES NOT exist at {absolute_path} immediately after write_text call!"
-                                )
-
-                            # Convert to Docker path FOR DISPLAY/LOGGING PURPOSES ONLY
-                            docker_path_display = str(
-                                absolute_path
-                            )  # Default to host path if conversion fails
-                            try:
-                                # Ensure convert_to_docker_path can handle the absolute host path
-                                docker_path_display = convert_to_docker_path(
-                                    absolute_path)
-                                logger.debug(
-                                    f"Converted host path {absolute_path} to display path {docker_path_display}"
-                                )
-                            except Exception as conv_err:
-                                logger.warning(
-                                    f"Could not convert host path {absolute_path} to docker path for display: {conv_err}. Using host path for display."
-                                )
-
-                            # Log operation (using absolute_path for logging context)
-                            try:
-                                log_file_operation(
-                                    file_path=
-                                    absolute_path,  # Log using the actual host path written to
-                                    operation=operation,
-                                    content=fixed_code,
-                                    metadata={
-                                        "code_description":
-                                        file_detail.code_description,
-                                    },
-                                )
-                                logger.debug(
-                                    f"Logged file operation for {absolute_path}"
-                                )
-                            except Exception as log_error:
-                                logger.error(
-                                    f"Failed to log code writing for {filename} ({absolute_path}): {log_error}",
-                                    exc_info=True)
-
-                            # Use docker_path_display in the results if that's what the UI expects
-                            write_results.append({
-                                "filename":
-                                str(docker_path_display),
-                                "status":
-                                "success",
-                                "operation":
-                                operation,
-                                # Add the generated code here
-                                "code":
-                                fixed_code,
-                            })
-                            success_count += 1
-                            logger.info(
-                                f"Successfully processed and wrote {filename} to {absolute_path}"
-                            )
-
-                            # Display generated code (use docker_path_display if needed by UI)
-                            if self.display:
-                                language = get_language_from_extension(
-                                    absolute_path.suffix)
-                                # Determine the language for highlighting.
-                                # The 'language' variable from get_language_from_extension might be simple (e.g., 'py')
-                                # or more specific if html_format_code needs it.
-                                # For pygments, simple extensions usually work.
-                                formatted_code = html_format_code(
-                                    fixed_code, language
-                                    or absolute_path.suffix.lstrip('.'))
-                                
-                                # Show console output for successful file creation
-                                console_output = self._format_terminal_output(
-                                    command="write_file",
-                                    files=[filename],
-                                    result=f"File written successfully",
-                                    additional_info=f"Path: {docker_path_display}\nSize: {len(fixed_code)} characters\nLanguage: {language or 'unknown'}"
-                                )
-                                self.display.add_message("assistant", console_output)
-                                
-                                # Also show the formatted code
-                                # self.display.add_message("tool", formatted_code)
-
-                        except Exception as write_error:
-                            logger.error(
-                                f"Caught exception during write operation for {filename} at path {absolute_path}",
-                                exc_info=True)
-                            errors_write.append(
-                                f"Error writing file {filename}: {write_error}"
-                            )
-                            write_results.append({
-                                "filename":
-                                filename,
-                                "status":
-                                "error",
-                                "message":
-                                f"Error writing file {filename}: {write_error}",
-                            })
-
-            # --- Step 4: Format and Return Result ---
+            # Format result
             final_status = "success"
-            if errors_code_gen or errors_write:
-                final_status = "partial_success" if success_count > 0 else "error"
+            if errors_code_gen or errors_write or image_error_count > 0:
+                final_status = "partial_success" if (success_count > 0 or image_success_count > 0) else "error"
 
-            # Calculate image generation results
-            image_success_count = sum(1 for r in image_results if not r.error)
-            image_error_count = len(image_results) - image_success_count
-            total_files = len(file_details) + len(image_files)
+            total_files = len(file_details)
             total_success = success_count + image_success_count
 
-            # Use the resolved host path in the final message
-            if image_files:
-                output_message = f"File generation finished. Status: {final_status}. {total_success}/{total_files} files created successfully to HOST path '{repo_path_obj}'."
-                output_message += f"\n  - Code files: {success_count}/{len(file_details)} successful"
+            output_message = f"Codebase generation finished. Status: {final_status}. {total_success}/{total_files} files processed."
+            if success_count > 0:
+                output_message += f"\n  - Code files: {success_count}/{len(code_files)} successful"
+            if image_success_count > 0:
                 output_message += f"\n  - Image files: {image_success_count}/{len(image_files)} successful"
-            else:
-                output_message = f"Codebase generation finished. Status: {final_status}. {success_count}/{len(file_details)} files written successfully to HOST path '{repo_path_obj}'."
-
+            
             if errors_code_gen:
                 output_message += f"\nCode Generation Errors: {len(errors_code_gen)}"
             if errors_write:
@@ -665,52 +340,24 @@ class WriteCodeTool(BaseAnthropicTool):
             if image_error_count > 0:
                 output_message += f"\nImage Generation Errors: {image_error_count}"
 
-            # Add image results to write_results
-            for i, image_result in enumerate(image_results):
-                if image_result.error:
-                    write_results.append({
-                        "filename":
-                        image_files[i].filename,
-                        "status":
-                        "error",
-                        "message":
-                        f"Error generating image: {image_result.error}",
-                    })
-                else:
-                    write_results.append({
-                        "filename":
-                        image_files[i].filename,
-                        "status":
-                        "success",
-                        "operation":
-                        "image_generation",
-                        "message":
-                        f"Successfully generated image: {image_files[i].filename}",
-                    })
-
             result_data = {
                 "status": final_status,
                 "message": output_message,
                 "files_processed": total_files,
                 "files_successful": total_success,
-                "code_files_processed": len(file_details),
-                "code_files_successful": success_count,
-                "image_files_processed": len(image_files),
-                "image_files_successful": image_success_count,
                 "write_path": str(repo_path_obj),
                 "results": write_results,
                 "errors": errors_code_gen + errors_write,
             }
 
-            # Display final completion message
             if self.display:
                 status_text = "completed successfully" if final_status == "success" else f"completed with status: {final_status}"
-                all_filenames = [f.filename for f in file_details] + [f.filename for f in image_files]
+                all_filenames = [f.filename for f in file_details]
                 console_output = self._format_terminal_output(
                     command="write_codebase",
                     files=all_filenames,
                     result=f"Codebase generation {status_text}",
-                    additional_info=f"Total files: {total_files}\nSuccessful: {total_success}\nCode files: {success_count}/{len(file_details)}\nImage files: {image_success_count}/{len(image_files)}\nWrite path: {repo_path_obj}"
+                    additional_info=f"Total files: {total_files}\nSuccessful: {total_success}\nWrite path: {repo_path_obj}"
                 )
                 self.display.add_message("assistant", console_output)
 
@@ -720,38 +367,201 @@ class WriteCodeTool(BaseAnthropicTool):
                 command=command,
             )
 
-        except ValueError as ve:  # Catch specific config/path errors
+        except ValueError as ve:
             error_message = f"Configuration Error in WriteCodeTool __call__: {str(ve)}"
             logger.critical(error_message, exc_info=True)
-            
             if self.display:
-                console_output = self._format_terminal_output(
-                    command="write_codebase",
-                    error=f"Configuration Error: {str(ve)}"
-                )
-                self.display.add_message("assistant", console_output)
-            
-            return ToolResult(error=error_message,
-                              tool_name=self.name,
-                              command=command)
+                self.display.add_message("assistant", self._format_terminal_output(command="write_codebase", error=str(ve)))
+            return ToolResult(error=error_message, tool_name=self.name, command=command)
         except Exception as e:
             error_message = f"Critical Error in WriteCodeTool __call__: {str(e)}"
-            logger.critical("Critical error during codebase generation",
-                            exc_info=True)
-            
+            logger.critical("Critical error during codebase generation", exc_info=True)
             if self.display:
-                console_output = self._format_terminal_output(
-                    command="write_codebase",
-                    error=f"Critical Error: {str(e)}"
+                self.display.add_message("assistant", self._format_terminal_output(command="write_codebase", error=str(e)))
+            return ToolResult(error=error_message, tool_name=self.name, command=command)
+
+    async def _handle_image_generation(self, image_files: List[FileDetail]) -> tuple[List[dict], int, int]:
+        """Handle generation of image files."""
+        image_results = []
+        success_count = 0
+        error_count = 0
+
+        if self.display:
+            image_filenames = [file.filename for file in image_files]
+            console_output = self._format_terminal_output(
+                command="generate_images",
+                files=image_filenames,
+                result="Detected image files, using PictureGenerationTool",
+                additional_info=f"Files to generate:\n" + "\n".join(f"  - {filename}" for filename in image_filenames)
+            )
+            self.display.add_message("assistant", console_output)
+
+        for image_file in image_files:
+            try:
+                result = await self.picture_tool(
+                    command=PictureCommand.CREATE,
+                    prompt=image_file.code_description,
+                    output_path=image_file.filename,
+                    width=1024,
+                    height=1024
                 )
-                self.display.add_message("assistant", console_output)
-            # Optionally include repo_path_obj if it was set
-            if repo_path_obj:
-                error_message += f"\nAttempted Host Path: {repo_path_obj}"
-            # print(error_message) # Replaced by logger
-            return ToolResult(error=error_message,
-                              tool_name=self.name,
-                              command=command)
+                
+                if result.error:
+                    error_count += 1
+                    image_results.append({
+                        "filename": image_file.filename,
+                        "status": "error",
+                        "message": f"Error generating image: {result.error}",
+                    })
+                else:
+                    success_count += 1
+                    image_results.append({
+                        "filename": image_file.filename,
+                        "status": "success",
+                        "operation": "image_generation",
+                        "message": f"Successfully generated image: {image_file.filename}",
+                    })
+                    if self.display:
+                        self.display.add_message("assistant", self._format_terminal_output(
+                            command="generate_image",
+                            files=[image_file.filename],
+                            result="Image generated successfully"
+                        ))
+
+            except Exception as e:
+                error_count += 1
+                error_msg = f"Error generating image {image_file.filename}: {str(e)}"
+                logger.error(error_msg)
+                image_results.append({
+                    "filename": image_file.filename,
+                    "status": "error",
+                    "message": error_msg,
+                })
+
+        return image_results, success_count, error_count
+
+    async def _handle_code_generation(self, code_files: List[FileDetail], repo_path_obj: Path) -> tuple[List[Any], List[str]]:
+        """Handle generation of code files."""
+        if self.display:
+            code_filenames = [file.filename for file in code_files]
+            console_output = self._format_terminal_output(
+                command="generate_code",
+                files=code_filenames,
+                result="Starting code generation process",
+                additional_info=f"Files to generate:\n" + "\n".join(f"  - {filename}" for filename in code_filenames)
+            )
+            self.display.add_message("assistant", console_output)
+
+        code_gen_tasks = [
+            self._call_llm_to_generate_code(
+                file.code_description,
+                file.external_imports or [],
+                file.internal_imports or [],
+                repo_path_obj / file.filename,
+            ) for file in code_files
+        ]
+        
+        code_results = await asyncio.gather(*code_gen_tasks, return_exceptions=True)
+        
+        errors = []
+        for i, result in enumerate(code_results):
+            if isinstance(result, Exception):
+                errors.append(f"Error generating code for {code_files[i].filename}: {result}")
+        
+        return code_results, errors
+
+    def _write_files_to_disk(self, file_details: List[FileDetail], code_results: List[Any], repo_path_obj: Path) -> tuple[List[dict], List[str], int]:
+        """Write generated code to disk."""
+        write_results = []
+        errors_write = []
+        success_count = 0
+
+        logger.info(f"Starting file writing phase for {len(code_results)} results to HOST path: {repo_path_obj}")
+
+        for i, result in enumerate(code_results):
+            file_detail = file_details[i]
+            filename = file_detail.filename
+            absolute_path = (repo_path_obj / filename).resolve()
+            
+            logger.info(f"Processing result for: {filename} (Host Path: {absolute_path})")
+
+            if isinstance(result, Exception):
+                # Handle generation error - try to write error file
+                write_results.append({
+                    "filename": filename,
+                    "status": "error",
+                    "message": f"Error generating code: {result}"
+                })
+                try:
+                    absolute_path.parent.mkdir(parents=True, exist_ok=True)
+                    error_content = (
+                        f"# Code generation failed for {filename}: {result}\n\n"
+                        "# Code description:\n"
+                        f"{file_detail.code_description}"
+                    )
+                    absolute_path.write_text(error_content, encoding="utf-8", errors="replace")
+                except Exception as write_err:
+                    logger.error(f"Failed to write error file for {filename}: {write_err}", exc_info=True)
+            else:
+                # Success case
+                code_content = result
+                if not code_content or not code_content.strip():
+                    logger.warning(f"Generated code content for {filename} is empty. Skipping write.")
+                    write_results.append({
+                        "filename": filename,
+                        "status": "error",
+                        "message": "Generated code was empty",
+                    })
+                    continue
+
+                try:
+                    absolute_path.parent.mkdir(parents=True, exist_ok=True)
+                    operation = "modify" if absolute_path.exists() else "create"
+                    
+                    fixed_code = ftfy.fix_text(code_content)
+                    absolute_path.write_text(fixed_code, encoding="utf-8", errors="replace")
+                    
+                    # Log operation
+                    log_file_operation(
+                        file_path=absolute_path,
+                        operation=operation,
+                        content=fixed_code,
+                        metadata={"code_description": file_detail.code_description},
+                    )
+
+                    # Display logic
+                    docker_path_display = str(absolute_path)
+                    try:
+                        docker_path_display = convert_to_docker_path(absolute_path)
+                    except Exception:
+                        pass
+
+                    write_results.append({
+                        "filename": str(docker_path_display),
+                        "status": "success",
+                        "operation": operation,
+                        "code": fixed_code,
+                    })
+                    success_count += 1
+                    
+                    if self.display:
+                        self.display.add_message("assistant", self._format_terminal_output(
+                            command="write_file",
+                            files=[filename],
+                            result="File written successfully",
+                            additional_info=f"Path: {docker_path_display}\nSize: {len(fixed_code)} chars"
+                        ))
+
+                except Exception as write_error:
+                    logger.error(f"Error writing file {filename}: {write_error}", exc_info=True)
+                    errors_write.append(f"Error writing file {filename}: {write_error}")
+                    write_results.append({
+                        "filename": filename,
+                        "status": "error",
+                        "message": f"Error writing file: {write_error}",
+                    })
+
+        return write_results, errors_write, success_count
 
     def format_output(self, data: dict) -> str:
         """
@@ -772,28 +582,11 @@ class WriteCodeTool(BaseAnthropicTool):
         # Handle different commands
         command = data.get("command", "")
 
-        if command == "write_code_to_file":
+        if command == "write_codebase":
             if data.get("status") == "success":
-                return f"Successfully wrote code to {data.get('file_path', 'unknown file')}"
+                return f"Successfully wrote codebase to {data.get('write_path', 'unknown path')}"
             else:
-                return f"Failed to write code: {data.get('error', 'Unknown error')}"
-
-        elif command == "write_code_multiple_files":
-            if data.get("status") in ["success", "partial_success"]:
-                return f"Wrote {data.get('files_processed', 0)} files to {data.get('write_path', 'unknown path')}\n{data.get('files_results', '')}"
-            else:
-                return f"Failed to write files: {data.get('errors', 'Unknown error')}"
-
-        elif command == "get_all_current_skeleton":
-            from utils.file_logger import get_all_current_skeleton
-
-            return get_all_current_skeleton()
-
-        elif command == "get_revised_version":
-            if data.get("status") == "success":
-                return f"Successfully revised {data.get('file_path', 'unknown file')}"
-            else:
-                return f"Failed to revise file: {data.get('error', 'Unknown error')}"
+                return f"Failed to write codebase: {data.get('message', 'Unknown error')}"
 
         # Default case
         return str(data)
@@ -931,10 +724,18 @@ class WriteCodeTool(BaseAnthropicTool):
         
         # If no successful generations, fall back to original method
         if not successful_generations:
-            logger.warning(f"All models failed for {file_path.name}, falling back to original single-model approach")
-            return await self._call_llm_to_generate_code_original(
-                code_description, external_imports, internal_imports, file_path
-            )
+            logger.warning(f"All models failed for {file_path.name}, falling back to single model retry")
+            # Fallback to single model generation with retry
+            model_to_use = get_constant("CODE_GEN_MODEL") or MODEL_STRING
+            try:
+                return await self._llm_generate_code_core_with_retry(
+                    prepared_messages=prepared_messages,
+                    file_path=file_path,
+                    model_to_use=model_to_use
+                )
+            except Exception as e:
+                logger.error(f"Fallback generation failed for {file_path.name}: {e}")
+                return f"# Error: Code generation failed for {file_path.name} after all retries."
         
         # If only one successful generation, use it directly
         if len(successful_generations) == 1:
@@ -1102,62 +903,7 @@ class WriteCodeTool(BaseAnthropicTool):
         except Exception:
             return "No codebase context available."
 
-    async def _call_llm_to_generate_code_original(
-        self,
-        code_description: str,
-        external_imports: List[str],
-        internal_imports: List[str],
-        file_path: Path,
-    ) -> str:
-        """Original single-model code generation method (renamed for fallback)."""
-        
-        agent_task = self._get_task_description()
-        log_content = self._get_file_creation_log_content()
 
-        prepared_messages = code_prompt_generate(
-            current_code_base="",
-            code_description=code_description,
-            research_string="",
-            agent_task=agent_task,
-            external_imports=external_imports,
-            internal_imports=internal_imports,
-            target_file=str(file_path.name),
-            file_creation_log_content=log_content,
-        )
-
-        model_to_use = get_constant("CODE_GEN_MODEL") or MODEL_STRING
-        final_code_string = (
-            f"# Error: Code generation failed for {file_path.name} after all retries."
-        )
-
-        try:
-            final_code_string = await self._llm_generate_code_core_with_retry(
-                prepared_messages=prepared_messages,
-                file_path=file_path,
-                model_to_use=model_to_use,
-            )
-        except LLMResponseError as e:
-            logger.error(
-                f"LLMResponseError for {file_path.name} after all retries: {e}",
-                exc_info=True)
-            final_code_string = f"# Error generating code for {file_path.name}: LLMResponseError - {str(e)}"
-        except APIError as e:
-            logger.error(
-                f"OpenAI APIError for {file_path.name} after all retries: {type(e).__name__} - {e}",
-                exc_info=True)
-            final_code_string = (
-                f"# Error generating code for {file_path.name}: API Error - {str(e)}"
-            )
-        except Exception as e:
-            logger.critical(
-                f"Unexpected error during code generation for {file_path.name} after retries: {type(e).__name__} - {e}",
-                exc_info=True)
-            final_code_string = (
-                f"# Error generating code for {file_path.name} (final): {str(e)}"
-            )
-
-        self._log_generated_output(final_code_string, file_path, "Code")
-        return final_code_string
 
     @retry(
         wait=wait_exponential(multiplier=1, min=4, max=60),

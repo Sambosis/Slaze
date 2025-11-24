@@ -1,1 +1,1 @@
-create a graphing calculator python gui app. Use Pygame for the gui.
+create a graphing calculator python gui app. 

@@ -1,0 +1,8 @@
+Traceback (most recent call last):
+  File "C:\Users\Machine81\Slazy\tools\verify_cst_console.py", line 8, in <module>
+    from tools.cst_code_editor import CSTCodeEditorTool, CSTEditorCommand
+  File "C:\Users\Machine81\Slazy\tools\__init__.py", line 16, in <module>
+    from .write_code import WriteCodeTool
+  File "C:\Users\Machine81\Slazy\tools\write_code.py", line 17, in <module>
+    from openai import (
+ImportError: cannot import name 'APIConnectionError' from 'openai' (C:\Users\Machine81\AppData\Local\Programs\Python\Python312\Lib\site-packages\openai\__init__.py)

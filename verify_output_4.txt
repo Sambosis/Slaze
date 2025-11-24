@@ -1,0 +1,14 @@
+Testing LIST command...
+DEBUG: __call__ called with command=list_symbols
+DEBUG: repo_dir=C:\Users\Machine81\Slazy\repo
+
+Testing SHOW command...
+DEBUG: __call__ called with command=show_symbol
+DEBUG: repo_dir=C:\Users\Machine81\Slazy\repo
+
+Testing REPLACE_BODY command...
+DEBUG: __call__ called with command=replace_body
+DEBUG: repo_dir=C:\Users\Machine81\Slazy\repo
+
+--- Verification ---
+FAILURE: Expected at least 3 messages, got 0

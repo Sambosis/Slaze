@@ -338,7 +338,7 @@ class TestWriteCodeTool:
     def test_extract_code_block(self, write_code_tool: WriteCodeTool):
         """Test the extract_code_block method."""
         # Test with markdown code block
-        markdown_text = """
+        markdown_text = \"\"\"
 Here's the code:
 
 ```python
@@ -347,7 +347,7 @@ def hello():
 ```
 
 Some additional text.
-"""
+\"\"\"
         
         code, language = write_code_tool.extract_code_block(markdown_text)
         assert "def hello():" in code
@@ -426,7 +426,7 @@ Some additional text.
                 mock_select_best.return_value = "# Best selected code\nprint('selected')"
                 
                 write_code_tool._generate_code_with_single_model = mock_generate_single
-                write_code_tool._select_best_code_version = mock_select_best
+                write_code_tool._synthesize_best_code_version = mock_select_best
                 
                 # Test the multi-model generation
                 result = await write_code_tool._generate_code_with_multiple_models(
@@ -460,12 +460,12 @@ Some additional text.
                 Exception("Model 2 failed")
             ]
             
-            # Mock the original single-model method
-            mock_original = AsyncMock()
-            mock_original.return_value = "# Fallback code\nprint('fallback')"
+            # Mock the core generation method
+            mock_core_retry = AsyncMock()
+            mock_core_retry.return_value = "# Fallback code\nprint('fallback')"
             
             write_code_tool._generate_code_with_single_model = mock_generate_single
-            write_code_tool._call_llm_to_generate_code_original = mock_original
+            write_code_tool._llm_generate_code_core_with_retry = mock_core_retry
             
             # Test multi-model generation with all failures
             result = await write_code_tool._generate_code_with_multiple_models(
@@ -476,7 +476,7 @@ Some additional text.
             )
             
             # Verify fallback was called
-            mock_original.assert_called_once()
+            mock_core_retry.assert_called_once()
             assert result == "# Fallback code\nprint('fallback')"
 
     @pytest.mark.asyncio
