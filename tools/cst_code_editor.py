@@ -581,6 +581,7 @@ class CSTEditorCommand(str, Enum):
     WRAP_BODY = "wrap_body"
     RENAME = "rename"
     REFACTOR = "refactor"
+    CREATE = "create"
 
 class CSTCodeEditorTool(BaseAnthropicTool):
     """
@@ -591,7 +592,7 @@ class CSTCodeEditorTool(BaseAnthropicTool):
     api_type: Literal["custom"] = "custom"
     description: str = (
         "Edit Python source files using LibCST for format-preserving AST modifications. "
-        "Commands: list_symbols, show_symbol, replace_whole, replace_body, insert_after, insert_before, delete_symbol, add_import, remove_import, add_decorator, remove_decorator, wrap_body, rename. "
+        "Commands: list_symbols, show_symbol, replace_whole, replace_body, insert_after, insert_before, delete_symbol, add_import, remove_import, add_decorator, remove_decorator, wrap_body, rename, refactor, create. "
         "Superior to ast_code_editor for complex edits."
     )
 
@@ -626,7 +627,7 @@ class CSTCodeEditorTool(BaseAnthropicTool):
                     "Edit a Python source file using LibCST in a format-preserving way. "
                     "Use this tool for small, surgical edits (renaming a symbol, replacing a body, "
                     "adding imports or decorators), not for rewriting whole files from scratch. "
-                    "For a new file, create it by other means first, then use this tool to refine it."
+                    "For a new file, use the 'create' command to provide its initial content."
                 ),
                 "parameters": {
                     "type": "object",
@@ -714,6 +715,10 @@ class CSTCodeEditorTool(BaseAnthropicTool):
                                 "    Rename a symbol AND all its references throughout the file.\n"
                                 "    Required: path, symbol, text\n"
                                 "    text must be the new identifier name (no dots).\n\n"
+                                "- create:\n"
+                                "    Create a new Python file with the provided text as its complete content.\n"
+                                "    Required: path, text\n"
+                                "    text must be the complete Python code for the new file.\n\n"
                                 "SYMBOL FORMAT EXAMPLES:\n"
                                 "- 'my_function' for a top-level function\n"
                                 "- 'MyClass' for a class\n"
@@ -728,7 +733,7 @@ class CSTCodeEditorTool(BaseAnthropicTool):
                                 "REQUIRED for these commands: show_symbol, replace_whole, replace_body, "
                                 "insert_before, insert_after, delete_symbol, add_decorator, remove_decorator, "
                                 "wrap_body, rename, refactor.\n\n"
-                                "IGNORED for these commands: list_symbols, add_import, remove_import.\n\n"
+                                "IGNORED for these commands: list_symbols, add_import, remove_import, create.\n\n"
                                 "FORMAT EXAMPLES:\n"
                                 "- 'my_function' for a top-level function\n"
                                 "- 'MyClass' for a class\n"
@@ -755,7 +760,8 @@ class CSTCodeEditorTool(BaseAnthropicTool):
                                 "  original body should be spliced in (e.g. a try/except block with 'pass' in "
                                 "  the try body).\n"
                                 "- rename: the new short name for the symbol (identifier only, no dots).\n"
-                                "- refactor: the new short name for the symbol (identifier only, no dots).\n\n"
+                                "- refactor: the new short name for the symbol (identifier only, no dots).\n"
+                                "- create: the complete Python code for the new file.\n\n"
                                 "Commands that do NOT use text and will ignore it if provided: "
                                 "list_symbols, show_symbol, delete_symbol."
                             ),
@@ -818,6 +824,11 @@ class CSTCodeEditorTool(BaseAnthropicTool):
         if not LIBCST_AVAILABLE:
             return ToolResult(error="LibCST is not installed. Please install it to use this tool.", tool_name=self.name)
 
+        try:
+            cmd = CSTEditorCommand(command)
+        except ValueError:
+             return ToolResult(error=f"Unknown command: {command}", tool_name=self.name)
+
         repo_dir = get_constant("REPO_DIR")
         if not repo_dir:
             return ToolResult(error="REPO_DIR not set", tool_name=self.name)
@@ -825,6 +836,29 @@ class CSTCodeEditorTool(BaseAnthropicTool):
         abs_path = (Path(repo_dir) / path).resolve()
         if not _within_repo(Path(repo_dir), abs_path):
             return ToolResult(error="Path escapes REPO_DIR", tool_name=self.name)
+
+        if cmd == CSTEditorCommand.CREATE:
+            if abs_path.exists():
+                return ToolResult(error="File already exists. Use other commands to edit it.", tool_name=self.name)
+            if not text:
+                return ToolResult(error="Missing text for create command.", tool_name=self.name)
+            
+            try:
+                # verify it's valid python
+                cst.parse_module(text)
+            except Exception as e:
+                return ToolResult(error=f"Failed to parse provided code: {e}", tool_name=self.name)
+                
+            if dry_run:
+                diff = _diff("", text)
+                self._emit_console(str(repo_dir), f"{self.name} {command} (dry-run)", detail=diff, path=path)
+                return ToolResult(output=diff, message=self.format_output({"command": command, "status": "success", "diff": diff}), tool_name=self.name)
+            
+            abs_path.parent.mkdir(parents=True, exist_ok=True)
+            abs_path.write_text(text, encoding="utf-8")
+            self._emit_console(str(repo_dir), f"{self.name} {command}", detail="(File created)", path=path)
+            return ToolResult(output="OK", message=self.format_output({"command": command, "status": "success"}), tool_name=self.name)
+
         if not abs_path.exists():
             return ToolResult(error="File not found", tool_name=self.name)
 
@@ -833,11 +867,6 @@ class CSTCodeEditorTool(BaseAnthropicTool):
             tree = cst.parse_module(src)
         except Exception as e:
             return ToolResult(error=f"Failed to parse file: {e}", tool_name=self.name)
-
-        try:
-            cmd = CSTEditorCommand(command)
-        except ValueError:
-             return ToolResult(error=f"Unknown command: {command}", tool_name=self.name)
 
         # Dispatch
         if cmd == CSTEditorCommand.LIST:

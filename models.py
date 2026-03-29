@@ -10,7 +10,6 @@ openaio3pro = "openai/o3-pro"
 googlepro = "google/gemini-2.5-pro-preview"
 googleflash = "google/gemini-2.5-flash-preview-09-2025"
 googleflashlite = "google/gemini-2.5-flash-lite-preview-09-2025"
-# googleflashlite duplicate removed
 grok4 = "x-ai/grok-4"
 grok4fast = "x-ai/grok-4-fast" # Kept this one, removed the duplicate re-definition at the end
 qwen3 = "qwen/qwen3-235b-a22b-07-25"
@@ -36,17 +35,19 @@ codex51 = "openai/gpt-5.1-codex"
 sherthink = "openrouter/sherlock-think-alpha"
 sherdash = "openrouter/sherlock-dash-alpha"
 gemini3pro = "google/gemini-3-pro-preview"
-
-# Re-definition from original file (line 109 was grok4fast = "x-ai/grok-4.1-fast")
-# The original file had grok4fast defined twice. 
-# Line 84: grok4fast = "x-ai/grok-4-fast"
-# Line 109: grok4fast = "x-ai/grok-4.1-fast"
-# The second one overwrites the first. I will use the second one as it was effectively the active one.
+devstral2 = "mistralai/devstral-2512:free"
 grok4fast = "x-ai/grok-4.1-fast"
+deep31nex = "nex-agi/deepseek-v3.1-nex-n1:free"
+olma3 = "allenai/olmo-3-32b-think:free"
+deeptng = "tngtech/deepseek-r1t2-chimera:free"
+kat1 = "kwaipilot/kat-coder-pro:free"
+glm45air = "z-ai/glm-4.5-air:free"
+qwen3coder = "qwen/qwen3-coder:free"
+alpha = "openrouter/hunter-alpha"
 
-ALL_MODELS = grok4fast    # Default model for all tasks
+ALL_MODELS = alpha    # Default model for all tasks
 
 SUMMARY_MODEL = ALL_MODELS  #   QModel for summaries
 MAIN_MODEL = ALL_MODELS  # Primary model for main agent operations
 CODE_MODEL = ALL_MODELS  # Model for code generation tasks
-CODE_LIST = [grok4fast]  # List of models suitable for code generation
+CODE_LIST = [alpha]  # List of models suitable for code generation

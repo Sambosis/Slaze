@@ -214,6 +214,7 @@ class Agent:
         self.client = AsyncOpenAI(
             api_key=os.getenv("OPENROUTER_API_KEY") or os.getenv("OPENAI_API_KEY"),
             base_url=os.getenv("OPENAI_BASE_URL", "https://openrouter.ai/api/v1"),
+            max_retries=5,
         )
 
         self.display = display

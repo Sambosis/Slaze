@@ -1,0 +1,1 @@
+write a prototype python app that opens chrome, navigates to google.com hit's control u to view the source, copys it to the clipboard, then opens notepad and pastes it into a new file and saves it as googlesource.html 

@@ -1,0 +1,19 @@
+[project]
+name = "tk-drum-machine"
+version = "0.1.0"
+description = "A desktop Python drum machine with a Tkinter UI, real-time sequencing, swing, tempo, volume controls, and preset management."
+authors = [{ name = "Your Name", email = "you@example.com" }]
+requires-python = ">=3.10"
+dependencies = [
+    "pygame>=2.6",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.uv]
+managed = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["src"]

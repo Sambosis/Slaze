@@ -1,0 +1,1 @@
+Using pygame, create a war game that learns using rainbow dqn.  Periodically render a game during training.

@@ -300,7 +300,7 @@ class ProjectSetupTool(BaseAnthropicTool):
                     if isinstance(package_group, str):
                         # Further split if a single string in the list contains multiple packages
                         # e.g. "packageA packageB" or "['packageA', 'packageB']"
-                        if '[' in package_group and ']' in package_group:  # Looks like a stringified list
+                        if package_group.strip().startswith('[') and package_group.strip().endswith(']'):  # Looks like a stringified list
                             try:
                                 # This is a basic attempt, for more complex strings, json.loads might be better
                                 # but pip install can often handle multiple package names in one command.
@@ -391,7 +391,7 @@ class ProjectSetupTool(BaseAnthropicTool):
             for i, package_item in enumerate(packages, 1):
                 pkgs_to_install_this_round = []
                 if isinstance(package_item, str):
-                    if '[' in package_item and ']' in package_item:
+                    if package_item.strip().startswith('[') and package_item.strip().endswith(']'):
                         try:
                             cleaned_str = package_item.strip("[]'\" ")
                             pkgs_to_install_this_round.extend([

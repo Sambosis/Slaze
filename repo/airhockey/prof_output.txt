@@ -1,0 +1,40 @@
+Wed Mar 18 18:17:42 2026    stats.prof
+
+         88010282 function calls (82902493 primitive calls) in 170.388 seconds
+
+   Ordered by: internal time
+   List reduced from 9597 to 30 due to restriction <30>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+    43968   20.019    0.000   20.035    0.000 {method 'run_backward' of 'torch._C._EngineBase' objects}
+   372447   13.935    0.000   13.937    0.000 {built-in method torch._C._nn.linear}
+   263808    8.176    0.000    8.179    0.000 {method 'lerp_' of 'torch._C.TensorBase' objects}
+    43968    7.847    0.000   30.494    0.001 adam.py:336(_single_tensor_adam)
+    87997    5.343    0.000    6.333    0.000 environment.py:134(step)
+    45755    3.388    0.000    3.389    0.000 {built-in method nt._path_exists}
+   175994    3.049    0.000  136.510    0.001 agent.py:190(learn)
+   248298    3.027    0.000    3.030    0.000 {built-in method torch.relu}
+   263808    2.963    0.000    2.963    0.000 {method 'sqrt' of 'torch._C.TensorBase' objects}
+   263808    2.803    0.000    2.803    0.000 {method 'addcdiv_' of 'torch._C.TensorBase' objects}
+   263808    2.495    0.000    2.495    0.000 {method 'mul_' of 'torch._C.TensorBase' objects}
+    43968    2.200    0.000   13.501    0.000 clip_grad.py:12(clip_grad_norm_)
+   263808    2.191    0.000    2.191    0.000 {method 'add_' of 'torch._C.TensorBase' objects}
+   263808    2.146    0.000    2.146    0.000 {method 'addcmul_' of 'torch._C.TensorBase' objects}
+913011/168117    2.125    0.000   33.941    0.000 module.py:1513(_call_impl)
+    43968    1.709    0.000    3.528    0.000 agent.py:85(sample)
+    43968    1.681    0.000    1.694    0.000 {built-in method torch._foreach_norm}
+   187545    1.675    0.000    5.671    0.000 markup.py:106(render)
+    87936    1.557    0.000    1.568    0.000 {built-in method torch._ops.profiler._record_function_enter_new}
+    43968    1.514    0.000    1.514    0.000 {built-in method torch._C._nn.smooth_l1_loss}
+   124149    1.227    0.000   25.490    0.000 container.py:215(forward)
+   175994    1.164    0.000    7.978    0.000 agent.py:155(select_action)
+    43968    1.157    0.000    1.782    0.000 adam.py:80(_init_group)
+321552/68112    1.143    0.000   13.599    0.000 measure.py:78(get)
+   913011    1.127    0.000    1.127    0.000 {built-in method torch._C._get_tracing_state}
+913011/168117    1.114    0.000   35.142    0.000 module.py:1507(_wrapped_call_impl)
+5073389/5072973    1.078    0.000    1.314    0.000 {built-in method builtins.isinstance}
+  1948365    1.072    0.000    1.391    0.000 cells.py:51(cell_len)
+5468271/5465045    1.068    0.000    1.175    0.000 {built-in method builtins.len}
+3270080/3270064    1.031    0.000    2.051    0.000 {built-in method builtins.max}
+
+

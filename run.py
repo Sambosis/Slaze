@@ -93,6 +93,26 @@ def web(port, manual_tools):
     except Exception:
         host_ip = "localhost"
 
+    def find_available_port(start_port, max_attempts=10):
+        """Finds the first available port starting from start_port."""
+        for port_num in range(start_port, start_port + max_attempts):
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                try:
+                    s.bind(("0.0.0.0", port_num))
+                    return port_num
+                except OSError:
+                    continue
+        return None
+
+    actual_port = find_available_port(port)
+    if actual_port is None:
+        print(f"Error: Could not find an available port starting from {port} (checked 10 ports).")
+        return
+
+    if actual_port != port:
+        print(f"Message: Port {port} is in use. Starting on available port {actual_port} instead.")
+        port = actual_port
+
     url = f"http://{host_ip}:{port}"
     
     # Run the server in a separate thread

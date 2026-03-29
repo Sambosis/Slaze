@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wind Tunnel Simulator</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <aside class="sidebar">
+            <h2>Car Properties</h2>
+            <div class="controls">
+                <label>
+                    Length:
+                    <input type="range" id="length" min="100" max="400" value="200" step="5">
+                    <span id="length_val">200</span> px
+                    <input type="number" id="length_num" min="100" max="400" value="200" step="5">
+                </label>
+                <label>
+                    Height:
+                    <input type="range" id="height" min="40" max="120" value="80" step="1">
+                    <span id="height_val">80</span> px
+                    <input type="number" id="height_num" min="40" max="120" value="80" step="1">
+                </label>
+                <label>
+                    Nose Angle:
+                    <input type="range" id="noseAngle" min="5" max="45" value="20" step="1">
+                    <span id="noseAngle_val">20</span>&deg;
+                    <input type="number" id="noseAngle_num" min="5" max="45" value="20" step="1">
+                </label>
+                <label>
+                    Rear Angle:
+                    <input type="range" id="rearAngle" min="0" max="30" value="15" step="1">
+                    <span id="rearAngle_val">15</span>&deg;
+                    <input type="number" id="rearAngle_num" min="0" max="30" value="15" step="1">
+                </label>
+            </div>
+
+            <h2>Wind Properties</h2>
+            <div class="controls">
+                <label>
+                    Wind Speed:
+                    <input type="range" id="windSpeed" min="0.5" max="5" value="2" step="0.1">
+                    <span id="windSpeed_val">2</span> px/frame
+                    <input type="number" id="windSpeed_num" min="0.5" max="5" value="2" step="0.1">
+                </label>
+                <label>
+                    Particle Count:
+                    <input type="range" id="particleCount" min="50" max="1000" value="300" step="10">
+                    <span id="particleCount_val">300</span>
+                    <input type="number" id="particleCount_num" min="50" max="1000" value="300" step="10">
+                </label>
+                <label>
+                    Turbulence:
+                    <input type="range" id="turbulence" min="0" max="1" value="0.1" step="0.05">
+                    <span id="turbulence_val">0.1</span>
+                    <input type="number" id="turbulence_num" min="0" max="1" value="0.1" step="0.05">
+                </label>
+            </div>
+
+            <h2>Controls</h2>
+            <div class="controls">
+                <label>
+                    <input type="checkbox" id="showStreamlines" checked>
+                    Show Streamlines
+                </label>
+                <label>
+                    <input type="checkbox" id="showMetrics" checked>
+                    Show Metrics
+                </label>
+                <button id="pauseBtn">Pause</button>
+                <button id="resetBtn">Reset</button>
+            </div>
+        </aside>
+        <main class="canvas-container">
+            <canvas id="canvas" width="1200" height="600"></canvas>
+            <div id="metrics"></div>
+        </main>
+    </div>
+    <script src="app.js"></script>
+</body>
+</html>

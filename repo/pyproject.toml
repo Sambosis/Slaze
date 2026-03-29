@@ -1,0 +1,13 @@
+[project]
+name = "repo"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "customtkinter>=5.2.2",
+    "matplotlib>=3.10.0",
+    "networkx>=3.4.2",
+    "pygments>=2.19.1",
+    "rapidfuzz>=3.14.3",
+]
