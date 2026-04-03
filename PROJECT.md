@@ -64,6 +64,6 @@ _Conventions will be learned as the AI works with this project._
 _Not yet detected._
 
 ## Recent Changes
-- Added a full README with setup, run commands, CLI examples, config defaults, and artifact notes.
-- Updated `main.py` argparse to use `ArgumentDefaultsHelpFormatter` and removed hardcoded `(default: ...)` text from help strings.
-- Fixed `visualizer.py` example block to correctly unpack `init_pygame` return values and call `draw_game` with valid arguments (`clock` instead of invalid `fps`).
+- Added optional per-visualized-episode MP4 recording via `recorder.py`, `train.py`, and `main.py` flags (`--record`, `--record_dir`, `--record_fps`, `--record_frame_skip`).
+- Added optional Git sync after each completed visualization via `--push_videos`, `--git_remote`, and `--git_branch`; `train.py` now commits/pushes each timestamped episode video without crashing training on Git failures.
+- `pyproject.toml` now includes `imageio` and README documents recording plus remote GitHub access workflow.

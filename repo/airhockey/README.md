@@ -30,6 +30,7 @@ This project trains two independent agents in the same environment:
   - `pygame`
   - `rich`
   - `torch`
+- `imageio`
 
 ## Setup
 
@@ -48,7 +49,7 @@ python -m venv .venv
 # macOS/Linux:
 # source .venv/bin/activate
 
-pip install -U numpy pygame rich torch
+pip install -U numpy pygame rich torch imageio
 ```
 
 ## Run
@@ -109,6 +110,58 @@ Training produces:
 - Checkpoints like `agent1_episode_1000.pth`, `agent2_episode_1000.pth`
 - Final models: `agent1_final.pth`, `agent2_final.pth`
 - CSV logs in `logs/` (timestamped)
+- Optional recorded MP4 videos in `videos/` by default
+
+## Recording Visualized Episodes
+
+You can record each visualized episode to a timestamped MP4 file.
+
+Record every visualized episode:
+
+```bash
+python main.py --visualize_every 1 --record
+```
+
+Record and write videos into a custom directory:
+
+```bash
+python main.py --visualize_every 1 --record --record_dir videos
+```
+
+Record with a custom frame skip to reduce file size:
+
+```bash
+python main.py --visualize_every 1 --record --record_frame_skip 1
+```
+
+Each saved file uses a timestamped per-episode name like:
+
+```text
+videos/episode_000100_YYYYmmdd_HHMMSS.mp4
+```
+
+## Remote Access via GitHub
+
+If you want each completed visualization to be accessible remotely through GitHub while training is running elsewhere, enable video pushing:
+
+```bash
+python main.py --visualize_every 1 --record --push_videos
+```
+
+You can also specify the Git remote or branch:
+
+```bash
+python main.py --visualize_every 100 --record --record_dir videos --push_videos --git_remote origin --git_branch main
+```
+
+With `--push_videos` enabled, the training loop will:
+
+- create one timestamped MP4 per visualized episode,
+- close the file when that visualization ends,
+- commit that MP4,
+- and push it to the configured Git remote.
+
+This is convenient for remote review, but MP4 files are binary artifacts and can grow the repository quickly over time.
 
 ## Notes
 

@@ -10,12 +10,12 @@ from train import train
 
 def main() -> None:
     """
-Main entry point for the air hockey training script.
-Parses command line arguments, sets hyperparameters, and starts training.
-"""
+    Main entry point for the air hockey training script.
+    Parses command line arguments, sets hyperparameters, and starts training.
+    """
     import json
     import os
-    
+
     # Load configuration from config.json if it exists
     config = {}
     if os.path.exists("config.json"):
@@ -25,142 +25,187 @@ Parses command line arguments, sets hyperparameters, and starts training.
             print("Loaded configuration from config.json")
         except Exception as e:
             print(f"Warning: Could not load config.json: {e}")
-    
+
     # Merge config with defaults
     training_config = config.get("training", {})
     dqn_config = config.get("dqn", {})
     env_config = config.get("environment", {})
     reward_config = config.get("rewards", {})
-    
+
     parser = argparse.ArgumentParser(
         description="Train two DQN agents to play air hockey against each other.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    
+
     # Training parameters
     parser.add_argument(
-        "--num_episodes", 
-        type=int, 
+        "--num_episodes",
+        type=int,
         default=training_config.get("num_episodes", 10000),
-        help="Total number of training episodes"
+        help="Total number of training episodes",
     )
     parser.add_argument(
-        "--visualize_every", 
-        type=int, 
+        "--visualize_every",
+        type=int,
         nargs="?",
         const=training_config.get("visualize_every", 250),
         default=training_config.get("visualize_every", 250),
-        help="Visualize every nth episode using Pygame"
+        help="Visualize every nth episode using Pygame",
     )
-    
+
     # DQN hyperparameters
     parser.add_argument(
-        "--learning_rate", 
-        type=float, 
+        "--learning_rate",
+        type=float,
         default=dqn_config.get("learning_rate", 0.001),
-        help="Learning rate for DQN agents"
+        help="Learning rate for DQN agents",
     )
     parser.add_argument(
-        "--gamma", 
-        type=float, 
+        "--gamma",
+        type=float,
         default=dqn_config.get("gamma", 0.99),
-        help="Discount factor for future rewards"
+        help="Discount factor for future rewards",
     )
     parser.add_argument(
-        "--epsilon_start", 
-        type=float, 
+        "--epsilon_start",
+        type=float,
         default=dqn_config.get("epsilon_start", 1.0),
-        help="Starting epsilon for exploration"
+        help="Starting epsilon for exploration",
     )
     parser.add_argument(
-        "--epsilon_end", 
-        type=float, 
+        "--epsilon_end",
+        type=float,
         default=dqn_config.get("epsilon_end", 0.01),
-        help="Minimum epsilon value"
+        help="Minimum epsilon value",
     )
     parser.add_argument(
-        "--epsilon_decay", 
-        type=float, 
+        "--epsilon_decay",
+        type=float,
         default=dqn_config.get("epsilon_decay", 0.995),
-        help="Epsilon decay rate per episode"
+        help="Epsilon decay rate per episode",
     )
     parser.add_argument(
-        "--batch_size", 
-        type=int, 
+        "--batch_size",
+        type=int,
         default=dqn_config.get("batch_size", 64),
-        help="Batch size for training"
+        help="Batch size for training",
     )
     parser.add_argument(
-        "--memory_size", 
-        type=int, 
+        "--memory_size",
+        type=int,
         default=dqn_config.get("memory_size", 10000),
-        help="Replay memory buffer size"
+        help="Replay memory buffer size",
     )
     parser.add_argument(
-        "--target_update_freq", 
-        type=int, 
+        "--target_update_freq",
+        type=int,
         default=dqn_config.get("target_update_freq", 16),
-        help="Update target network every n episodes"
+        help="Update target network every n episodes",
     )
-    
-    # Environment parameters
+
+    # Environment / training cadence parameters
     parser.add_argument(
-        "--max_steps", 
-        type=int, 
+        "--max_steps",
+        type=int,
         default=training_config.get("max_steps", 1000),
-        help="Maximum steps per episode before auto-reset"
+        help="Maximum steps per episode before auto-reset",
     )
-    
     parser.add_argument(
-        "--learn_every", 
-        type=int, 
+        "--learn_every",
+        type=int,
         default=training_config.get("learn_every", 24),
-        help="Number of steps between agent learning updates"
+        help="Number of steps between agent learning updates",
     )
-    
+
     # Soft update / LR scheduler parameters
     parser.add_argument(
         "--tau",
         type=float,
         default=dqn_config.get("tau", 0.005),
-        help="Polyak averaging factor for soft target updates"
+        help="Polyak averaging factor for soft target updates",
     )
     parser.add_argument(
-        "--lr_step_size",
-        type=int,
-        default=dqn_config.get("lr_step_size", 2000),
-        help="Decay LR every N episodes"
-    )
-    parser.add_argument(
-        "--lr_decay",
+        "--lr_min",
         type=float,
-        default=dqn_config.get("lr_decay", 0.5),
-        help="Multiplicative LR decay factor"
+        default=dqn_config.get("lr_min", 1e-6),
+        help="Minimum learning rate for cosine annealing",
     )
-    
+    parser.add_argument(
+        "--lr_T0",
+        type=int,
+        default=dqn_config.get("lr_T0", 1000),
+        help="Episodes in first cosine annealing cycle",
+    )
+    parser.add_argument(
+        "--lr_T_mult",
+        type=int,
+        default=dqn_config.get("lr_T_mult", 2),
+        help="Cycle length multiplier after each warm restart",
+    )
+
     # Resume training from checkpoint
     parser.add_argument(
-        "--resume", 
+        "--resume",
         action="store_true",
-        help="Resume training from saved checkpoint files (agent1_final.pth, agent2_final.pth)"
+        help="Resume training from saved checkpoint files (agent1_final.pth, agent2_final.pth)",
     )
-    
     parser.add_argument(
         "--override_lr",
         type=float,
         default=None,
-        help="Override the learning rate when resuming training from a checkpoint"
+        help="Override the learning rate when resuming training from a checkpoint",
     )
-    
     parser.add_argument(
         "--override_epsilon",
         type=float,
         default=None,
-        help="Override the starting epsilon when resuming training from a checkpoint"
+        help="Override the starting epsilon when resuming training from a checkpoint",
     )
-    
+
+    # Recording / Git sync parameters
+    parser.add_argument(
+        "--record",
+        action="store_true",
+        help="Record each visualized episode to a timestamped MP4",
+    )
+    parser.add_argument(
+        "--record_dir",
+        type=str,
+        default="videos",
+        help="Directory for recorded visualization videos",
+    )
+    parser.add_argument(
+        "--record_fps",
+        type=int,
+        default=None,
+        help="Override recording FPS",
+    )
+    parser.add_argument(
+        "--record_frame_skip",
+        type=int,
+        default=0,
+        help="Save every N+1th frame while recording",
+    )
+    parser.add_argument(
+        "--push_videos",
+        action="store_true",
+        help="Commit and push each completed visualization video to Git",
+    )
+    parser.add_argument(
+        "--git_remote",
+        type=str,
+        default="origin",
+        help="Git remote name used when pushing recorded videos",
+    )
+    parser.add_argument(
+        "--git_branch",
+        type=str,
+        default=None,
+        help="Optional Git branch name used when pushing recorded videos",
+    )
+
     args = parser.parse_args()
-    
+
     # Print training configuration
     print("=" * 50)
     print("Air Hockey RL Training Configuration:")
@@ -176,15 +221,25 @@ Parses command line arguments, sets hyperparameters, and starts training.
     print(f"Max Steps per Episode: {args.max_steps}")
     print(f"Learn Every N Steps: {args.learn_every}")
     print(f"Tau (soft update): {args.tau}")
-    print(f"LR Step Size: {args.lr_step_size}")
-    print(f"LR Decay: {args.lr_decay}")
+    print(f"LR Min (eta_min): {args.lr_min}")
+    print(f"LR T0 (first cycle): {args.lr_T0}")
+    print(f"LR T_mult: {args.lr_T_mult}")
     print(f"Resume Training: {args.resume}")
     if args.override_lr is not None:
         print(f"Override LR: {args.override_lr}")
     if args.override_epsilon is not None:
         print(f"Override Epsilon: {args.override_epsilon}")
+    if args.record:
+        print(f"Recording Visualizations: {args.record}")
+        print(f"Record Directory: {args.record_dir}")
+        print(f"Record FPS Override: {args.record_fps}")
+        print(f"Record Frame Skip: {args.record_frame_skip}")
+        print(f"Push Videos to Git: {args.push_videos}")
+        if args.push_videos:
+            print(f"Git Remote: {args.git_remote}")
+            print(f"Git Branch: {args.git_branch}")
     print("=" * 50)
-    
+
     # Start training
     try:
         train(
@@ -204,10 +259,18 @@ Parses command line arguments, sets hyperparameters, and starts training.
             env_config=env_config,
             reward_config=reward_config,
             tau=args.tau,
-            lr_step_size=args.lr_step_size,
-            lr_decay=args.lr_decay,
+            lr_min=args.lr_min,
+            lr_T0=args.lr_T0,
+            lr_T_mult=args.lr_T_mult,
             override_lr=args.override_lr,
-            override_epsilon=args.override_epsilon
+            override_epsilon=args.override_epsilon,
+            record=args.record,
+            record_dir=args.record_dir,
+            record_fps=args.record_fps,
+            record_frame_skip=args.record_frame_skip,
+            push_videos=args.push_videos,
+            git_remote=args.git_remote,
+            git_branch=args.git_branch,
         )
     except KeyboardInterrupt:
         print("\nTraining interrupted by user.")

@@ -117,7 +117,8 @@ class DQNAgent:
                  epsilon_decay: float = 0.995, memory_size: int = 10000,
                  batch_size: int = 64, target_update_freq: int = 100,
                  learn_every: int = 4, tau: float = 0.005,
-                 lr_step_size: int = 2000, lr_decay: float = 0.5):
+                 lr_min: float = 1e-6, lr_T0: int = 1000,
+                 lr_T_mult: int = 2):
         """
         Initialize the Double DQN agent.
         
@@ -134,8 +135,9 @@ class DQNAgent:
             target_update_freq: (unused, kept for API compat) 
             learn_every: Only run a gradient update every N calls to learn()
             tau: Soft update interpolation factor for Polyak averaging
-            lr_step_size: Decay learning rate every N scheduler steps
-            lr_decay: Multiplicative LR decay factor
+            lr_min: Minimum learning rate (eta_min for cosine annealing)
+            lr_T0: Number of episodes in the first cosine annealing cycle
+            lr_T_mult: Multiplier for cycle length after each restart
         """
         self.state_dim = state_dim
         self.action_dim = action_dim
@@ -161,11 +163,13 @@ class DQNAgent:
         self.optimizer = optim.Adam(self.model.parameters(), lr=learning_rate)
         self.criterion = nn.SmoothL1Loss()
         
-        # Learning rate scheduler — decays LR over training for fine-tuning
-        self.lr_step_size = lr_step_size
-        self.lr_decay = lr_decay
-        self.scheduler = optim.lr_scheduler.StepLR(
-            self.optimizer, step_size=lr_step_size, gamma=lr_decay
+        # Learning rate scheduler — cosine annealing with warm restarts
+        # Smoothly decays LR then restarts, helping escape local optima in self-play
+        self.lr_min = lr_min
+        self.lr_T0 = lr_T0
+        self.lr_T_mult = lr_T_mult
+        self.scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(
+            self.optimizer, T_0=lr_T0, T_mult=lr_T_mult, eta_min=lr_min
         )
         
         # Training step counter
@@ -326,8 +330,9 @@ class DQNAgent:
         
         if override_lr is not None:
             self.optimizer = optim.Adam(self.model.parameters(), lr=override_lr)
-            self.scheduler = optim.lr_scheduler.StepLR(
-                self.optimizer, step_size=self.lr_step_size, gamma=self.lr_decay
+            self.scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(
+                self.optimizer, T_0=self.lr_T0, T_mult=self.lr_T_mult,
+                eta_min=self.lr_min
             )
         else:
             self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
