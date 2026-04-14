@@ -127,6 +127,174 @@ class WebUI:
             options = [file.name for file in prompt_files]
             return render_template("select_prompt_modern.html", options=options)
 
+        @self.app.route("/state-verticals")
+        def state_verticals_route():
+            logging.info("Serving State vertical guide page")
+            verticals = [
+                {
+                    "key": "hotels",
+                    "name": "Hotels",
+                    "tagline": "Protect the guest experience and reduce repeat complaints.",
+                    "common_problems": [
+                        "Lobby and restroom odors",
+                        "Drain issues",
+                        "Housekeeping consistency",
+                        "Warewash reliability",
+                        "Guest-facing cleanliness",
+                        "Back-of-house sanitation",
+                    ],
+                    "best_fit_categories": [
+                        "Odor control",
+                        "Ambient scenting / air care",
+                        "Drain maintenance",
+                        "Warewash / dish service",
+                        "Housekeeping / facility cleaning support",
+                        "Hand care",
+                        "Floor care",
+                        "Laundry",
+                    ],
+                    "message_angle": "Protect guest experience, reduce odor complaints, keep kitchens and public areas consistently clean, and support staff with easier maintenance routines.",
+                    "safe_talk_track": "We help hotels stay ahead of recurring odor, drain, warewash, and housekeeping issues with products plus local service support.",
+                    "useful_examples": [
+                        "Fragrance Cube",
+                        "Fresh Zone",
+                        "D-Stroy",
+                        "Warewash support",
+                    ],
+                    "discovery_questions": [
+                        "Where do odor or drain complaints show up most often?",
+                        "Any warewash or housekeeping consistency issues?",
+                    ],
+                },
+                {
+                    "key": "healthcare",
+                    "name": "Healthcare",
+                    "tagline": "Support cleaner, safer-looking facilities with consistent maintenance routines.",
+                    "common_problems": [
+                        "Persistent restroom and common-area odors",
+                        "Drains",
+                        "Housekeeping consistency",
+                        "Hand hygiene support",
+                        "Laundry demands",
+                        "Appearance and safety expectations",
+                    ],
+                    "best_fit_categories": [
+                        "Cleaning & sanitation",
+                        "Odor control",
+                        "Drain maintenance",
+                        "Hand care",
+                        "Laundry",
+                        "Housekeeping support",
+                        "Floor care",
+                        "Water treatment",
+                    ],
+                    "message_angle": "Support cleaner, safer-looking facilities, help environmental services teams stay consistent, and reduce recurring nuisance problems.",
+                    "safe_talk_track": "State can support healthcare facilities with practical maintenance solutions for odor, drains, sanitation, and housekeeping consistency.",
+                    "useful_examples": [],
+                    "discovery_questions": [
+                        "What recurring odor or housekeeping issues take the most staff time?",
+                        "Any drain or restroom complaint areas?",
+                    ],
+                    "caution": "Avoid making disinfecting, regulatory, or clinical-efficacy claims unless verified on the exact product label or spec sheet.",
+                },
+                {
+                    "key": "restaurants",
+                    "name": "Restaurants / Foodservice",
+                    "tagline": "Keep kitchens moving and reduce drain, odor, and warewash interruptions.",
+                    "common_problems": [
+                        "Grease and drain buildup",
+                        "Kitchen odors",
+                        "Warewash performance",
+                        "Sanitation consistency",
+                        "Front-of-house cleanliness",
+                        "Restroom odor issues",
+                    ],
+                    "best_fit_categories": [
+                        "Commercial dishwashing / warewash",
+                        "Drain maintenance",
+                        "Odor control",
+                        "Cleaning & sanitation",
+                        "Hand care",
+                        "Floor care",
+                    ],
+                    "message_angle": "Keep kitchens moving, improve wash results, reduce drain and odor interruptions, and support a cleaner guest-facing environment.",
+                    "safe_talk_track": "We work on recurring kitchen and restroom issues like drains, odors, and warewash consistency so staff can stay focused on service.",
+                    "useful_examples": [
+                        "Warewash support",
+                        "Fresh Zone",
+                        "Fragrance Cube",
+                    ],
+                    "discovery_questions": [
+                        "Any repeat problems with drains, odors, or dish results?",
+                        "Where does cleaning consistency break down during busy periods?",
+                    ],
+                },
+                {
+                    "key": "property-management",
+                    "name": "Property Management",
+                    "tagline": "Reduce recurring complaints across properties and protect site appearance.",
+                    "common_problems": [
+                        "Common-area odors",
+                        "Trash room smells",
+                        "Restroom complaints",
+                        "Drain backups",
+                        "Turnover cleaning",
+                        "Appearance issues",
+                        "Wastewater-related nuisance odors",
+                    ],
+                    "best_fit_categories": [
+                        "Odor control",
+                        "Ambient scenting",
+                        "Wastewater / sewage maintenance",
+                        "Drain maintenance",
+                        "Cleaning & sanitation",
+                        "Floor care",
+                        "Housekeeping / facility support",
+                    ],
+                    "message_angle": "Improve tenant and resident experience, protect property appearance, reduce repeat complaints, and simplify recurring maintenance issues across sites.",
+                    "safe_talk_track": "State helps property teams address recurring odor, drain, wastewater, and cleaning issues with practical solutions and service support.",
+                    "useful_examples": [
+                        "Fresh Zone",
+                        "Fragrance Cube",
+                    ],
+                    "discovery_questions": [
+                        "What complaints come up repeatedly across properties—odor, drains, trash rooms, restrooms, turnover cleaning?",
+                    ],
+                },
+                {
+                    "key": "industrial",
+                    "name": "Industrial / Manufacturing",
+                    "tagline": "Improve uptime and solve recurring facility maintenance problems faster.",
+                    "common_problems": [
+                        "Parts washing",
+                        "Shop odors",
+                        "Floor and restroom upkeep",
+                        "Wastewater or drain issues",
+                        "General facility cleanliness",
+                        "Uptime-related maintenance needs",
+                    ],
+                    "best_fit_categories": [
+                        "Parts washing / vehicle maintenance",
+                        "Cleaning & sanitation",
+                        "Drain maintenance",
+                        "Wastewater maintenance",
+                        "Odor control",
+                        "Water treatment",
+                        "Specialty maintenance",
+                    ],
+                    "message_angle": "Improve uptime, keep facilities cleaner and safer-looking, address recurring maintenance problems, and support teams with reliable supply and field service.",
+                    "safe_talk_track": "State supports industrial facilities with maintenance solutions for recurring cleaning, parts washing, odor, drain, and wastewater issues.",
+                    "useful_examples": [
+                        "Current Issue",
+                        "D-Stroy",
+                    ],
+                    "discovery_questions": [
+                        "What recurring maintenance issues slow the team down—parts washing, drains, odors, wastewater, or general facility cleaning?",
+                    ],
+                },
+            ]
+            return render_template("state_verticals.html", verticals=verticals)
+
         @self.app.route("/run_agent", methods=["POST"])
         def run_agent_route():
             logging.info("Received request to run agent")

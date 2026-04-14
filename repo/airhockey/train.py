@@ -105,6 +105,7 @@ def train(
     max_steps: int = 1000,
     learn_every: int = 4,
     resume: bool = False,
+    resume_interrupted: bool = False,
     env_config: Optional[Dict[str, Any]] = None,
     reward_config: Optional[Dict[str, float]] = None,
     tau: float = 0.005,
@@ -138,6 +139,7 @@ def train(
         max_steps: Maximum steps per episode before auto-reset
         learn_every: Number of steps between agent learning updates
         resume: Whether to resume training from saved checkpoint
+        resume_interrupted: Whether to resume from manually interrupted checkpoint
         env_config: Configuration dictionary for the environment
         reward_config: Configuration dictionary for rewards
         tau: Soft update interpolation factor (Polyak averaging)
@@ -211,12 +213,16 @@ def train(
 
     # Resume from checkpoint if requested
     start_episode = 1
-    if resume:
-        if os.path.exists("agent1_final.pth") and os.path.exists("agent2_final.pth"):
+    if resume or resume_interrupted:
+        suffix = "interrupted" if resume_interrupted else "final"
+        chk1 = f"agent1_{suffix}.pth"
+        chk2 = f"agent2_{suffix}.pth"
+        
+        if os.path.exists(chk1) and os.path.exists(chk2):
             try:
-                agent1.load_model("agent1_final.pth", override_lr=override_lr, override_epsilon=override_epsilon)
-                agent2.load_model("agent2_final.pth", override_lr=override_lr, override_epsilon=override_epsilon)
-                print("Resumed training from checkpoints.")
+                agent1.load_model(chk1, override_lr=override_lr, override_epsilon=override_epsilon)
+                agent2.load_model(chk2, override_lr=override_lr, override_epsilon=override_epsilon)
+                print(f"Resumed training from {suffix} checkpoints.")
                 if override_lr is not None:
                     print(f"Overrode learning rate to: {override_lr}")
                 if override_epsilon is not None:
@@ -243,6 +249,12 @@ def train(
     wins2 = 0
     ties = 0
 
+    # Best reward tracking
+    max_reward1 = float("-inf")
+    max_reward2 = float("-inf")
+    best_ep1 = 0
+    best_ep2 = 0
+
     # Moving averages for logging – cached running sums avoid np.mean() per episode
     avg_window = 100
     recent_rewards1: deque = deque(maxlen=avg_window)
@@ -250,6 +262,8 @@ def train(
     recent_steps: deque = deque(maxlen=avg_window)
     recent_loss1: deque = deque(maxlen=avg_window)
     recent_loss2: deque = deque(maxlen=avg_window)
+    recent_breakdown1: deque = deque(maxlen=avg_window)
+    recent_breakdown2: deque = deque(maxlen=avg_window)
     _sum1 = 0.0
     _sum2 = 0.0
     _sum_steps = 0
@@ -313,6 +327,8 @@ def train(
             total_reward2 = 0.0
             episode_loss1 = 0.0
             episode_loss2 = 0.0
+            ep_breakdown1 = {k: 0.0 for k in env.reward_config}
+            ep_breakdown2 = {k: 0.0 for k in env.reward_config}
             step = 0
             done = False
             episode_recorder = None
@@ -350,6 +366,13 @@ def train(
 
                     # Execute actions in environment
                     next_state, reward1, reward2, done, info = env.step(action1, action2)
+
+                    b1 = info.get('reward_breakdown1', {})
+                    b2 = info.get('reward_breakdown2', {})
+                    for k, v in b1.items():
+                        ep_breakdown1[k] = ep_breakdown1.get(k, 0.0) + v
+                    for k, v in b2.items():
+                        ep_breakdown2[k] = ep_breakdown2.get(k, 0.0) + v
 
                     # Store experiences in replay buffers
                     agent1.remember(state, action1, reward1, next_state, done)
@@ -423,12 +446,22 @@ def train(
             episode_rewards2.append(total_reward2)
             episode_lengths.append(step)
 
+            # Update best rewards
+            if total_reward1 > max_reward1:
+                max_reward1 = total_reward1
+                best_ep1 = episode
+            if total_reward2 > max_reward2:
+                max_reward2 = total_reward2
+                best_ep2 = episode
+
             avg_loss1 = episode_loss1 / step if step > 0 else 0.0
             avg_loss2 = episode_loss2 / step if step > 0 else 0.0
             losses1.append(avg_loss1)
             losses2.append(avg_loss2)
 
             # Update running sums (pop evicted value when window is full)
+            recent_breakdown1.append(ep_breakdown1)
+            recent_breakdown2.append(ep_breakdown2)
             if len(recent_rewards1) == avg_window:
                 _sum1 -= recent_rewards1[0]
                 _sum2 -= recent_rewards2[0]
@@ -454,6 +487,9 @@ def train(
             avg_loss2_window = _sum_loss2 / n if n > 0 else 0.0
             win_rate1 = wins1 / episode if episode > 0 else 0.0
             win_rate2 = wins2 / episode if episode > 0 else 0.0
+
+            avg_bd1 = {k: sum(d.get(k, 0) for d in recent_breakdown1) / n for k in env.reward_config} if n > 0 else {}
+            avg_bd2 = {k: sum(d.get(k, 0) for d in recent_breakdown2) / n for k in env.reward_config} if n > 0 else {}
 
             # Write to CSV
             csv_writer.writerow(
@@ -484,11 +520,12 @@ def train(
                     "episode": episode,
                     "steps": step,
                     "avg_steps": _sum_steps / n if n > 0 else 0.0,
-                    "winner": winner,
                     "reward1": total_reward1,
                     "reward2": total_reward2,
                     "avg_reward1": avg_reward1,
                     "avg_reward2": avg_reward2,
+                    "avg_breakdown1": avg_bd1,
+                    "avg_breakdown2": avg_bd2,
                     "loss1": avg_loss1,
                     "loss2": avg_loss2,
                     "avg_loss1": avg_loss1_window,
@@ -502,11 +539,14 @@ def train(
                     "ties": ties,
                     "score1": env.score1,
                     "score2": env.score2,
+                    "best_reward1": max_reward1,
+                    "best_reward2": max_reward2,
+                    "best_ep1": best_ep1,
+                    "best_ep2": best_ep2,
                     "lr": agent1.get_current_lr(),
                     "gamma": gamma,
                     "batch_size": batch_size,
                     "target_update_freq": target_update_freq,
-                    "learn_every": learn_every,
                 }
             )
 

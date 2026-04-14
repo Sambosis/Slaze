@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>State Verticals - Slazy Agent</title>
+    <style>
+        :root {
+            --primary-bg: #1a202c;
+            --secondary-bg: #2d3748;
+            --tertiary-bg: #4a5568;
+            --text-color: #e2e8f0;
+            --muted-text: #a0aec0;
+            --accent-color: #3182ce;
+            --accent-strong: #63b3ed;
+            --success-soft: rgba(72, 187, 120, 0.16);
+            --warning-soft: rgba(237, 137, 54, 0.14);
+            --border-color: rgba(255, 255, 255, 0.08);
+            --card-shadow: 0 18px 40px rgba(8, 15, 30, 0.35);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: "Noto Sans", "Segoe UI", system-ui, sans-serif;
+            background:
+                radial-gradient(circle at top left, rgba(49, 130, 206, 0.18), transparent 30%),
+                radial-gradient(circle at top right, rgba(99, 179, 237, 0.12), transparent 28%),
+                var(--primary-bg);
+            color: var(--text-color);
+            min-height: 100vh;
+        }
+
+        .header {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+            padding: 14px 24px;
+            background: rgba(26, 32, 44, 0.92);
+            backdrop-filter: blur(14px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 20px;
+            color: var(--accent-strong);
+        }
+
+        .nav-links {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .nav-links a {
+            color: var(--text-color);
+            text-decoration: none;
+            padding: 8px 12px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid transparent;
+            transition: 0.2s ease;
+        }
+
+        .nav-links a:hover,
+        .nav-links a.active {
+            background: rgba(49, 130, 206, 0.18);
+            border-color: rgba(99, 179, 237, 0.35);
+        }
+
+        .page-shell {
+            max-width: 1320px;
+            margin: 0 auto;
+            padding: 32px 24px 48px;
+        }
+
+        .hero {
+            display: grid;
+            grid-template-columns: 1.35fr 0.85fr;
+            gap: 20px;
+            margin-bottom: 28px;
+        }
+
+        .hero-card,
+        .summary-card,
+        .selector-panel,
+        .details-panel {
+            background: linear-gradient(180deg, rgba(45, 55, 72, 0.96), rgba(26, 32, 44, 0.96));
+            border: 1px solid var(--border-color);
+            border-radius: 22px;
+            box-shadow: var(--card-shadow);
+        }
+
+        .hero-card {
+            padding: 28px;
+        }
+
+        .eyebrow {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            color: var(--accent-strong);
+            background: rgba(49, 130, 206, 0.12);
+            border: 1px solid rgba(99, 179, 237, 0.2);
+            padding: 8px 12px;
+            border-radius: 999px;
+        }
+
+        .hero h2 {
+            margin: 18px 0 12px;
+            font-size: clamp(30px, 4vw, 48px);
+            line-height: 1.05;
+            letter-spacing: -0.03em;
+        }
+
+        .hero p {
+            margin: 0;
+            color: var(--muted-text);
+            font-size: 16px;
+            line-height: 1.7;
+            max-width: 62ch;
+        }
+
+        .hero-stats {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-top: 24px;
+        }
+
+        .stat-pill {
+            padding: 10px 14px;
+            border-radius: 14px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            color: var(--text-color);
+            font-size: 14px;
+        }
+
+        .summary-card {
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            gap: 18px;
+        }
+
+        .summary-card h3 {
+            margin: 0;
+            font-size: 16px;
+            color: #f7fafc;
+        }
+
+        .summary-card p {
+            margin: 0;
+            color: var(--muted-text);
+            line-height: 1.6;
+        }
+
+        .summary-list {
+            display: grid;
+            gap: 10px;
+        }
+
+        .summary-item {
+            padding: 14px 16px;
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        .summary-item strong {
+            display: block;
+            margin-bottom: 4px;
+            color: #f7fafc;
+        }
+
+        .workspace {
+            display: grid;
+            grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+            gap: 20px;
+            align-items: start;
+        }
+
+        .selector-panel {
+            padding: 20px;
+            position: sticky;
+            top: 92px;
+        }
+
+        .section-title {
+            margin: 0 0 8px;
+            font-size: 18px;
+        }
+
+        .section-copy {
+            margin: 0 0 18px;
+            color: var(--muted-text);
+            line-height: 1.6;
+            font-size: 14px;
+        }
+
+        .vertical-list {
+            display: grid;
+            gap: 12px;
+        }
+
+        .vertical-button {
+            width: 100%;
+            text-align: left;
+            background: rgba(255, 255, 255, 0.03);
+            color: var(--text-color);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 18px;
+            padding: 16px;
+            cursor: pointer;
+            transition: transform 0.16s ease, border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .vertical-button:hover {
+            transform: translateY(-1px);
+            border-color: rgba(99, 179, 237, 0.25);
+            background: rgba(255, 255, 255, 0.06);
+        }
+
+        .vertical-button.active {
+            background: linear-gradient(180deg, rgba(49, 130, 206, 0.24), rgba(49, 130, 206, 0.14));
+            border-color: rgba(99, 179, 237, 0.5);
+            box-shadow: 0 10px 26px rgba(49, 130, 206, 0.18);
+        }
+
+        .vertical-button .button-name {
+            display: block;
+            font-size: 16px;
+            font-weight: 700;
+            margin-bottom: 6px;
+        }
+
+        .vertical-button .button-tagline {
+            display: block;
+            color: var(--muted-text);
+            line-height: 1.45;
+            font-size: 13px;
+        }
+
+        .details-panel {
+            padding: 28px;
+        }
+
+        .details-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .details-title-wrap h2 {
+            margin: 0 0 8px;
+            font-size: clamp(28px, 3.2vw, 40px);
+            line-height: 1.05;
+        }
+
+        .details-title-wrap p {
+            margin: 0;
+            color: var(--muted-text);
+            line-height: 1.7;
+            max-width: 60ch;
+        }
+
+        .badge {
+            white-space: nowrap;
+            padding: 10px 14px;
+            border-radius: 999px;
+            background: rgba(49, 130, 206, 0.14);
+            border: 1px solid rgba(99, 179, 237, 0.25);
+            color: var(--accent-strong);
+            font-size: 13px;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+        }
+
+        .details-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 16px;
+        }
+
+        .detail-card {
+            padding: 18px;
+            border-radius: 18px;
+            background: rgba(255, 255, 255, 0.035);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        .detail-card.full {
+            grid-column: 1 / -1;
+        }
+
+        .detail-card h3 {
+            margin: 0 0 14px;
+            font-size: 15px;
+            color: #f7fafc;
+            letter-spacing: 0.01em;
+        }
+
+        .tag-list,
+        .question-list,
+        .problem-list,
+        .example-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin: 0;
+            padding: 0;
+            list-style: none;
+        }
+
+        .tag-list li,
+        .problem-list li,
+        .example-list li,
+        .question-list li {
+            padding: 10px 12px;
+            border-radius: 14px;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+
+        .problem-list li {
+            background: rgba(255, 255, 255, 0.045);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        .tag-list li {
+            background: rgba(49, 130, 206, 0.14);
+            border: 1px solid rgba(99, 179, 237, 0.18);
+            color: #d6ebff;
+        }
+
+        .example-list li {
+            background: rgba(72, 187, 120, 0.12);
+            border: 1px solid rgba(72, 187, 120, 0.16);
+        }
+
+        .question-list li {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.045);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        .message-angle {
+            margin: 0;
+            color: var(--text-color);
+            line-height: 1.7;
+        }
+
+        .talk-track {
+            margin: 0;
+            padding: 18px 20px;
+            border-radius: 18px;
+            background: rgba(49, 130, 206, 0.11);
+            border-left: 4px solid var(--accent-strong);
+            color: #edf2f7;
+            line-height: 1.75;
+            font-size: 15px;
+        }
+
+        .caution-box {
+            margin-top: 16px;
+            padding: 16px 18px;
+            border-radius: 18px;
+            background: var(--warning-soft);
+            border: 1px solid rgba(237, 137, 54, 0.25);
+            color: #fbd38d;
+            line-height: 1.65;
+        }
+
+        .caution-box strong {
+            color: #f6ad55;
+        }
+
+        @media (max-width: 980px) {
+            .hero,
+            .workspace,
+            .details-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .selector-panel {
+                position: static;
+            }
+        }
+
+        @media (max-width: 720px) {
+            .header {
+                padding: 14px 16px;
+                align-items: flex-start;
+                flex-direction: column;
+            }
+
+            .page-shell {
+                padding: 20px 16px 40px;
+            }
+
+            .hero-card,
+            .summary-card,
+            .selector-panel,
+            .details-panel {
+                border-radius: 18px;
+            }
+
+            .details-top {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>State Vertical Guide</h1>
+        <div class="nav-links">
+            <a href="/">Home</a>
+            <a href="/classic">Classic</a>
+            <a href="/web_ide">Web IDE</a>
+            <a href="/tools">Tools</a>
+            <a href="/state-verticals" class="active">State Verticals</a>
+        </div>
+    </div>
+
+    <main class="page-shell">
+        <section class="hero">
+            <div class="hero-card">
+                <div class="eyebrow">Quick sales reference</div>
+                <h2>Click a vertical and get the right talk track fast.</h2>
+                <p>
+                    This page turns the State vertical cheat sheet into a fast browser for outreach, discovery calls,
+                    and meeting prep. Pick a vertical on the left and the detail panel updates instantly with problems,
+                    best-fit categories, message angle, proof examples, and discovery questions.
+                </p>
+                <div class="hero-stats">
+                    <div class="stat-pill">5 core verticals</div>
+                    <div class="stat-pill">Clickable detail switching</div>
+                    <div class="stat-pill">Safe, repeatable talk tracks</div>
+                </div>
+            </div>
+            <aside class="summary-card">
+                <div>
+                    <h3>How to use it</h3>
+                    <p>Lead with the recurring problem, not the chemistry. Use the detail panel to keep the conversation practical and specific.</p>
+                </div>
+                <div class="summary-list">
+                    <div class="summary-item">
+                        <strong>Start with friction</strong>
+                        Ask where odors, drains, warewash, or housekeeping consistency break down.
+                    </div>
+                    <div class="summary-item">
+                        <strong>Map the fit</strong>
+                        Use the best-fit categories to steer the conversation without over-claiming.
+                    </div>
+                    <div class="summary-item">
+                        <strong>Close with a next step</strong>
+                        Use the discovery questions to turn the conversation into a walkthrough or demo.
+                    </div>
+                </div>
+            </aside>
+        </section>
+
+        <section class="workspace">
+            <aside class="selector-panel">
+                <h2 class="section-title">Choose a vertical</h2>
+                <p class="section-copy">The details update on click, so this stays fast during emails, calls, and prep.</p>
+                <div class="vertical-list" id="verticalList"></div>
+            </aside>
+
+            <section class="details-panel" aria-live="polite">
+                <div class="details-top">
+                    <div class="details-title-wrap">
+                        <h2 id="verticalName"></h2>
+                        <p id="verticalTagline"></p>
+                    </div>
+                    <div class="badge">State fit snapshot</div>
+                </div>
+
+                <div class="details-grid">
+                    <article class="detail-card">
+                        <h3>Common Problems</h3>
+                        <ul class="problem-list" id="commonProblems"></ul>
+                    </article>
+
+                    <article class="detail-card">
+                        <h3>Best-Fit Categories</h3>
+                        <ul class="tag-list" id="bestFitCategories"></ul>
+                    </article>
+
+                    <article class="detail-card">
+                        <h3>Best Message Angle</h3>
+                        <p class="message-angle" id="messageAngle"></p>
+                    </article>
+
+                    <article class="detail-card">
+                        <h3>Useful Public Examples</h3>
+                        <ul class="example-list" id="usefulExamples"></ul>
+                    </article>
+
+                    <article class="detail-card full">
+                        <h3>Safe Talk Track</h3>
+                        <blockquote class="talk-track" id="talkTrack"></blockquote>
+                        <div class="caution-box" id="cautionBox" hidden></div>
+                    </article>
+
+                    <article class="detail-card full">
+                        <h3>Discovery Questions</h3>
+                        <ul class="question-list" id="discoveryQuestions"></ul>
+                    </article>
+                </div>
+            </section>
+        </section>
+    </main>
+
+    <script>
+        const verticals = {{ verticals|tojson }};
+        const verticalList = document.getElementById('verticalList');
+        const verticalName = document.getElementById('verticalName');
+        const verticalTagline = document.getElementById('verticalTagline');
+        const commonProblems = document.getElementById('commonProblems');
+        const bestFitCategories = document.getElementById('bestFitCategories');
+        const messageAngle = document.getElementById('messageAngle');
+        const usefulExamples = document.getElementById('usefulExamples');
+        const talkTrack = document.getElementById('talkTrack');
+        const discoveryQuestions = document.getElementById('discoveryQuestions');
+        const cautionBox = document.getElementById('cautionBox');
+
+        function makeList(container, items) {
+            container.innerHTML = '';
+            (items || []).forEach(item => {
+                const li = document.createElement('li');
+                li.textContent = item;
+                container.appendChild(li);
+            });
+        }
+
+        function renderVerticalButtons() {
+            verticalList.innerHTML = '';
+            verticals.forEach((vertical, index) => {
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'vertical-button';
+                button.dataset.key = vertical.key;
+                button.innerHTML = `
+                    <span class="button-name">${vertical.name}</span>
+                    <span class="button-tagline">${vertical.tagline}</span>
+                `;
+                button.addEventListener('click', () => selectVertical(vertical.key));
+                if (index === 0) {
+                    button.classList.add('active');
+                }
+                verticalList.appendChild(button);
+            });
+        }
+
+        function selectVertical(verticalKey) {
+            const selected = verticals.find(vertical => vertical.key === verticalKey);
+            if (!selected) {
+                return;
+            }
+
+            document.querySelectorAll('.vertical-button').forEach(button => {
+                button.classList.toggle('active', button.dataset.key === verticalKey);
+            });
+
+            verticalName.textContent = selected.name;
+            verticalTagline.textContent = selected.tagline;
+            messageAngle.textContent = selected.message_angle;
+            talkTrack.textContent = selected.safe_talk_track;
+
+            makeList(commonProblems, selected.common_problems);
+            makeList(bestFitCategories, selected.best_fit_categories);
+            makeList(discoveryQuestions, selected.discovery_questions);
+            makeList(usefulExamples, selected.useful_examples && selected.useful_examples.length ? selected.useful_examples : ['No specific public examples listed.']);
+
+            if (selected.caution) {
+                cautionBox.hidden = false;
+                cautionBox.innerHTML = `<strong>Important caution:</strong> ${selected.caution}`;
+            } else {
+                cautionBox.hidden = true;
+                cautionBox.textContent = '';
+            }
+        }
+
+        renderVerticalButtons();
+        if (verticals.length > 0) {
+            selectVertical(verticals[0].key);
+        }
+    </script>
+</body>
+</html>

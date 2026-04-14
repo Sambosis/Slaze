@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import time
 from collections import deque
-from typing import Optional
+from typing import Optional, Any
 
 from rich.align import Align
 from rich.console import Console, Group
@@ -18,26 +18,10 @@ from rich.layout import Layout
 from rich.live import Live
 from rich.panel import Panel
 from rich.progress import BarColumn, Progress, SpinnerColumn, TaskID, TextColumn, TimeElapsedColumn
+from rich.rule import Rule
 from rich.style import Style
 from rich.table import Table
 from rich.text import Text
-
-
-# ──────────────────────────────────────────────
-# Sparkline helper
-# ──────────────────────────────────────────────
-_SPARK_CHARS = " ▁▂▃▄▅▆▇█"
-
-
-def _sparkline(values: list[float], width: int = 30) -> str:
-    """Return a Unicode sparkline string for the last `width` values."""
-    if not values:
-        return " " * width
-    window = list(values)[-width:]
-    lo, hi = min(window), max(window)
-    span = hi - lo if hi != lo else 1.0
-    chars = [_SPARK_CHARS[round((v - lo) / span * (len(_SPARK_CHARS) - 1))] for v in window]
-    return "".join(chars).ljust(width)
 
 
 # ──────────────────────────────────────────────
@@ -46,7 +30,7 @@ def _sparkline(values: list[float], width: int = 30) -> str:
 class TrainingDashboard:
     """Live TUI dashboard for the air hockey training loop."""
 
-    LOG_CAPACITY = 10  # lines visible in the log panel
+    LOG_CAPACITY = 15  # lines visible in the log panel
 
     def __init__(self, num_episodes: int) -> None:
         self.num_episodes = num_episodes
@@ -99,16 +83,14 @@ class TrainingDashboard:
         """Called every episode with the latest training stats."""
         self._stats = stats
         ep = stats.get("episode", 0)
-
         self._progress.update(self._prog_task, completed=ep)
-
         if self._live:
             self._live.update(self._build_layout())
 
     def log(self, message: str) -> None:
         """Push a message into the scrolling event log."""
         ts = time.strftime("%H:%M:%S")
-        self._log_lines.append(f"[dim]{ts}[/dim]  {message}")
+        self._log_lines.append(f"[steel_blue1]{ts}[/]  {message}")
         if self._live:
             self._live.update(self._build_layout())
 
@@ -128,133 +110,199 @@ class TrainingDashboard:
         h, rem = divmod(int(elapsed), 3600)
         m, s = divmod(rem, 60)
         elapsed_str = f"{h:02d}:{m:02d}:{s:02d}"
-
         title = Text("🏒  Air Hockey RL Training", style="bold bright_white")
-        subtitle = Text(f"  ⏱  {elapsed_str}", style="dim white")
-        header = Align.center(title + subtitle)
-        return Panel(header, style="bold blue", padding=(0, 1))
+        subtitle = Text(f"   ⏱  {elapsed_str}", style="white")
+        return Panel(Align.center(title + subtitle), style="bold blue", padding=(0, 1))
 
     def _middle_row(self) -> Table:
-        """Two-column row: episode stats left, win rates right."""
+        """Three-column row: overview | agent 1 | agent 2."""
         grid = Table.grid(expand=True, padding=(0, 1))
         grid.add_column(ratio=1)
         grid.add_column(ratio=1)
+        grid.add_column(ratio=1)
         grid.add_row(
-            self._episode_panel(),
-            self._winrate_panel(),
+            self._overview_panel(),
+            self._agent_panel(1, "cyan"),
+            self._agent_panel(2, "yellow"),
         )
         return grid
 
-    def _episode_panel(self) -> Panel:
+    # ── Overview panel ─────────────────────────
+
+    def _overview_panel(self) -> Panel:
         s = self._stats
-        ep = s.get("episode", 0)
-        total = self.num_episodes
 
         tbl = Table.grid(padding=(0, 2))
-        tbl.add_column(style="dim white", justify="right", min_width=18)
-        tbl.add_column(style="bold white")
+        tbl.add_column(style="bright_white", justify="right", min_width=9)
+        tbl.add_column(style="bold white", no_wrap=True)
 
         def row(label: str, value: str) -> None:
             tbl.add_row(label, value)
 
-        row("Episode", f"[bright_cyan]{ep}[/] / {total}")
-        row("Steps", f"{s.get('steps', 0)}  [dim](avg {s.get('avg_steps', 0.0):.1f})[/]")
-        row("Episode Winner", _winner_text(s.get("winner", "—")))
-        row("Memory", f"{s.get('mem1', 0):,}")
+        def section(title: str) -> None:
+            tbl.add_row(f"[bold blue]── {title} ──[/]", "")
+
+        # Episode dynamics
+        section("Episode")
+        steps = s.get("steps", 0)
+        avg_steps = s.get("avg_steps", 0.0)
+        row("Steps", f"[bold white]{steps}[/]  [white]avg {avg_steps:.0f}[/]")
+        row("Memory", f"[white]{s.get('mem1', 0):,}[/]")
         row("Epsilon", _epsilon_bar(s.get("epsilon1", 1.0)))
 
-        tbl.add_row()  # spacer
-
-        # Agent 1
-        tbl.add_row(
-            "[bold magenta]── Agent 1 ──[/]", ""
-        )
-        row("  Reward", f"[magenta]{s.get('reward1', 0.0):+.2f}[/]  "
-                        f"[dim](avg {s.get('avg_reward1', 0.0):+.2f})[/]")
-        row("  Loss", f"[magenta]{s.get('loss1', 0.0):.6f}[/]  "
-                        f"[dim](avg {s.get('avg_loss1', 0.0):.6f})[/]")
-
-        tbl.add_row()  # spacer
-
-        # Agent 2
-        tbl.add_row(
-            "[bold green]── Agent 2 ──[/]", ""
-        )
-        row("  Reward", f"[green]{s.get('reward2', 0.0):+.2f}[/]  "
-                        f"[dim](avg {s.get('avg_reward2', 0.0):+.2f})[/]")
-        row("  Loss", f"[green]{s.get('loss2', 0.0):.6f}[/]  "
-                        f"[dim](avg {s.get('avg_loss2', 0.0):.6f})[/]")
-
-        return Panel(tbl, title="[bold white]📊 Episode Stats[/]", border_style="blue", padding=(0, 1))
-
-    def _winrate_panel(self) -> Panel:
-        s = self._stats
-        ep = max(s.get("episode", 1), 1)
-        wins1 = s.get("wins1", 0)
-        wins2 = s.get("wins2", 0)
         ties = s.get("ties", 0)
-        wr1 = wins1 / ep
-        wr2 = wins2 / ep
+        ep = max(s.get("episode", 1), 1)
         tr = ties / ep
+        row("Ties", f"[white]{ties}  ({tr:.1%})[/]")
 
-        tbl = Table.grid(padding=(0, 2))
-        tbl.add_column(style="dim white", justify="right", min_width=14)
-        tbl.add_column(style="bold white")
+        tbl.add_row()  # spacer
 
-        def row(label, value):
-            tbl.add_row(label, value)
+        # Hyperparams (static)
+        section("Config")
+        row("LR", f"[white]{s.get('lr', '—')}[/]")
+        row("γ  Gamma", f"[white]{s.get('gamma', '—')}[/]")
+        row("Batch", f"[white]{s.get('batch_size', '—')}[/]")
 
-        row("Total Episodes", f"[white]{ep}[/]")
-        tbl.add_row()
+        return Panel(tbl, title="[bold white]⚙  Overview[/]", border_style="blue", padding=(0, 1))
 
-        # Win rate bars
-        bar_width = 24
-        row("[bold magenta]Agent 1 Wins[/]",
-            f"[magenta]{wins1:4d}[/]  {_rate_bar(wr1, bar_width, 'magenta')}  [magenta]{wr1:.1%}[/]")
-        row("[bold green]Agent 2 Wins[/]",
-            f"[green]{wins2:4d}[/]  {_rate_bar(wr2, bar_width, 'green')}  [green]{wr2:.1%}[/]")
-        row("[dim white]Ties[/]",
-            f"[white]{ties:4d}[/]  {_rate_bar(tr, bar_width, 'white')}  [white]{tr:.1%}[/]")
+    # ── Agent panel ────────────────────────────
 
-        tbl.add_row()
+    def _agent_panel(self, agent_num: int, color: str) -> Panel:
+        s = self._stats
+        n = str(agent_num)
 
-        # Hyperparams reminder
-        row("Learning Rate", f"{s.get('lr', '—')}")
-        row("Gamma", f"{s.get('gamma', '—')}")
-        row("Batch Size", f"{s.get('batch_size', '—')}")
-        row("Target Upd Freq", f"{s.get('target_update_freq', '—')}")
+        # ─── Reward + Loss (big number table) ───
+        metrics_tbl = Table.grid(padding=(0, 3))
+        metrics_tbl.add_column(justify="right", style="bright_white", min_width=7)
+        metrics_tbl.add_column(justify="right", no_wrap=True)  # current (big)
+        metrics_tbl.add_column(justify="left", style="white", no_wrap=True)    # avg
 
-        return Panel(tbl, title="[bold white]🏆 Win Rates & Config[/]", border_style="blue", padding=(0, 1))
+        # Header row
+        metrics_tbl.add_row("", f"[{color}]Current[/]", "[white]Avg (100)[/]")
+
+        reward  = s.get(f"reward{n}", 0.0)
+        avg_r   = s.get(f"avg_reward{n}", 0.0)
+        loss    = s.get(f"loss{n}", 0.0)
+        avg_l   = s.get(f"avg_loss{n}", 0.0)
+        best    = s.get(f"best_reward{n}", 0.0)
+        best_ep = s.get(f"best_ep{n}", 0)
+
+        # Reward (right-padded by 3 spaces to align .2f decimal with .5f Loss)
+        metrics_tbl.add_row(
+            "Reward",
+            f"[bold {color}]{reward:>+9.2f}   [/]",
+            f"[white]{avg_r:>+8.2f}   [/]",
+        )
+
+        # Loss (no padding needed, has 5 decimals)
+        metrics_tbl.add_row(
+            "Loss",
+            f"[{color}]{loss:>9.5f}[/]",
+            f"[white]{avg_l:>8.5f}[/]",
+        )
+
+        # Best reward (right-padded by 3 spaces to align)
+        metrics_tbl.add_row(
+            "Best",
+            f"[bold {color}]{best:>+9.2f}   [/]",
+            f"[white]ep {best_ep:,}   [/]",
+        )
+
+        # ─── Win rate bar ───
+        wins = s.get(f"wins{n}", 0)
+        ep   = max(s.get("episode", 1), 1)
+        wr   = wins / ep
+        wins_tbl = Table.grid(padding=(0, 2))
+        wins_tbl.add_column(style="bright_white", justify="right", min_width=7)
+        wins_tbl.add_column(no_wrap=True)
+        wins_tbl.add_row(
+            "Wins",
+            f"[bold {color}]{wins:>5,}[/]  {_rate_bar(wr, 18, color)}  [bold {color}]{wr:.1%}[/]",
+        )
+
+        # ─── Reward breakdown ───
+        bd = s.get(f"avg_breakdown{n}", {})
+        breakdown_tbl = _format_breakdown(bd, color)
+
+        # Stack everything vertically inside agent panel
+        outer = Table.grid(expand=True)
+        outer.add_column()
+        outer.add_row(metrics_tbl)
+        outer.add_row(wins_tbl)
+        outer.add_row(_dim_rule())
+        outer.add_row(breakdown_tbl)
+
+        return Panel(
+            outer,
+            title=f"[bold {color}]  Agent {agent_num}  [/]",
+            border_style=color,
+            padding=(0, 1),
+        )
 
     def _log_panel(self) -> Panel:
         lines = list(self._log_lines)
         if not lines:
-            lines = ["[dim]Waiting for events…[/dim]"]
+            lines = ["[white]Waiting for events…[/white]"]
         text = Text.from_markup("\n".join(lines))
-        return Panel(text, title="[bold white]📋 Event Log[/]", border_style="dim blue", padding=(0, 1))
+        return Panel(text, title="[bold white]📋  Event Log[/]", border_style="blue", padding=(0, 1))
 
 
 # ──────────────────────────────────────────────
 # Helpers
 # ──────────────────────────────────────────────
 
-def _winner_text(winner: str) -> str:
-    mapping = {
-        "Agent1": "[bold magenta]Agent 1 🏆[/]",
-        "Agent2": "[bold green]Agent 2 🏆[/]",
-        "Tie": "[dim white]Tie[/]",
-    }
-    return mapping.get(winner, f"[dim]{winner}[/]")
+def _dim_rule() -> Text:
+    """A thin dim separator line."""
+    return Text("─" * 40, style="blue")
 
 
-def _epsilon_bar(eps: float, width: int = 16) -> str:
+def _epsilon_bar(eps: float, width: int = 14) -> str:
     filled = round(eps * width)
     bar = "█" * filled + "░" * (width - filled)
     color = "bright_red" if eps > 0.5 else ("yellow" if eps > 0.2 else "bright_green")
-    return f"[{color}]{bar}[/] [dim]{eps:.4f}[/]"
+    return f"[{color}]{bar}[/] [white]{eps:.4f}[/]"
 
 
-def _rate_bar(rate: float, width: int = 20, color: str = "white") -> str:
+def _format_breakdown(bd: dict, color: str) -> Any:
+    """Two-column breakdown table, positive values bright, negative dimmed."""
+    if not bd:
+        return Text("—", style="white")
+
+    KEYS = [
+        ("goal",             "Goal "),
+        ("hit_puck",         "Hit  "),
+        ("puck_dir_bonus",   "Dir  "),
+        ("defense_bonus",    "Def  "),
+        ("concede",          "Cncd "),
+        ("step_penalty",     "Step "),
+        ("boundary_penalty", "Bndy "),
+    ]
+
+    tbl = Table.grid(padding=(0, 3))
+    tbl.add_column(style="bright_white", justify="right", min_width=5)  # abbr
+    tbl.add_column(justify="right", min_width=7, no_wrap=True)       # value col 1
+    tbl.add_column(style="bright_white", justify="right", min_width=5)  # abbr
+    tbl.add_column(justify="right", min_width=7, no_wrap=True)       # value col 2
+
+    pairs = []
+    for k, abbr in KEYS:
+        v = bd.get(k, 0.0)
+        val_color = color if v >= 0 else "red"
+        pairs.append((abbr.strip(), f"[{val_color}]{v:>+6.2f}[/]"))
+
+    # Render in rows of 2
+    for i in range(0, len(pairs), 2):
+        a1, v1 = pairs[i]
+        if i + 1 < len(pairs):
+            a2, v2 = pairs[i + 1]
+        else:
+            a2, v2 = "", ""
+        tbl.add_row(a1, v1, a2, v2)
+
+    return tbl
+
+
+def _rate_bar(rate: float, width: int = 18, color: str = "white") -> str:
     filled = round(rate * width)
     bar = "█" * filled + "░" * (width - filled)
     return f"[{color}]{bar}[/]"

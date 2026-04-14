@@ -150,6 +150,11 @@ def main() -> None:
         help="Resume training from saved checkpoint files (agent1_final.pth, agent2_final.pth)",
     )
     parser.add_argument(
+        "--resume_interrupted",
+        action="store_true",
+        help="Resume training from manually interrupted checkpoint files (agent1_interrupted.pth, agent2_interrupted.pth)",
+    )
+    parser.add_argument(
         "--override_lr",
         type=float,
         default=None,
@@ -224,7 +229,8 @@ def main() -> None:
     print(f"LR Min (eta_min): {args.lr_min}")
     print(f"LR T0 (first cycle): {args.lr_T0}")
     print(f"LR T_mult: {args.lr_T_mult}")
-    print(f"Resume Training: {args.resume}")
+    print(f"Resume Training (final): {args.resume}")
+    print(f"Resume Training (interrupted): {args.resume_interrupted}")
     if args.override_lr is not None:
         print(f"Override LR: {args.override_lr}")
     if args.override_epsilon is not None:
@@ -256,6 +262,7 @@ def main() -> None:
             max_steps=args.max_steps,
             learn_every=args.learn_every,
             resume=args.resume,
+            resume_interrupted=args.resume_interrupted,
             env_config=env_config,
             reward_config=reward_config,
             tau=args.tau,

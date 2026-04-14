@@ -192,8 +192,8 @@ class AirHockeyEnv:
         # Puck (center)
         puck_x = self.width // 2
         puck_y = self.height // 2
-        puck_vx = np.random.uniform(-5, 5)
-        puck_vy = np.random.uniform(-5, 5)
+        puck_vx = np.random.uniform(-8, 8)
+        puck_vy = np.random.uniform(-8, 8)
         
         # Create internal state vector
         self.state = np.array([
@@ -233,8 +233,14 @@ class AirHockeyEnv:
         _max_dist = math.sqrt(self.width ** 2 + self.height ** 2)
         _dist1 = math.sqrt((paddle1_x - puck_x) ** 2 + (paddle1_y - puck_y) ** 2)
         _dist2 = math.sqrt((paddle2_x - puck_x) ** 2 + (paddle2_y - puck_y) ** 2)
+        
+        breakdown1 = {k: 0.0 for k in self.reward_config}
+        breakdown2 = {k: 0.0 for k in self.reward_config}
+        
         reward1 = self.reward_config["step_penalty"] * (_dist1 / _max_dist)
         reward2 = self.reward_config["step_penalty"] * (_dist2 / _max_dist)
+        breakdown1["step_penalty"] = reward1
+        breakdown2["step_penalty"] = reward2
         
         # Apply actions to paddles
         # Map actions to velocity changes
@@ -274,6 +280,7 @@ class AirHockeyEnv:
             p1_hit_boundary = True
         if p1_hit_boundary:
             reward1 += self.reward_config["boundary_penalty"]
+            breakdown1["boundary_penalty"] += self.reward_config["boundary_penalty"]
 
         p2_hit_boundary = False
         if paddle2_x < self.width // 2 + self.paddle_radius:
@@ -294,6 +301,7 @@ class AirHockeyEnv:
             p2_hit_boundary = True
         if p2_hit_boundary:
             reward2 += self.reward_config["boundary_penalty"]
+            breakdown2["boundary_penalty"] += self.reward_config["boundary_penalty"]
         
         # Update puck position
         puck_x += puck_vx
@@ -328,6 +336,8 @@ class AirHockeyEnv:
                 self.done = True
                 reward1 += self.reward_config["concede"]
                 reward2 += self.reward_config["goal"]
+                breakdown1["concede"] += self.reward_config["concede"]
+                breakdown2["goal"] += self.reward_config["goal"]
                 self.score2 += 1
             else:
                 puck_x = self.puck_radius
@@ -340,6 +350,8 @@ class AirHockeyEnv:
                 self.done = True
                 reward1 += self.reward_config["goal"]
                 reward2 += self.reward_config["concede"]
+                breakdown1["goal"] += self.reward_config["goal"]
+                breakdown2["concede"] += self.reward_config["concede"]
                 self.score1 += 1
             else:
                 puck_x = self.width - self.puck_radius
@@ -374,6 +386,7 @@ class AirHockeyEnv:
                 
                 # Small reward for hitting the puck
                 reward1 += self.reward_config["hit_puck"]
+                breakdown1["hit_puck"] += self.reward_config["hit_puck"]
         
         # Paddle 2 collision (squared-distance to skip sqrt when no collision)
         dx2 = puck_x - paddle2_x
@@ -403,6 +416,7 @@ class AirHockeyEnv:
                 
                 # Small reward for hitting the puck
                 reward2 += self.reward_config["hit_puck"]
+                breakdown2["hit_puck"] += self.reward_config["hit_puck"]
         
         # ── Reward Shaping ─────────────────────────────────────────────
         # These small dense rewards guide learning without overwhelming
@@ -416,8 +430,12 @@ class AirHockeyEnv:
             #    Agent1 wants puck moving right (+vx), Agent2 wants it left (-vx).
             puck_speed_val = math.sqrt(puck_vx * puck_vx + puck_vy * puck_vy)
             if puck_speed_val > 0.5:  # only when puck is actually moving
-                reward1 += self.reward_config["puck_dir_bonus"] * (puck_vx / self.max_speed)   # positive when moving right
-                reward2 += self.reward_config["puck_dir_bonus"] * (-puck_vx / self.max_speed)  # positive when moving left
+                b1 = self.reward_config["puck_dir_bonus"] * (puck_vx / self.max_speed)
+                b2 = self.reward_config["puck_dir_bonus"] * (-puck_vx / self.max_speed)
+                reward1 += b1   # positive when moving right
+                reward2 += b2  # positive when moving left
+                breakdown1["puck_dir_bonus"] += b1
+                breakdown2["puck_dir_bonus"] += b2
             
             # 2) Defensive positioning bonus:
             #    Reward when paddle moves toward the puck on its own side.
@@ -427,12 +445,16 @@ class AirHockeyEnv:
             if puck_x < half_w:
                 dist_to_puck = math.sqrt((paddle1_x - puck_x)**2 + (paddle1_y - puck_y)**2)
                 max_dist = math.sqrt(half_w**2 + self.height**2)
-                reward1 += self.reward_config["defense_bonus"] * (1.0 - dist_to_puck / max_dist)
+                d1 = self.reward_config["defense_bonus"] * (1.0 - dist_to_puck / max_dist)
+                reward1 += d1
+                breakdown1["defense_bonus"] += d1
             # Agent 2 (right side): puck is on its side when px >= half_w
             if puck_x >= half_w:
                 dist_to_puck = math.sqrt((paddle2_x - puck_x)**2 + (paddle2_y - puck_y)**2)
                 max_dist = math.sqrt(half_w**2 + self.height**2)
-                reward2 += self.reward_config["defense_bonus"] * (1.0 - dist_to_puck / max_dist)
+                d2 = self.reward_config["defense_bonus"] * (1.0 - dist_to_puck / max_dist)
+                reward2 += d2
+                breakdown2["defense_bonus"] += d2
         
         # Update state
         self.state = np.array([
@@ -447,7 +469,9 @@ class AirHockeyEnv:
             'score2': self.score2,
             'paddle1_pos': (paddle1_x, paddle1_y),
             'paddle2_pos': (paddle2_x, paddle2_y),
-            'puck_pos': (puck_x, puck_y)
+            'puck_pos': (puck_x, puck_y),
+            'reward_breakdown1': breakdown1,
+            'reward_breakdown2': breakdown2
         }
         
         return self._get_obs(), reward1, reward2, self.done, info

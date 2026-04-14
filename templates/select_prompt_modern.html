@@ -474,6 +474,7 @@
             <a href="/">🏠 Home</a>
             <a href="/browser">📁 File Browser</a>
             <a href="/tools">🔧 Tools</a>
+            <a href="/state-verticals">🧭 State Verticals</a>
         </div>
     </div>
 
@@ -546,6 +547,7 @@
             <a href="/classic" class="nav-link">📝 Classic Interface</a>
             <a href="/tools" class="nav-link">🔧 Toolbox</a>
             <a href="/browser" class="nav-link">📁 File Browser</a>
+            <a href="/state-verticals" class="nav-link">🧭 State Verticals</a>
         </div>
     </div>
 
@@ -588,26 +590,26 @@
             });
         }
 
-                                   function loadTasks() {
-             // Get tasks from the server via API
-             fetch('/api/tasks')
-                 .then(response => response.json())
-                 .then(taskOptions => {
-                     tasks = taskOptions.map(option => ({
-                         filename: option,
-                         name: option.replace('.md', '').replace(/[_-]/g, ' '),
-                         category: categorizeTask(option),
-                         icon: getTaskIcon(option)
-                     }));
-                     renderTasks();
-                 })
-                 .catch(error => {
-                     console.error('Error loading tasks:', error);
-                     // Show empty state on error
-                     tasks = [];
-                     renderTasks();
-                 });
-         }
+        function loadTasks() {
+            // Get tasks from the server via API
+            fetch('/api/tasks')
+                .then(response => response.json())
+                .then(taskOptions => {
+                    tasks = taskOptions.map(option => ({
+                        filename: option,
+                        name: option.replace('.md', '').replace(/[_-]/g, ' '),
+                        category: categorizeTask(option),
+                        icon: getTaskIcon(option)
+                    }));
+                    renderTasks();
+                })
+                .catch(error => {
+                    console.error('Error loading tasks:', error);
+                    // Show empty state on error
+                    tasks = [];
+                    renderTasks();
+                });
+        }
 
         function categorizeTask(filename) {
             const name = filename.toLowerCase();
