@@ -107,12 +107,22 @@ class TrainingDashboard:
 
     def _header_panel(self) -> Panel:
         elapsed = time.time() - self._start_time
-        h, rem = divmod(int(elapsed), 3600)
-        m, s = divmod(rem, 60)
-        elapsed_str = f"{h:02d}:{m:02d}:{s:02d}"
+
+        # ETA calculation
+        ep = self._stats.get("episode", 0)
+        if ep > 0 and elapsed > 0:
+            rate = elapsed / ep  # seconds per episode
+            remaining_eps = self.num_episodes - ep
+            eta_secs = int(rate * remaining_eps)
+            eh, erem = divmod(eta_secs, 3600)
+            em, es = divmod(erem, 60)
+            eta_str = f"   ⏳ ~{eh:02d}:{em:02d}:{es:02d} remaining"
+        else:
+            eta_str = "   ⏳ estimating…"
+
         title = Text("🏒  Air Hockey RL Training", style="bold bright_white")
-        subtitle = Text(f"   ⏱  {elapsed_str}", style="white")
-        return Panel(Align.center(title + subtitle), style="bold blue", padding=(0, 1))
+        eta_text = Text(eta_str, style="bright_white")
+        return Panel(Align.center(title + eta_text), style="bold blue", padding=(0, 1))
 
     def _middle_row(self) -> Table:
         """Three-column row: overview | agent 1 | agent 2."""
@@ -269,13 +279,12 @@ def _format_breakdown(bd: dict, color: str) -> Any:
         return Text("—", style="white")
 
     KEYS = [
-        ("goal",             "Goal "),
-        ("hit_puck",         "Hit  "),
-        ("puck_dir_bonus",   "Dir  "),
-        ("defense_bonus",    "Def  "),
-        ("concede",          "Cncd "),
-        ("step_penalty",     "Step "),
-        ("boundary_penalty", "Bndy "),
+        ("goal",                "Goal "),
+        ("hit_puck",            "Hit  "),
+        ("territory",           "Terr "),
+        ("goal_line_save",      "Save "),
+        ("concede",             "Cncd "),
+        ("boundary_penalty",    "Bndy "),
     ]
 
     tbl = Table.grid(padding=(0, 3))

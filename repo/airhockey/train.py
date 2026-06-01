@@ -121,6 +121,7 @@ def train(
     push_videos: bool = False,
     git_remote: str = "origin",
     git_branch: Optional[str] = None,
+    model_dir: str = "models",
 ) -> None:
     """
     Main training function for the air hockey RL agents.
@@ -140,6 +141,7 @@ def train(
         learn_every: Number of steps between agent learning updates
         resume: Whether to resume training from saved checkpoint
         resume_interrupted: Whether to resume from manually interrupted checkpoint
+        model_dir: Directory for saving and loading model checkpoints
         env_config: Configuration dictionary for the environment
         reward_config: Configuration dictionary for rewards
         tau: Soft update interpolation factor (Polyak averaging)
@@ -159,6 +161,9 @@ def train(
     print("\n" + "=" * 50)
     print("Starting Air Hockey RL Training")
     print("=" * 50)
+
+    # Ensure model directory exists
+    os.makedirs(model_dir, exist_ok=True)
 
     # Initialize the live TUI dashboard
     dash = TrainingDashboard(num_episodes=num_episodes)
@@ -215,8 +220,8 @@ def train(
     start_episode = 1
     if resume or resume_interrupted:
         suffix = "interrupted" if resume_interrupted else "final"
-        chk1 = f"agent1_{suffix}.pth"
-        chk2 = f"agent2_{suffix}.pth"
+        chk1 = os.path.join(model_dir, f"agent1_{suffix}.pth")
+        chk2 = os.path.join(model_dir, f"agent2_{suffix}.pth")
         
         if os.path.exists(chk1) and os.path.exists(chk2):
             try:
@@ -277,25 +282,33 @@ def train(
     csv_path = os.path.join(log_dir, f"training_log_{timestamp}.csv")
     csv_file = open(csv_path, "w", newline="")
     csv_writer = csv.writer(csv_file)
-    csv_writer.writerow(
-        [
-            "episode",
-            "reward1",
-            "reward2",
-            "length",
-            "loss1",
-            "loss2",
-            "epsilon1",
-            "epsilon2",
-            "winner",
-            "avg_reward1_100",
-            "avg_reward2_100",
-            "win_rate1",
-            "win_rate2",
-            "score1",
-            "score2",
-        ]
-    )
+    # Stable, ordered list of reward component keys for the breakdown columns.
+    # Captured once at startup so column count stays consistent across the run.
+    reward_keys = list(env.reward_config.keys())
+    csv_header = [
+        "episode",
+        "reward1",
+        "reward2",
+        "length",
+        "loss1",
+        "loss2",
+        "epsilon1",
+        "epsilon2",
+        "winner",
+        "avg_reward1_100",
+        "avg_reward2_100",
+        "win_rate1",
+        "win_rate2",
+        "score1",
+        "score2",
+    ]
+    # Per-episode reward component totals for each agent
+    csv_header += [f"breakdown1_{k}" for k in reward_keys]
+    csv_header += [f"breakdown2_{k}" for k in reward_keys]
+    # 100-episode rolling average of each component (matches live dashboard)
+    csv_header += [f"avg_breakdown1_{k}_100" for k in reward_keys]
+    csv_header += [f"avg_breakdown2_{k}_100" for k in reward_keys]
+    csv_writer.writerow(csv_header)
 
     print(f"Logging training metrics to: {csv_path}")
     print("Starting dashboard…")
@@ -403,6 +416,8 @@ def train(
                             score2=env.score2,
                             agent1_epsilon=agent1.epsilon,
                             agent2_epsilon=agent2.epsilon,
+                            reward1=total_reward1,
+                            reward2=total_reward2,
                         )
 
                         if episode_recorder is not None:
@@ -492,25 +507,30 @@ def train(
             avg_bd2 = {k: sum(d.get(k, 0) for d in recent_breakdown2) / n for k in env.reward_config} if n > 0 else {}
 
             # Write to CSV
-            csv_writer.writerow(
-                [
-                    episode,
-                    total_reward1,
-                    total_reward2,
-                    step,
-                    avg_loss1,
-                    avg_loss2,
-                    agent1.epsilon,
-                    agent2.epsilon,
-                    winner,
-                    avg_reward1,
-                    avg_reward2,
-                    win_rate1,
-                    win_rate2,
-                    env.score1,
-                    env.score2,
-                ]
-            )
+            row = [
+                episode,
+                total_reward1,
+                total_reward2,
+                step,
+                avg_loss1,
+                avg_loss2,
+                agent1.epsilon,
+                agent2.epsilon,
+                winner,
+                avg_reward1,
+                avg_reward2,
+                win_rate1,
+                win_rate2,
+                env.score1,
+                env.score2,
+            ]
+            # Per-episode reward component totals
+            row += [ep_breakdown1.get(k, 0.0) for k in reward_keys]
+            row += [ep_breakdown2.get(k, 0.0) for k in reward_keys]
+            # 100-ep rolling averages of each component
+            row += [avg_bd1.get(k, 0.0) for k in reward_keys]
+            row += [avg_bd2.get(k, 0.0) for k in reward_keys]
+            csv_writer.writerow(row)
             if episode % 100 == 0:
                 csv_file.flush()  # Periodic flush (not every episode)
 
@@ -563,8 +583,8 @@ def train(
             # Save models periodically (every 1000 episodes)
             if episode % 1000 == 0:
                 try:
-                    agent1.save_model(f"agent1_episode_{episode}.pth")
-                    agent2.save_model(f"agent2_episode_{episode}.pth")
+                    agent1.save_model(os.path.join(model_dir, f"agent1_episode_{episode}.pth"))
+                    agent2.save_model(os.path.join(model_dir, f"agent2_episode_{episode}.pth"))
                     dash.log(f"[green]✔ Models saved at episode {episode:,}[/green]")
                 except Exception as e:
                     dash.log(f"[red]⚠ Could not save models: {e}[/red]")
@@ -584,8 +604,8 @@ def train(
 
         # Save final models
         try:
-            agent1.save_model("agent1_final.pth")
-            agent2.save_model("agent2_final.pth")
+            agent1.save_model(os.path.join(model_dir, "agent1_final.pth"))
+            agent2.save_model(os.path.join(model_dir, "agent2_final.pth"))
             print("Final models saved.")
         except Exception as e:
             print(f"Warning: Could not save final models: {e}")
@@ -609,8 +629,8 @@ def train(
         print("\n\nTraining interrupted by user.")
         # Save models on interrupt
         try:
-            agent1.save_model("agent1_interrupted.pth")
-            agent2.save_model("agent2_interrupted.pth")
+            agent1.save_model(os.path.join(model_dir, "agent1_interrupted.pth"))
+            agent2.save_model(os.path.join(model_dir, "agent2_interrupted.pth"))
             print("Models saved on interrupt.")
         except Exception as e:
             print(f"Warning: Could not save models on interrupt: {e}")
@@ -704,6 +724,8 @@ def visualize_episode(
             score2=env.score2,
             agent1_epsilon=agent1.epsilon,
             agent2_epsilon=agent2.epsilon,
+            reward1=total_reward1,
+            reward2=total_reward2,
         )
 
         if recorder is not None:

@@ -53,7 +53,8 @@ def init_pygame(width: int, height: int, caption: str = "Air Hockey RL Training"
         sys.exit(1)
 def draw_game(screen: pygame.Surface, env, episode: int, step: int,
               score1: int, score2: int, agent1_epsilon: float,
-              agent2_epsilon: float, clock: pygame.time.Clock = None) -> bool:
+              agent2_epsilon: float, clock: pygame.time.Clock = None,
+              reward1: float = 0.0, reward2: float = 0.0) -> bool:
     """
     Draw the current game state on the provided Pygame surface.
     
@@ -83,7 +84,7 @@ def draw_game(screen: pygame.Surface, env, episode: int, step: int,
     
     # Draw UI elements (scores, episode info)
     _draw_ui(screen, score1, score2, episode, step, agent1_epsilon, agent2_epsilon, 
-             env.width, env.height)
+             env.width, env.height, reward1, reward2)
     
     # Update the display
     pygame.display.flip()
@@ -95,7 +96,7 @@ def draw_game(screen: pygame.Surface, env, episode: int, step: int,
     return True
 def _draw_ui(screen: pygame.Surface, score1: int, score2: int, 
              episode: int, step: int, agent1_epsilon: float, agent2_epsilon: float,
-             width: int, height: int) -> None:
+             width: int, height: int, reward1: float = 0.0, reward2: float = 0.0) -> None:
     """
     Draw a modern, premium HUD overlay.
     
@@ -109,6 +110,8 @@ def _draw_ui(screen: pygame.Surface, score1: int, score2: int,
         agent2_epsilon: Epsilon value for agent 2
         width: Width of the game area
         height: Height of the game area
+        reward1: Current accumulated reward for agent 1
+        reward2: Current accumulated reward for agent 2
     """
     try:
         # Initialize fonts
@@ -191,6 +194,15 @@ def _draw_ui(screen: pygame.Surface, score1: int, score2: int,
         eps2_text = font_small.render(f"ε {agent2_epsilon:.3f}", True, (120, 150, 220))
         screen.blit(eps2_text, (3 * width // 4 - eps2_text.get_width() // 2,
                                 s2_y + score2_text.get_height() + 2))
+                                
+        # ── Current Reward Values (under epsilon) ──
+        rwd1_text = font_small.render(f"Reward: {reward1:.1f}", True, (240, 160, 160))
+        screen.blit(rwd1_text, (width // 4 - rwd1_text.get_width() // 2,
+                                s1_y + score1_text.get_height() + 2 + eps1_text.get_height() + 2))
+                                
+        rwd2_text = font_small.render(f"Reward: {reward2:.1f}", True, (160, 190, 240))
+        screen.blit(rwd2_text, (3 * width // 4 - rwd2_text.get_width() // 2,
+                                s2_y + score2_text.get_height() + 2 + eps2_text.get_height() + 2))
         
         # ── Bottom bar ──
         bar_h = 28

@@ -155,6 +155,12 @@ def main() -> None:
         help="Resume training from manually interrupted checkpoint files (agent1_interrupted.pth, agent2_interrupted.pth)",
     )
     parser.add_argument(
+        "--model_dir",
+        type=str,
+        default="models",
+        help="Directory for saving and loading model checkpoints",
+    )
+    parser.add_argument(
         "--override_lr",
         type=float,
         default=None,
@@ -231,6 +237,7 @@ def main() -> None:
     print(f"LR T_mult: {args.lr_T_mult}")
     print(f"Resume Training (final): {args.resume}")
     print(f"Resume Training (interrupted): {args.resume_interrupted}")
+    print(f"Model Directory: {args.model_dir}")
     if args.override_lr is not None:
         print(f"Override LR: {args.override_lr}")
     if args.override_epsilon is not None:
@@ -278,6 +285,7 @@ def main() -> None:
             push_videos=args.push_videos,
             git_remote=args.git_remote,
             git_branch=args.git_branch,
+            model_dir=args.model_dir,
         )
     except KeyboardInterrupt:
         print("\nTraining interrupted by user.")

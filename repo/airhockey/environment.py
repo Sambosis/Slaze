@@ -53,10 +53,9 @@ class AirHockeyEnv:
             "goal": 1.0,
             "concede": -1.0,
             "hit_puck": 0.1,
-            "step_penalty": 0.0,
             "boundary_penalty": 0.0,
-            "puck_dir_bonus": 0.02,
-            "defense_bonus": 0.01
+            "territory": 0.01,
+            "goal_line_save": 0.2
         }
         if reward_config:
             self.reward_config.update(reward_config)
@@ -71,6 +70,7 @@ class AirHockeyEnv:
         # Game state
         self.state = None
         self.done = False
+        self._frame_counter = 0
         self.score1 = 0
         self.score2 = 0
         
@@ -172,6 +172,7 @@ class AirHockeyEnv:
         self.score1 = 0
         self.score2 = 0
         self.done = False
+        self._frame_counter = 0
         
         # Clear puck trail on reset
         self._puck_trail.clear()
@@ -228,19 +229,13 @@ class AirHockeyEnv:
         paddle2_x, paddle2_y, paddle2_vx, paddle2_vy = self.state[4:8]
         puck_x, puck_y, puck_vx, puck_vy = self.state[8:12]
         
-        # Proximity-weighted step penalty: penalize proportionally to distance from the puck.
-        # Agents near the puck incur little penalty; agents ignoring the puck incur the full penalty.
-        _max_dist = math.sqrt(self.width ** 2 + self.height ** 2)
-        _dist1 = math.sqrt((paddle1_x - puck_x) ** 2 + (paddle1_y - puck_y) ** 2)
-        _dist2 = math.sqrt((paddle2_x - puck_x) ** 2 + (paddle2_y - puck_y) ** 2)
+        self._frame_counter += 1
         
         breakdown1 = {k: 0.0 for k in self.reward_config}
         breakdown2 = {k: 0.0 for k in self.reward_config}
         
-        reward1 = self.reward_config["step_penalty"] * (_dist1 / _max_dist)
-        reward2 = self.reward_config["step_penalty"] * (_dist2 / _max_dist)
-        breakdown1["step_penalty"] = reward1
-        breakdown2["step_penalty"] = reward2
+        reward1 = 0.0
+        reward2 = 0.0
         
         # Apply actions to paddles
         # Map actions to velocity changes
@@ -380,6 +375,46 @@ class AirHockeyEnv:
             
             # Apply impulse (elastic collision)
             if rel_vn < 0:
+                # --- Goal-line save bonus (BEFORE impulse changes velocity) ---
+                # Agent 1 defends the LEFT goal.  Puck heading left = negative vx.
+                # Any leftward velocity could score, so reward any interception.
+                # Scaled only by y-alignment with goal mouth (not speed).
+                if puck_vx < 0:
+                    # Agent 1 defends the LEFT goal at x = 0.
+                    # Friction decays vx and vy equally, so vy/vx (the slope)
+                    # is constant — the puck follows a straight line between
+                    # bounces regardless of friction.
+                    #
+                    # 1) Check the puck has enough momentum to reach the goal.
+                    #    Total x-distance under geometric friction:
+                    #    sum = |vx| / (1 - friction)
+                    max_travel_x = abs(puck_vx) / (1 - self.friction) if self.friction < 1 else float('inf')
+                    dist_to_goal = max(0.0, puck_x - self.puck_radius)
+                    if dist_to_goal <= max_travel_x:
+                        # 2) Project y using the constant slope (vy/vx).
+                        #    dx is negative (heading left), so we use signed dx.
+                        dx_to_goal = self.puck_radius - puck_x  # negative
+                        unbounded_y = puck_y + (puck_vy / puck_vx) * dx_to_goal
+                        
+                        # 3) Fold the y-coordinate via triangle-wave to
+                        #    simulate top/bottom wall bounces.
+                        min_y = float(self.puck_radius)
+                        max_y = float(self.height - self.puck_radius)
+                        h = max_y - min_y
+                        
+                        if h > 0:
+                            p = (unbounded_y - min_y) % (2 * h)
+                            final_y = min_y + (p if p <= h else 2 * h - p)
+                            
+                            goal_cy = self.height / 2.0
+                            goal_half = self.goal_height / 2.0
+                            y_off = abs(final_y - goal_cy)
+                            
+                            y_align = max(0.0, 1.0 - y_off / goal_half) if goal_half > 0 else 0.0
+                            save_bonus = self.reward_config["goal_line_save"] * y_align
+                            reward1 += save_bonus
+                            breakdown1["goal_line_save"] += save_bonus
+
                 impulse = -(1 + self.restitution) * rel_vn
                 puck_vx += impulse * nx
                 puck_vy += impulse * ny
@@ -410,6 +445,35 @@ class AirHockeyEnv:
             
             # Apply impulse (elastic collision)
             if rel_vn < 0:
+                # --- Goal-line save bonus (BEFORE impulse changes velocity) ---
+                # Agent 2 defends the RIGHT goal.  Puck heading right = positive vx.
+                # Scaled only by y-alignment with goal mouth (not speed).
+                if puck_vx > 0:
+                    # Agent 2 defends the RIGHT goal at x = self.width.
+                    # Same constant-slope projection as Agent 1 (see above).
+                    max_travel_x = puck_vx / (1 - self.friction) if self.friction < 1 else float('inf')
+                    dist_to_goal = max(0.0, (self.width - self.puck_radius) - puck_x)
+                    if dist_to_goal <= max_travel_x:
+                        dx_to_goal = (self.width - self.puck_radius) - puck_x  # positive
+                        unbounded_y = puck_y + (puck_vy / puck_vx) * dx_to_goal
+                        
+                        min_y = float(self.puck_radius)
+                        max_y = float(self.height - self.puck_radius)
+                        h = max_y - min_y
+                        
+                        if h > 0:
+                            p = (unbounded_y - min_y) % (2 * h)
+                            final_y = min_y + (p if p <= h else 2 * h - p)
+                            
+                            goal_cy = self.height / 2.0
+                            goal_half = self.goal_height / 2.0
+                            y_off = abs(final_y - goal_cy)
+                            
+                            y_align = max(0.0, 1.0 - y_off / goal_half) if goal_half > 0 else 0.0
+                            save_bonus = self.reward_config["goal_line_save"] * y_align
+                            reward2 += save_bonus
+                            breakdown2["goal_line_save"] += save_bonus
+
                 impulse = -(1 + self.restitution) * rel_vn
                 puck_vx += impulse * nx
                 puck_vy += impulse * ny
@@ -423,38 +487,18 @@ class AirHockeyEnv:
         # the sparse goal/concede signal.
         
         if not self.done:
-            center_y = self.height / 2.0
             
-            # 1) Puck-toward-opponent-goal bonus:
-            #    Reward when the puck is moving toward the opponent's goal.
-            #    Agent1 wants puck moving right (+vx), Agent2 wants it left (-vx).
-            puck_speed_val = math.sqrt(puck_vx * puck_vx + puck_vy * puck_vy)
-            if puck_speed_val > 0.5:  # only when puck is actually moving
-                b1 = self.reward_config["puck_dir_bonus"] * (puck_vx / self.max_speed)
-                b2 = self.reward_config["puck_dir_bonus"] * (-puck_vx / self.max_speed)
-                reward1 += b1   # positive when moving right
-                reward2 += b2  # positive when moving left
-                breakdown1["puck_dir_bonus"] += b1
-                breakdown2["puck_dir_bonus"] += b2
+            # 2) Territory reward (gradient based on puck X position):
+            #    Provides relentless pressure to push the puck toward the opponent's goal.
+            #    Agent 1 (left) wants the puck at x = width.
+            t1 = self.reward_config["territory"] * (puck_x / self.width)
+            reward1 += t1
+            breakdown1["territory"] += t1
             
-            # 2) Defensive positioning bonus:
-            #    Reward when paddle moves toward the puck on its own side.
-            #    Encourages interception rather than just sitting still.
-            half_w = self.width / 2.0
-            # Agent 1 (left side): puck is on its side when px < half_w
-            if puck_x < half_w:
-                dist_to_puck = math.sqrt((paddle1_x - puck_x)**2 + (paddle1_y - puck_y)**2)
-                max_dist = math.sqrt(half_w**2 + self.height**2)
-                d1 = self.reward_config["defense_bonus"] * (1.0 - dist_to_puck / max_dist)
-                reward1 += d1
-                breakdown1["defense_bonus"] += d1
-            # Agent 2 (right side): puck is on its side when px >= half_w
-            if puck_x >= half_w:
-                dist_to_puck = math.sqrt((paddle2_x - puck_x)**2 + (paddle2_y - puck_y)**2)
-                max_dist = math.sqrt(half_w**2 + self.height**2)
-                d2 = self.reward_config["defense_bonus"] * (1.0 - dist_to_puck / max_dist)
-                reward2 += d2
-                breakdown2["defense_bonus"] += d2
+            #    Agent 2 (right) wants the puck at x = 0.
+            t2 = self.reward_config["territory"] * ((self.width - puck_x) / self.width)
+            reward2 += t2
+            breakdown2["territory"] += t2
         
         # Update state
         self.state = np.array([

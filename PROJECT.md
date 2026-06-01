@@ -67,6 +67,7 @@ _Not yet detected._
 - Added optional per-visualized-episode MP4 recording via `recorder.py`, `train.py`, and `main.py` flags (`--record`, `--record_dir`, `--record_fps`, `--record_frame_skip`).
 - Added optional Git sync after each completed visualization via `--push_videos`, `--git_remote`, and `--git_branch`; `train.py` now commits/pushes each timestamped episode video without crashing training on Git failures.
 - `pyproject.toml` now includes `imageio` and README documents recording plus remote GitHub access workflow.
+- `train.py` now persists the full reward breakdown per agent to `logs/training_log_*.csv`. New columns (added after `score2`): `breakdown{1,2}_<key>` (per-episode totals) and `avg_breakdown{1,2}_<key>_100` (100-ep rolling averages). Keys come from `env.reward_config`: `goal, concede, hit_puck, step_penalty, boundary_penalty, puck_dir_bonus, defense_bonus`. The 100-ep avg matches what the live Rich dashboard's "Reward breakdown" table shows. Active only on next training restart.
 
 ## Known Product Offerings
 - State Industrial Products positions itself as a facility-maintenance partner offering programs built around products + guidance + service, with emphasis on cleaning, sanitation, odor control, drains, warewash, wastewater, air care, equipment, and housekeeping support.
