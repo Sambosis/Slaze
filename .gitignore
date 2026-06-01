@@ -12,7 +12,7 @@ wheels/
 ignore/
 llm_gen_code/
 # repo/
-*.json
+# *.json
 # *.lock
 # *.toml
 .env

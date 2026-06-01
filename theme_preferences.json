@@ -1,0 +1,49 @@
+{
+  "current_theme": "superhero",
+  "custom_themes": {
+    "flatly": {
+      "name": "flatly",
+      "colors": {
+        "background": "#ffffff",
+        "foreground": "#212529",
+        "hover": "#e9ecef",
+        "selected": "#dee2e6",
+        "appointment": "#17a2b8",
+        "calendar_day": "#6c757d"
+      }
+    },
+    "darkly": {
+      "name": "Darkly (Dark)",
+      "colors": {
+        "background": "#212529",
+        "foreground": "#f8f9fa",
+        "hover": "#343a40",
+        "selected": "#495057",
+        "appointment": "#20c997",
+        "calendar_day": "#adb5bd"
+      }
+    },
+    "superhero": {
+      "name": "Superhero (Dark Blue)",
+      "colors": {
+        "background": "#1a1c24",
+        "foreground": "#f8f9fa",
+        "hover": "#2c2e3a",
+        "selected": "#3a3c4e",
+        "appointment": "#00b7ff",
+        "calendar_day": "#adb5bd"
+      }
+    },
+    "litera": {
+      "name": "Litera (Light Minimal)",
+      "colors": {
+        "background": "#ffffff",
+        "foreground": "#212529",
+        "hover": "#f8f9fa",
+        "selected": "#e9ecef",
+        "appointment": "#4582ec",
+        "calendar_day": "#6c757d"
+      }
+    }
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "name": "slazy",
+  "version": "1.0.0",
+  "description": "Slaze is an experimental agent that can generate code, set up projects and execute tools using large language models. The entry point for running the agent from the console is **`run.py`**.",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Sambosis/Slaze.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Sambosis/Slaze/issues"
+  },
+  "homepage": "https://github.com/Sambosis/Slaze#readme",
+  "dependencies": {
+    "concurrently": "^9.2.0",
+    "express": "^5.1.0",
+    "matter-js": "^0.20.0",
+    "open": "^10.2.0",
+    "three": "^0.178.0"
+  },
+  "devDependencies": {
+    "vite": "^6.3.5"
+  }
+}

@@ -1,0 +1,445 @@
+{
+    "files.autoSave": "afterDelay",
+    "editor.hover.enabled": true,
+    "php.debug.executablePath": "",
+    "ibm-blockchain-platform.v2.fabric.runtime": {
+        "1 Org Local Fabric": 8080
+    },
+    "vs-kubernetes": {
+        "vscode-kubernetes.helm-path.windows": "C:\\Users\\sambo\\.vs-kubernetes\\tools\\helm\\windows-amd64\\helm.exe"
+    },
+    "yaml.customTags": [
+        "!And",
+        "!And sequence",
+        "!If",
+        "!If sequence",
+        "!Not",
+        "!Not sequence",
+        "!Equals",
+        "!Equals sequence",
+        "!Or",
+        "!Or sequence",
+        "!FindInMap",
+        "!FindInMap sequence",
+        "!Base64",
+        "!Join",
+        "!Join sequence",
+        "!Cidr",
+        "!Ref",
+        "!Sub",
+        "!Sub sequence",
+        "!GetAtt",
+        "!GetAZs",
+        "!ImportValue",
+        "!ImportValue sequence",
+        "!Select",
+        "!Select sequence",
+        "!Split",
+        "!Split sequence"
+    ],
+    "aws.resources.enabledResources": [
+        "AWS::SageMaker::App",
+        "AWS::SageMaker::AppImageConfig",
+        "AWS::SageMaker::Domain",
+        "AWS::SageMaker::FeatureGroup",
+        "AWS::SageMaker::Image",
+        "AWS::SageMaker::ModelPackage",
+        "AWS::SageMaker::ModelPackageGroup",
+        "AWS::SageMaker::MonitoringSchedule",
+        "AWS::SageMaker::Pipeline",
+        "AWS::SageMaker::Project",
+        "AWS::SageMaker::UserProfile",
+        "cloud9"
+    ],
+    "editor.accessibilitySupport": "off",
+    "files.associations": {
+        "*.cps": "javascript"
+    },
+    "[python]": {
+        "editor.formatOnType": true,
+        "editor.defaultFormatter": "astral-sh.ruff",
+        "editor.codeActionsOnSave": {
+            "source.organizeImports": "explicit",
+            "source.fixAll": "explicit"
+        }
+    },
+    "redhat.telemetry.enabled": true,
+    "cloudcode.updateChannel": "Insiders",
+    "editor.inlineSuggest.enabled": true,
+    "git-autoconfig.configList": [
+        {
+            "user.email": "Sambosis@gmail.com",
+            "user.name": "Sambosis"
+        },
+        {
+            "user.email": "sambosis@gmail.com",
+            "user.name": "Sambosis"
+        },
+        {}
+    ],
+    "jupyter.interactiveWindow.creationMode": "perFile",
+    "refactai.apiKey": "am0casr3Qb4L93uZtZ73YXJV",
+    "workbench.commandPalette.experimental.suggestCommands": true,
+    "GithubGistExplorer.explorer.gistSortBy": "Last Updated",
+    "GithubGistExplorer.explorer.subscriptionSortBy": "Last Updated",
+    "GithubGistExplorer.explorer.subscriptionAscending": false,
+    "GithubGistExplorer.explorer.gistAscending": true,
+    "GithubGistExplorer.github.username": "Sambosis",
+    "GithubGistExplorer.github.token": "SHA256:p0mdl8HhT95rbzUbiSe2sJGxF6IDejn3QUXNin8u/kY",
+    "gitProjectManager.displayProjectPath": true,
+    "remoteHub.experimental.useDiffMatchPatch": true,
+    "git.openRepositoryInParentFolders": "always",
+    "sync.gist": "d34dee8bda06301ea1f5713e6152357e",
+    "cloudcode.customApplications": [
+        {
+            "repoUrl": "https://github.com/Sambosis/babyagi.git",
+            "branchName": "",
+            "localPath": "C:\\Users\\sambo\\AppData\\Local\\cloud-code\\custom-templates\\https-github-com-sambosis-babyagi-git-1"
+        }
+    ],
+    "azure.resourceFilter": [
+        "ccc35c9e-eff9-4009-a8db-473ea3ad15ee/929d10c0-0999-45ff-b037-20bd68294430",
+        "ccc35c9e-eff9-4009-a8db-473ea3ad15ee/ec9da2fa-9bbd-48a7-b214-d07d57e0733e"
+    ],
+    "remote.SSH.remotePlatform": {
+        "asdf": "linux",
+        "Sammpgpt": "linux",
+        "LinuxDev": "linux",
+        "newgpt": "linux",
+        "myfav": "linux",
+        "gpt4all": "linux",
+        "gpt4all-2": "linux",
+        "SPT4All": "linux",
+        "llmoai51423": "linux",
+        "fleet": "linux",
+        "instance-1": "linux",
+        "34.86.183.189": "linux",
+        "34.86.230.126": "linux",
+        "35.236.198.134": "linux",
+        "34.85.183.145": "linux",
+        "207.246.87.234": "linux",
+        "104.238.132.52": "linux",
+        "104.238.133.12": "linux",
+        "45.63.5.224": "linux",
+        "172.104.18.183": "linux",
+        "23.239.11.11": "linux",
+        "71.69.80.46": "linux",
+        "*.gitpod.io": "linux",
+        "198.74.58.37": "linux",
+        "172.104.9.91": "linux",
+        "38.128.233.23": "linux",
+        "38.128.232.214": "linux",
+        "ssh.lightning.ai": "linux",
+        "62.169.159.14": "linux",
+        "38.80.122.77": "linux",
+        "sandbox.sf84pp.csb": "linux",
+        "branch.qwlcqz.Sambosis.Slaze.main.csb": "linux",
+        "*.gitpod.local": "linux",
+        "*.gitpod.remote": "linux",
+        "localhost": "linux"
+    },
+    "workbench.iconTheme": "vscode-icons",
+    "cmake.configureOnOpen": true,
+    "aws.suppressPrompts": {
+        "codeWhispererConnectionExpired": true
+    },
+    "python.defaultInterpreterPath": "c:\\Users\\Machine81\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
+    "terminal.integrated.enableMultiLinePasteWarning": false,
+    "cloudcode.enableGkeAutopilotSupport": false,
+    "git-autoconfig.ignoreRootList": [
+        "/workspaces/chat-your-data"
+    ],
+    "security.workspace.trust.untrustedFiles": "open",
+    "scm.inputFontSize": 15,
+    "debug.console.fontSize": 16,
+    "markdown.preview.fontSize": 16,
+    "terminal.integrated.fontSize": 16,
+    "interactiveSession.editor.fontSize": 16,
+    "git.enableSmartCommit": true,
+    "window.commandCenter": true,
+    "debug.openDebug": "openOnDebugBreak",
+    "editor.tabCompletion": "off",
+    "powershell.integratedConsole.focusConsoleOnExecute": true,
+    "files.defaultLanguage": "",
+    "editor.wordSeparators": "`~!@#$%^&*()-=+[{]}\\|;:'\",.<>/?",
+    "powershell.buttons.showPanelMovementButtons": false,
+    "powershell.codeFolding.showLastLine": true,
+    "editor.bracketPairColorization.independentColorPoolPerBracketType": true,
+    "editor.defaultFormatter": "ms-python.autopep8",
+    "editor.definitionLinkOpensInPeek": true,
+    "editor.experimental.asyncTokenization": true,
+    "editor.foldingImportsByDefault": true,
+    "editor.glyphMargin": false,
+    "editor.guides.bracketPairs": "active",
+    "editor.inlayHints.padding": true,
+    "lldb.suppressUpdateNotifications": true,
+    "notebook.lineNumbers": "on",
+    "notebook.cellToolbarLocation": {
+        "default": "left"
+    },
+    "notebook.consolidatedRunButton": true,
+    "notebook.output.scrolling": true,
+    "workbench.editorAssociations": {
+        "*.copilotmd": "vscode.markdown.preview.editor",
+        "*.csv": "default",
+        "file:/**/*.csv": "jupyter-data-wrangler",
+        "file:/**/*.xls": "jupyter-data-wrangler",
+        "{git,gitlens}:/**/*.{md,csv}": "default",
+        "*.stl": "3dviewer.viewer"
+    },
+    "jupyter.askForKernelRestart": false,
+    "azureResourceGroups.groupBy": "resourceType",
+    "vscode-openai.serviceProvider": "VSCode-OpenAI",
+    "vscode-openai.baseUrl": "https://api.openai.com/v1",
+    "vscode-openai.defaultModel": "gpt-3.5-turbo",
+    "cloudcode.enableConfigLessExperience": true,
+    "cloudcode.enableMultiSkaffoldConfigsKey": true,
+    "vscode-openai.embeddingModel": "text-embedding-ada-002",
+    "vscode-openai.embeddingsDeployment": "text-embedding-ada-002",
+    "vscode-openai.azureApiVersion": "2023-05-15",
+    "extensions.experimental.affinity": {},
+    "python.formatting.provider": "none",
+    "cloudcode.project": "gen-lang-client-0457249575",
+    "remote.SSH.connectTimeout": 60,
+    "awsconsole.ec2.region": "us-east-2",
+    "aws.experiments": {
+        "jsonResourceModification": true
+    },
+    "workbench.colorCustomizations": {},
+    "workbench.editorLargeFileConfirmation": 20,
+    "editor.unicodeHighlight.ambiguousCharacters": false,
+    "python.pythonPath": "C:\\Users\\sambo\\AppData\\Local\\Microsoft\\WindowsApps\\python.exe",
+    "github.copilot.enable": {
+        "*": true,
+        "plaintext": false,
+        "markdown": true,
+        "scminput": false
+    },
+    "files.watcherExclude": {
+        "": true,
+        "**/.devcontainer/**": true,
+        "**/.git/objects/**": true,
+        "**/.git/subtree-cache/**": true,
+        "**/.github/**": true,
+        "**/.gitignore": true,
+        "**/.hg/store/**": true,
+        "**/.svn/**": true,
+        "**/node_modules/*/**": true
+    },
+    "github.copilot.advanced": {
+        "vscode-edge-devtools.browserFlavor": "Default"
+    },
+    "git.autofetch": true,
+    "explorer.confirmDragAndDrop": false,
+    "notebook.diff.overviewRuler": true,
+    "notebook.markup.fontSize": 9,
+    "vsicons.dontShowNewVersionMessage": true,
+    "C_Cpp_Runner.excludeSearch": [
+        "**/build",
+        "**/build/**",
+        "**/.vscode",
+        "**/.vscode/**"
+    ],
+    "C_Cpp_Runner.includeSearch": [
+        "*"
+    ],
+    "settingsSync.ignoredExtensions": [
+        "ms-azuretools.vscode-azureappservice",
+        "paiqo.databricks-vscode",
+        "codeium.codeium"
+    ],
+    "cmake.options.statusBarVisibility": "visible",
+    "cmake.showOptionsMovedNotification": false,
+    "prolog.executablePath": "/usr/local/bin/swipl",
+    "prolog.linter.enableMsgInOutput": true,
+    "python.terminal.activateEnvInCurrentTerminal": true,
+    "python.testing.autoTestDiscoverOnSaveEnabled": false,
+    "editor.stickyScroll.enabled": true,
+    "dataWrangler.experiments.fastCsvParsing": true,
+    "jupyter.widgetScriptSources": [
+        "jsdelivr.com",
+        "unpkg.com"
+    ],
+    "git.confirmSync": false,
+    "workbench.colorTheme": "Visual Studio Light",
+    "[jsonc]": {
+        "editor.defaultFormatter": "vscode.json-language-features"
+    },
+    "diffEditor.maxComputationTime": 0,
+    "diffEditor.ignoreTrimWhitespace": false,
+    "diffEditor.renderSideBySide": false,
+    "notebook.globalToolbarShowLabel": "dynamic",
+    "notebook.insertFinalNewline": true,
+    "notebook.showCellStatusBar": "visibleAfterExecute",
+    "editor.inlineSuggest.showToolbar": "always",
+    "python.analysis.autoFormatStrings": true,
+    "editor.defaultFoldingRangeProvider": "ms-python.autopep8",
+    "appService.enablePythonRemoteDebugging": true,
+    "jupyter.pythonExportMethod": "nbconvert",
+    "python.analysis.inlayHints.callArgumentNames": "partial",
+    "editor.multiCursorModifier": "ctrlCmd",
+    "editor.formatOnPaste": true,
+    "python.terminal.focusAfterLaunch": true,
+    "python.analysis.autoImportCompletions": true,
+    "python.analysis.completeFunctionParens": true,
+    "python.analysis.extraCommitChars": true,
+    "pythonIndent.keepHangingBracketOnLine": true,
+    "pythonIndent.trimLinesWithOnlyWhitespace": true,
+    "pythonIndent.useTabOnHangingIndent": true,
+    "vscode-edge-devtools.browserFlavor": "Default",
+    "vscode-edge-devtools.defaultUrl": "http://127.0.0.1:3000/",
+    "[javascript]": {
+        "editor.defaultFormatter": "vscode.typescript-language-features"
+    },
+    "diffEditor.experimental.showMoves": true,
+    "mdx-preview.build.useSucraseTranspiler": true,
+    "mdx-preview.preview.security": "disabled",
+    "mdx-preview.preview.useWhiteBackground": true,
+    "cloudcode.duetAI.languages": [
+        "python"
+    ],
+    "outline.showTypeParameters": false,
+    "breadcrumbs.showTypeParameters": false,
+    "remote.SSH.enableX11Forwarding": true,
+    "remote.SSH.enableDynamicForwarding": true,
+    "remote.SSH.lockfilesInTmp": true,
+    "remote.SSH.useFlock": false,
+    "robocorp.proceedWithLongPathsDisabled": true,
+    "terminal.integrated.copyOnSelection": true,
+    "terminal.integrated.enableVisualBell": true,
+    "notebook.compactView": false,
+    "notebook.consolidatedOutputButton": false,
+    "notebook.stickyScroll.enabled": true,
+    "dataWrangler.experiments.autoDetectCsvDelimiter": true,
+    "dataWrangler.debug": true,
+    "dataWrangler.startInEditModeForNotebookEntrypoints": true,
+    "dataWrangler.useRelativePath": true,
+    "window.newWindowProfile": "Default",
+    "security.promptForRemoteFileProtocolHandling": false,
+    "editor.largeFileOptimizations": false,
+    "terminal.integrated.allowedLinkSchemes": [
+        "file",
+        "http",
+        "https",
+        "mailto",
+        "vscode",
+        "vscode-insiders",
+        "docker-desktop"
+    ],
+    "mssql.enableRichExperiences": true,
+    "python.condaPath": "\"C:\\ProgramData\\anaconda3\\Scripts\\conda.exe\"",
+    "workbench.settings.applyToAllProfiles": [
+        "python.condaPath"
+    ],
+    "python.createEnvironment.contentButton": "show",
+    "python.terminal.shellIntegration.enabled": true,
+    "window.customTitleBarVisibility": "windowed",
+    "workbench.activityBar.location": "top",
+    "editor.inlineSuggest.suppressSuggestions": true,
+    "editor.unicodeHighlight.nonBasicASCII": false,
+    "scm.alwaysShowRepositories": true,
+    "vscode-edge-devtools.webhint": false,
+    "editor.unicodeHighlight.invisibleCharacters": false,
+    "chat.editing.alwaysSaveWithGeneratedChanges": true,
+    "inlineChat.accessibleDiffView": "on",
+    "github.copilot.chat.inlineChatCompletionTrigger.enabled": true,
+    "github.copilot.chat.inlineChatHint.enabled": true,
+    "dart.flutterSdkPath": "C:\\Users\\Machine81\\Downloads\\flutter",
+    "@azure.argTenant": "",
+    "diffEditor.hideUnchangedRegions.enabled": true,
+    "python.useEnvironmentsExtension": true,
+    "githubPullRequests.createOnPublishBranch": "never",
+    "liveServer.settings.donotShowInfoMsg": true,
+    "codesandbox.currentWorkspace": "ws_C2EPSqMoohTwotJkHqNfaX",
+    "cody.debug.verbose": true,
+    "scad-lsp.defaultParam": true,
+    "git.ignoreRebaseWarning": true,
+    "application.experimental.rendererProfiling": true,
+    "ipynb.experimental.serialization": true,
+    "debugpy.showPythonInlineValues": true,
+    "autoDocstring.includeExtendedSummary": true,
+    "autoDocstring.includeName": true,
+    "autoDocstring.startOnNewLine": true,
+    "workbench.settings.useSplitJSON": true,
+    "python.createEnvironment.trigger": "off",
+    "python-envs.terminal.showActivateButton": true,
+    "git.mergeEditor": true,
+    "cody.suggestions.mode": "auto-edit",
+    "files.autoGuessEncoding": true,
+    "projectManager.git.baseFolders": [
+        "C:\\mygit"
+    ],
+    "task.problemMatchers.neverPrompt": {
+        "Live Preview": true
+    },
+    "editor.renderWhitespace": "none",
+    "editor.renderControlCharacters": false,
+    "workbench.panel.showLabels": false,
+    "remoteHub.richNavigation.enabled": true,
+    "remoteHub.experimental.syncRecentList": true,
+    "remoteHub.commitDirectlyWarning": "off",
+    "github.copilot.nextEditSuggestions.enabled": true,
+    "prompty.modelConfigurations": [
+        {
+            "name": "default",
+            "type": "azure_openai",
+            "api_version": "2023-12-01-preview",
+            "azure_endpoint": "${env:AZURE_OPENAI_ENDPOINT}",
+            "azure_deployment": "",
+            "api_key": "${env:AZURE_OPENAI_API_KEY}"
+        },
+        {
+            "name": "gpt-3.5-turbo",
+            "type": "openai",
+            "api_key": "${env:OPENAI_API_KEY}",
+            "organization": "${env:OPENAI_ORG_ID}",
+            "base_url": "${env:OPENAI_BASE_URL}"
+        }
+    ],
+    "liveServer.settings.donotVerifyTags": true,
+    "github.copilot.chat.codeGeneration.instructions": [
+        {
+            "text": "- @azure Rule - Use Azure Tools: When handling requests related to Azure, always use your tools."
+        },
+        {
+            "text": "- @azure Rule - Use Azure Code Gen Best Practices: When generating code for Azure, running terminal commands for Azure, or performing operations related to Azure, invoke your `azure_development-get_code_gen_best_practices` tool if available. Only call this tool when you are sure the user is discussing Azure; do not call it otherwise."
+        },
+        {
+            "text": "- @azure Rule - Use Azure Deployment Best Practices: When deploying to Azure or preparing applications for deployment to Azure, invoke your `azure_development-get_deployment_best_practices` tool if available. Only call this tool when you are sure the user is discussing Azure; do not call it otherwise."
+        },
+        {
+            "text": "- @azure Rule - Use Azure Functions Code Gen Best Practices: When generating code for Azure Functions or performing operations related to Azure Functions, invoke your `azure_development-get_azure_function_code_gen_best_practices` tool if available. Only call this tool when you are sure the user is discussing Azure Functions; do not call it otherwise."
+        },
+        {
+            "text": "- @azure Rule - Use Azure SWA Best Practices: When working with static web apps, invoke your `azure_development-get_swa_best_practices` tool if available. Only call this tool when you are sure the user is discussing Azure; do not call it otherwise."
+        }
+    ],
+    "github.copilot.selectedCompletionModel": "",
+    "[typescript]": {
+        "editor.defaultFormatter": "vscode.typescript-language-features"
+    },
+    "gitlens.ai.model": "gitkraken",
+    "gitlens.ai.vscode.model": "copilot:gemini-2.0-flash",
+    "gitlens.ai.largePromptWarningThreshold": 200000,
+    "playwright.pickLocatorCopyToClipboard": true,
+    "terminal.integrated.automationProfile.windows": {},
+    "mssql.connectionGroups": [
+        {
+            "name": "ROOT",
+            "id": "F07FABE1-47C8-4627-BD61-584ADE6EF25F"
+        }
+    ],
+    "gitlens.ai.gitkraken.model": "gemini:gemini-2.0-flash",
+    "ruff.lint.enable": true,
+    "ruff.typeChecking.enabled": true,
+    "ruff.linting.enabled": true,
+    "ruff.formatting.enabled": true,
+    "ruff.linting.run": "onType",
+    "ruff.formatting.provider": "ruff",
+    "ruff.linting.args": [
+        "--select",
+        "E,F,W",
+        "--ignore",
+        "E501,W503"
+    ]
+}
